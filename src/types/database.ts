@@ -36366,6 +36366,10 @@ export type Database = {
         Args: { p_change_id: string }
         Returns: string
       }
+      request_google_profile_write_v6: {
+        Args: { p_change_id: string }
+        Returns: string
+      }
       request_google_reply_send_v6: {
         Args: { p_reply_id: string }
         Returns: string

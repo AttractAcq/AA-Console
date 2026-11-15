@@ -45,16 +45,23 @@ function provider(url: RequestInfo | URL, init?: RequestInit, readback = "After"
 describe("disconnected one-shot Google profile writer", () => {
   it("does not reserve without a credential", async () => {
     const { sb, calls } = database({ token: null });
-    await expect(writeApprovedGoogleProfileField(sb, "change-1"))
+    await expect(writeApprovedGoogleProfileField(sb, "change-1", "client-1"))
       .resolves.toMatchObject({ status: "held" });
     expect(calls).toEqual(["integration_secret"]);
   });
 
   it("holds an already reserved or stale proposal", async () => {
     const { sb, calls } = database({ claim: null });
-    await expect(writeApprovedGoogleProfileField(sb, "change-1"))
+    await expect(writeApprovedGoogleProfileField(sb, "change-1", "client-1"))
       .resolves.toMatchObject({ status: "held" });
     expect(calls).toEqual(["integration_secret", "claim_google_profile_execution_v6"]);
+  });
+
+  it("rejects a queued job for another client before reading a credential", async () => {
+    const { sb, calls } = database();
+    await expect(writeApprovedGoogleProfileField(sb, "change-1", "other-client"))
+      .resolves.toMatchObject({ status: "held" });
+    expect(calls).toEqual([]);
   });
 
   it("begins once immediately before PATCH and records exact readback", async () => {
@@ -67,7 +74,7 @@ describe("disconnected one-shot Google profile writer", () => {
       }
       return provider(url, init);
     }) as unknown as typeof fetch;
-    await expect(writeApprovedGoogleProfileField(sb, "change-1", fetchImpl))
+    await expect(writeApprovedGoogleProfileField(sb, "change-1", "client-1", fetchImpl))
       .resolves.toMatchObject({ status: "confirmed", providerRef: "locations/456#description" });
     expect(calls).toEqual(["integration_secret", "claim_google_profile_execution_v6",
       "integration_secret", "begin_google_profile_write_v6", "finish_google_profile_execution_v6"]);
@@ -80,7 +87,7 @@ describe("disconnected one-shot Google profile writer", () => {
     const { sb, rpc } = database({ begin: false });
     const fetchImpl = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) =>
       provider(url, init, "Before")) as unknown as typeof fetch;
-    await expect(writeApprovedGoogleProfileField(sb, "change-1", fetchImpl))
+    await expect(writeApprovedGoogleProfileField(sb, "change-1", "client-1", fetchImpl))
       .resolves.toMatchObject({ status: "refused" });
     expect(fetchImpl).toHaveBeenCalledTimes(3);
     expect(rpc).toHaveBeenLastCalledWith("finish_google_profile_execution_v6",
@@ -93,7 +100,7 @@ describe("disconnected one-shot Google profile writer", () => {
       if (init?.method === "PATCH") throw new Error("socket dropped");
       return provider(url, init, "Before");
     }) as unknown as typeof fetch;
-    await expect(writeApprovedGoogleProfileField(sb, "change-1", fetchImpl))
+    await expect(writeApprovedGoogleProfileField(sb, "change-1", "client-1", fetchImpl))
       .resolves.toMatchObject({ status: "uncertain" });
     expect(fetchImpl).toHaveBeenCalledTimes(4);
     expect(rpc).toHaveBeenLastCalledWith("finish_google_profile_execution_v6",

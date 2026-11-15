@@ -516,6 +516,7 @@ export async function collectSystemReadiness(
         publishing: config.publishEnabled,
         proofPublishing: config.proofPublishEnabled,
         googleReviewReply: config.googleReviewReplyEnabled,
+        googleProfileFieldWrite: config.googleProfileFieldWriteEnabled,
         campaignActions: config.campaignActionsEnabled,
         leadMagnetDelivery: config.leadMagnetDeliveryEnabled,
         outboundMessaging: config.outboundMessagingEnabled,

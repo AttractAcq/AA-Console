@@ -15,6 +15,9 @@ type Location = Database["public"]["Tables"]["client_google_locations"]["Row"];
 type ProfileDue = Database["public"]["Views"]["google_profile_due"]["Row"];
 type ProfileChange = Pick<Database["public"]["Tables"]["google_profile_changes"]["Row"],
   "id" | "location_id" | "field" | "current_value" | "proposed_value" | "status" | "approved_request_id">;
+type ProfileOutcome = Database["public"]["Views"]["google_profile_execution_overview_v6"]["Row"];
+type ProfileJob = Pick<Database["public"]["Tables"]["agent_jobs"]["Row"],
+  "id" | "input_id" | "status" | "error">;
 type Review = Database["public"]["Tables"]["google_reviews"]["Row"];
 type Reply = Database["public"]["Tables"]["google_review_replies"]["Row"];
 type ReplyOutcome = Database["public"]["Views"]["google_reply_execution_overview_v6"]["Row"];
@@ -56,6 +59,8 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
   const [due, setDue] = useState<ReadonlyMap<string, ProfileDue>>(new Map());
   const [changes, setChanges] = useState<ProfileChange[]>([]);
   const [profileDecisions, setProfileDecisions] = useState<ReadonlyMap<string, ProfileDecision>>(new Map());
+  const [profileOutcomes, setProfileOutcomes] = useState<ProfileOutcome[]>([]);
+  const [profileJobs, setProfileJobs] = useState<ProfileJob[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [replyOutcomes, setReplyOutcomes] = useState<ReplyOutcome[]>([]);
@@ -81,7 +86,8 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
       return;
     }
     try {
-      const [locs, board, proposed, profileCards, revs, reps, outcomes, jobs, place] = await Promise.all([
+      const [locs, board, proposed, profileCards, profileAttempts, profileQueued,
+        revs, reps, outcomes, jobs, place] = await Promise.all([
         supabase
           .from("client_google_locations")
           .select("*")
@@ -93,6 +99,10 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           .eq("client_id", clientId).order("created_at", { ascending: false }).limit(100),
         supabase.from("approval_inbox_v6").select("id,status")
           .eq("client_id", clientId).eq("source_kind", "google_profile_change"),
+        supabase.from("google_profile_execution_overview_v6").select("*").eq("client_id", clientId),
+        supabase.from("agent_jobs").select("id,input_id,status,error")
+          .eq("client_id", clientId).eq("agent_key", "google_profile_field_writer")
+          .eq("input_table", "google_profile_changes"),
         supabase
           .from("google_reviews")
           .select("*")
@@ -111,7 +121,8 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           .eq("destination_key", "google_business_profile")
           .order("created_at", { ascending: false }),
       ]);
-      for (const result of [locs, board, proposed, profileCards, revs, reps, outcomes, jobs, place]) {
+      for (const result of [locs, board, proposed, profileCards, profileAttempts,
+        profileQueued, revs, reps, outcomes, jobs, place]) {
         if (result.error) throw new Error(result.error.message);
       }
       if (!isCurrent()) return;
@@ -121,6 +132,8 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
       setProfileDecisions(new Map((profileCards.data ?? [])
         .filter((row): row is ProfileDecision & { id: string } => Boolean(row.id))
         .map((row) => [row.id, row])));
+      setProfileOutcomes(profileAttempts.data ?? []);
+      setProfileJobs(profileQueued.data ?? []);
       setReviews(revs.data ?? []);
       setReplies(reps.data ?? []);
       setReplyOutcomes(outcomes.data ?? []);
@@ -301,8 +314,8 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
             <div>
               <h3 className="font-semibold">Recent recorded field proposals</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Request an exact Approval Inbox decision for a pending proposal. Provider PATCH
-                remains held until its location, credential and field are verified at execution.
+                Request an exact Approval Inbox decision, then queue that proposal once. The
+                dedicated provider worker is off until its release is approved and verified.
               </p>
               {clientId && <Link className="mt-2 inline-block text-xs underline"
                 to={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>
@@ -312,7 +325,10 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
             <DataTable
               columns={["Location", "Field", "Current", "Proposed", "Record status", "Execution", "Review"]}
               emptyLabel={loading ? "Loading…" : "No profile field proposal has been recorded"}
-              rows={changes.map((change) => [
+              rows={changes.map((change) => {
+                const attempt = profileOutcomes.find((row) => row.change_id === change.id);
+                const queued = profileJobs.find((row) => row.input_id === change.id);
+                return [
                 <span key="location" className="text-xs">
                   {locations.find((location) => location.id === change.location_id)?.title ?? "Unknown location"}
                 </span>,
@@ -329,13 +345,22 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                       : "Pre-Inbox approval; review again"}
                   </span>}
                 </span>,
-                <span key="execution" className={change.status === "applied"
-                  ? "text-xs text-muted-foreground" : "text-xs text-destructive"}>
-                  {change.status === "applied"
-                    ? "Recorded as applied; external readback remains separate."
-                    : change.status === "rejected"
-                      ? "Rejected; no field PATCH."
-                      : "Held; no field PATCH will be claimed."}
+                <span key="execution" className="text-xs text-muted-foreground">
+                  {attempt?.status === "confirmed"
+                    ? `Provider readback confirmed · ${attempt.provider_ref ?? "reference unavailable"}`
+                    : attempt?.status === "uncertain"
+                      ? `Outcome uncertain; reconcile before retrying. ${attempt.outcome_note ?? ""}`
+                      : attempt?.status === "refused"
+                        ? `Write refused before provider call. ${attempt.outcome_note ?? ""}`
+                        : attempt?.status === "started"
+                          ? "Provider write started; awaiting readback."
+                          : attempt?.status === "reserved"
+                            ? "One provider attempt reserved; prewrite pending."
+                            : queued
+                              ? `Queued job ${queued.status.replace(/_/g, " ")}${queued.error ? `: ${queued.error}` : ""}`
+                              : change.status === "rejected"
+                                ? "Rejected; no field PATCH."
+                                : "No provider write requested."}
                 </span>,
                 <span key="review">
                   {["drafted", "awaiting_approval"].includes(change.status) &&
@@ -348,8 +373,21 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                         if (result.error) throw result.error;
                       }, "Exact profile proposal sent to Approval Inbox.")}
                     >Request Inbox review</button>}
+                  {change.status === "approved"
+                    && change.approved_request_id
+                    && profileDecisions.get(change.approved_request_id)?.status === "approved"
+                    && !queued && !attempt &&
+                    <button type="button" className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50"
+                      disabled={busy !== null}
+                      onClick={() => void act(`profile-write:${change.id}`, async () => {
+                        const result = await supabase.rpc("request_google_profile_write_v6", {
+                          p_change_id: change.id,
+                        });
+                        if (result.error) throw result.error;
+                      }, "Exact profile write queued; runtime release remains off.")}
+                    >Request field write</button>}
                 </span>,
-              ])}
+              ]; })}
             />
           </section>
         </div>

@@ -36,12 +36,15 @@ async function currentToken(sb: SupabaseClient, clientId: string): Promise<strin
 
 /** One explicit profile proposal; not connected to the held scheduler. */
 export async function writeApprovedGoogleProfileField(
-  sb: SupabaseClient, changeId: string, fetchImpl: typeof fetch = fetch,
+  sb: SupabaseClient, changeId: string, expectedClientId: string,
+  fetchImpl: typeof fetch = fetch,
 ): Promise<ProfileWriteResult> {
   const { data: source, error: sourceError } = await sb.from("google_profile_changes")
     .select("id,client_id").eq("id", changeId).maybeSingle();
   if (sourceError) throw new Error(`Could not load the Google profile proposal: ${sourceError.message}`);
   if (!source) return { status: "held", reason: "The Google profile proposal no longer exists." };
+  if (source.client_id !== expectedClientId) return { status: "held",
+    reason: "The queued client does not own this Google profile proposal." };
   const token = await currentToken(sb, String(source.client_id));
   if (!token) return { status: "held", reason: "No current Google Business credential is available." };
 
@@ -51,7 +54,7 @@ export async function writeApprovedGoogleProfileField(
     reason: "No current exact approval is available, or this proposal already has an attempt." };
   if (!validClaim(data)) throw new Error("The Google profile execution claim was malformed.");
   const claim = data;
-  if (claim.change_id !== changeId || claim.client_id !== source.client_id) {
+  if (claim.change_id !== changeId || claim.client_id !== expectedClientId) {
     throw new Error("The Google profile claim did not match its source client and proposal.");
   }
 

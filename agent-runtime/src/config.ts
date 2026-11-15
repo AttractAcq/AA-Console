@@ -72,6 +72,8 @@ export interface RuntimeConfig {
   proofPublishEnabled: boolean;
   /** Separate release for Google review replies; off unless explicitly enabled. */
   googleReviewReplyEnabled: boolean;
+  /** Separate release for exact Google profile field writes; off by default. */
+  googleProfileFieldWriteEnabled: boolean;
   /**
    * Whether this runtime may perform campaign actions a person has approved.
    * Off unless set, and the first of four: the client flag,
@@ -324,6 +326,8 @@ export function loadConfig(): RuntimeConfig {
     proofPublishEnabled: (optionalEnv("PROOF_PUBLISH_ENABLED") ?? "false").toLowerCase() === "true",
     googleReviewReplyEnabled:
       (optionalEnv("GOOGLE_REVIEW_REPLY_ENABLED") ?? "false").toLowerCase() === "true",
+    googleProfileFieldWriteEnabled:
+      (optionalEnv("GOOGLE_PROFILE_FIELD_WRITE_ENABLED") ?? "false").toLowerCase() === "true",
     campaignActionsEnabled:
       (optionalEnv("CAMPAIGN_ACTIONS_ENABLED") ?? "false").toLowerCase() === "true",
     campaignActionOwnedClaimEnabled:

@@ -84,7 +84,7 @@ do $prewrite$
 declare cid uuid:='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
  change_id uuid:='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
  loc_id uuid:='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
- integration_id uuid; request_id uuid; review_id uuid;
+ integration_id uuid; request_id uuid; review_id uuid; job_id uuid;
  claim jsonb; attempt_id uuid; claim_key uuid;
 begin
  integration_id:=public.admin_store_integration_credential(
@@ -93,6 +93,20 @@ begin
  select id into review_id from public.integration_grant_reviews_v6
   where canonical_request_id=request_id;
  perform public.decide_integration_grant_v6(review_id,request_id,true);
+ perform set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal1"}',true);
+ begin
+  perform public.request_google_profile_write_v6(change_id);
+  raise exception 'AAL1 queued a Google profile write';
+ exception when insufficient_privilege then null; end;
+ perform set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+ job_id:=public.request_google_profile_write_v6(change_id);
+ if job_id is null or public.request_google_profile_write_v6(change_id)<>job_id
+  or not exists(select 1 from public.agent_jobs j where j.id=job_id
+   and j.agent_key='google_profile_field_writer'
+   and j.input_table='google_profile_changes' and j.input_id=change_id) then
+  raise exception 'Exact Google profile write did not queue one owned job'; end if;
  if public.google_profile_prewrite_current_v6(change_id) then
   raise exception 'Authenticated caller passed service-only profile prewrite'; end if;
  perform set_config('request.jwt.claim.role','service_role',true);

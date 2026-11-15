@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "73bbfbe58d5965b97544178655bcb0aaedf8919219e7add90b4065ce9729092a",
-  "generatedTypesSha256": "9fd383a546b49152769ab9b499b0149f494c4a8329b491ffa95b47fff888e2a2",
-  "generatedSchemaBodySha256": "a805086f80eb9b85ccf11e4e3d2111ef6e71153275df6d38aa88900f512870fa",
+  "migrationSourceDigest": "61440be7f7668aa68bb7a7585827986e424f7f39142d4c917f75b55c8996e72f",
+  "generatedTypesSha256": "adc809bec8894d12c78311447c5493e4fa98fc4a1fe514a9252ce23ad2bc6b27",
+  "generatedSchemaBodySha256": "e1ee4485e8cb00020a2f20d176a8704739d3e768a6190ab3df8b0a6aff816fa5",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3419,6 +3419,13 @@
       "filename": "20261120110000_471_google_profile_attempt.sql",
       "sha256": "8a7bb852ca5591c1db750ca94c911ba71f54408e4ab26ef7a5bca4e61c37ece2",
       "trimmedMd5": "48449c79f80b9466911b891b71662c44"
+    },
+    {
+      "version": "20261120120000",
+      "name": "472_google_profile_job",
+      "filename": "20261120120000_472_google_profile_job.sql",
+      "sha256": "2a3f5348784d9ca2f883210af2dcbed222d912c64f39456e9f9f6c37c3837cef",
+      "trimmedMd5": "083eb7db0b913a7617a5f2a436077792"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

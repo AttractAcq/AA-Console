@@ -63,6 +63,7 @@ function database(options: {
   locations?: unknown[]; due?: unknown[]; reviews?: unknown[];
   replies?: unknown[]; replyOutcomes?: unknown[]; replyJobs?: unknown[];
   placements?: unknown[]; changes?: unknown[]; profileCards?: unknown[];
+  profileOutcomes?: unknown[]; profileJobs?: unknown[];
 } = {}) {
   from.mockImplementation((table: string) => {
     const payload = () => {
@@ -71,6 +72,7 @@ function database(options: {
         case "google_profile_due": return options.due ?? [due()];
         case "google_profile_changes": return options.changes ?? [];
         case "approval_inbox_v6": return options.profileCards ?? [];
+        case "google_profile_execution_overview_v6": return options.profileOutcomes ?? [];
         case "google_reviews": return options.reviews ?? [review()];
         case "google_review_replies": return options.replies ?? [];
         case "google_reply_execution_overview_v6": return options.replyOutcomes ?? [];
@@ -182,7 +184,7 @@ describe("the location", () => {
     render(<GoogleProfilePanel tab="location" />);
     expect(await screen.findByText("New description")).toBeInTheDocument();
     expect(screen.getByText("Old description")).toBeInTheDocument();
-    expect(screen.getByText("Held; no field PATCH will be claimed.")).toBeInTheDocument();
+    expect(screen.getByText("No provider write requested.")).toBeInTheDocument();
     expect(screen.getByText(/exact-version AAL2 Approval Inbox decision/)).toBeInTheDocument();
     expect(from).toHaveBeenCalledWith("google_profile_changes");
     expect(screen.getByText("Pre-Inbox approval; review again")).toBeInTheDocument();
@@ -204,6 +206,26 @@ describe("the location", () => {
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_google_profile_review_v6", {
       p_change_id: "change-1",
     }));
+  });
+
+  it("queues only a current exact approved profile proposal", async () => {
+    database({ changes: [change({ approved_request_id: "card-1" })],
+      profileCards: [{ id: "card-1", status: "approved" }] });
+    render(<GoogleProfilePanel tab="location" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Request field write" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_google_profile_write_v6", {
+      p_change_id: "change-1",
+    }));
+  });
+
+  it("shows provider attempt outcomes separately from the approval", async () => {
+    database({ changes: [change({ approved_request_id: "card-1" })],
+      profileCards: [{ id: "card-1", status: "approved" }],
+      profileOutcomes: [{ change_id: "change-1", status: "uncertain",
+        outcome_note: "Readback failed", provider_ref: null }] });
+    render(<GoogleProfilePanel tab="location" />);
+    expect(await screen.findByText(/Outcome uncertain; reconcile before retrying/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Request field write" })).not.toBeInTheDocument();
   });
 
   it("leads with the blocker when the credential cannot see the location", async () => {
