@@ -16987,15 +16987,18 @@ export type Database = {
       }
       profiles: {
         Row: {
+          bot_key: string | null
           created_at: string
           email: string | null
           employee_category: Database["public"]["Enums"]["team_category"] | null
           full_name: string | null
           id: string
+          is_bot: boolean
           role: Database["public"]["Enums"]["app_role"]
           updated_at: string
         }
         Insert: {
+          bot_key?: string | null
           created_at?: string
           email?: string | null
           employee_category?:
@@ -17003,10 +17006,12 @@ export type Database = {
             | null
           full_name?: string | null
           id: string
+          is_bot?: boolean
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
         }
         Update: {
+          bot_key?: string | null
           created_at?: string
           email?: string | null
           employee_category?:
@@ -17014,6 +17019,7 @@ export type Database = {
             | null
           full_name?: string | null
           id?: string
+          is_bot?: boolean
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
         }
@@ -28916,6 +28922,7 @@ export type Database = {
       }
       is_active_assigned_smm: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
+      is_human_admin: { Args: never; Returns: boolean }
       is_channel_member: { Args: { target: string }; Returns: boolean }
       is_client_user: { Args: { target: string }; Returns: boolean }
       is_eligible_lead_owner: {

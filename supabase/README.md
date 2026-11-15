@@ -73,6 +73,41 @@ Then confirm nothing slipped through:
 git diff --cached | grep -E "^\+.*('Alex@Acq'|'AA123')"
 ```
 
+## Bot console logins
+
+Migration 324 adds `profiles.is_bot` and `profiles.bot_key` and denies bot
+admins on hard-hold RPCs and on admin `FOR ALL` writes. It does not create
+the bot users. `create_console_user` is not the path for that.
+
+Run the provisioner only with a service-role key, and only after a separate
+CLEAR for the target project. Do not point it at staging
+(`vmmertwoboqiazcsougw`) or production (`bancbdztffokwiifzoiv`) from this
+change. The password is read from `BOT_USER_PASSWORD` or from stdin. It is
+not accepted from an interactive prompt, not logged, and not written to disk.
+
+```bash
+BOT_PROVISION_CONFIRM=create-bot-user \
+SUPABASE_URL=https://<project>.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
+BOT_USER_PASSWORD=<at-least-16-chars> \
+node --experimental-strip-types scripts/provision-bot-user.ts \
+  --bot-key bot-cos \
+  --full-name "Chief of Staff"
+```
+
+`--bot-key` must be one of `bot-cos`, `bot-cdm`, `bot-marketing`,
+`bot-production`, `bot-distribution`, `bot-sales`, `bot-admin`,
+`bot-finance`, `bot-engineering`, `bot-security`. The Auth email is
+`<bot_key>@attractacq.com`. The script calls `auth.admin.createUser` with
+`email_confirm` and `app_metadata.is_bot` / `bot_key`, then inserts
+`profiles` (`role=admin`, `is_bot=true`). If that insert fails, it deletes
+the Auth user it just created. If the email already exists, it reports the
+user and does not change the password.
+
+There is no database test job in CI. The same checks run in the agent-runtime
+test suite. A local pgTAP file is `supabase/tests/bot_console_identity.sql`,
+run with `supabase test db` after the migrations are applied locally.
+
 ## Local state
 
 `.temp/` is machine-specific CLI state (project ref, service versions,
