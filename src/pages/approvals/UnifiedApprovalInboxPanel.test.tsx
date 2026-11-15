@@ -56,6 +56,7 @@ let freshRequest: unknown | undefined;
 let clientEqValues: string[];
 let requestRanges: Array<[number, number]>;
 let historyIds: string[][];
+let campaignDueRows: unknown[];
 
 const readyCampaign = {
   ...request, source_system: "aa_console", expires_at: "2030-01-01T00:00:00Z",
@@ -699,7 +700,13 @@ function wireDatabase() {
         return query;
       },
       is: (column: string, value: null) => { filters.push([column, value]); return query; },
-      in: (_column: string, ids: string[]) => { historyIds.push(ids); return query; },
+      in: (_column: string, ids: string[]) => {
+        historyIds.push(ids);
+        if (table === "campaign_action_due") return Promise.resolve({ data: campaignDueRows, error: null });
+        if (["google_reply_execution_overview_v6", "google_profile_execution_overview_v6",
+          "meta_profile_execution_overview_v6"].includes(table)) return Promise.resolve({ data: [], error: null });
+        return query;
+      },
       maybeSingle: async () => ({
         data: freshRequest === undefined ? requests.find((row) => (row as { id: string }).id === id) ?? null : freshRequest,
         error: requestError,
@@ -733,12 +740,26 @@ beforeEach(() => {
   clientEqValues = [];
   requestRanges = [];
   historyIds = [];
+  campaignDueRows = [];
   getAAL.mockResolvedValue({ data: { currentLevel: "aal2" }, error: null });
   rpc.mockResolvedValue({ data: null, error: null });
   wireDatabase();
 });
 
 describe("unified approval inbox", () => {
+  it("shows an approved campaign action's execution separately from its decision", async () => {
+    requests = [{ ...readyCampaign, status: "approved" }];
+    campaignDueRows = [{ approval_id: "action-1", client_id: "client-1",
+      execution_status: "executed", blocker: null, external_id: "provider-123",
+      external_url: null }];
+    show("client", "/approvals?source=action-1");
+    const card = await screen.findByRole("article", { name: "Build the Meta ad" });
+    expect(within(card).getByText("Execution evidence")).toBeInTheDocument();
+    expect(within(card).getByText("Recorded state: executed")).toBeInTheDocument();
+    expect(within(card).getByText("External reference: provider-123")).toBeInTheDocument();
+    expect(within(card).getByText(/Approval and execution are separate/)).toBeInTheDocument();
+  });
+
   it("shows only manager-owned cards across assigned clients and no admin source links", async () => {
     requests = [
       { ...readyCampaign, id: "manager-client-1", title: "Client one action",

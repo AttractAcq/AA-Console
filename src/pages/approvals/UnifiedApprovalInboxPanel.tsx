@@ -5,6 +5,8 @@ import { supabase } from "../../lib/supabase";
 import { downloadVerifiedMagnetFile } from "../../lib/leadMagnets";
 import { downloadVerifiedProofFile } from "../../lib/proofRights";
 import { downloadVerifiedCreativeFile } from "../../lib/creativeReview";
+import { shouldShowExecutionEvidence, loadApprovalExecutionEvidence,
+  type ApprovalExecutionEvidence } from "../../lib/approvalExecutionEvidence";
 import type { Database } from "../../types/database";
 import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 import { ExternalExecutionAlerts } from "./ExternalExecutionAlerts";
@@ -1107,10 +1109,11 @@ function exactHtml(preview: unknown): string | null {
   return typeof html === "string" && html.trim() ? html : null;
 }
 
-function RequestCard({ request, history, gatewayOutcome, clientId, manager, aal, busy, onDecide }: {
+function RequestCard({ request, history, gatewayOutcome, executionEvidence, clientId, manager, aal, busy, onDecide }: {
   request: UnifiedApprovalRequest;
   history: UnifiedApprovalDecision[];
   gatewayOutcome?: GatewayOutcome;
+  executionEvidence?: ApprovalExecutionEvidence;
   clientId: string;
   manager: boolean;
   aal: "aal2" | "aal1" | "unavailable";
@@ -1350,6 +1353,22 @@ function RequestCard({ request, history, gatewayOutcome, clientId, manager, aal,
         <p className="mt-1 text-xs text-muted-foreground">This gateway outcome is not an external provider receipt.</p>
       </div>}
 
+      {shouldShowExecutionEvidence(request) && (
+        <div className="mt-4 rounded-lg border border-border p-3 text-sm">
+          <p className="font-medium">Execution evidence</p>
+          <p>Recorded state: {executionEvidence?.state ?? "unknown"}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {executionEvidence?.detail ?? "The execution ledger has not been read."}
+          </p>
+          {executionEvidence?.externalRef && <p className="mt-1 break-all text-xs">
+            External reference: {executionEvidence.externalRef}
+          </p>}
+          <p className="mt-1 text-xs text-muted-foreground">
+            Approval and execution are separate. Inspect the owning source for the full attempt and provider receipt.
+          </p>
+        </div>
+      )}
+
       {(canApprove || canReject || canRevoke) && (
         <div className="mt-4 space-y-3 rounded-lg border border-border p-3">
           <p className="text-sm font-medium">{decisionLabel} decision</p>
@@ -1417,6 +1436,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
   const [requests, setRequests] = useState<UnifiedApprovalRequest[]>([]);
   const [decisions, setDecisions] = useState<UnifiedApprovalDecision[]>([]);
   const [gatewayOutcomes, setGatewayOutcomes] = useState<Record<string, GatewayOutcome>>({});
+  const [executionEvidence, setExecutionEvidence] = useState<Map<string, ApprovalExecutionEvidence>>(new Map());
   const [statusFilter, setStatusFilter] = useState(initialSource ? "all" : "pending");
   const [clientFilter, setClientFilter] = useState<string | null>(null);
   const [kindFilter, setKindFilter] = useState<string | null>(null);
@@ -1478,6 +1498,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             outcomeMap[outcome.approval_id] = outcome as GatewayOutcome;
         }
       }
+      const executionMap = await loadApprovalExecutionEvidence(rows);
       if (sequence !== refreshSequence.current) return;
       try {
         const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
@@ -1490,6 +1511,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
       setRequests(rows);
       setDecisions(decisionRows);
       setGatewayOutcomes(outcomeMap);
+      setExecutionEvidence(executionMap);
       setHasNextPage(pageRows.length > PAGE_SIZE);
       setError(null);
     } catch (cause) {
@@ -1902,6 +1924,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             </p> : <div className="space-y-4">{visible.map((request) => (
               <RequestCard key={request.id} request={request} history={historyByRequest.get(request.id) ?? []}
                 gatewayOutcome={gatewayOutcomes[request.source_id]}
+                executionEvidence={executionEvidence.get(request.id)}
                 clientId={multiClient ? request.client_id ?? "" : clientId ?? ""}
                 manager={manager}
                 aal={aal} busy={busyId === request.id} onDecide={decide} />
