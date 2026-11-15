@@ -12,21 +12,17 @@
  * refuses. That check could not live in `campaign_action_due`, because the
  * view cannot know what the row looked like when somebody said yes.
  *
- * RETRYABLE IS NARROW BECAUSE A BUDGET CHANGE IS NOT IDEMPOTENT IN EFFECT
- *
- * Setting the same figure twice is harmless. Retrying a call that may have
- * succeeded is therefore safe, which is why a network fault is retryable.
- * What is not retryable is anything Meta refused deliberately: a revoked
- * token, an ad set the credential cannot see, a figure below the account's
- * floor. Those are three identical refusals in a log pretending to be
- * diligence.
+ * An ambiguous provider response, failed readback, or failed local recording
+ * needs reconciliation before another write. The worker does not retry these
+ * outcomes automatically, even though setting the same figure twice is a
+ * provider-level no-op.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { RuntimeConfig } from "../../config.js";
 import { ActionError, assertActionPrewrite, type ActionHandler } from "./executor.js";
-import { MetaWriteError, updateAdSetDailyBudget } from "../../meta/ads.js";
+import { MetaWriteError, readAdSetBudget, updateAdSetDailyBudget } from "../../meta/ads.js";
 import { adAccountFor } from "../../meta/account.js";
 
 interface BudgetChange {
@@ -34,6 +30,7 @@ interface BudgetChange {
   client_id: string;
   campaign_id: string;
   ad_set_external_id: string;
+  current_daily_budget: string | number | null;
   proposed_daily_budget: string | number;
   currency: string;
 }
@@ -83,25 +80,62 @@ export const changeAdSetBudget: ActionHandler = async (sb, config: RuntimeConfig
 
   const account = await accountFor(sb, change.client_id);
   const amount = Number(change.proposed_daily_budget);
+  const current = Number(change.current_daily_budget);
+  const decimals = new Intl.NumberFormat("en", { style: "currency", currency: change.currency })
+    .resolvedOptions().maximumFractionDigits;
+  if (!Number.isFinite(current) || current <= 0 || !Number.isFinite(amount)
+    || decimals !== 2) {
+    throw new ActionError("This budget change needs a known current amount and a two-decimal account currency.");
+  }
+  let before;
+  try {
+    before = await readAdSetBudget(account, change.ad_set_external_id);
+  } catch (cause) {
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    throw new ActionError(`Meta budget preflight refused: ${reason}`, false);
+  }
+  if (before.currency !== change.currency
+    || before.dailyBudgetMinor !== Math.round(current * 100)) {
+    throw new ActionError("Meta's current account currency or ad-set budget differs from the reviewed change.");
+  }
 
   await assertActionPrewrite(sb, config, action);
+  const currentAccount = await accountFor(sb, change.client_id);
+  if (currentAccount.accountId !== account.accountId
+    || currentAccount.accessToken !== account.accessToken) {
+    throw new ActionError("The Meta account or credential changed before the budget write.");
+  }
   try {
     await updateAdSetDailyBudget(account, change.ad_set_external_id, amount);
   } catch (thrown) {
-    const retryable = thrown instanceof MetaWriteError ? thrown.retryable : false;
     const reason = thrown instanceof Error ? thrown.message : String(thrown);
-    throw new ActionError(reason, retryable);
+    throw new ActionError(thrown instanceof MetaWriteError && thrown.retryable
+      ? `Meta budget write outcome is uncertain: ${reason} Reconcile the ad set before any retry.`
+      : reason, false);
+  }
+  let after;
+  try {
+    after = await readAdSetBudget(account, change.ad_set_external_id);
+  } catch (cause) {
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    throw new ActionError(`Meta budget write was requested but readback failed: ${reason} Reconcile before retrying.`);
+  }
+  if (after.currency !== change.currency
+    || after.dailyBudgetMinor !== Math.round(amount * 100)) {
+    throw new ActionError("Meta budget readback differs from the approved amount. Reconcile before retrying.");
   }
 
   const { error: recordError } = await sb.rpc("record_budget_change_applied", {
     p_change_id: change.id,
     p_external_ref: change.ad_set_external_id,
   } as never);
-  // The budget has moved at Meta. Failing to record it leaves the row
-  // claimed for the reaper, and a retry sets the same figure again, which
-  // is a no-op rather than a second change.
+  // Meta confirmed the amount, but the local effect was not recorded. A
+  // retry would fail its old-budget preflight, so hold for reconciliation.
   if (recordError) {
-    throw new ActionError(`The budget changed, but recording it failed: ${recordError.message}`, true);
+    throw new ActionError(
+      `Meta confirmed the budget, but recording it failed: ${recordError.message} Reconcile before retrying.`,
+      false,
+    );
   }
 
   return {
@@ -110,6 +144,7 @@ export const changeAdSetBudget: ActionHandler = async (sb, config: RuntimeConfig
       ad_set_external_id: change.ad_set_external_id,
       daily_budget: amount,
       currency: change.currency,
+      provider_readback_minor: after.dailyBudgetMinor,
     },
     externalId: change.ad_set_external_id,
     detail: `Daily budget set to ${amount} ${change.currency} on ad set ${change.ad_set_external_id}.`,

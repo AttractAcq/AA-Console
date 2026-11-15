@@ -246,3 +246,59 @@ export async function updateAdSetDailyBudget(
     clearTimeout(timer);
   }
 }
+
+export interface AdSetBudgetSnapshot {
+  id: string;
+  accountId: string;
+  dailyBudgetMinor: number;
+  currency: string;
+}
+
+/** Read the exact ad set and account before or after a reviewed money change. */
+export async function readAdSetBudget(
+  account: AdAccount,
+  adSetId: string,
+): Promise<AdSetBudgetSnapshot> {
+  if (!/^[0-9]+$/.test(adSetId) || !/^act_[0-9]+$/.test(account.accountId)) {
+    throw new MetaWriteError("A numeric Meta ad set and ad account ID are required.", false);
+  }
+  async function read(path: string, fields: string): Promise<Record<string, unknown>> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      const url = `${BASE}/${path}?fields=${encodeURIComponent(fields)}`;
+      const response = await fetch(url, {
+        method: "GET", headers: { authorization: `Bearer ${account.accessToken}` },
+        signal: controller.signal,
+      });
+      const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+      if (!response.ok) throw classifyWrite(response.status, body);
+      if (!body || typeof body !== "object") {
+        throw new MetaWriteError("Meta returned an unreadable budget preflight.", true);
+      }
+      return body;
+    } catch (error) {
+      if (error instanceof MetaWriteError) throw error;
+      throw new MetaWriteError("Could not read the Meta budget; inspect provider connectivity.", true);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  const [adSet, adAccount] = await Promise.all([
+    read(encodeURIComponent(adSetId), "id,account_id,daily_budget"),
+    read(encodeURIComponent(account.accountId), "id,currency"),
+  ]);
+  const accountNumber = account.accountId.slice(4);
+  const observedAccount = String(adSet.account_id ?? "").replace(/^act_/, "");
+  const minor = Number(adSet.daily_budget);
+  if (adSet.id !== adSetId || observedAccount !== accountNumber
+    || adAccount.id !== account.accountId
+    || typeof adAccount.currency !== "string"
+    || !Number.isSafeInteger(minor) || minor <= 0) {
+    throw new MetaWriteError(
+      "Meta did not confirm the exact ad set, owning account, currency and daily budget.", false,
+    );
+  }
+  return { id: adSetId, accountId: account.accountId,
+    dailyBudgetMinor: minor, currency: adAccount.currency };
+}
