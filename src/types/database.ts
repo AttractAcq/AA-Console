@@ -31443,6 +31443,17 @@ export type Database = {
         }
         Relationships: []
       }
+      proof_approval_execution_evidence_v6: {
+        Row: {
+          client_id: string | null
+          detail: string | null
+          external_ref: string | null
+          request_id: string | null
+          source_kind: string | null
+          state: string | null
+        }
+        Relationships: []
+      }
       proof_placement_due: {
         Row: {
           attempts: number | null

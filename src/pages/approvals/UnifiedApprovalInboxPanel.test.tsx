@@ -57,6 +57,7 @@ let clientEqValues: string[];
 let requestRanges: Array<[number, number]>;
 let historyIds: string[][];
 let campaignDueRows: unknown[];
+let proofOutcomeRows: unknown[];
 
 const readyCampaign = {
   ...request, source_system: "aa_console", expires_at: "2030-01-01T00:00:00Z",
@@ -703,6 +704,8 @@ function wireDatabase() {
       in: (_column: string, ids: string[]) => {
         historyIds.push(ids);
         if (table === "campaign_action_due") return Promise.resolve({ data: campaignDueRows, error: null });
+        if (table === "proof_approval_execution_evidence_v6")
+          return Promise.resolve({ data: proofOutcomeRows, error: null });
         if (["google_reply_execution_overview_v6", "google_profile_execution_overview_v6",
           "meta_profile_execution_overview_v6"].includes(table)) return Promise.resolve({ data: [], error: null });
         return query;
@@ -741,12 +744,26 @@ beforeEach(() => {
   requestRanges = [];
   historyIds = [];
   campaignDueRows = [];
+  proofOutcomeRows = [];
   getAAL.mockResolvedValue({ data: { currentLevel: "aal2" }, error: null });
   rpc.mockResolvedValue({ data: null, error: null });
   wireDatabase();
 });
 
 describe("unified approval inbox", () => {
+  it("shows a proof delivery send as recorded without claiming recipient receipt", async () => {
+    requests = [{ ...readyProofDelivery, status: "approved" }];
+    proofOutcomeRows = [{ request_id: readyProofDelivery.id, client_id: "client-1",
+      source_kind: "proof_delivery", state: "sent",
+      detail: "A provider send is recorded for this delivery. The attempt is not bound to this exact approval request; recipient receipt is not proved.",
+      external_ref: "provider-message-1" }];
+    show("client", `/approvals?source=${proofDeliveryReviewId}`);
+    const card = await screen.findByRole("article", { name: readyProofDelivery.title });
+    expect(within(card).getByText("Recorded state: sent")).toBeInTheDocument();
+    expect(within(card).getByText(/recipient receipt is not proved/)).toBeInTheDocument();
+    expect(within(card).getByText("External reference: provider-message-1")).toBeInTheDocument();
+  });
+
   it("shows an approved campaign action's execution separately from its decision", async () => {
     requests = [{ ...readyCampaign, status: "approved" }];
     campaignDueRows = [{ approval_id: "action-1", client_id: "client-1",

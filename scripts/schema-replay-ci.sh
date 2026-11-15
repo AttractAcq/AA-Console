@@ -108,10 +108,16 @@ snapshot_schema() {
 # A fresh project start is itself a clean migration replay. Reset below
 # exercises the CLI's separate reset path as well.
 started=1
-if [[ "${AA_SCHEMA_EXCLUDE_VECTOR:-0}" == "1" ]]; then
+if [[ "${AA_SCHEMA_EXCLUDE_VECTOR:-0}" == "1" && "${AA_SCHEMA_EXCLUDE_STORAGE:-0}" == "1" ]]; then
+  # The schema gate needs the database, not the optional log collector or
+  # Storage API. Excluding either does not skip a migration or database check.
+  run_logged start supabase_local start --exclude vector,storage
+elif [[ "${AA_SCHEMA_EXCLUDE_VECTOR:-0}" == "1" ]]; then
   # Some local Colima setups cannot mount the Docker socket into the optional
   # log collector. The database and migration checks remain unchanged.
   run_logged start supabase_local start --exclude vector
+elif [[ "${AA_SCHEMA_EXCLUDE_STORAGE:-0}" == "1" ]]; then
+  run_logged start supabase_local start --exclude storage
 else
   run_logged start supabase_local start
 fi

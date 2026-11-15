@@ -52,3 +52,27 @@ it("shows unknown when an execution ledger read fails", async () => {
   expect(evidence.get("profile-card")).toMatchObject({ state: "unknown",
     detail: "Execution ledger could not be read. Check the owning source." });
 });
+
+it("keeps proof placement and delivery outcomes tied to their own exact requests", async () => {
+  rows.set("proof_approval_execution_evidence_v6", { data: [
+    { request_id: "placement-card", client_id: "client-a", source_kind: "proof_placement",
+      state: "retraction_required", detail: "Proof must be removed.", external_ref: "page-1" },
+    { request_id: "delivery-card", client_id: "client-a", source_kind: "proof_delivery",
+      state: "sent", detail: "A provider send is recorded for this delivery. The attempt is not bound to this exact approval request; recipient receipt is not proved.",
+      external_ref: "message-1" },
+    { request_id: "other-card", client_id: "other-client", source_kind: "proof_placement",
+      state: "placed", detail: "Other tenant", external_ref: "page-2" },
+  ], error: null });
+  const evidence = await loadApprovalExecutionEvidence([
+    { id: "placement-card", client_id: "client-a", source_kind: "proof_placement",
+      source_id: "approval-1", status: "revoked" },
+    { id: "delivery-card", client_id: "client-a", source_kind: "proof_delivery",
+      source_id: "review-1", status: "approved" },
+    { id: "other-card", client_id: "client-a", source_kind: "proof_placement",
+      source_id: "approval-2", status: "approved" },
+  ]);
+  expect(evidence.get("placement-card")).toMatchObject({ state: "retraction_required",
+    externalRef: "page-1" });
+  expect(evidence.get("delivery-card")?.detail).toContain("recipient receipt is not proved");
+  expect(evidence.get("other-card")?.state).toBe("unknown");
+});

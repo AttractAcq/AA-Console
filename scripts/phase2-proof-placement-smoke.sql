@@ -24,6 +24,7 @@ declare p public.client_proof_assets%rowtype;
   rights_source uuid;
   placement_id uuid;
   confirmation_placement_id uuid;
+  confirmation_request_id uuid;
   request_id uuid;
   placement_approval_id uuid;
   stale_placement_id uuid;
@@ -146,12 +147,27 @@ begin
   perform public.record_proof_retraction_confirmation_v6(placement_id,
     'human_checked','https://example.invalid/removal-ticket','Rights withdrawn');
   confirmation_placement_id := placement_id;
+  confirmation_request_id := request_id;
   if (select status from public.proof_placements where id=placement_id)<>'retracted'
     or not exists(select 1 from public.proof_placement_retraction_receipts_v6 r
       where r.placement_id=confirmation_placement_id and r.method='human_checked'
         and r.evidence_ref='https://example.invalid/removal-ticket'
         and r.recorded_by='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') then
     raise exception 'Removal confirmation did not atomically record its receipt'; end if;
+  if not exists(select 1 from public.proof_approval_execution_evidence_v6 e
+    where e.request_id=confirmation_request_id and e.client_id=p.client_id
+      and e.source_kind='proof_placement' and e.state='retracted'
+      and e.detail like 'Removal confirmation recorded%') then
+    raise exception 'Unified proof placement outcome did not show the receipt-backed state'; end if;
+  perform set_config('request.jwt.claim.sub','cccccccc-cccc-4ccc-8ccc-cccccccccccc',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated","aal":"aal2"}',true);
+  if exists(select 1 from public.proof_approval_execution_evidence_v6 e
+    where e.request_id=confirmation_request_id) then
+    raise exception 'Unrelated client could read the proof execution projection'; end if;
+  perform set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
   begin
     perform public.record_proof_retraction_confirmation_v6(placement_id,
       'human_checked','https://example.invalid/removal-ticket','Again');

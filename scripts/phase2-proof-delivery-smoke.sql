@@ -77,5 +77,13 @@ begin
   then raise exception 'Revoked delivery was claimed for sending (status %, role %, scheduled %)',
    (select status from public.proof_request_deliveries where id=delivery),auth.role(),
    (select scheduled_at from public.proof_request_deliveries where id=delivery); end if;
+ perform set_config('request.jwt.claim.role','authenticated',true);
+ perform set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+ if not exists(select 1 from public.proof_approval_execution_evidence_v6 e
+  where e.request_id=second_id and e.client_id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+   and e.source_kind='proof_delivery' and e.state='cancelled'
+   and e.external_ref is null) then
+  raise exception 'Unified proof delivery outcome did not show cancellation'; end if;
 end $checks$;
 rollback;

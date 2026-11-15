@@ -16,6 +16,7 @@ export type ApprovalExecutionEvidence = {
 
 const JOINED_KINDS = new Set([
   "campaign_action", "google_review_reply", "google_profile_change", "meta_profile_change",
+  "proof_placement", "proof_delivery",
 ]);
 const VISIBLE_OUTCOME_STATES = new Set(["approved", "revoked", "source_decided", "stale", "superseded"]);
 
@@ -44,7 +45,21 @@ export async function loadApprovalExecutionEvidence(
     const ids = rows.map((row) => row[key]);
     const byId = new Map(rows.map((row) => [row[key], row]));
     try {
-      if (kind === "campaign_action") {
+      if (kind === "proof_placement" || kind === "proof_delivery") {
+        const { data, error } = await supabase.from("proof_approval_execution_evidence_v6")
+          .select("request_id,client_id,source_kind,state,detail,external_ref")
+          .in("request_id", ids);
+        if (error) throw error;
+        for (const item of data ?? []) {
+          const request = item.request_id ? byId.get(item.request_id) : null;
+          if (!request || item.client_id !== request.client_id || item.source_kind !== kind) continue;
+          result.set(request.id, {
+            state: item.state ?? "unknown",
+            detail: item.detail ?? "No external effect is proved.",
+            externalRef: item.external_ref,
+          });
+        }
+      } else if (kind === "campaign_action") {
         const { data, error } = await supabase.from("campaign_action_due")
           .select("approval_id,client_id,execution_status,blocker,external_id,external_url")
           .in("approval_id", ids);
