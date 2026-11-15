@@ -86,6 +86,7 @@ declare v_worker text := 'agent-runtime:1:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
   v_unknown_request public.approval_requests_v6%rowtype;
   v_unknown_claim record;
   v_release jsonb;
+  v_proof_id uuid;
 begin
   if has_function_privilege('service_role',
     'public.release_campaign_proof_placements(uuid)','execute')
@@ -129,6 +130,47 @@ begin
     v_claim.execution_id,v_worker,v_sha);
   if v_release->>'released' <> '0' then
     raise exception 'Synthetic proof fixture unexpectedly released a placement'; end if;
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  perform set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  if not exists (select 1 from public.campaign_proof_release_observations_v6 o
+      where o.execution_id=v_claim.execution_id
+        and o.placement_ref='11111111-1111-4111-8111-111111111111'
+        and o.placement_approval_status is null and o.placement_status is null) then
+    raise exception 'Missing proof placement was hidden from the release source check'; end if;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claim.sub','',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+  -- Add a linked local placement after the zero-release call, solely to test
+  -- the readback. The frozen fixture scope deliberately has a stale hash.
+  insert into public.client_proof_assets(client_id,media_type,title,body,source)
+    values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','text',
+      'Synthetic release source','Fixture only','Fixture') returning id into v_proof_id;
+  insert into public.proof_placements(id,client_id,destination_key,proof_id,
+    source_proof_id,payload_hash,idempotency_key)
+    values ('11111111-1111-4111-8111-111111111111',
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','third_party_directory',
+      v_proof_id,v_proof_id,repeat('c',64),'fixture-proof-source');
+  insert into public.proof_placement_approvals(client_id,placement_id,
+    destination_key,payload_hash,scope,campaign_action_approval_id)
+    values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      '11111111-1111-4111-8111-111111111111',
+      'third_party_directory',repeat('c',64),'{}'::jsonb,v_claim.approval_id);
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  perform set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  if not exists (select 1 from public.campaign_proof_release_observations_v6 o
+      where o.execution_id=v_claim.execution_id
+        and o.placement_approval_status='pending'
+        and o.placement_status='drafted'
+        and o.destination_key='third_party_directory'
+        and o.payload_matches=false and o.external_url is null) then
+    raise exception 'Linked proof release source or stale hash was not visible'; end if;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claim.sub','',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
   begin
     perform public.enrol_campaign_leads_owned_v6(v_claim.execution_id,v_worker,v_sha);
     raise exception 'Lead wrapper accepted a proof execution';

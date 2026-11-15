@@ -83,6 +83,17 @@ export type ActionHandler = (
   action: ClaimedAction,
 ) => Promise<ActionOutcome>;
 
+/** SQL rejections roll back their transaction; a lost RPC response does not tell us. */
+function internalRpcFailure(error: { message: string; code?: string }, action: string): ActionError {
+  const code = error.code ?? "";
+  const retryable = code === "40001" || code === "40P01";
+  const rolledBack = retryable || /^(22|23|28|42|P0)[0-9A-Z]{3}$/.test(code);
+  return new ActionError(rolledBack
+    ? `${action} was refused: ${error.message}`
+    : `${action} returned no reliable outcome: ${error.message} Inspect the source records before any new request.`,
+  retryable, !rolledBack);
+}
+
 function ownedIdentity(config: RuntimeConfig): { workerId: string; buildSha: string } {
   const workerId = config.campaignActionWorkerId;
   const buildSha = deployedCommitSha();
@@ -127,8 +138,7 @@ export const releaseProofPlacements: ActionHandler = async (sb, config, action) 
     p_worker_id: workerId,
     p_build_sha: buildSha,
   } as never);
-  if (error) throw new ActionError(`Could not release the placements: ${error.message}`,
-    error.code === "40001" || error.code === "40P01");
+  if (error) throw internalRpcFailure(error, "Proof placement release");
 
   const outcome = (data ?? {}) as { released?: number; skipped?: unknown[] };
   const released = Number(outcome.released ?? 0);
@@ -173,8 +183,7 @@ export const enrolCampaignLeads: ActionHandler = async (sb, config, action) => {
     p_worker_id: workerId,
     p_build_sha: buildSha,
   } as never);
-  if (error) throw new ActionError(`Could not enrol the leads: ${error.message}`,
-    error.code === "40001" || error.code === "40P01");
+  if (error) throw internalRpcFailure(error, "Campaign lead enrolment");
 
   const outcome = (data ?? {}) as {
     enrolled?: number; skipped?: unknown[]; sequence_name?: string;

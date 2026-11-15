@@ -130,7 +130,7 @@ describe("generic campaign action preclaim hold", () => {
 describe("owned campaign action claim path", () => {
   const SHA = "c".repeat(40);
   function ownedDb(options: { claim?: ClaimedAction[]; releaseError?: string;
-    releaseCount?: number; claimError?: string; prewriteError?: string;
+    releaseCode?: string; releaseCount?: number; claimError?: string; prewriteError?: string;
     outcomeRecordError?: string } = {}) {
     const events: Record<string, unknown>[] = [];
     const rpc = vi.fn(async (name: string) => {
@@ -141,7 +141,7 @@ describe("owned campaign action claim path", () => {
       if (name === "release_campaign_proof_placements_owned_v6") return {
         data: { released: options.releaseCount ?? 1, skipped: [] },
         error: options.prewriteError ? { message: options.prewriteError, code: "23514" }
-          : options.releaseError ? { message: options.releaseError, code: "40001" } : null,
+          : options.releaseError ? { message: options.releaseError, code: options.releaseCode ?? "40001" } : null,
       };
       if (name === "record_campaign_action_executed" && options.outcomeRecordError) {
         return { data: null, error: { message: options.outcomeRecordError } };
@@ -188,7 +188,7 @@ describe("owned campaign action claim path", () => {
     expect(result).toMatchObject({ ok: false, retryable: false });
     expect(rpc).toHaveBeenCalledWith("record_campaign_action_failure", {
       p_execution_id: ACTION.execution_id,
-      p_reason: "Could not release the placements: provider refused",
+      p_reason: "Proof placement release was refused: provider refused",
       p_retryable: true,
     });
     expect(rpc).not.toHaveBeenCalledWith("record_campaign_action_executed", expect.anything());
@@ -202,6 +202,18 @@ describe("owned campaign action claim path", () => {
     expect(rpc).toHaveBeenCalledWith("record_campaign_action_uncertain_v6",
       expect.objectContaining({ p_execution_id: ACTION.execution_id,
         p_reason: expect.stringContaining("outcome could not be recorded") }));
+    expect(rpc).not.toHaveBeenCalledWith("record_campaign_action_failure", expect.anything());
+  });
+
+  it("holds a proof release when its RPC response does not prove rollback", async () => {
+    vi.stubEnv("RAILWAY_GIT_COMMIT_SHA", SHA);
+    const { sb, rpc } = ownedDb({ releaseError: "connection reset after request", releaseCode: "" });
+    expect(await runCampaignActionJob(sb, owned, agent, job())).toMatchObject({
+      ok: false, retryable: false,
+    });
+    expect(rpc).toHaveBeenCalledWith("record_campaign_action_uncertain_v6",
+      expect.objectContaining({ p_execution_id: ACTION.execution_id,
+        p_reason: expect.stringContaining("Inspect the source records") }));
     expect(rpc).not.toHaveBeenCalledWith("record_campaign_action_failure", expect.anything());
   });
 
@@ -284,6 +296,18 @@ describe("dormant handler bodies", () => {
         ? { message: "serialization failure", code: "40001" } : null }));
     await expect(releaseProofPlacements({ rpc } as unknown as SupabaseClient, attested(), ACTION))
       .rejects.toMatchObject({ retryable: true });
+  });
+
+  it("holds an ambiguous lead enrolment but treats an exact SQL refusal as rolled back", async () => {
+    const action = { ...ACTION, action_key: "lead_message" };
+    const rpc = vi.fn().mockResolvedValueOnce({ data: null,
+      error: { message: "connection closed", code: "" } });
+    await expect(enrolCampaignLeads({ rpc } as unknown as SupabaseClient, attested(), action))
+      .rejects.toMatchObject({ outcomeUncertain: true, retryable: false });
+    rpc.mockResolvedValueOnce({ data: null,
+      error: { message: "stale approval", code: "23514" } });
+    await expect(enrolCampaignLeads({ rpc } as unknown as SupabaseClient, attested(), action))
+      .rejects.toMatchObject({ outcomeUncertain: false, retryable: false });
   });
 
   it("enrols only the exact claimed lead-message execution", async () => {

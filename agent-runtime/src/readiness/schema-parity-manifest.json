@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "dc424258fbc34a88276ec00dee9e85d5c2b0f4a92b39c70eb47f362f670ba2c2",
-  "generatedTypesSha256": "5b27e7375a101d900da7ed7003537465ca63f77e6ae7ef737f2c806be06d5514",
-  "generatedSchemaBodySha256": "a0e852149f0c363a8d07b62fc445af615aad45e960ab64ff6e0a92695f6f69a4",
+  "migrationSourceDigest": "e92a24a3d75ae2f51727005bfbd58fbf04f431fcbe3a0217019670c27b1d0a07",
+  "generatedTypesSha256": "8ee1241acc170dac54a7f6195a328d908a3067ac1ed09b133f796bc2b7e5d6d9",
+  "generatedSchemaBodySha256": "61a5f90a037db84df66c22f909348f22aa4607ded78f791b5537c2884aa7a40f",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3580,6 +3580,13 @@
       "filename": "20261121100000_494_campaign_page_readback.sql",
       "sha256": "b3ab46fc3d998e9c57309c1fc906d1ca58ab0a65e2b70a9f00bef3ee8c5e2c99",
       "trimmedMd5": "f194a39bb3996a082720837abf4dc54c"
+    },
+    {
+      "version": "20261121110000",
+      "name": "495_campaign_proof_release_observations",
+      "filename": "20261121110000_495_campaign_proof_release_observations.sql",
+      "sha256": "2df570414302d30d14045a3edfc9d5eb681e8e24c254948811e3d22553af1b96",
+      "trimmedMd5": "3966f985a27b344ed02446dda392dc79"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

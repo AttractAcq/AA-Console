@@ -23,6 +23,11 @@ type BudgetJob = { input_id: string; status: string };
 type PageReadback = { execution_id: string; result: string; checked_ref: string;
   observed_sha256: string | null; checked_at: string; repository_owner: string;
   repository_name: string; site_path: string };
+type ProofReleaseObservation = { execution_id: string; placement_ref: string | null;
+  expected_payload_hash: string | null; placement_approval_status: string | null;
+  placement_status: string | null; payload_matches: boolean | null;
+  destination_key: string | null; external_id: string | null; external_url: string | null;
+  retracted_at: string | null };
 
 export function CampaignActionApprovalsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -35,6 +40,7 @@ export function CampaignActionApprovalsPanel() {
   const [budgetJobs, setBudgetJobs] = useState<Record<string, BudgetJob>>({});
   const [pageReadbacks, setPageReadbacks] = useState<Record<string, PageReadback>>({});
   const [pageJobs, setPageJobs] = useState<Record<string, BudgetJob>>({});
+  const [proofObservations, setProofObservations] = useState<Record<string, ProofReleaseObservation[]>>({});
   const [actionsOn, setActionsOn] = useState(false);
   const [runtimeHold, setRuntimeHold] = useState<string | null>("Runtime state has not been verified.");
   const [loading, setLoading] = useState(true);
@@ -59,6 +65,7 @@ export function CampaignActionApprovalsPanel() {
       setBudgetJobs({});
       setPageReadbacks({});
       setPageJobs({});
+      setProofObservations({});
       setLoading(false);
       return;
     }
@@ -99,8 +106,9 @@ export function CampaignActionApprovalsPanel() {
         setBudgetJobs({});
         setPageReadbacks({});
         setPageJobs({});
+        setProofObservations({});
       } else {
-        const [{ data: attemptRows, error: attemptError }, readbacks, jobs, pageChecks, pageJobRows] = await Promise.all([
+        const [{ data: attemptRows, error: attemptError }, readbacks, jobs, pageChecks, pageJobRows, proofRows] = await Promise.all([
           supabase.from("campaign_action_attempts_v6" as never)
             .select("execution_id,attempt_number,status,started_at,finished_at,external_id,external_url,error,legacy_inferred")
             .in("execution_id", executionIds).order("attempt_number", { ascending: true }),
@@ -116,12 +124,16 @@ export function CampaignActionApprovalsPanel() {
           supabase.from("agent_jobs").select("input_id,status")
             .eq("agent_key", "campaign_page_reconciler").in("input_id", executionIds)
             .order("created_at", { ascending: false }),
+          supabase.from("campaign_proof_release_observations_v6" as never)
+            .select("execution_id,placement_ref,expected_payload_hash,placement_approval_status,placement_status,payload_matches,destination_key,external_id,external_url,retracted_at")
+            .in("execution_id", executionIds),
         ]);
         if (attemptError) throw new Error(`Attempt receipts could not be read: ${attemptError.message}`);
         if (readbacks.error) throw new Error(`Budget readbacks could not be read: ${readbacks.error.message}`);
         if (jobs.error) throw new Error(`Budget readback jobs could not be read: ${jobs.error.message}`);
         if (pageChecks.error) throw new Error(`Page readbacks could not be read: ${pageChecks.error.message}`);
         if (pageJobRows.error) throw new Error(`Page readback jobs could not be read: ${pageJobRows.error.message}`);
+        if (proofRows.error) throw new Error(`Proof release observations could not be read: ${proofRows.error.message}`);
         const grouped: Record<string, ActionAttempt[]> = {};
         for (const row of (attemptRows ?? []) as ActionAttempt[]) {
           (grouped[row.execution_id] ??= []).push(row);
@@ -147,6 +159,11 @@ export function CampaignActionApprovalsPanel() {
           if (row.input_id) latestPageJobs[row.input_id] ??= row;
         }
         setPageJobs(latestPageJobs);
+        const groupedProof: Record<string, ProofReleaseObservation[]> = {};
+        for (const row of (proofRows.data ?? []) as ProofReleaseObservation[]) {
+          (groupedProof[row.execution_id] ??= []).push(row);
+        }
+        setProofObservations(groupedProof);
       }
     } catch (cause) {
       setAttemptsByExecution(null);
@@ -154,6 +171,7 @@ export function CampaignActionApprovalsPanel() {
       setBudgetJobs({});
       setPageReadbacks({});
       setPageJobs({});
+      setProofObservations({});
       setRuntimeHold("Runtime state has not been verified.");
       setError(cause instanceof Error ? cause.message : "Could not read what happened to approved actions.");
     }
@@ -463,6 +481,26 @@ export function CampaignActionApprovalsPanel() {
                       onClick={() => void requestPageReadback(action.execution_id!)}>
                       Check GitHub page bytes
                     </button>
+                  </div>
+                )}
+                {action.action_key === "proof_publish" && action.execution_id && (
+                  <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3 text-xs">
+                    <p className="font-medium">Proof release source check</p>
+                    <p className="mt-1 text-muted-foreground">These are the current local placement records. An approved release still needs its destination placement receipt.</p>
+                    {(proofObservations[action.execution_id] ?? []).length === 0
+                      ? <p className="mt-2 text-destructive">No linked placement records were found for this action.</p>
+                      : <ul className="mt-2 space-y-2">{proofObservations[action.execution_id].map((item, index) => (
+                        <li key={`${item.placement_ref ?? "missing"}-${index}`} className="rounded-md bg-background p-2">
+                          <span className="font-mono">{item.placement_ref ?? "Unknown placement"}</span>
+                          {` · ${item.destination_key ?? "destination unknown"}`}
+                          {` · approval ${item.placement_approval_status ?? "missing"}`}
+                          {` · placement ${item.placement_status ?? "missing"}`}
+                          {item.payload_matches === false && <span className="block text-destructive">Current payload differs from the approved version.</span>}
+                          {item.retracted_at && <span className="block text-destructive">Retracted {new Date(item.retracted_at).toLocaleString()}</span>}
+                          {item.external_url && <a href={item.external_url} target="_blank" rel="noreferrer" className="block break-all text-primary underline">Destination receipt</a>}
+                          {!item.external_url && item.external_id && <span className="block break-all font-mono">External ID: {item.external_id}</span>}
+                        </li>
+                      ))}</ul>}
                   </div>
                 )}
                 {!revocations[action.approval_id] && <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-xs">

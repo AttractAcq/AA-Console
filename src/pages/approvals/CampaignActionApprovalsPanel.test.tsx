@@ -49,6 +49,7 @@ function database(
     budgetJobs?: unknown[];
     pageReadbacks?: unknown[];
     pageJobs?: unknown[];
+    proofRows?: unknown[];
     runtime?: unknown;
   } = {},
 ) {
@@ -89,6 +90,9 @@ function database(
       const query = { in: () => query,
         order: async () => ({ data: options.pageReadbacks ?? [], error: null }) };
       return { select: () => query };
+    }
+    if (table === "campaign_proof_release_observations_v6") {
+      return { select: () => ({ in: async () => ({ data: options.proofRows ?? [], error: null }) }) };
     }
     if (table === "agent_jobs") {
       let key = "";
@@ -297,6 +301,19 @@ it("requests a read-only GitHub page check and keeps intake unverified", async (
   await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_campaign_page_readback_v6", {
     p_execution_id: "execution-1",
   }));
+});
+
+it("shows proof release and destination receipts as separate facts", async () => {
+  database({ due: [{ ...done, execution_status: "uncertain", blocker: "Inspect the placement release." }],
+    proofRows: [{ execution_id: "execution-1", placement_ref: "placement-1",
+      expected_payload_hash: "a".repeat(64), placement_approval_status: "approved",
+      placement_status: "queued", payload_matches: true,
+      destination_key: "google_business_profile", external_id: null,
+      external_url: null, retracted_at: null }] });
+  render(<CampaignActionApprovalsPanel />);
+  expect(await screen.findByText("Proof release source check")).toBeInTheDocument();
+  expect(screen.getByText(/approval approved · placement queued/)).toBeInTheDocument();
+  expect(screen.getByText(/still needs its destination placement receipt/)).toBeInTheDocument();
 });
 
 it("requires a reason and records a revocation through the owning RPC", async () => {
