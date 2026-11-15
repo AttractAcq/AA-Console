@@ -11,10 +11,12 @@ import { supabase } from "../../lib/supabase";
 import {
   LIVE_STATUSES, MODE_HINT,
   createPlacement, fetchClientDestinations, fetchDestinations,
-  fetchPlacementDue, fetchPlacements, markPlacedByHand, recordRetracted,
+  fetchPlacementDue, fetchPlacements, fetchRetractionReceipts,
+  markPlacedByHand, recordRetracted, auditLegacyRetraction,
   requestApproval, setDestinationEnabled, setProofPublishingEnabled,
   fetchProofSurfaceCoverage,
   type ClientDestination, type Destination, type Placement, type PlacementDue,
+  type RetractionReceipt,
   type ProofSurfaceCoverage,
 } from "../../lib/proofDistribution";
 
@@ -58,11 +60,26 @@ function confirmProofRemoval(
   }), wasLive ? "Human removal confirmation recorded." : "Unplaced proof cancelled.");
 }
 
+function auditLegacyProofRemoval(
+  placement: Placement,
+  onAct: (key: string, work: () => Promise<void>, said: string) => Promise<void>,
+) {
+  const reason = window.prompt("Why was this historical placement removed?")?.trim();
+  if (!reason) return;
+  const evidenceRef = window.prompt(
+    "Where did you verify that the historical placement is no longer live? Paste a provider URL, ticket, or screenshot reference.",
+  )?.trim();
+  if (!evidenceRef) return;
+  void onAct(placement.id, () => auditLegacyRetraction(placement.id, evidenceRef, reason),
+    "Later human removal confirmation recorded.");
+}
+
 export function ProofDistributionPanel({ tab }: { tab: Tab }) {
   const { clientId } = useParams<{ clientId: string }>();
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [clientDestinations, setClientDestinations] = useState<ReadonlyMap<string, ClientDestination>>(new Map());
   const [placements, setPlacements] = useState<Placement[]>([]);
+  const [retractionReceipts, setRetractionReceipts] = useState<ReadonlyMap<string, RetractionReceipt>>(new Map());
   const [due, setDue] = useState<ReadonlyMap<string, PlacementDue>>(new Map());
   const [proof, setProof] = useState<ProofAsset[]>([]);
   const [publishingOn, setPublishingOn] = useState(false);
@@ -77,10 +94,11 @@ export function ProofDistributionPanel({ tab }: { tab: Tab }) {
       return;
     }
     try {
-      const [all, mine, rows, blockers, proofRows, settings] = await Promise.all([
+      const [all, mine, rows, receipts, blockers, proofRows, settings] = await Promise.all([
         fetchDestinations(),
         fetchClientDestinations(clientId),
         fetchPlacements(clientId),
+        fetchRetractionReceipts(clientId),
         fetchPlacementDue(clientId),
         fetchProofAssets(clientId),
         supabase.from("client_engine_settings")
@@ -89,6 +107,7 @@ export function ProofDistributionPanel({ tab }: { tab: Tab }) {
       setDestinations(all);
       setClientDestinations(mine);
       setPlacements(rows);
+      setRetractionReceipts(receipts);
       setDue(blockers);
       setProof(proofRows);
       setPublishingOn(Boolean((settings.data as { proof_publishing_enabled?: boolean } | null)?.proof_publishing_enabled));
@@ -151,6 +170,7 @@ export function ProofDistributionPanel({ tab }: { tab: Tab }) {
       {tab === "placements" && (
         <PlacementsTab
           placements={placements}
+          retractionReceipts={retractionReceipts}
           due={due}
           destinations={destinations}
           titleOf={titleOf}
@@ -162,6 +182,7 @@ export function ProofDistributionPanel({ tab }: { tab: Tab }) {
       {tab === "rights" && (
         <RightsTab
           placements={placements}
+          retractionReceipts={retractionReceipts}
           due={due}
           proof={proof}
           titleOf={titleOf}
@@ -296,9 +317,10 @@ function DestinationsTab({
 }
 
 function PlacementsTab({
-  placements, due, destinations, titleOf, busy, loading, onAct,
+  placements, retractionReceipts, due, destinations, titleOf, busy, loading, onAct,
 }: {
   placements: Placement[];
+  retractionReceipts: ReadonlyMap<string, RetractionReceipt>;
   due: ReadonlyMap<string, PlacementDue>;
   destinations: Destination[];
   titleOf: (id: string) => string;
@@ -318,7 +340,7 @@ function PlacementsTab({
 
   return (
     <DataTable
-      columns={["Proof", "Destination", "Status", "What is stopping it", "Placed", "Actions"]}
+      columns={["Proof", "Destination", "Status", "What is stopping it", "Placed", "Removal record", "Actions"]}
       emptyLabel={loading ? "Loading placements…" : "No placements yet"}
       rows={placements.map((placement) => {
         const blocker = due.get(placement.id)?.blocker ?? null;
@@ -350,6 +372,22 @@ function PlacementsTab({
             ) : (
               dayOrDash(placement.placed_at)
             )}
+          </span>,
+          <span key="r" className="text-xs">
+            {placement.status === "retracted"
+              ? retractionReceipts.has(placement.id)
+                ? <>
+                    {retractionReceipts.get(placement.id)?.legacy_audit
+                      ? "Confirmed later by a person" : "Removal confirmation recorded"}
+                    {" · "}{dayOrDash(retractionReceipts.get(placement.id)?.recorded_at ?? null)}
+                    {retractionReceipts.get(placement.id)?.evidence_ref && (
+                      <span className="block break-all text-muted-foreground">
+                        {retractionReceipts.get(placement.id)?.evidence_ref}
+                      </span>
+                    )}
+                  </>
+                : <span className="text-destructive">Historical removal unverified</span>
+              : "—"}
           </span>,
           <ActionMenu
             key="a"
@@ -414,6 +452,12 @@ function PlacementsTab({
                     onSelect: () => confirmProofRemoval(placement, onAct),
                   }]
                 : []),
+              ...(placement.status === "retracted" && !retractionReceipts.has(placement.id)
+                ? [{
+                    label: "Audit historical removal",
+                    onSelect: () => auditLegacyProofRemoval(placement, onAct),
+                  }]
+                : []),
             ]}
           />,
         ];
@@ -423,9 +467,10 @@ function PlacementsTab({
 }
 
 function RightsTab({
-  placements, due, proof, titleOf, busy, loading, onAct,
+  placements, retractionReceipts, due, proof, titleOf, busy, loading, onAct,
 }: {
   placements: Placement[];
+  retractionReceipts: ReadonlyMap<string, RetractionReceipt>;
   due: ReadonlyMap<string, PlacementDue>;
   proof: ProofAsset[];
   titleOf: (id: string) => string;
@@ -434,6 +479,7 @@ function RightsTab({
   onAct: (key: string, work: () => Promise<void>, said: string) => Promise<void>;
 }) {
   const needsRetraction = placements.filter((p) => p.status === "retraction_required");
+  const unverifiedLegacy = placements.filter((p) => p.status === "retracted" && !retractionReceipts.has(p.id));
   const live = placements.filter((p) => LIVE_STATUSES.has(p.status));
   const bySource = new Map<string, Placement[]>();
   for (const placement of live) {
@@ -452,7 +498,9 @@ function RightsTab({
         <h3 className="font-semibold">Needs taking down</h3>
         {needsRetraction.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Nothing. Every live placement rests on proof that is still cleared.
+            {unverifiedLegacy.length > 0
+              ? "No current removal demand. Historical removals below still need verification."
+              : "No current removal demand. Every recorded live placement rests on proof that is still cleared."}
           </p>
         ) : (
           <DataTable
@@ -486,12 +534,37 @@ function RightsTab({
         )}
       </section>
 
+      {unverifiedLegacy.length > 0 && (
+        <section className="space-y-2" aria-label="Historical removal audit">
+          <h3 className="font-semibold">Historical removals without confirmation</h3>
+          <p className="text-sm text-muted-foreground">
+            These placements were marked retracted before removal receipts were required. Their external state is unknown until checked.
+          </p>
+          <DataTable
+            columns={["Proof", "Destination", "Recorded removal", "Actions"]}
+            emptyLabel=""
+            rows={unverifiedLegacy.map((placement) => [
+              <span key="p">{titleOf(placement.source_proof_id)}</span>,
+              <span key="d">{due.get(placement.id)?.destination_label ?? placement.destination_key}</span>,
+              <span key="t">{dayOrDash(placement.retracted_at)}</span>,
+              <ActionMenu key="a" name={titleOf(placement.source_proof_id)} busy={busy === placement.id}
+                items={[{ label: "Audit historical removal",
+                  onSelect: () => auditLegacyProofRemoval(placement, onAct) }]} />,
+            ])}
+          />
+        </section>
+      )}
+
       <section className="space-y-2">
         <h3 className="font-semibold">What is live, and on whose permission</h3>
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : bySource.size === 0 ? (
-          <p className="text-sm text-muted-foreground">Nothing is placed anywhere yet.</p>
+          <p className="text-sm text-muted-foreground">
+            {unverifiedLegacy.length > 0
+              ? "No placement is currently recorded as live. Historical external state may still be unknown."
+              : "Nothing is placed anywhere yet."}
+          </p>
         ) : (
           <div className="space-y-3">
             {[...bySource.entries()].map(([sourceId, rows]) => {

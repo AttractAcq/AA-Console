@@ -33,6 +33,7 @@ const DESTINATIONS = [
 
 const state = {
   placements: [] as Record<string, unknown>[],
+  retractionReceipts: [] as Record<string, unknown>[],
   due: [] as Record<string, unknown>[],
   clientDestinations: [] as Record<string, unknown>[],
   coverage: [] as Record<string, unknown>[],
@@ -44,6 +45,7 @@ function result(table: string) {
     case "proof_destinations": return { data: DESTINATIONS, error: null };
     case "client_proof_destinations": return { data: state.clientDestinations, error: null };
     case "proof_placements": return { data: state.placements, error: null };
+    case "proof_placement_retraction_receipts_v6": return { data: state.retractionReceipts, error: null };
     case "proof_placement_due": return { data: state.due, error: null };
     case "proof_surface_coverage": return { data: state.coverage, error: null };
     case "client_engine_settings":
@@ -85,7 +87,8 @@ const placement = (over: Record<string, unknown> = {}) => ({
   id: "pl1", client_id: "c1", destination_key: "third_party_directory",
   status: "awaiting_manual_placement", source_proof_id: "p1",
   artifact_version_id: "a1", proof_id: null, asset_id: null, approval_id: null,
-  campaign_id: null, external_url: null, attempts: 0, placed_at: null,
+  campaign_id: null, external_id: null, external_url: null, attempts: 0, placed_at: null,
+  retracted_at: null,
   created_at: "2026-10-18T00:00:00Z", last_error: null, ...over,
 });
 
@@ -95,6 +98,7 @@ beforeEach(() => {
   rpc.mockResolvedValue({ data: null, error: null });
   requestProofPublish.mockResolvedValue("approval-1");
   state.placements = [];
+  state.retractionReceipts = [];
   state.due = [];
   state.clientDestinations = [];
   state.publishing = false;
@@ -175,11 +179,38 @@ describe("placements", () => {
 });
 
 describe("rights", () => {
+  it("labels old retracted rows unverified and records a later AAL2 audit request", async () => {
+    state.placements = [placement({ status: "retracted", retracted_at: "2026-10-31T09:00:00Z" })];
+    const prompt = vi.spyOn(window, "prompt").mockReturnValueOnce("Historical removal checked")
+      .mockReturnValueOnce("https://directory.example/removal-check");
+    render(<ProofDistributionPanel tab="rights" />);
+    const section = (await screen.findByText("Historical removals without confirmation")).parentElement!;
+    expect(within(section).getByText(/external state is unknown/)).toBeInTheDocument();
+    await userEvent.click(within(section).getByRole("button", { name: /^Actions for / }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Audit historical removal" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("audit_legacy_proof_retraction_v6", {
+      p_placement_id: "pl1", p_reason: "Historical removal checked",
+      p_evidence_ref: "https://directory.example/removal-check",
+    }));
+    prompt.mockRestore();
+  });
+
+  it("distinguishes a later human audit from a current removal receipt", async () => {
+    state.placements = [placement({ status: "retracted", retracted_at: "2026-10-31T09:00:00Z" })];
+    state.retractionReceipts = [{ placement_id: "pl1", method: "human_checked",
+      evidence_ref: "ticket-12345678", reason: "Checked", legacy_audit: true,
+      recorded_at: "2026-11-15T09:00:00Z" }];
+    render(<ProofDistributionPanel tab="placements" />);
+    expect(await screen.findByText("Confirmed later by a person", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("ticket-12345678")).toBeInTheDocument();
+    expect(screen.queryByText("Historical removal unverified")).not.toBeInTheDocument();
+  });
+
   it("leads with what has to come down, and is quiet when nothing does", async () => {
     state.placements = [placement({ status: "verified", external_url: "https://directory.example/9" })];
     render(<ProofDistributionPanel tab="rights" />);
     expect(
-      await screen.findByText(/Every live placement rests on proof that is still cleared/),
+      await screen.findByText(/Every recorded live placement rests on proof that is still cleared/),
     ).toBeInTheDocument();
     expect(screen.getByText("On: Written consent")).toBeInTheDocument();
   });

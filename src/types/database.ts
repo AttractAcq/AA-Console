@@ -21675,6 +21675,7 @@ export type Database = {
           client_id: string
           evidence_ref: string | null
           id: string
+          legacy_audit: boolean
           method: string
           placement_id: string
           reason: string
@@ -21685,6 +21686,7 @@ export type Database = {
           client_id: string
           evidence_ref?: string | null
           id?: string
+          legacy_audit?: boolean
           method: string
           placement_id: string
           reason: string
@@ -21695,6 +21697,7 @@ export type Database = {
           client_id?: string
           evidence_ref?: string | null
           id?: string
+          legacy_audit?: boolean
           method?: string
           placement_id?: string
           reason?: string
@@ -33076,6 +33079,14 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      audit_legacy_proof_retraction_v6: {
+        Args: {
+          p_evidence_ref: string
+          p_placement_id: string
+          p_reason: string
+        }
+        Returns: string
       }
       auto_rebuild_rejected_reel_sources: {
         Args: { p_limit?: number }

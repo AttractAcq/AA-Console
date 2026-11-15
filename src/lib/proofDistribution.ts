@@ -69,8 +69,18 @@ export interface Placement {
   external_url: string | null;
   attempts: number;
   placed_at: string | null;
+  retracted_at: string | null;
   created_at: string;
   last_error: string | null;
+}
+
+export interface RetractionReceipt {
+  placement_id: string;
+  method: string;
+  evidence_ref: string | null;
+  reason: string;
+  recorded_at: string;
+  legacy_audit: boolean;
 }
 
 export interface PlacementDue {
@@ -113,11 +123,20 @@ export async function fetchClientDestinations(clientId: string): Promise<Map<str
 export async function fetchPlacements(clientId: string): Promise<Placement[]> {
   const { data, error } = await supabase
     .from("proof_placements")
-    .select("id, client_id, destination_key, status, source_proof_id, artifact_version_id, proof_id, asset_id, approval_id, campaign_id, external_id, external_url, attempts, placed_at, created_at, last_error")
+    .select("id, client_id, destination_key, status, source_proof_id, artifact_version_id, proof_id, asset_id, approval_id, campaign_id, external_id, external_url, attempts, placed_at, retracted_at, created_at, last_error")
     .eq("client_id", clientId)
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []) as Placement[];
+}
+
+export async function fetchRetractionReceipts(clientId: string): Promise<Map<string, RetractionReceipt>> {
+  const { data, error } = await supabase
+    .from("proof_placement_retraction_receipts_v6")
+    .select("placement_id, method, evidence_ref, reason, recorded_at, legacy_audit")
+    .eq("client_id", clientId);
+  if (error) throw new Error(error.message);
+  return new Map(((data ?? []) as RetractionReceipt[]).map((row) => [row.placement_id, row]));
 }
 
 export async function fetchPlacementDue(clientId: string): Promise<Map<string, PlacementDue>> {
@@ -199,6 +218,15 @@ export async function recordRetracted(
     p_method: confirmation.method,
     p_reason: confirmation.reason,
     p_evidence_ref: confirmation.evidenceRef ?? "",
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function auditLegacyRetraction(
+  placementId: string, evidenceRef: string, reason: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("audit_legacy_proof_retraction_v6", {
+    p_placement_id: placementId, p_evidence_ref: evidenceRef, p_reason: reason,
   });
   if (error) throw new Error(error.message);
 }

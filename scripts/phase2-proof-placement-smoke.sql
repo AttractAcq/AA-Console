@@ -158,4 +158,65 @@ begin
     raise exception 'A duplicate removal confirmation succeeded';
   exception when check_violation then null; end;
 end $checks$;
+
+-- Recreate one historical status-only retraction inside this rollback-only
+-- fixture, without weakening the installed append-only contract afterward.
+alter table public.proof_placement_retraction_receipts_v6
+  disable trigger proof_placement_retraction_receipts_append_only_v6;
+delete from public.proof_placement_retraction_receipts_v6
+  where placement_id=(select id from public.proof_placements
+    where idempotency_key='test-directory-placement');
+alter table public.proof_placement_retraction_receipts_v6
+  enable trigger proof_placement_retraction_receipts_append_only_v6;
+
+do $legacy_checks$
+declare v_placement_id uuid; v_pending_id uuid;
+begin
+  select id into v_placement_id from public.proof_placements
+    where idempotency_key='test-directory-placement';
+  select id into v_pending_id from public.proof_placements
+    where idempotency_key='stale-quotation-placement';
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal1"}',true);
+  begin
+    perform public.audit_legacy_proof_retraction_v6(v_placement_id,
+      'https://example.invalid/removal-check','Checked historical removal');
+    raise exception 'AAL1 audited a historical removal';
+  exception when insufficient_privilege then null; end;
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  begin
+    perform public.audit_legacy_proof_retraction_v6(v_pending_id,
+      'https://example.invalid/removal-check','Not yet retracted');
+    raise exception 'A non-retracted placement was audited as historical removal';
+  exception when check_violation then null; end;
+  begin
+    perform public.audit_legacy_proof_retraction_v6(v_placement_id,
+      null,'Checked historical removal');
+    raise exception 'Historical removal was audited without evidence';
+  exception when invalid_parameter_value then null; end;
+  perform set_config('request.jwt.claims',
+    '{"sub":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated","aal":"aal2"}',true);
+  perform set_config('request.jwt.claim.sub','cccccccc-cccc-4ccc-8ccc-cccccccccccc',true);
+  begin
+    perform public.audit_legacy_proof_retraction_v6(v_placement_id,
+      'https://example.invalid/removal-check','Wrong client');
+    raise exception 'An unrelated owner audited a proof removal';
+  exception when insufficient_privilege then null; end;
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  perform set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
+  perform public.audit_legacy_proof_retraction_v6(v_placement_id,
+    'https://example.invalid/removal-check','Checked historical removal');
+  if not exists(select 1 from public.proof_placement_retraction_receipts_v6 r
+    where r.placement_id=v_placement_id and r.legacy_audit
+      and r.evidence_ref='https://example.invalid/removal-check'
+      and r.recorded_by='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') then
+    raise exception 'Legacy removal audit did not retain later attestation'; end if;
+  begin
+    perform public.audit_legacy_proof_retraction_v6(v_placement_id,
+      'https://example.invalid/removal-check','Again');
+    raise exception 'A second legacy audit succeeded';
+  exception when check_violation then null; end;
+end $legacy_checks$;
 rollback;
