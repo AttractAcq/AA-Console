@@ -54,7 +54,9 @@ export function ProofIntegrationCapture({ clientId }: { clientId: string }) {
       : reviews.length === 0 ? <p className="text-sm text-muted-foreground">
         No ingested Google reviews are available. Verify the location and review ingest in Google Studio.
       </p> : <div className="space-y-3">{reviews.map((review) => {
-        const blocker = review.captured_proof_id ? "Already captured"
+        const blocker = review.captured_proof_id && review.gone_at
+          ? "Captured; source removed — rights held"
+          : review.captured_proof_id ? "Already captured"
           : review.gone_at ? "Removed from Google"
           : !review.comment?.trim() ? "No review text"
           : !review.review_url?.trim() ? "No source URL"

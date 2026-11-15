@@ -8475,6 +8475,7 @@ export type Database = {
           created_at: string
           evidence: string | null
           expires_on: string | null
+          google_source_changed_at: string | null
           id: string
           media_type: Database["public"]["Enums"]["media_type"]
           permission_basis: string | null
@@ -8505,6 +8506,7 @@ export type Database = {
           created_at?: string
           evidence?: string | null
           expires_on?: string | null
+          google_source_changed_at?: string | null
           id?: string
           media_type: Database["public"]["Enums"]["media_type"]
           permission_basis?: string | null
@@ -8535,6 +8537,7 @@ export type Database = {
           created_at?: string
           evidence?: string | null
           expires_on?: string | null
+          google_source_changed_at?: string | null
           id?: string
           media_type?: Database["public"]["Enums"]["media_type"]
           permission_basis?: string | null
@@ -33708,6 +33711,7 @@ export type Database = {
           created_at: string
           evidence: string | null
           expires_on: string | null
+          google_source_changed_at: string | null
           id: string
           media_type: Database["public"]["Enums"]["media_type"]
           permission_basis: string | null
@@ -40610,6 +40614,7 @@ export type Database = {
           created_at: string
           evidence: string | null
           expires_on: string | null
+          google_source_changed_at: string | null
           id: string
           media_type: Database["public"]["Enums"]["media_type"]
           permission_basis: string | null

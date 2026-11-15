@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "458db962b2d99a1e7ce8c513ca63ec4287f536b10d9c5c4005fcd072d4d864e4",
-  "generatedTypesSha256": "4df56dc1d490f52c760282e70a5eba3768dfbf556ab4622b09b1cfeed6d80f40",
-  "generatedSchemaBodySha256": "2514cb64606565953b19bfef17323b2eb89ec2be2afbb84657c4c74db2dee9a2",
+  "migrationSourceDigest": "889ac4b226bc62fb556fffa4fe835cad3e28ff75e8b1ec455ecc3289155e0d76",
+  "generatedTypesSha256": "64498db047a41465b9453d3b224ae44a03f0c718c22fede77622702b6e3462da",
+  "generatedSchemaBodySha256": "82cdbca07936b8da28855751371a865df68975f036cdc907755dd5ba5af0123b",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3678,6 +3678,13 @@
       "filename": "20261121231000_508_google_review_proof_source_gate.sql",
       "sha256": "9772eaf98e2512e6a0c80bc998caac23a992a1a67e3991da320cf547d34c4f3f",
       "trimmedMd5": "f17bc08c5c632616a88e599d917d2ddc"
+    },
+    {
+      "version": "20261121232000",
+      "name": "509_google_review_proof_invalidation",
+      "filename": "20261121232000_509_google_review_proof_invalidation.sql",
+      "sha256": "87536f106f840bb24cef2cfa0cfd19d170c0e0d21c2684e1e566367be33c4b2e",
+      "trimmedMd5": "17223448d7ed90ba4390c4b1404867a3"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
