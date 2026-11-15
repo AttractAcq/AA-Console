@@ -85,6 +85,7 @@ declare cid uuid:='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
  change_id uuid:='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
  loc_id uuid:='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
  integration_id uuid; request_id uuid; review_id uuid;
+ claim jsonb; attempt_id uuid; claim_key uuid;
 begin
  integration_id:=public.admin_store_integration_credential(
   cid,'google_business','accounts/test_account','fixture-secret','write');
@@ -97,6 +98,36 @@ begin
  perform set_config('request.jwt.claim.role','service_role',true);
  if not public.google_profile_prewrite_current_v6(change_id) then
   raise exception 'Exact approved proposal and write grant did not pass prewrite'; end if;
+ claim:=public.claim_google_profile_execution_v6(change_id);
+ if claim is null or claim->>'proposed_value'<>'Different text'
+  or public.claim_google_profile_execution_v6(change_id) is not null then
+  raise exception 'Profile field did not receive exactly one execution reservation'; end if;
+ attempt_id:=(claim->>'attempt_id')::uuid;
+ claim_key:=(claim->>'claim_key')::uuid;
+ if public.begin_google_profile_write_v6(attempt_id,gen_random_uuid())
+  or not public.begin_google_profile_write_v6(attempt_id,claim_key)
+  or public.begin_google_profile_write_v6(attempt_id,claim_key) then
+  raise exception 'Google profile write did not begin exactly once'; end if;
+ begin
+  perform public.finish_google_profile_execution_v6(
+   attempt_id,claim_key,'confirmed','Wrong text','locations/test_location#description');
+  raise exception 'Mismatched provider readback was confirmed';
+ exception when check_violation then null; end;
+ begin
+  perform public.finish_google_profile_execution_v6(
+   attempt_id,claim_key,'refused',null,null,'After write');
+  raise exception 'Started provider write was falsely recorded as refused';
+ exception when check_violation then null; end;
+ if not public.finish_google_profile_execution_v6(attempt_id,claim_key,
+  'confirmed','Different text','locations/test_location#description')
+  or public.finish_google_profile_execution_v6(attempt_id,claim_key,
+   'confirmed','Different text','locations/test_location#description') then
+  raise exception 'Google profile result was not final and immutable'; end if;
+ if (select v.status from public.google_profile_execution_overview_v6 v
+  where v.change_id='cccccccc-cccc-4ccc-8ccc-cccccccccccc') is distinct from 'confirmed' then
+  raise exception 'Profile execution outcome was not readable'; end if;
+ if (select status from public.google_profile_changes where id=change_id)<>'approved' then
+  raise exception 'A held profile worker falsely marked the source applied'; end if;
  update public.client_google_locations set title='Changed title' where id=loc_id;
  update public.client_google_locations set title='Test location' where id=loc_id;
  if public.google_profile_prewrite_current_v6(change_id) then

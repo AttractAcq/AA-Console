@@ -12791,6 +12791,116 @@ export type Database = {
           },
         ]
       }
+      google_profile_execution_attempts_v6: {
+        Row: {
+          approval_request_id: string
+          before_value: string | null
+          change_id: string
+          claim_key: string
+          client_id: string
+          field: string
+          finished_at: string | null
+          id: string
+          location_ref: string
+          observed_value: string | null
+          outcome_note: string | null
+          proposed_value: string
+          provider_ref: string | null
+          reserved_at: string
+          source_hash: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          approval_request_id: string
+          before_value?: string | null
+          change_id: string
+          claim_key?: string
+          client_id: string
+          field: string
+          finished_at?: string | null
+          id?: string
+          location_ref: string
+          observed_value?: string | null
+          outcome_note?: string | null
+          proposed_value: string
+          provider_ref?: string | null
+          reserved_at?: string
+          source_hash: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          approval_request_id?: string
+          before_value?: string | null
+          change_id?: string
+          claim_key?: string
+          client_id?: string
+          field?: string
+          finished_at?: string | null
+          id?: string
+          location_ref?: string
+          observed_value?: string | null
+          outcome_note?: string | null
+          proposed_value?: string
+          provider_ref?: string | null
+          reserved_at?: string
+          source_hash?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_change_id_fkey"
+            columns: ["change_id"]
+            isOneToOne: true
+            referencedRelation: "google_profile_changes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       google_profile_review_requests_v6: {
         Row: {
           canonical_request_id: string | null
@@ -27728,6 +27838,104 @@ export type Database = {
           },
         ]
       }
+      google_profile_execution_overview_v6: {
+        Row: {
+          approval_request_id: string | null
+          attempt_id: string | null
+          change_id: string | null
+          client_id: string | null
+          field: string | null
+          finished_at: string | null
+          location_ref: string | null
+          observed_value: string | null
+          outcome_note: string | null
+          provider_ref: string | null
+          reserved_at: string | null
+          started_at: string | null
+          status: string | null
+        }
+        Insert: {
+          approval_request_id?: string | null
+          attempt_id?: string | null
+          change_id?: string | null
+          client_id?: string | null
+          field?: string | null
+          finished_at?: string | null
+          location_ref?: string | null
+          observed_value?: string | null
+          outcome_note?: string | null
+          provider_ref?: string | null
+          reserved_at?: string | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          approval_request_id?: string | null
+          attempt_id?: string | null
+          change_id?: string | null
+          client_id?: string | null
+          field?: string | null
+          finished_at?: string | null
+          location_ref?: string | null
+          observed_value?: string | null
+          outcome_note?: string | null
+          provider_ref?: string | null
+          reserved_at?: string | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_change_id_fkey"
+            columns: ["change_id"]
+            isOneToOne: true
+            referencedRelation: "google_profile_changes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       google_reply_execution_overview_v6: {
         Row: {
           approval_request_id: string | null
@@ -31417,6 +31625,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      begin_google_profile_write_v6: {
+        Args: { p_attempt_id: string; p_claim_key: string }
+        Returns: boolean
+      }
       begin_google_reply_write_v6: {
         Args: { p_attempt_id: string; p_claim_key: string }
         Returns: boolean
@@ -31864,6 +32076,10 @@ export type Database = {
           p_payload_hash: string
           p_token_id: string
         }
+        Returns: Json
+      }
+      claim_google_profile_execution_v6: {
+        Args: { p_change_id: string }
         Returns: Json
       }
       claim_google_reply_execution_v6: {
@@ -33626,6 +33842,17 @@ export type Database = {
           p_status: string
         }
         Returns: Json
+      }
+      finish_google_profile_execution_v6: {
+        Args: {
+          p_attempt_id: string
+          p_claim_key: string
+          p_note?: string
+          p_observed_value?: string
+          p_outcome: string
+          p_provider_ref?: string
+        }
+        Returns: boolean
       }
       finish_google_reply_execution_v6: {
         Args: {

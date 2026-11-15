@@ -17,10 +17,11 @@
  *
  * UNPROVEN, AND SAYING SO
  *
- * The existing source decisions have no exact AAL2 Approval Inbox binding
- * or last-moment prewrite verifier. The worker stays held before any claim,
- * credential read or provider call. The adapter code remains available for
- * later integration and testing, but it does not establish live acceptance.
+ * Current Google source decisions have exact AAL2 Inbox binding, a local
+ * prewrite predicate and a one-shot attempt ledger. This worker still uses
+ * the legacy claim/record functions and stays held before any claim,
+ * credential read or provider call. The v1 adapter and its readback path
+ * are tested in isolation; they do not establish live acceptance.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
