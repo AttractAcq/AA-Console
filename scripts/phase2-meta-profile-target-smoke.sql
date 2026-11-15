@@ -64,6 +64,10 @@ begin
   or public.begin_meta_profile_write_v6(attempt_id,claim_key) then
   raise exception 'Meta Page write did not begin exactly once'; end if;
  begin
+  perform public.record_profile_change_applied(change_id,'unverified-page-ref');
+  raise exception 'Started but unconfirmed Meta Page write marked source applied';
+ exception when insufficient_privilege then null; end;
+ begin
   perform public.finish_meta_profile_execution_v6(attempt_id,claim_key,
    'confirmed','Wrong words','facebook_page:123456#about');
   raise exception 'Wrong Facebook readback was confirmed';
@@ -81,6 +85,10 @@ begin
  if (select v.status from public.meta_profile_execution_overview_v6 v
   where v.change_id='cccccccc-cccc-4ccc-8ccc-cccccccccccc')<>'confirmed' then
   raise exception 'Meta Page outcome was not visible to the client'; end if;
+ if (select m.status from public.meta_profile_changes m where m.id=change_id)<>'applied'
+  or (select m.external_ref from public.meta_profile_changes m where m.id=change_id)
+   is distinct from 'facebook_page:123456#about' then
+  raise exception 'Confirmed Meta Page readback did not update exact source'; end if;
  update public.client_integrations set meta_page_id='222222' where id=iid;
  update public.client_integrations set meta_page_id='123456' where id=iid;
  if public.meta_profile_prewrite_current_v6(change_id)
