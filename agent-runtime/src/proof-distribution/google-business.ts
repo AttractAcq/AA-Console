@@ -239,6 +239,72 @@ function expectedFieldValue(field: string, value: string | null): string | null 
   catch { throw new PlacementTransportError("The reviewed current hours are not valid JSON.", false); }
 }
 
+/** Read-only merchant-record check for an uncertain location PATCH. */
+export async function readVerifiedLocationField(input: {
+  accessToken: string; accountRef: string; field: string; fetchImpl?: typeof fetch;
+}): Promise<{ externalRef: string; observedValue: string | null }> {
+  const mask = LOCATION_FIELD[input.field];
+  if (!mask || !ACCOUNT_REF.test(input.accountRef) || !input.accessToken) {
+    throw new PlacementTransportError("A supported field, exact account location and credential are required.");
+  }
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const accountRef = input.accountRef.split("/locations/")[0]!;
+  const locationName = `locations/${input.accountRef.split("/")[3]!}`;
+  async function get(url: string): Promise<Record<string, unknown>> {
+    let response: Response;
+    try {
+      response = await fetchImpl(url, { method: "GET",
+        headers: { Authorization: `Bearer ${input.accessToken}` },
+        redirect: "error", signal: AbortSignal.timeout(TIMEOUT_MS) });
+    } catch {
+      throw new PlacementTransportError("Google location reconciliation read did not return an outcome.", true);
+    }
+    if (!response.ok) throw new PlacementTransportError(
+      `Google location reconciliation read returned ${response.status}.`,
+      response.status === 429 || response.status >= 500);
+    const body = await response.json().catch(() => null) as Record<string, unknown> | null;
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      throw new PlacementTransportError("Google returned an unreadable reconciliation response.");
+    }
+    return body;
+  }
+  const account = await get(`${ACCOUNT_API_BASE}/${accountRef}`);
+  if (account.name !== accountRef) {
+    throw new PlacementTransportError("Google did not confirm the reviewed Business Profile account.");
+  }
+  let pageToken: string | null = null;
+  let member = false;
+  for (let page = 0; page < 100 && !member; page += 1) {
+    const params = new URLSearchParams({ readMask: "name", pageSize: "100" });
+    if (pageToken) params.set("pageToken", pageToken);
+    const listing = await get(`${LOCATION_LIST_API_BASE}/${accountRef}/locations?${params}`);
+    if (listing.locations !== undefined && (!Array.isArray(listing.locations)
+      || listing.locations.some((item) => !item || typeof item !== "object"
+        || typeof (item as Record<string, unknown>).name !== "string"))) {
+      throw new PlacementTransportError("Google returned an unreadable account location listing.");
+    }
+    member = ((listing.locations ?? []) as Record<string, unknown>[])
+      .some((item) => item.name === locationName);
+    if (listing.nextPageToken !== undefined && typeof listing.nextPageToken !== "string") {
+      throw new PlacementTransportError("Google returned an unreadable location page token.");
+    }
+    pageToken = typeof listing.nextPageToken === "string" && listing.nextPageToken
+      ? listing.nextPageToken : null;
+    if (!member && !pageToken) break;
+    if (!member && page === 99) {
+      throw new PlacementTransportError("Google location membership exceeded the page limit.");
+    }
+  }
+  if (!member) throw new PlacementTransportError(
+    "The location is absent from the reviewed Business Profile account.");
+  const location = await get(`${LOCATION_API_BASE}/${locationName}?readMask=${encodeURIComponent(mask)}`);
+  if (location.name !== locationName) {
+    throw new PlacementTransportError("Google returned a different location during reconciliation.");
+  }
+  return { externalRef: `${locationName}#${input.field}`,
+    observedValue: locationFieldValue(location, input.field) };
+}
+
 /** Builds the nested body Google expects for one field. */
 export function locationPatchBody(field: string, value: string): Record<string, unknown> {
   switch (field) {

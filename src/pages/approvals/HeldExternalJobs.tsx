@@ -6,6 +6,7 @@ import { supabase } from "../../lib/supabase";
 const ROUTES = {
   google_reply_sender: { title: "Google review reply", path: "google-profile?tab=reviews" },
   google_profile_field_writer: { title: "Google profile change", path: "google-profile?tab=location" },
+  google_profile_field_reconciler: { title: "Google profile readback", path: "google-profile?tab=location" },
   meta_profile_field_writer: { title: "Meta Page change", path: "meta-profile?tab=profile" },
   meta_profile_field_reconciler: { title: "Meta Page readback", path: "meta-profile?tab=profile" },
 } as const;

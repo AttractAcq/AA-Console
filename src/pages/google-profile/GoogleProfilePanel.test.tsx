@@ -84,6 +84,7 @@ function database(options: {
     Object.assign(chain, {
       select: () => chain,
       eq: () => chain,
+      in: () => chain,
       order: () => chain,
       limit: async () => ({ data: payload(), error: null }),
       insert: async () => ({ error: null }),
@@ -132,6 +133,7 @@ function routeDatabase(pending: Record<string, Promise<ReadResult>> = {}) {
         if (key === "client_id") selectedClient = String(value);
         return chain;
       },
+      in: () => chain,
       order: () => chain,
       limit: () => response(),
       insert: async (value: unknown) => { insert(value); return { error: null }; },
@@ -221,10 +223,25 @@ describe("the location", () => {
   it("shows provider attempt outcomes separately from the approval", async () => {
     database({ changes: [change({ approved_request_id: "card-1" })],
       profileCards: [{ id: "card-1", status: "approved" }],
-      profileOutcomes: [{ change_id: "change-1", status: "uncertain",
-        outcome_note: "Readback failed", provider_ref: null }] });
+      profileOutcomes: [{ attempt_id: "attempt-1", change_id: "change-1", status: "uncertain",
+        reconciliation_result: null, reconciled_at: null, provider_ref: null }] });
     render(<GoogleProfilePanel tab="location" />);
-    expect(await screen.findByText(/Outcome uncertain; reconcile before retrying/)).toBeInTheDocument();
+    expect(await screen.findByText(/Outcome uncertain; request a read-only merchant-record check/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Request field write" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Check merchant record read-only" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_google_profile_reconciliation_v6", {
+      p_attempt_id: "attempt-1",
+    }));
+  });
+
+  it("shows a later merchant-record match without offering another check or write", async () => {
+    database({ changes: [change({ status: "applied" })], profileOutcomes: [{
+      attempt_id: "attempt-1", change_id: "change-1", status: "uncertain",
+      reconciliation_result: "matched", reconciled_at: "2026-11-15T09:00:00Z", provider_ref: null,
+    }] });
+    render(<GoogleProfilePanel tab="location" />);
+    expect(await screen.findByText(/Later merchant-record readback matched/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Check merchant record read-only" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Request field write" })).not.toBeInTheDocument();
   });
 

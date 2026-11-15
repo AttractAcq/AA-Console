@@ -43,6 +43,7 @@ import { runOutboundCourierJob } from "../outbound/courier.js";
 import { runNurtureSequencerJob } from "../outbound/sequencer.js";
 import { runProfileUpdaterJob } from "../profiles/updater.js";
 import { runGoogleProfileFieldJob } from "../profiles/google-profile-job.js";
+import { runGoogleProfileReconciliationJob } from "../profiles/google-profile-reconciliation-job.js";
 import { runMetaProfileFieldJob } from "../profiles/meta-profile-job.js";
 import { runMetaProfileReconciliationJob } from "../profiles/meta-profile-reconciliation-job.js";
 import { runGoogleReplySenderJob } from "../google-profile/reply-job.js";
@@ -181,6 +182,7 @@ const RUNNERS: Record<string, JobRunner> = {
   // Instagram bio never reaches it and stays a job for a person.
   profile_updater: runProfileUpdaterJob,
   google_profile_field_writer: runGoogleProfileFieldJob,
+  google_profile_field_reconciler: runGoogleProfileReconciliationJob,
   meta_profile_field_writer: runMetaProfileFieldJob,
   meta_profile_field_reconciler: runMetaProfileReconciliationJob,
   google_reply_sender: runGoogleReplySenderJob,

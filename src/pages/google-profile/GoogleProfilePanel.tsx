@@ -15,9 +15,10 @@ type Location = Database["public"]["Tables"]["client_google_locations"]["Row"];
 type ProfileDue = Database["public"]["Views"]["google_profile_due"]["Row"];
 type ProfileChange = Pick<Database["public"]["Tables"]["google_profile_changes"]["Row"],
   "id" | "location_id" | "field" | "current_value" | "proposed_value" | "status" | "approved_request_id">;
-type ProfileOutcome = Database["public"]["Views"]["google_profile_execution_overview_v6"]["Row"];
+type ProfileOutcome = Pick<Database["public"]["Views"]["google_profile_execution_overview_v6"]["Row"],
+  "attempt_id" | "change_id" | "status" | "provider_ref" | "reconciliation_result" | "reconciled_at">;
 type ProfileJob = Pick<Database["public"]["Tables"]["agent_jobs"]["Row"],
-  "id" | "input_id" | "status" | "error">;
+  "id" | "agent_key" | "input_id" | "status">;
 type Review = Database["public"]["Tables"]["google_reviews"]["Row"];
 type Reply = Database["public"]["Tables"]["google_review_replies"]["Row"];
 type ReplyOutcome = Database["public"]["Views"]["google_reply_execution_overview_v6"]["Row"];
@@ -99,10 +100,12 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           .eq("client_id", clientId).order("created_at", { ascending: false }).limit(100),
         supabase.from("approval_inbox_v6").select("id,status")
           .eq("client_id", clientId).eq("source_kind", "google_profile_change"),
-        supabase.from("google_profile_execution_overview_v6").select("*").eq("client_id", clientId),
-        supabase.from("agent_jobs").select("id,input_id,status,error")
-          .eq("client_id", clientId).eq("agent_key", "google_profile_field_writer")
-          .eq("input_table", "google_profile_changes"),
+        supabase.from("google_profile_execution_overview_v6")
+          .select("attempt_id,change_id,status,provider_ref,reconciliation_result,reconciled_at")
+          .eq("client_id", clientId),
+        supabase.from("agent_jobs").select("id,agent_key,input_id,status")
+          .eq("client_id", clientId)
+          .in("agent_key", ["google_profile_field_writer", "google_profile_field_reconciler"]),
         supabase
           .from("google_reviews")
           .select("*")
@@ -327,7 +330,10 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
               emptyLabel={loading ? "Loading…" : "No profile field proposal has been recorded"}
               rows={changes.map((change) => {
                 const attempt = profileOutcomes.find((row) => row.change_id === change.id);
-                const queued = profileJobs.find((row) => row.input_id === change.id);
+                const queued = profileJobs.find((row) => row.input_id === change.id
+                  && row.agent_key === "google_profile_field_writer");
+                const readJob = profileJobs.find((row) => row.input_id === attempt?.attempt_id
+                  && row.agent_key === "google_profile_field_reconciler");
                 return [
                 <span key="location" className="text-xs">
                   {locations.find((location) => location.id === change.location_id)?.title ?? "Unknown location"}
@@ -349,15 +355,21 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                   {attempt?.status === "confirmed"
                     ? `Provider readback confirmed · ${attempt.provider_ref ?? "reference unavailable"}`
                     : attempt?.status === "uncertain"
-                      ? `Outcome uncertain; reconcile before retrying. ${attempt.outcome_note ?? ""}`
+                      ? attempt.reconciliation_result === "matched"
+                        ? `Later merchant-record readback matched · ${dayOrDash(attempt.reconciled_at)}`
+                        : attempt.reconciliation_result === "different"
+                          ? `Later merchant-record value differs · ${dayOrDash(attempt.reconciled_at)}; inspect before a new proposal.`
+                          : readJob
+                            ? `Outcome uncertain; read-only check ${readJob.status.replace(/_/g, " ")}.`
+                            : "Outcome uncertain; request a read-only merchant-record check."
                       : attempt?.status === "refused"
-                        ? `Write refused before provider call. ${attempt.outcome_note ?? ""}`
+                        ? "Write refused before provider call."
                         : attempt?.status === "started"
                           ? "Provider write started; awaiting readback."
                           : attempt?.status === "reserved"
                             ? "One provider attempt reserved; prewrite pending."
                             : queued
-                              ? `Queued job ${queued.status.replace(/_/g, " ")}${queued.error ? `: ${queued.error}` : ""}`
+                              ? `Queued job ${queued.status.replace(/_/g, " ")}`
                               : change.status === "rejected"
                                 ? "Rejected; no field PATCH."
                                 : "No provider write requested."}
@@ -386,6 +398,20 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                         if (result.error) throw result.error;
                       }, "Exact profile write queued; runtime release remains off.")}
                     >Request field write</button>}
+                  {attempt?.status === "uncertain" && attempt.attempt_id
+                    && attempt.reconciliation_result !== "matched"
+                    && !profileJobs.some((row) => row.agent_key === "google_profile_field_reconciler"
+                      && row.input_id === attempt.attempt_id
+                      && ["queued", "claimed", "running", "paused"].includes(row.status)) &&
+                    <button type="button" className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50"
+                      disabled={busy !== null}
+                      onClick={() => void act(`profile-reconcile:${attempt.attempt_id}`, async () => {
+                        const result = await supabase.rpc("request_google_profile_reconciliation_v6", {
+                          p_attempt_id: attempt.attempt_id!,
+                        });
+                        if (result.error) throw result.error;
+                      }, "Read-only merchant-record check queued.")}
+                    >Check merchant record read-only</button>}
                 </span>,
               ]; })}
             />
