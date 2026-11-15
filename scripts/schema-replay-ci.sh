@@ -108,19 +108,24 @@ snapshot_schema() {
 # A fresh project start is itself a clean migration replay. Reset below
 # exercises the CLI's separate reset path as well.
 started=1
+start_args=(start)
 if [[ "${AA_SCHEMA_EXCLUDE_VECTOR:-0}" == "1" && "${AA_SCHEMA_EXCLUDE_STORAGE:-0}" == "1" ]]; then
   # The schema gate needs the database, not the optional log collector or
   # Storage API. Excluding either does not skip a migration or database check.
-  run_logged start supabase_local start --exclude vector,storage
+  start_args+=(--exclude vector,storage)
 elif [[ "${AA_SCHEMA_EXCLUDE_VECTOR:-0}" == "1" ]]; then
   # Some local Colima setups cannot mount the Docker socket into the optional
   # log collector. The database and migration checks remain unchanged.
-  run_logged start supabase_local start --exclude vector
+  start_args+=(--exclude vector)
 elif [[ "${AA_SCHEMA_EXCLUDE_STORAGE:-0}" == "1" ]]; then
-  run_logged start supabase_local start --exclude storage
-else
-  run_logged start supabase_local start
+  start_args+=(--exclude storage)
 fi
+if [[ "${AA_SCHEMA_IGNORE_OPTIONAL_HEALTH:-0}" == "1" ]]; then
+  # CLI 2.101 can still health-check an excluded Storage container. The psql
+  # migration, schema and fixture checks below independently require a live DB.
+  start_args+=(--ignore-health-check)
+fi
+run_logged start supabase_local "${start_args[@]}"
 head_version="$(AA_SCHEMA_MANIFEST="$evidence_dir/manifest.json" node -p \
   "JSON.parse(require('fs').readFileSync(process.env.AA_SCHEMA_MANIFEST)).headVersion")"
 released_version="$(AA_SCHEMA_MANIFEST="$evidence_dir/manifest.json" node -p \

@@ -104,5 +104,15 @@ begin
   or not exists(select 1 from public.proof_approval_execution_evidence_v6 e
    where e.request_id=first_request_id and e.state='unattributed' and e.external_ref is null)
   then raise exception 'Proof sender outcome leaked across review epochs'; end if;
+ if not exists(select 1 from public.client_external_outcomes_v6 e
+  where e.outcome_id=delivery and e.client_id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+   and e.source_kind='proof_delivery' and e.outcome='unverified'
+   and e.external_ref='fixture-provider-id' and e.occurred_at is not null
+   and e.owning_path='/clients/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/delivery/proof-production-factory?tab=capture')
+  then raise exception 'Provider acceptance was not visible as unverified in the owning queue'; end if;
+ update public.proof_request_deliveries set attempt_request_id=null where id=delivery;
+ if not exists(select 1 from public.client_external_outcomes_v6 e
+  where e.outcome_id=delivery and e.outcome='unattributed' and e.external_ref is null)
+  then raise exception 'Historical unbound attempt was attributed as a verified outcome'; end if;
 end $checks$;
 rollback;

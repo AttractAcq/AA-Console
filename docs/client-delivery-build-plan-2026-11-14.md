@@ -236,6 +236,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Proof delivery attribution checkpoint, 15 November 2026:** The sender claim now writes the exact approved Inbox request ID onto the delivery attempt, and the post-claim send check and completion update require that same ID. The Unified Inbox projection attributes provider-send state and provider ID only to that request; older reviews and historical attempts without a stored request ID remain explicitly unattributed. The rollback fixture checks both a bound send and the older review's unknown attribution. This is local source-side attribution, not provider readback or proof of recipient receipt. Class 9 and the Phase 2 external test receipt gate remain blocked.
 
+**Proof delivery outcome alert checkpoint, 15 November 2026:** Proof-request sender attempts now record start and finish times. Their source-scoped outcomes enter the shared Dashboard and Approval Inbox alert ledger: provider acceptance remains unverified recipient delivery, failed and uncertain sends need reconciliation, and historical attempts without an exact approval binding are unattributed. The owner link opens Proof Production capture. This is an observed local sender state, not a live provider readback or recipient receipt. Class 9 and the Phase 2 external test receipt gate remain blocked.
+
 ## Phase 3 — Intelligence, Market Opportunities, Offer Studio and proof inputs
 
 ### Intelligence OS

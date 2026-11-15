@@ -24,7 +24,7 @@ export function ExternalExecutionAlerts({ clientId }: { clientId?: string }) {
     let query = supabase.from("client_external_outcomes_v6")
       .select("outcome_id,client_id,source_kind,outcome,occurred_at,owning_path")
       .in("outcome", ["refused", "uncertain", "different", "pending", "rejected",
-        "unverified", "failed", "abandoned"]);
+        "unverified", "unattributed", "failed", "abandoned"]);
     if (clientId) query = query.eq("client_id", clientId);
     const result = await query.order("occurred_at", { ascending: false }).limit(5);
     if (sequence !== refreshSequence.current) return;

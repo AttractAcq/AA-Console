@@ -22343,7 +22343,9 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          attempt_finished_at: string | null
           attempt_request_id: string | null
+          attempt_started_at: string | null
           attempts: number
           capture_url: string
           channel: string
@@ -22368,7 +22370,9 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          attempt_finished_at?: string | null
           attempt_request_id?: string | null
+          attempt_started_at?: string | null
           attempts?: number
           capture_url: string
           channel: string
@@ -22393,7 +22397,9 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          attempt_finished_at?: string | null
           attempt_request_id?: string | null
+          attempt_started_at?: string | null
           attempts?: number
           capture_url?: string
           channel?: string
@@ -33686,7 +33692,9 @@ export type Database = {
         Returns: {
           approved_at: string | null
           approved_by: string | null
+          attempt_finished_at: string | null
           attempt_request_id: string | null
+          attempt_started_at: string | null
           attempts: number
           capture_url: string
           channel: string
