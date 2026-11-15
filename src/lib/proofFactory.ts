@@ -24,7 +24,7 @@ export const CAPTURE_METHODS = [
   {
     id: "outcome_followup",
     label: "Outcome Follow-up Engine",
-    description: "Outcome-triggered follow-ups need a verified completion event, recipient consent and an approved request route.",
+    description: "Prepare proof requests for recorded sale or cash outcomes with separate customer consent and exact-message Inbox review.",
   },
 ] as const;
 export const PROOF_CATEGORIES = {

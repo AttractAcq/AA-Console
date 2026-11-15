@@ -9,9 +9,10 @@ async function call(
   sb: SupabaseClient,
   path = "/admin/proof-capture",
   token = "test",
+  body: Record<string, unknown> = { clientId, action: "create_link" },
 ) {
   const req = Readable.from([
-    Buffer.from(JSON.stringify({ clientId, action: "create_link" })),
+    Buffer.from(JSON.stringify(body)),
   ]) as IncomingMessage;
   req.method = "POST";
   req.url = path;
@@ -65,4 +66,40 @@ it("rejects incorrect internal secrets before reading client data", async () => 
     ),
   ).toBe(401);
   expect(from).not.toHaveBeenCalled();
+});
+
+it("refuses an outcome request when consent no longer matches the lead contact", async () => {
+  const leadId = "00000000-0000-0000-0000-000000000002";
+  const consentId = "00000000-0000-0000-0000-000000000003";
+  const configId = "00000000-0000-0000-0000-000000000004";
+  const from = vi.fn((table: string) => {
+    const rows: Record<string, unknown> = {
+      profiles: { role: "admin" },
+      proof_capture_configs: {
+        id: configId, method: "outcome_followup", trigger_event: "sale",
+        message_template: "Please share your experience: {{capture_link}}",
+      },
+      client_leads: { id: leadId, name: "Customer", stage: "sale", email: "current@example.invalid" },
+      proof_outcome_followup_consents_v7: {
+        id: consentId, lead_id: leadId, channel: "email",
+        recipient: "old@example.invalid", withdrawn_at: null,
+      },
+    };
+    const chain = {
+      select: () => chain,
+      eq: () => chain,
+      maybeSingle: async () => ({ data: rows[table], error: null }),
+    };
+    return chain;
+  });
+  const sb = {
+    auth: { getUser: async () => ({ data: { user: { id: "admin" } }, error: null }) },
+    from,
+    rpc: async () => ({ data: null, error: null }),
+  } as unknown as SupabaseClient;
+  expect(await call(sb, "/admin/proof-capture", "test", {
+    clientId, action: "queue_delivery", configId, leadId, consentId,
+  })).toBe(400);
+  expect(from).not.toHaveBeenCalledWith("proof_capture_links");
+  expect(from).not.toHaveBeenCalledWith("proof_request_deliveries");
 });

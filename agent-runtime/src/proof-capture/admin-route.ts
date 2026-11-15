@@ -142,18 +142,56 @@ export async function handleProofCaptureAdmin(
       json(404, { ok: false, error: "Capture setup unavailable." });
       return;
     }
+    if (body.action === "create_link" && setup.method === "outcome_followup") {
+      json(400, { ok: false, error: "Outcome follow-up links must be bound to a sale and consent." });
+      return;
+    }
     let scheduled = new Date(),
       channel = "",
       recipient = "",
       eventKey = "";
+    let outcomeLeadId: string | null = null;
+    let outcomeConsentId: string | null = null;
+    let outcomeCustomerName = "";
     if (body.action === "queue_delivery") {
-      if (setup.method !== "automated_requests") {
-        json(400, { ok: false, error: "Choose an Automated Requests setup." });
+      if (setup.method !== "automated_requests" && setup.method !== "outcome_followup") {
+        json(400, { ok: false, error: "Choose a request delivery setup." });
         return;
       }
-      channel = String(body.channel ?? "email");
-      recipient = String(body.recipient ?? "").trim();
-      eventKey = String(body.eventKey ?? "");
+      if (setup.method === "outcome_followup") {
+        outcomeLeadId = String(body.leadId ?? "");
+        outcomeConsentId = String(body.consentId ?? "");
+        if (!UUID.test(outcomeLeadId) || !UUID.test(outcomeConsentId)) {
+          json(400, { ok: false, error: "Select a sale and its separate proof follow-up consent." });
+          return;
+        }
+        const [{ data: lead, error: leadError }, { data: consent, error: consentError }] = await Promise.all([
+          sb.from("client_leads").select("id,name,stage,email,phone")
+            .eq("id", outcomeLeadId).eq("client_id", clientId).maybeSingle(),
+          sb.from("proof_outcome_followup_consents_v7")
+            .select("id,lead_id,channel,recipient,withdrawn_at")
+            .eq("id", outcomeConsentId).eq("client_id", clientId).maybeSingle(),
+        ]);
+        if (leadError || consentError) throw leadError ?? consentError;
+        if (!lead || !consent || !["sale", "cash"].includes(lead.stage)
+            || consent.lead_id !== lead.id || consent.withdrawn_at
+            || (consent.channel === "email" &&
+              consent.recipient.trim().toLowerCase() !== String(lead.email ?? "").trim().toLowerCase())
+            || (consent.channel !== "email" &&
+              consent.recipient.trim() !== String(lead.phone ?? "").trim())
+            || (setup.trigger_event && setup.trigger_event !== lead.stage)) {
+          json(400, { ok: false, error: "The sale, contact or proof follow-up consent is no longer current." });
+          return;
+        }
+        channel = consent.channel;
+        recipient = consent.recipient.trim();
+        outcomeCustomerName = String(lead.name ?? "").slice(0, 200);
+        eventKey = `outcome:${setup.id}:${lead.id}:${consent.id}`;
+      } else {
+        channel = String(body.channel ?? "email");
+        recipient = String(body.recipient ?? "").trim();
+        eventKey = String(body.eventKey ?? "");
+      }
       if (!deliveryChannelAvailable(channel, config)) {
         json(400, {
           ok: false,
@@ -183,7 +221,7 @@ export async function handleProofCaptureAdmin(
         });
         return;
       }
-      if (setup.trigger_event && body.triggerEvent !== setup.trigger_event) {
+      if (setup.method === "automated_requests" && setup.trigger_event && body.triggerEvent !== setup.trigger_event) {
         json(400, {
           ok: false,
           error: "This event does not match the configured trigger.",
@@ -287,7 +325,8 @@ export async function handleProofCaptureAdmin(
       .replaceAll("{{capture_link}}", url)
       .replaceAll(
         "{{customer_name}}",
-        String(body.customerName ?? "").slice(0, 200),
+        setup.method === "outcome_followup" ? outcomeCustomerName
+          : String(body.customerName ?? "").slice(0, 200),
       );
     const requestMessage = message.includes(url)
       ? message
@@ -300,6 +339,8 @@ export async function handleProofCaptureAdmin(
         config_id: setup.id,
         link_id: linkId,
         event_key: eventKey,
+        outcome_lead_id: outcomeLeadId,
+        outcome_consent_id: outcomeConsentId,
         recipient,
         channel,
         subject: setup.name,

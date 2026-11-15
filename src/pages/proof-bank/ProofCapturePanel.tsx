@@ -1,5 +1,6 @@
 import { ProofCaptureDelivery } from "./ProofCaptureDelivery";
 import { ProofIntegrationCapture } from "./ProofIntegrationCapture";
+import { ProofOutcomeConsentPanel } from "./ProofOutcomeConsentPanel";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
@@ -68,7 +69,6 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
         ))}
       </div>
     );
-  const placeholder = method.id === "outcome_followup";
   return (
     <div className="space-y-4">
       <button type="button" className={button} onClick={() => choose()}>
@@ -76,17 +76,8 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
       </button>
       <h2 className="text-xl font-semibold">{method.label}</h2>
       {method.id === "integration" && <ProofIntegrationCapture clientId={clientId} />}
-      {placeholder && (
-        <div role="status" className="rounded-lg border border-border bg-card p-4 text-sm">
-          <p className="font-medium">Automatic capture is held</p>
-          <p className="mt-1 text-muted-foreground">{method.description}</p>
-          <p className="mt-2 text-muted-foreground">Use Manual Upload & Import for a sourced record while this route is being built. Manual uploads enter Raw and still require rights review.</p>
-          <button type="button" className={`${button} mt-3`} onClick={() => choose("manual_import")}>
-            Open Manual Upload & Import
-          </button>
-        </div>
-      )}
-      {!placeholder && method.id !== "integration" && (
+      {method.id === "outcome_followup" && <ProofOutcomeConsentPanel clientId={clientId} onChange={() => setRevision((n) => n + 1)} />}
+      {method.id !== "integration" && (
         <>
           <p className="text-sm text-muted-foreground">{method.description}</p>
           {error && (
@@ -121,6 +112,8 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
           <p className="text-xs text-muted-foreground">
             {method.id === "guided_interview"
               ? "Save the questions here, then share a capture link for written answers, recordings and supporting evidence."
+              : method.id === "outcome_followup"
+                ? "Record specific customer consent above, then prepare an outcome-bound request from a saved setup. Every request needs exact Inbox approval before delivery."
               : "Create a private capture link for this setup. Submissions enter Raw for review and permission clearance. A website can link to the capture portal."}
           </p>
           {configs
@@ -163,13 +156,16 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
             title={method.label}
             fields={[
               { name: "name", label: "Name", kind: "text", required: true },
-              ...(method.id === "automated_requests"
+              ...(method.id === "automated_requests" || method.id === "outcome_followup"
                 ? [
                     {
                       name: "trigger_event",
                       label: "Delivery event / trigger",
-                      kind: "text" as const,
+                      kind: method.id === "outcome_followup" ? "select" as const : "text" as const,
                       required: true,
+                      ...(method.id === "outcome_followup" ? { options: [
+                        { value: "sale", label: "Sale recorded" }, { value: "cash", label: "Cash recorded" },
+                      ] } : {}),
                     },
                     {
                       name: "message_template",
