@@ -37,22 +37,23 @@ function client(options: {
   const updateUserById = vi.fn(async () => ({ data: { user: { id: options.userId ?? "user-1" } }, error: null }));
   const deleteFactor = vi.fn(async ({ id }: { id: string }) => ({ data: { id }, error: null }));
   const listFactors = vi.fn(async () => ({ data: { factors: options.factors ?? [] }, error: null }));
-  const revokeAllSessions = vi.fn(async () => ({ error: null }));
+  const rpc = vi.fn(async () => ({ data: [{ sessions_deleted: 1, refresh_tokens_deleted: 1 }], error: null }));
   const insert = vi.fn(async () => ({ error: options.insertError ?? null }));
   const maybeSingle = vi.fn(async () => ({ data: options.profile ?? null, error: null }));
   const fake = {
     auth: {
       admin: {
-        createUser, deleteUser, listUsers, updateUserById, revokeAllSessions,
+        createUser, deleteUser, listUsers, updateUserById,
         mfa: { listFactors, deleteFactor },
       },
     },
+    rpc,
     from: () => ({
       select: () => ({ eq: () => ({ maybeSingle }) }),
       insert,
     }),
   } as unknown as BotProvisionClient;
-  return { fake, createUser, deleteUser, listUsers, insert, updateUserById, deleteFactor, listFactors, revokeAllSessions };
+  return { fake, createUser, deleteUser, listUsers, insert, updateUserById, deleteFactor, listFactors, rpc };
 }
 
 describe("provisionBotUser", () => {
@@ -163,7 +164,7 @@ describe("bot credential maintenance", () => {
     const result = await resetBotPassword(bot.fake, { botKey: "bot-cos", password: PASSWORD });
     expect(result.status).toBe("reset");
     expect(bot.updateUserById).toHaveBeenCalledWith("user-1", { password: PASSWORD });
-    expect(bot.revokeAllSessions).toHaveBeenCalledWith("user-1");
+    expect(bot.rpc).toHaveBeenCalledWith("revoke_bot_sessions", { p_user_id: "user-1" });
     expect(JSON.stringify(result)).not.toContain(PASSWORD);
 
     const human = client({
@@ -176,14 +177,14 @@ describe("bot credential maintenance", () => {
   });
 
   it("does not change a password on dry-run", async () => {
-    const { fake, updateUserById, revokeAllSessions } = client({
+    const { fake, updateUserById, rpc } = client({
       users: [{ id: "user-1", email: "cos@attractacq.com" }],
       profile: botProfile,
     });
     const result = await resetBotPassword(fake, { botKey: "bot-cos", password: "", dryRun: true });
     expect(result.status).toBe("dry_run");
     expect(updateUserById).not.toHaveBeenCalled();
-    expect(revokeAllSessions).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("deletes MFA factors for a bot and refuses a non-bot", async () => {
@@ -199,7 +200,7 @@ describe("bot credential maintenance", () => {
     expect(result.factorIds).toEqual(["factor-1", "factor-2"]);
     expect(bot.deleteFactor).toHaveBeenCalledTimes(2);
     expect(bot.deleteFactor).toHaveBeenCalledWith({ id: "factor-1", userId: "user-1" });
-    expect(bot.revokeAllSessions).toHaveBeenCalledWith("user-1");
+    expect(bot.rpc).toHaveBeenCalledWith("revoke_bot_sessions", { p_user_id: "user-1" });
 
     const dry = client({
       users: [{ id: "user-1", email: "finance@attractacq.com" }],
@@ -209,7 +210,7 @@ describe("bot credential maintenance", () => {
     const preview = await unenrollBotMfa(dry.fake, { botKey: "bot-finance", dryRun: true });
     expect(preview.status).toBe("dry_run");
     expect(dry.deleteFactor).not.toHaveBeenCalled();
-    expect(dry.revokeAllSessions).not.toHaveBeenCalled();
+    expect(dry.rpc).not.toHaveBeenCalled();
 
     const human = client({
       users: [{ id: "human-1", email: "finance@attractacq.com" }],

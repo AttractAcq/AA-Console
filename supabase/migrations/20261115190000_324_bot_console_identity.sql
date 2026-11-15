@@ -124,9 +124,10 @@ grant execute on function public.is_human_admin() to authenticated, service_role
 update public.profiles set is_bot = is_bot;
 
 
--- Product allowlist. bot-production may approve content, assets, and a
--- production-release decision. bot-sales may approve a lead-magnet version.
--- Publishing, distribution, and delivery are not on this list.
+-- Product allowlist. bot-production may approve ideas, media, and campaign
+-- plans. bot-sales may approve a lead-magnet version. Slot approval, proof
+-- artifacts, production-release decisions, publishing, distribution, and
+-- delivery are not on this list.
 create or replace function public.bot_may(p_action text)
 returns boolean
 language sql
@@ -141,8 +142,6 @@ as $$
        and p.is_bot
        and (p.bot_key, p_action) in (
          ('bot-production', 'approve_content'),
-         ('bot-production', 'approve_asset'),
-         ('bot-production', 'approve_production_release'),
          ('bot-sales', 'approve_lead_magnet')
        )
   );
@@ -154,6 +153,42 @@ comment on function public.bot_may(text) is
 revoke execute on function public.bot_may(text) from public, anon;
 grant execute on function public.bot_may(text) to authenticated, service_role;
 
+-- Purge a bot's GoTrue sessions. service_role only, and only for is_bot.
+-- GoTrue has no admin logout-by-user-id route, so the provisioner calls this.
+create or replace function public.revoke_bot_sessions(p_user_id uuid)
+returns table (sessions_deleted integer, refresh_tokens_deleted integer)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_sessions integer := 0;
+  v_tokens integer := 0;
+begin
+  if coalesce(auth.role(), '') is distinct from 'service_role' then
+    raise exception 'only service_role may revoke bot sessions' using errcode = '42501';
+  end if;
+  if p_user_id is null or not exists (
+    select 1 from public.profiles p
+     where p.id = p_user_id and p.is_bot
+  ) then
+    raise exception 'only a bot account may have sessions revoked here' using errcode = '42501';
+  end if;
+  delete from auth.refresh_tokens
+   where user_id::text = p_user_id::text;
+  get diagnostics v_tokens = row_count;
+  delete from auth.sessions
+   where user_id = p_user_id;
+  get diagnostics v_sessions = row_count;
+  return query select v_sessions, v_tokens;
+end;
+$$;
+
+revoke all on function public.revoke_bot_sessions(uuid) from public, anon, authenticated;
+grant execute on function public.revoke_bot_sessions(uuid) to service_role;
+
+comment on function public.revoke_bot_sessions(uuid) is
+  'Deletes auth.sessions and auth.refresh_tokens for one bot. Refuses every non-bot. service_role only.';
 
 revoke truncate, trigger, references on table public.profiles from public, anon, authenticated;
 
@@ -2238,26 +2273,20 @@ declare
   v_hash text;
   v_blocker text;
   v_id uuid;
-  v_kind text;
 begin
 
   -- Bot console users are admins so agency reads keep working, and AAL2 does
   -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
   -- service_role executors are unchanged.
   if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
      and exists (
        select 1
          from public.profiles as bot_identity
         where bot_identity.id = auth.uid()
           and bot_identity.is_bot
      ) then
-    select r.source_kind into v_kind
-      from public.approval_requests_v6 r
-     where r.id = p_request_id;
-    if v_kind is distinct from 'production_release'
-       or not public.bot_may('approve_production_release') then
-      raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
-    end if;
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
   end if;
 
   if auth.role() is distinct from 'authenticated' or auth.uid() is null
@@ -2276,11 +2305,7 @@ begin
     where id = p_request_id for update;
   if not found then raise exception 'Approval request not found.' using errcode = 'P0002'; end if;
   if v_request.client_id is null then
-    if not coalesce(public.is_human_admin(), false)
-       and not (
-         v_request.source_kind = 'production_release'
-         and public.bot_may('approve_production_release')
-       ) then
+    if not coalesce(public.is_human_admin(), false) then
       raise exception 'Only an admin may decide agency-wide approvals.' using errcode = '42501';
     end if;
   elsif not public.can_review_approval_request_v6(v_request.client_id, v_request.owner_role) then
@@ -2959,8 +2984,7 @@ begin
          from public.profiles as bot_identity
         where bot_identity.id = auth.uid()
           and bot_identity.is_bot
-     )
-     and not public.bot_may('approve_production_release') then
+     ) then
     raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
   end if;
 
@@ -3178,8 +3202,7 @@ begin
          from public.profiles as bot_identity
         where bot_identity.id = auth.uid()
           and bot_identity.is_bot
-     )
-     and not public.bot_may('approve_production_release') then
+     ) then
     raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
   end if;
 
@@ -3978,8 +4001,7 @@ begin
          from public.profiles as bot_identity
         where bot_identity.id = auth.uid()
           and bot_identity.is_bot
-     )
-     and not public.bot_may('approve_asset') then
+     ) then
     raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
   end if;
 
@@ -4256,8 +4278,7 @@ begin
          from public.profiles as bot_identity
         where bot_identity.id = auth.uid()
           and bot_identity.is_bot
-     )
-     and not public.bot_may('approve_content') then
+     ) then
     raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
   end if;
 
@@ -4278,7 +4299,7 @@ begin
   -- The commit itself, through the same function every other screen uses, so
   -- the decision is recorded in client_asset_reviews and attributed to the
   -- person exactly as a hand-made asset's approval is.
-  perform review_media_asset(v_slot.asset_id, 'approved'::review_status, p_note);
+  perform public.review_media_asset(v_slot.asset_id, 'approved'::review_status, p_note);
 
   -- The calendar entry. scheduled_at is what the planner chose, in the
   -- client's own time (migration 144), so an approved post goes out when it
@@ -4367,5 +4388,7 @@ $$;
 
 select public.lock_down_definer_functions();
 grant execute on function public.is_human_admin() to authenticated, service_role;
+grant execute on function public.revoke_bot_sessions(uuid) to service_role;
+revoke all on function public.revoke_bot_sessions(uuid) from public, anon, authenticated;
 revoke execute on function public.guard_profile_bot_identity() from public, anon, authenticated;
 revoke execute on function public.sync_profile_bot_app_metadata() from public, anon, authenticated;

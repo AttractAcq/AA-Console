@@ -81,7 +81,6 @@ export type BotProvisionClient = {
           error: AuthError | null;
         }>;
       };
-      revokeAllSessions: (userId: string) => Promise<{ error: AuthError | null }>;
     };
   };
   from: (table: "profiles") => {
@@ -99,6 +98,13 @@ export type BotProvisionClient = {
       bot_key: string;
     }) => Promise<{ error: AuthError | null }>;
   };
+  rpc: (
+    fn: "revoke_bot_sessions",
+    args: { p_user_id: string },
+  ) => Promise<{
+    data: Array<{ sessions_deleted: number; refresh_tokens_deleted: number }> | null;
+    error: AuthError | null;
+  }>;
 };
 
 export type ProvisionResult = {
@@ -254,7 +260,7 @@ export async function resetBotPassword(
   }
   const updated = await client.auth.admin.updateUserById(account.userId, { password: input.password });
   if (updated.error) throw new ProvisionError(scrub(updated.error.message, input.password));
-  const revoked = await client.auth.admin.revokeAllSessions(account.userId);
+  const revoked = await client.rpc("revoke_bot_sessions", { p_user_id: account.userId });
   if (revoked.error) {
     throw new ProvisionError(
       `Password was changed but sessions were not revoked: ${scrub(revoked.error.message, input.password)}`,
@@ -278,7 +284,7 @@ export async function unenrollBotMfa(
       throw new ProvisionError(`MFA factor ${id} was not deleted: ${removed.error.message}`);
     }
   }
-  const revoked = await client.auth.admin.revokeAllSessions(account.userId);
+  const revoked = await client.rpc("revoke_bot_sessions", { p_user_id: account.userId });
   if (revoked.error) {
     throw new ProvisionError(`MFA factors were deleted but sessions were not revoked: ${revoked.error.message}`);
   }
@@ -328,18 +334,9 @@ function liveClient(url: string, key: string): BotProvisionClient {
           listFactors: (params) => admin.mfa.listFactors(params),
           deleteFactor: (params) => admin.mfa.deleteFactor(params),
         },
-        revokeAllSessions: async (userId) => {
-          const response = await fetch(`${url}/auth/v1/admin/users/${userId}/logout`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${key}`, apikey: key },
-          });
-          if (!response.ok) {
-            return { error: { message: `session revoke failed (${response.status})` } };
-          }
-          return { error: null };
-        },
       },
     },
+    rpc: (fn, args) => raw.rpc(fn, args),
   };
 }
 

@@ -124,8 +124,9 @@ refuses and does not promote the account into a bot.
 Password resets and MFA removal use the same script. Without their own
 confirm value they dry-run and do not write. Both refuse a profile that is
 not `is_bot=true` with that `bot_key`. After a real reset or unenroll, the
-script revokes every session for that user through the Auth admin logout
-route.
+script deletes that bot's rows in auth.sessions and auth.refresh_tokens
+through public.revoke_bot_sessions. That function refuses every non-bot
+and is executable only by service_role.
 
 ```bash
 BOT_RESET_CONFIRM=reset-bot-password \

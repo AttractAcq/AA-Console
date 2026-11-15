@@ -147,6 +147,15 @@ beforeAll(async () => {
       raw_app_meta_data jsonb,
       raw_user_meta_data jsonb
     );
+    create table auth.sessions (
+      id uuid primary key,
+      user_id uuid not null
+    );
+    create table auth.refresh_tokens (
+      id bigint generated always as identity primary key,
+      user_id text,
+      session_id uuid
+    );
     create function auth.uid() returns uuid language sql stable as $$
       select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
     $$;
@@ -510,7 +519,6 @@ describe("bot console identity", () => {
       ["review_media_asset", "select public.review_media_asset($1, 'approved', null)", [CLIENT]],
       ["approve_idea_and_generate_brief", "select public.approve_idea_and_generate_brief($1)", [CLIENT]],
       ["approve_campaign_plan_v6", "select public.approve_campaign_plan_v6($1, null)", [CLIENT]],
-      ["approve_slot", "select public.approve_slot($1, null)", [CLIENT]],
     ];
     for (const [name, sql, params] of content) {
       const allowed = await callReady(production, sql, params);
@@ -518,6 +526,18 @@ describe("bot console identity", () => {
       const denied = await callReady(marketing, sql, params);
       expect(denied, name).toMatch(/Bot accounts cannot perform this action/);
     }
+    const productionSlot = await callReady(production, "select public.approve_slot($1, null)", [CLIENT]);
+    expect(productionSlot).toMatch(/Bot accounts cannot perform this action/);
+    const marketingSlot = await callReady(marketing, "select public.approve_slot($1, null)", [CLIENT]);
+    expect(marketingSlot).toMatch(/Bot accounts cannot perform this action/);
+    const proofArtifact = await callReady(production, "select public.approve_proof_artifact_v6($1)", [CLIENT]);
+    expect(proofArtifact).toMatch(/Bot accounts cannot perform this action/);
+    const releaseSubmit = await callReady(
+      production,
+      "select public.submit_production_release_candidate_v6('{}'::jsonb, now() + interval '1 hour')",
+      [],
+    );
+    expect(releaseSubmit).toMatch(/Bot accounts cannot perform this action/);
     const humanAsset = await callReady(HUMAN, content[0]![1], content[0]![2]);
     expect(humanAsset ?? "").not.toMatch(/Bot accounts cannot perform this action/);
 
@@ -583,13 +603,43 @@ describe("bot console identity", () => {
       "select public.record_approval_decision_v6($1,'rejected','hash','ref','no')",
       ["12121212-1212-4121-8121-121212121212"],
     );
-    expect(releaseDecision ?? "").not.toMatch(/Bot accounts cannot perform this action/);
+    expect(releaseDecision).toMatch(/Bot accounts cannot perform this action/);
     const marketingRelease = await callReady(
       marketing,
       "select public.record_approval_decision_v6($1,'rejected','hash','ref','no')",
       ["12121212-1212-4121-8121-121212121212"],
     );
     expect(marketingRelease).toMatch(/Bot accounts cannot perform this action/);
+  });
+
+  it("purges a bot's sessions and refuses a human", async () => {
+    await db.exec("reset role");
+    const botSession = "99999999-9999-4999-8999-999999999991";
+    const humanSession = "99999999-9999-4999-8999-999999999992";
+    await db.query("insert into auth.sessions (id, user_id) values ($1, $2), ($3, $4)", [
+      botSession, BOT, humanSession, HUMAN,
+    ]);
+    await db.query(
+      "insert into auth.refresh_tokens (user_id, session_id) values ($1, $2), ($3, $4)",
+      [BOT, botSession, HUMAN, humanSession],
+    );
+    await asService();
+    const refused = await call(`select * from public.revoke_bot_sessions('${HUMAN}'::uuid)`);
+    expect(refused).toMatch(/only a bot account may have sessions revoked here/);
+    await asUser(BOT);
+    const asBot = await call(`select * from public.revoke_bot_sessions('${BOT}'::uuid)`);
+    expect(asBot ?? "").toMatch(/permission denied|only service_role/);
+    await asService();
+    const purged = await db.query<{ sessions_deleted: number; refresh_tokens_deleted: number }>(
+      "select * from public.revoke_bot_sessions($1)",
+      [BOT],
+    );
+    expect(purged.rows[0]).toEqual({ sessions_deleted: 1, refresh_tokens_deleted: 1 });
+    const left = await db.query<{ user_id: string }>("select user_id::text from auth.sessions");
+    expect(left.rows.map((row) => row.user_id)).toEqual([HUMAN]);
+    const tokens = await db.query<{ user_id: string }>("select user_id from auth.refresh_tokens");
+    expect(tokens.rows.map((row) => row.user_id)).toEqual([HUMAN]);
+    await db.exec("reset role");
   });
 
   it("fires the AAL2 decision triggers against a bot before they trust assurance", async () => {

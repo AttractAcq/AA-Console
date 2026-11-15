@@ -4,7 +4,7 @@
 -- The agent-runtime pglite suite covers the same checks in CI.
 
 begin;
-select plan(17);
+select plan(19);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -156,6 +156,20 @@ select throws_ok(
   'Bot accounts cannot perform this action',
   'bot-production cannot publish'
 );
+select throws_ok(
+  $$select public.approve_slot('44444444-4444-4444-8444-444444444444', null)$$,
+  '42501',
+  'Bot accounts cannot perform this action',
+  'bot-production cannot approve a slot'
+);
+select set_config('request.jwt.claim.role', 'service_role', true);
+select throws_ok(
+  $$select * from public.revoke_bot_sessions('11111111-1111-4111-8111-111111111111')$$,
+  '42501',
+  'only a bot account may have sessions revoked here',
+  'session purge refuses a human'
+);
+select set_config('request.jwt.claim.role', 'authenticated', true);
 
 select set_config('request.jwt.claim.sub', '77777777-7777-4777-8777-777777777772', true);
 select throws_ok(
