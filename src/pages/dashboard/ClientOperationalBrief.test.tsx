@@ -33,6 +33,12 @@ vi.mock("../../lib/supabase", () => ({
             resolve({ data: [], count: status === "executed" ? 1 : 0, error: null });
           } else if (table === "lead_magnet_deliveries") {
             resolve({ count: 3, error: null });
+          } else if (table === "client_external_outcomes_v6") {
+            resolve(columns === "outcome_id"
+              ? { count: 2, error: null }
+              : { data: [{ source_kind: "google_review_reply", outcome: "confirmed",
+                occurred_at: "2026-11-15T12:00:00Z", owning_path: "/clients/client-1/google-profile?tab=reviews",
+                external_ref: "accounts/a/locations/b/reviews/c" }], error: null });
           } else {
             resolve({ data: [{ provider: "meta", status: "connected", last_checked_at: null }], error: null });
           }
@@ -52,6 +58,8 @@ it("keeps failed source counts unknown and scopes every brief read to its client
   expect(screen.getByText("Lead magnet deliveries owed").parentElement).toHaveTextContent("3 Open studio");
   expect(screen.getByRole("alert")).toHaveTextContent("stale approval read denied");
   expect(screen.getByText(/meta: connected/)).toHaveTextContent("no check recorded");
-  expect(reads).toHaveLength(10);
+  expect(screen.getByText("External execution").parentElement).toHaveTextContent("2 refused, uncertain or failed");
+  expect(screen.getByRole("link", { name: /google review reply/ })).toHaveAttribute("href", "/clients/client-1/google-profile?tab=reviews");
+  expect(reads).toHaveLength(12);
   expect(reads.every((read) => read.clientId === "client-1")).toBe(true);
 });

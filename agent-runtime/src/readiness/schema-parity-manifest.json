@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "ccd1f01fc0fa81854033c78039b92cf732600231714e5a9bc2ae014c47d06c41",
-  "generatedTypesSha256": "033c62792a490024d429703747aaa947cc59b8c7cf03168475fbceef651c554c",
-  "generatedSchemaBodySha256": "c9fdcebb706827318b98adba2b49a5873a98470bb3b09cf5116c7cfd338009a2",
+  "migrationSourceDigest": "83743bd3fd7749bde498d70c5f46956ef6d670199d77d6a13ca56ba0a53c5797",
+  "generatedTypesSha256": "795036cc35aa32ea0dc25243be3b7300e5d4aca171d5ff548dcf036fdb741c76",
+  "generatedSchemaBodySha256": "5e75994ddbf17bb2bc345044d86cbfb9dd6b8b790b1b654c9ba131f170a120ce",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3461,6 +3461,13 @@
       "filename": "20261120170000_477_google_reply_confirmed_source.sql",
       "sha256": "2b124889a662d9f6818ac59542b7ad312392b50e9471f6ce8a6c70418fd6b5c5",
       "trimmedMd5": "f54fbcafaa508f1617a045ebeee96170"
+    },
+    {
+      "version": "20261120180000",
+      "name": "478_client_external_outcomes",
+      "filename": "20261120180000_478_client_external_outcomes.sql",
+      "sha256": "4d4f122ec798134a86aa890afc38ba47089ae40c4c5a9e57ce7d6a5c2bc0a1e6",
+      "trimmedMd5": "242f08768eea422dd77efe34cf7686dd"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

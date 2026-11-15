@@ -198,6 +198,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Google review reply source-outcome checkpoint, 15 November 2026:** The one-shot finalizer now marks the exact reply posted in the same transaction as a confirmed provider readback. The source guard requires the matching confirmed attempt, exact body hash, client and review reference; a merely started attempt cannot be marked posted. The full disposable schema replay, two-connection budget lock and all **40** rollback fixtures pass. The dedicated sender remains off by default through `GOOGLE_REVIEW_REPLY_ENABLED`, and no live Google reply was sent. Class 21 remains **blocked** pending historical approval audit, live credential and scope verification, reviewed worker release and an authorized observed provider receipt.
 
+**Client external-outcome brief checkpoint, 15 November 2026:** A client-scoped terminal-outcome view brings campaign actions, Google review replies, Google profile changes and Meta Page changes into one Dashboard summary. The brief shows the latest recorded external receipt and counts refused, uncertain, failed or abandoned attempts; an absent or failed read remains unknown or “none recorded.” Queued work and approval decisions do not count as receipts. Campaign executions without an external reference are excluded from the receipt result. The frontend build, focused brief test, full disposable schema replay, generated types and all **40** rollback fixtures pass. This remains local evidence; the view does not establish a live provider action.
+
 ## Phase 3 — Intelligence, Market Opportunities, Offer Studio and proof inputs
 
 ### Intelligence OS

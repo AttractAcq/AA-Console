@@ -92,6 +92,10 @@ begin
  if (select status from public.google_reply_execution_overview_v6
    where attempt_id=v_id) is distinct from 'confirmed' then
    raise exception 'Client approval owner could not read the execution outcome'; end if;
+ if (select outcome from public.client_external_outcomes_v6
+   where outcome_id=v_id and client_id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')
+   is distinct from 'confirmed' then
+   raise exception 'Confirmed provider receipt missing from client operational outcomes'; end if;
  perform set_config('request.jwt.claim.role','service_role',true);
  update public.google_reviews set comment='Changed review'
   where id='dddddddd-dddd-4ddd-8ddd-dddddddddddd';

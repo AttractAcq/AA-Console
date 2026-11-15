@@ -26820,6 +26820,18 @@ export type Database = {
         }
         Relationships: []
       }
+      client_external_outcomes_v6: {
+        Row: {
+          client_id: string | null
+          external_ref: string | null
+          occurred_at: string | null
+          outcome: string | null
+          outcome_id: string | null
+          owning_path: string | null
+          source_kind: string | null
+        }
+        Relationships: []
+      }
       content_archive: {
         Row: {
           approved_assets: number | null
