@@ -33,7 +33,7 @@ export function CampaignActionApprovalsPanel() {
   const [revokeReasonById, setRevokeReasonById] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const failedCount = decided.filter((action) =>
-    action.execution_status === "failed" || action.execution_status === "abandoned").length;
+    ["failed", "abandoned", "uncertain"].includes(action.execution_status)).length;
   const heldCount = decided.filter((action) =>
     !revocations[action.approval_id] && action.execution_status === "not_attempted"
       && Boolean(action.blocker || runtimeHold)).length;
@@ -197,7 +197,7 @@ export function CampaignActionApprovalsPanel() {
         <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
           <p className="font-medium">Campaign action owner attention</p>
           <p className="mt-1">
-            {failedCount} failed or stopped action{failedCount === 1 ? "" : "s"}; {heldCount} approved action{heldCount === 1 ? "" : "s"} held before an attempt.
+            {failedCount} failed, stopped or uncertain action{failedCount === 1 ? "" : "s"}; {heldCount} approved action{heldCount === 1 ? "" : "s"} held before an attempt.
           </p>
           <a href="#campaign-action-outcomes" className="mt-2 inline-block text-primary underline">Review blockers and attempt receipts</a>
         </div>

@@ -82,6 +82,9 @@ declare v_worker text := 'agent-runtime:1:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
   v_page_execution uuid;
   v_revoke public.campaign_action_approvals%rowtype;
   v_revoke_request public.approval_requests_v6%rowtype;
+  v_unknown public.campaign_action_approvals%rowtype;
+  v_unknown_request public.approval_requests_v6%rowtype;
+  v_unknown_claim record;
   v_release jsonb;
 begin
   if has_function_privilege('service_role',
@@ -165,6 +168,46 @@ begin
     then raise exception 'Second attempt has no observed result receipt'; end if;
   if exists (select 1 from public.claim_campaign_actions_owned_v6(v_worker,v_sha,v_handlers,1))
     then raise exception 'Executed action was claimed again'; end if;
+
+  v_unknown := public.request_campaign_action_approval_v6(
+    'dddddddd-dddd-4ddd-8ddd-dddddddddddd','unknown-one','proof_publish',
+    'proof:approved_placements',repeat('9',64),
+    '{"placements":[{"placement_id":"uncertain","payload_hash":"9999"}]}'::jsonb);
+  select * into v_unknown_request from public.approval_requests_v6
+    where source_kind='campaign_action' and source_id=v_unknown.id::text;
+  perform public.attach_approval_evidence_v6(v_unknown_request.id,v_unknown_request.source_version,
+    'synthetic-fixture:'||v_unknown.id::text,jsonb_build_object(
+      'artifact_hash',v_unknown.artifact_version_hash,
+      'preview',v_unknown_request.preview||jsonb_build_object('exact_manifest','uncertain fixture'),
+      'destination',v_unknown.destination,'account_ref',v_unknown_request.account_ref,
+      'budget',v_unknown_request.budget,'scope',v_unknown.scope));
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  perform set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  perform public.decide_campaign_action_approval_v6(v_unknown.id,'approved');
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claim.sub','',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+  select * into v_unknown_claim from public.claim_campaign_actions_owned_v6(
+    v_worker,v_sha,v_handlers,1);
+  if v_unknown_claim.approval_id is distinct from v_unknown.id then
+    raise exception 'Uncertain fixture action was not claimed'; end if;
+  perform public.record_campaign_action_uncertain_v6(v_unknown_claim.execution_id,
+    'Provider write may have completed','fixture-unknown-id',null,
+    '{"fixture":true}'::jsonb);
+  if (select e.status from public.campaign_action_executions e
+    where e.id=v_unknown_claim.execution_id)<>'uncertain'
+    or not exists(select 1 from public.campaign_action_attempts_v6 t
+      where t.execution_id=v_unknown_claim.execution_id and t.status='uncertain'
+       and t.external_id='fixture-unknown-id')
+    or (select d.blocker from public.campaign_action_due d
+      where d.approval_id=v_unknown.id) not like 'Provider effect may have happened;%'
+    or (select o.outcome from public.client_external_outcomes_v6 o
+      where o.outcome_id=v_unknown_claim.execution_id)<>'uncertain' then
+    raise exception 'Uncertain effect lost its attempt, queue or alert'; end if;
+  if exists(select 1 from public.claim_campaign_actions_owned_v6(v_worker,v_sha,v_handlers,1))
+    then raise exception 'Uncertain effect was claimed for a second write'; end if;
 
   v_revoke := public.request_campaign_action_approval_v6(
     'dddddddd-dddd-4ddd-8ddd-dddddddddddd','revoke-one','proof_publish',

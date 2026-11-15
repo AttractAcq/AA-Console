@@ -87,7 +87,8 @@ it("holds an unconfirmed provider response for manual reconciliation", async () 
   updateAdSetDailyBudget.mockRejectedValue(new MetaWriteError("connection dropped", true));
   const { sb, rpc } = db();
   await expect(changeAdSetBudget(sb, config, action)).rejects.toMatchObject({
-    retryable: false, message: expect.stringContaining("outcome is uncertain"),
+    retryable: false, outcomeUncertain: true, externalId: "23848",
+    message: expect.stringContaining("outcome is uncertain"),
   });
   expect(rpc).not.toHaveBeenCalledWith("record_budget_change_applied", expect.anything());
 });
@@ -98,14 +99,17 @@ it("does not record success when provider readback differs", async () => {
     .mockResolvedValueOnce({ id: "23848", accountId: "act_1",
       dailyBudgetMinor: 7000, currency: "GBP" });
   const { sb, rpc } = db();
-  await expect(changeAdSetBudget(sb, config, action)).rejects.toThrow(/readback differs/);
+  await expect(changeAdSetBudget(sb, config, action)).rejects.toMatchObject({
+    outcomeUncertain: true, externalId: "23848",
+    message: expect.stringContaining("readback differs"),
+  });
   expect(rpc).not.toHaveBeenCalledWith("record_budget_change_applied", expect.anything());
 });
 
 it("holds a confirmed write when local recording fails", async () => {
   const { sb } = db(true);
   await expect(changeAdSetBudget(sb, config, action)).rejects.toMatchObject({
-    retryable: false,
+    retryable: false, outcomeUncertain: true, externalId: "23848",
     message: expect.stringContaining("Meta confirmed the budget, but recording it failed"),
   });
   expect(updateAdSetDailyBudget).toHaveBeenCalledTimes(1);

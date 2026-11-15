@@ -173,7 +173,8 @@ export const deployCampaignPage: ActionHandler = async (sb, config, action) => {
   if (gateError) throw new ActionError(gateError.message, false);
 
   await assertActionPrewrite(sb, config, action);
-  const published = await publishPage(
+  let published: Awaited<ReturnType<typeof publishPage>>;
+  try { published = await publishPage(
     // The publisher's own general guard would refuse a v6 campaign page, and
     // correctly: 212 left that block in place for every other route. This one
     // publish has already been cleared above, so the store is handed a check
@@ -186,7 +187,11 @@ export const deployCampaignPage: ActionHandler = async (sb, config, action) => {
     },
     { org: config.githubSitesOrg, runtimeBase: config.publicRuntimeBase },
     pageId,
-  );
+  ); } catch (cause) {
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    throw new ActionError(`Page publish outcome is uncertain: ${reason} Inspect the repository before another request.`,
+      false, true);
+  }
 
   // Two hashes, because they are two different facts. renderedSha is the
   // approved source, which the recorder now checks against the snapshot rather
@@ -205,7 +210,9 @@ export const deployCampaignPage: ActionHandler = async (sb, config, action) => {
     } as never,
   );
   if (recordError) {
-    throw new Error(`Published at ${published.url}, but could not record it: ${recordError.message}`);
+    throw new ActionError(`Published at ${published.url}, but could not record it: ${recordError.message}`,
+      false, true, published.commit, published.url,
+      { published_sha256: published.publishedSha256 });
   }
 
   const outcome: ActionOutcome = {

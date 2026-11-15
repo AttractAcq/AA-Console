@@ -67,6 +67,10 @@ export class ActionError extends Error {
   constructor(
     message: string,
     readonly retryable: boolean = false,
+    readonly outcomeUncertain: boolean = false,
+    readonly externalId: string | null = null,
+    readonly externalUrl: string | null = null,
+    readonly result: Record<string, unknown> | null = null,
   ) {
     super(message);
     this.name = "ActionError";
@@ -279,18 +283,30 @@ export async function runCampaignActionJob(
           + (outcome.externalId ? ` Provider ID: ${outcome.externalId}.` : "")
           + (outcome.externalUrl ? ` Provider URL: ${outcome.externalUrl}.` : ""),
           false,
+          true,
+          outcome.externalId,
+          outcome.externalUrl,
+          outcome.result,
         );
       }
       completedDetail = outcome.detail ?? completedDetail;
     } catch (cause) {
       const reason = cause instanceof Error ? cause.message : String(cause);
       const retryable = cause instanceof ActionError && cause.retryable;
-      const recorded = await sb.rpc("record_campaign_action_failure", {
-        p_execution_id: action.execution_id, p_reason: reason, p_retryable: retryable,
-      } as never);
+      const uncertain = cause instanceof ActionError && cause.outcomeUncertain;
+      const recorded = uncertain
+        ? await sb.rpc("record_campaign_action_uncertain_v6", {
+          p_execution_id: action.execution_id, p_reason: reason,
+          p_external_id: cause.externalId, p_external_url: cause.externalUrl,
+          p_result: cause.result,
+        } as never)
+        : await sb.rpc("record_campaign_action_failure", {
+          p_execution_id: action.execution_id, p_reason: reason, p_retryable: retryable,
+        } as never);
       failures.push(`${action.action_key}: ${reason}`);
-      if (recorded.error) failures.push(`Failure receipt could not be recorded: ${recorded.error.message}`);
-      await appendEvent(sb, job.id, `${action.action_key} failed for ${action.client_id}: ${reason}`, "error");
+      if (recorded.error) failures.push(`Outcome receipt could not be recorded: ${recorded.error.message}`);
+      await appendEvent(sb, job.id,
+        `${action.action_key} ${uncertain ? "outcome uncertain" : "failed"} for ${action.client_id}: ${reason}`, "error");
       continue;
     }
     await appendEvent(sb, job.id,

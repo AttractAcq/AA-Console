@@ -36,7 +36,7 @@ export function ClientOperationalBrief({ clientId, spend, failedRuns, activeRuns
       supabase.from("approval_inbox_v6").select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("status", "source_held"),
       supabase.from("approval_inbox_v6").select("id,title,owning_path,preview_blocker").eq("client_id", clientId).eq("status", "source_held").order("requested_at", { ascending: false }).limit(3),
       supabase.from("campaign_action_due").select("approval_id", { count: "exact", head: true }).eq("client_id", clientId).neq("execution_status", "executed").not("blocker", "is", null),
-      supabase.from("campaign_action_due").select("approval_id", { count: "exact", head: true }).eq("client_id", clientId).in("execution_status", ["failed", "abandoned"]),
+      supabase.from("campaign_action_due").select("approval_id", { count: "exact", head: true }).eq("client_id", clientId).in("execution_status", ["failed", "abandoned", "uncertain"]),
       supabase.from("campaign_action_due").select("approval_id", { count: "exact", head: true }).eq("client_id", clientId).eq("execution_status", "executed"),
       supabase.from("campaign_action_due").select("action_key,blocker,execution_status").eq("client_id", clientId).neq("execution_status", "executed").not("blocker", "is", null).limit(3),
       supabase.from("lead_magnet_deliveries").select("id", { count: "exact", head: true }).eq("client_id", clientId).in("status", ["queued", "sending", "failed"]),
@@ -92,7 +92,7 @@ export function ClientOperationalBrief({ clientId, spend, failedRuns, activeRuns
         <div><dt className="text-muted-foreground">Agent work</dt><dd>{activeRuns} active · {failedRuns} unresolved failures</dd></div>
         <div><dt className="text-muted-foreground">Agent spend</dt><dd>${spend.toFixed(2)} recorded</dd></div>
         <div><dt className="text-muted-foreground">Approvals</dt><dd>{count(brief?.pendingApprovals)} pending · {count(brief?.heldApprovals)} source held · {count(brief?.staleApprovals)} stale <Link className="text-primary underline" to={`${base}/delivery/approval-inbox?tab=unified`}>Open inbox</Link></dd></div>
-        <div><dt className="text-muted-foreground">Campaign actions</dt><dd>{count(brief?.heldActionCount)} held · {count(brief?.failedActions)} failed · {count(brief?.executedActions)} executed <Link className="text-primary underline" to={`${base}/delivery/approval-inbox?tab=campaign-actions`}>View outcomes</Link></dd></div>
+        <div><dt className="text-muted-foreground">Campaign actions</dt><dd>{count(brief?.heldActionCount)} held · {count(brief?.failedActions)} failed or uncertain · {count(brief?.executedActions)} executed <Link className="text-primary underline" to={`${base}/delivery/approval-inbox?tab=campaign-actions`}>View outcomes</Link></dd></div>
         <div><dt className="text-muted-foreground">Lead magnet deliveries owed</dt><dd>{count(brief?.owedDeliveries)} <Link className="text-primary underline" to={`${base}/delivery/lead-magnet-studio`}>Open studio</Link></dd></div>
         <div><dt className="text-muted-foreground">Provider records</dt><dd>{count(brief?.integrations?.length)} recorded <Link className="text-primary underline" to={`${base}/account/integrations`}>Review access</Link></dd></div>
         <div><dt className="text-muted-foreground">External execution</dt><dd>

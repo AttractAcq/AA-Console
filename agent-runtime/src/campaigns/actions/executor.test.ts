@@ -130,7 +130,8 @@ describe("generic campaign action preclaim hold", () => {
 describe("owned campaign action claim path", () => {
   const SHA = "c".repeat(40);
   function ownedDb(options: { claim?: ClaimedAction[]; releaseError?: string;
-    releaseCount?: number; claimError?: string; prewriteError?: string } = {}) {
+    releaseCount?: number; claimError?: string; prewriteError?: string;
+    outcomeRecordError?: string } = {}) {
     const events: Record<string, unknown>[] = [];
     const rpc = vi.fn(async (name: string) => {
       if (name === "claim_campaign_actions_owned_v6") return {
@@ -142,6 +143,9 @@ describe("owned campaign action claim path", () => {
         error: options.prewriteError ? { message: options.prewriteError, code: "23514" }
           : options.releaseError ? { message: options.releaseError, code: "40001" } : null,
       };
+      if (name === "record_campaign_action_executed" && options.outcomeRecordError) {
+        return { data: null, error: { message: options.outcomeRecordError } };
+      }
       return { data: null, error: null };
     });
     const from = vi.fn((table: string) => {
@@ -188,6 +192,17 @@ describe("owned campaign action claim path", () => {
       p_retryable: true,
     });
     expect(rpc).not.toHaveBeenCalledWith("record_campaign_action_executed", expect.anything());
+  });
+
+  it("records uncertainty when the handler completed but its outcome receipt failed", async () => {
+    vi.stubEnv("RAILWAY_GIT_COMMIT_SHA", SHA);
+    const { sb, rpc } = ownedDb({ outcomeRecordError: "connection reset" });
+    const result = await runCampaignActionJob(sb, owned, agent, job());
+    expect(result).toMatchObject({ ok: false, retryable: false });
+    expect(rpc).toHaveBeenCalledWith("record_campaign_action_uncertain_v6",
+      expect.objectContaining({ p_execution_id: ACTION.execution_id,
+        p_reason: expect.stringContaining("outcome could not be recorded") }));
+    expect(rpc).not.toHaveBeenCalledWith("record_campaign_action_failure", expect.anything());
   });
 
   it("refuses the effect when the approval or client switch changes after claim", async () => {

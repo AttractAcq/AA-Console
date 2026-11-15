@@ -120,18 +120,22 @@ export const changeAdSetBudget: ActionHandler = async (sb, config: RuntimeConfig
     const reason = thrown instanceof Error ? thrown.message : String(thrown);
     throw new ActionError(thrown instanceof MetaWriteError && thrown.retryable
       ? `Meta budget write outcome is uncertain: ${reason} Reconcile the ad set before any retry.`
-      : reason, false);
+      : `Meta budget write was invoked: ${reason} Inspect the ad set before another request.`,
+      false, true, change.ad_set_external_id);
   }
   let after;
   try {
     after = await readAdSetBudget(account, change.ad_set_external_id);
   } catch (cause) {
     const reason = cause instanceof Error ? cause.message : String(cause);
-    throw new ActionError(`Meta budget write was requested but readback failed: ${reason} Reconcile before retrying.`);
+    throw new ActionError(`Meta budget write was requested but readback failed: ${reason} Reconcile before retrying.`,
+      false, true, change.ad_set_external_id);
   }
   if (after.currency !== change.currency
     || after.dailyBudgetMinor !== Math.round(amount * 100)) {
-    throw new ActionError("Meta budget readback differs from the approved amount. Reconcile before retrying.");
+    throw new ActionError("Meta budget readback differs from the approved amount. Reconcile before retrying.",
+      false, true, change.ad_set_external_id,
+      null, { observed_budget_minor: after.dailyBudgetMinor, currency: after.currency });
   }
 
   const { error: recordError } = await sb.rpc("record_budget_change_applied", {
@@ -144,6 +148,10 @@ export const changeAdSetBudget: ActionHandler = async (sb, config: RuntimeConfig
     throw new ActionError(
       `Meta confirmed the budget, but recording it failed: ${recordError.message} Reconcile before retrying.`,
       false,
+      true,
+      change.ad_set_external_id,
+      null,
+      { observed_budget_minor: after.dailyBudgetMinor, currency: after.currency },
     );
   }
 

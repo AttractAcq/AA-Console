@@ -42,6 +42,7 @@ export const EXECUTION_HINT: Record<string, string> = {
   executed: "Done, and the external result is on the record.",
   failed: "The last attempt failed and will be tried again.",
   abandoned: "Stopped after a failure that cannot be safely retried.",
+  uncertain: "An external effect may have happened. Inspect the destination before any new approval.",
 };
 
 export async function fetchCampaignActionDue(clientId: string): Promise<CampaignActionDue[]> {

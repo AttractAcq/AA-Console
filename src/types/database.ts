@@ -35968,6 +35968,16 @@ export type Database = {
         }
         Returns: undefined
       }
+      record_campaign_action_uncertain_v6: {
+        Args: {
+          p_execution_id: string
+          p_external_id?: string
+          p_external_url?: string
+          p_reason: string
+          p_result?: Json
+        }
+        Returns: undefined
+      }
       record_campaign_page_probe_v6: {
         Args: {
           p_detail: string
