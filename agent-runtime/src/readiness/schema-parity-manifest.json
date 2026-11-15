@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "e10d320d4a98bf07967166c3adf7bf1f2e056e547fc805ac8582a7d11cc5f06e",
-  "generatedTypesSha256": "39e67cce4c95a5d912e382e6709f07463ebefc32df472beb3ed77cf3ccd93da5",
-  "generatedSchemaBodySha256": "963134be2d39db62024fc35473ab11ed8c7e4623eedd3c654c9351385525169d",
+  "migrationSourceDigest": "43b5b8a311b4d331f0a0185331c021e8ab72415f22ffe7791ef0474acae9294f",
+  "generatedTypesSha256": "79c55929930c393e433901a86cd0c0425d97effefd954c2e1dd8a939b1e5121f",
+  "generatedSchemaBodySha256": "d96d71f36208928b7c8bf0326edbe7f7abea8ccc0e95d0a2fb6ae859a311e40c",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3734,6 +3734,13 @@
       "filename": "20261122010000_516_campaign_sweep_work_items.sql",
       "sha256": "9d7c15585e27d7e8016f68910008c052016fef01114e3c69d91a05839455ee84",
       "trimmedMd5": "c91ebe50956ff3d01b8d0cb40ad77307"
+    },
+    {
+      "version": "20261122020000",
+      "name": "517_campaign_sweep_step_retry",
+      "filename": "20261122020000_517_campaign_sweep_step_retry.sql",
+      "sha256": "3b967b5eeadcbe0d8c578a86b52ca574e4135d827bf2f96a7934001d0ce64244",
+      "trimmedMd5": "c812434663180750648cf50d7ac2fbb6"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

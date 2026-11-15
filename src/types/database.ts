@@ -3767,6 +3767,162 @@ export type Database = {
           },
         ]
       }
+      campaign_sweep_step_retries_v7: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          id: string
+          prior_blocker: string
+          prior_job_id: string | null
+          requested_at: string
+          requested_by: string
+          run_id: string
+          step_id: string
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          id?: string
+          prior_blocker: string
+          prior_job_id?: string | null
+          requested_at?: string
+          requested_by: string
+          run_id: string
+          step_id: string
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          id?: string
+          prior_blocker?: string
+          prior_job_id?: string | null
+          requested_at?: string
+          requested_by?: string
+          run_id?: string
+          step_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_prior_job_id_fkey"
+            columns: ["prior_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_prior_job_id_fkey"
+            columns: ["prior_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_prior_job_id_fkey"
+            columns: ["prior_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_sweep_work_bindings_v7: {
         Row: {
           created_at: string
@@ -39924,6 +40080,33 @@ export type Database = {
         }
       }
       resume_paused_jobs: { Args: never; Returns: number }
+      retry_campaign_sweep_step_v7: {
+        Args: { p_step_id: string }
+        Returns: {
+          agent_key: string
+          blocker: string | null
+          completed_at: string | null
+          created_at: string
+          dependencies: string[]
+          id: string
+          input_from_step_key: string | null
+          input_id: string | null
+          input_params: Json
+          input_table: string
+          job_id: string | null
+          resolved_input_id: string | null
+          run_id: string
+          status: string
+          step_key: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_steps"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       retry_failed_higgsfield_motion_step: {
         Args: { p_failed_requests: Json; p_step_id: string }
         Returns: {

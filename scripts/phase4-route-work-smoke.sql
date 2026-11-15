@@ -61,6 +61,27 @@ begin
   if n<>1 or (select state from public.delivery_work_items_v6 where id=work1)<>'held'
     or (select state from public.delivery_work_items_v6 where id=work2)<>'prepared' then
     raise exception 'A failed piece affected its sibling'; end if;
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  perform set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  perform public.retry_campaign_sweep_step_v7((select id from public.workflow_steps
+    where run_id=run1 and step_key='piece1_create'));
+  if (select status from public.workflow_steps where run_id=run1
+      and step_key='piece1_create')<>'pending'
+    or (select status from public.workflow_steps where run_id=run1
+      and step_key='piece2_create')<>'pending'
+    or (select count(*) from public.campaign_sweep_step_retries_v7 where run_id=run1)<>1
+    then raise exception 'Retry reset a sibling or lost its audit'; end if;
+  begin
+    perform public.retry_campaign_sweep_step_v7((select id from public.workflow_steps
+      where run_id=run1 and step_key='piece1_create'));
+    raise exception 'A second retry reset pending work';
+  exception when raise_exception then
+    if sqlerrm='A second retry reset pending work' then raise; end if;
+  end;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
   if (select id from public.ensure_campaign_route_packages_v7(cid,run1)
     where route='organic')<>organic1.id then
     raise exception 'Retry changed the package version'; end if;

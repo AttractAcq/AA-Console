@@ -26,6 +26,7 @@ import { Modal } from "../../components/Modal";
 import { PageBuilderPanel } from "../conversion/PageBuilderPanel";
 import { SalesOverviewPanel } from "../sales/SalesOverviewPanel";
 import { useCampaignV2Package } from "./useCampaignV2Package";
+import { CampaignSweepWork } from "./CampaignSweepWork";
 
 type ContentSpecPiece = { route: string; platform: string; media_type: string; content_format: string };
 type PlannedIdea = { id: string; campaign_position: number | null; title: string; body: string | null };
@@ -718,6 +719,8 @@ export function CampaignExecutionPanel() {
               {packageState.manifest && <p className="mt-3 text-xs text-muted-foreground">New content links record the campaign package active when linked. Older links are marked as not version-bound; review the exact asset before requesting external approval.</p>}
               {packageState.approvals.length > 0 && <p className="mt-3 text-xs text-muted-foreground">Current-package approvals: {packageState.approvals.map((approval) => `${approval.action_key.replaceAll("_", " ")} · ${approval.status}`).join("; ")}</p>}
             </section>
+            {clientId && c.acquisition_mode !== "legacy" &&
+              <CampaignSweepWork clientId={clientId} campaignId={c.id} />}
             <div className="relative mt-4">
               <Button onClick={() => setActionsOpen((open) => !open)}>Action buttons</Button>
               {actionsOpen && <CampaignActions campaign={c} checks={reqs} busy={busy} planning={planning.has(c.id)} onChoose={(kind) => setConfirmAction({ campaign: c, kind })} />}
