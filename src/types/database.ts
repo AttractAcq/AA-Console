@@ -2149,6 +2149,7 @@ export type Database = {
           lease_until: string | null
           proposed_daily_budget: number
           reason: string
+          review_epoch_v6: number
           status: string
           updated_at: string
         }
@@ -2170,6 +2171,7 @@ export type Database = {
           lease_until?: string | null
           proposed_daily_budget: number
           reason: string
+          review_epoch_v6?: number
           status?: string
           updated_at?: string
         }
@@ -2191,6 +2193,7 @@ export type Database = {
           lease_until?: string | null
           proposed_daily_budget?: number
           reason?: string
+          review_epoch_v6?: number
           status?: string
           updated_at?: string
         }
@@ -4684,6 +4687,7 @@ export type Database = {
           audience: string | null
           brief: string
           budget: number | null
+          budget_context_epoch_v6: number
           built_at: string | null
           channels: string[]
           client_id: string
@@ -4739,6 +4743,7 @@ export type Database = {
           audience?: string | null
           brief: string
           budget?: number | null
+          budget_context_epoch_v6?: number
           built_at?: string | null
           channels?: string[]
           client_id: string
@@ -4794,6 +4799,7 @@ export type Database = {
           audience?: string | null
           brief?: string
           budget?: number | null
+          budget_context_epoch_v6?: number
           built_at?: string | null
           channels?: string[]
           client_id?: string
@@ -31240,6 +31246,7 @@ export type Database = {
           lease_until: string | null
           proposed_daily_budget: number
           reason: string
+          review_epoch_v6: number
           status: string
           updated_at: string
         }
@@ -31538,10 +31545,18 @@ export type Database = {
         Returns: string
       }
       caller_gate_markers: { Args: never; Returns: string }
+      campaign_action_exact_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       campaign_action_inbox_payload_v6: {
         Args: {
           p_action: Database["public"]["Tables"]["campaign_action_approvals"]["Row"]
         }
+        Returns: Json
+      }
+      campaign_budget_exact_snapshot_v6: {
+        Args: { p_change_id: string }
         Returns: Json
       }
       campaign_plan_fingerprint: {
@@ -32228,6 +32243,7 @@ export type Database = {
           audience: string | null
           brief: string
           budget: number | null
+          budget_context_epoch_v6: number
           built_at: string | null
           channels: string[]
           client_id: string

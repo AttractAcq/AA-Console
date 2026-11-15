@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "c0150e9d620f004aee2808ff7b5e0f55e8c3d41666a03ac2f0ccf6bc93866cad",
-  "generatedTypesSha256": "f1e17ab880ae1da5dff45883a56338ee682ec6f1fcf00024fcb3550226c53808",
-  "generatedSchemaBodySha256": "698d1a64e9ba8cfa89db19f4aa8f00a136a30972af5fdc0566a3a469c6317494",
+  "migrationSourceDigest": "93327bbe4b7df94b05a4ac9be3fa0ed4f73f7bc3a1461459be34a46aeaa4e107",
+  "generatedTypesSha256": "f8a4a93c8cdeeafe599708c66e7d3f8e74050f16dc3025a5299fe36f21e92aa2",
+  "generatedSchemaBodySha256": "e476840f5c1fb54688a2d839699799e48d11b4ec555fd386575148c98ffe4d4b",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3356,6 +3356,27 @@
       "filename": "20261120020000_462_metrics_backfill_coverage.sql",
       "sha256": "49bdadc4d59e284dbe1fad94559386bd6c571eaa7d56c3c2cf875a11164aa828",
       "trimmedMd5": "d09f921d99a1f8d158948b0c0112cfad"
+    },
+    {
+      "version": "20261120030000",
+      "name": "463_campaign_budget_exact_review",
+      "filename": "20261120030000_463_campaign_budget_exact_review.sql",
+      "sha256": "d9cabd3b3884b52d46d2fd280aaeb32b154515f40c2a3e71d5ca4428b8a9e1af",
+      "trimmedMd5": "455aa5db07150fc7cb0835563d9d294a"
+    },
+    {
+      "version": "20261120040000",
+      "name": "464_campaign_budget_inbox_view",
+      "filename": "20261120040000_464_campaign_budget_inbox_view.sql",
+      "sha256": "0154290a65e8954912685c201a295a2cc32141f29468cf7d61c77dc22a65ffbd",
+      "trimmedMd5": "f21a98d61ad6f9b9afb57c971dc84c93"
+    },
+    {
+      "version": "20261120050000",
+      "name": "465_campaign_budget_review_coverage",
+      "filename": "20261120050000_465_campaign_budget_review_coverage.sql",
+      "sha256": "24d3f7dd71704032ee9e7059275102c2ef329fb636865b29bea45b3bb3502821",
+      "trimmedMd5": "babf324ab0d03dcbf6cf0c8aaa5acdd1"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
