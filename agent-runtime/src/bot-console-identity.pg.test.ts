@@ -228,7 +228,8 @@ beforeAll(async () => {
       status text,
       decided_at timestamptz,
       decided_by uuid,
-      rejection_reason text
+      rejection_reason text,
+      revoked_reason text
     );
   `);
   await applyCreatingMissingTypes(section(sql, "approval-decisions"));
@@ -258,6 +259,53 @@ beforeAll(async () => {
       render_path text,
       storage_path text
     );
+    create table if not exists public.client_engine_settings (
+      id uuid primary key default gen_random_uuid()
+    );
+    alter table public.client_engine_settings
+      add column if not exists client_id uuid;
+    alter table public.client_engine_settings
+      add column if not exists creative_director_required boolean;
+    alter table public.client_engine_settings
+      add column if not exists lead_magnet_delivery_enabled boolean;
+    create unique index if not exists client_engine_settings_client_idx
+      on public.client_engine_settings (client_id);
+    create table if not exists public.lead_magnets (
+      id uuid primary key,
+      name text
+    );
+    create table if not exists public.lead_magnet_versions (
+      id uuid primary key,
+      magnet_id uuid,
+      storage_path text,
+      media_type text,
+      content_sha256 text,
+      delivery_subject text,
+      delivery_body text
+    );
+    create table if not exists public.lead_magnet_deliveries (
+      id uuid primary key,
+      client_id uuid,
+      submission_id uuid,
+      lead_id uuid,
+      magnet_version_id uuid,
+      channel text,
+      recipient text,
+      status text,
+      attempts integer default 0,
+      provider_ref text,
+      last_error text,
+      lease_until timestamptz,
+      created_at timestamptz default now()
+    );
+    create or replace function public.lead_magnet_payload_hash_v6(p_version_id uuid)
+    returns text language sql stable as $$
+      select 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'::text
+    $$;
+    create or replace function public.active_creative_director(p_client_id uuid)
+    returns uuid language sql stable as $$ select null::uuid $$;
+    create or replace function public.active_video_approval_manager(target uuid)
+    returns uuid language sql stable as $$ select null::uuid $$;
   `);
   await applyCreatingMissingTypes(section(sql, "security-review-preambles"));
   await db.exec("set check_function_bodies = on");
@@ -749,6 +797,21 @@ describe("bot console identity", () => {
     );
     expect(published.rows[0]?.stamped).not.toBeNull();
     expect(published.rows[0]?.created_by).toBe(HUMAN);
+    const actor = await db.query<{
+      decision: string; reviewed_by: string; decided_in_seat: string; reason: string;
+    }>(
+      `select decision::text, reviewed_by::text, decided_in_seat, reason
+         from public.client_asset_reviews
+        where asset_id = $1
+          and reason = 'Approved by scheduling a bot-reviewed asset'`,
+      [botAsset],
+    );
+    expect(actor.rows[0]).toEqual({
+      decision: "approved",
+      reviewed_by: HUMAN,
+      decided_in_seat: "admin",
+      reason: "Approved by scheduling a bot-reviewed asset",
+    });
 
     await asUser(HUMAN);
     expect(await call("select public.review_media_asset($1, 'approved', null)", [humanAsset])).toBeNull();
@@ -778,7 +841,98 @@ describe("bot console identity", () => {
       [bareAsset],
     );
     expect(bare).toMatch(/not been approved by a person/);
+
+    await asUser(production);
+    expect(await call("select public.review_media_asset($1, 'rejected', 'reopen')", [humanAsset])).toBeNull();
     await db.exec("reset role");
+    const cleared = await db.query<{ human_approved_at: string | null }>(
+      "select human_approved_at::text from public.client_media_assets where id = $1",
+      [humanAsset],
+    );
+    expect(cleared.rows[0]?.human_approved_at).toBeNull();
+
+    const clientUser = "d1111111-1111-4111-8111-111111111111";
+    const director = "d2222222-2222-4222-8222-222222222222";
+    const clientAsset = "d3333333-3333-4333-8333-333333333331";
+    const seatAsset = "d3333333-3333-4333-8333-333333333332";
+    const smmAsset = "d3333333-3333-4333-8333-333333333333";
+    await asService();
+    await db.query(
+      `insert into auth.users (id, email) values
+         ($1, 'client-324@attractacq.com'),
+         ($2, 'director-324@attractacq.com')
+       on conflict (id) do nothing`,
+      [clientUser, director],
+    );
+    await db.query(
+      `insert into public.profiles (id, role, full_name, email, is_bot, bot_key) values
+         ($1, 'client', 'Client', 'client-324@attractacq.com', false, null),
+         ($2, 'employee', 'Director', 'director-324@attractacq.com', false, null)
+       on conflict (id) do nothing`,
+      [clientUser, director],
+    );
+    await db.query(
+      `insert into public.client_media_assets
+         (id, client_id, brief_id, media_type, review_status, edit_stage, content_format,
+          storage_path, bot_reviewed_at)
+       values
+         ($1, $4, $5, 'image', 'approved', 'review_ready', 'single', 'client.jpg', now()),
+         ($2, $4, $5, 'image', 'approved', 'review_ready', 'single', 'seat.jpg', now()),
+         ($3, $4, $5, 'image', 'approved', 'review_ready', 'single', 'smm.jpg', now())`,
+      [clientAsset, seatAsset, smmAsset, CLIENT, brief],
+    );
+    await db.exec(`
+      create or replace function public.can_access_client(target uuid)
+      returns boolean language sql stable security definer set search_path = public as $$
+        select true
+      $$;
+    `);
+    await db.exec("reset role");
+
+    await asUser(clientUser);
+    const clientSchedule = await call(
+      "select public.schedule_asset($1, current_date, 'organic', null, '09:00')",
+      [clientAsset],
+    );
+    expect(clientSchedule).toMatch(/42501|Only a human admin, the creative director, or the active SMM/);
+    expect(clientSchedule).toMatch(/Only a human admin, the creative director, or the active SMM/);
+
+    await db.exec("reset role");
+    await db.query(
+      `insert into public.client_engine_settings (client_id, creative_director_required)
+       values ($1, true)
+       on conflict (client_id) do update set creative_director_required = true`,
+      [CLIENT],
+    );
+    await db.exec(`
+      create or replace function public.active_creative_director(p_client_id uuid)
+      returns uuid language sql stable as $$ select '${director}'::uuid $$;
+      create or replace function public.active_video_approval_manager(target uuid)
+      returns uuid language sql stable as $$ select '${EMPLOYEE}'::uuid $$;
+    `);
+
+    await asUser(production);
+    const botSeat = await call("select public.review_media_asset($1, 'approved', null)", [seatAsset]);
+    expect(botSeat).toMatch(/Only the assigned creative director or an admin/);
+
+    await asUser(EMPLOYEE);
+    const smmSchedule = await call(
+      "select public.schedule_asset($1, current_date, 'organic', null, '09:00')",
+      [smmAsset],
+    );
+    expect(smmSchedule).toMatch(/Only the assigned creative director or an admin/);
+
+    await db.exec("reset role");
+    await db.exec(`
+      create or replace function public.can_access_client(target uuid)
+      returns boolean language sql stable security definer set search_path = public as $$
+        select public.is_admin()
+      $$;
+      create or replace function public.active_creative_director(p_client_id uuid)
+      returns uuid language sql stable as $$ select null::uuid $$;
+      create or replace function public.active_video_approval_manager(target uuid)
+      returns uuid language sql stable as $$ select null::uuid $$;
+    `);
   });
 
   it("lets bot-sales decide a pending lead magnet and refuses every other bot", async () => {
@@ -863,6 +1017,40 @@ describe("bot console identity", () => {
       [CLIENT],
     );
     expect(courier).toMatch(/Bot accounts cannot perform this action/);
+
+    await db.exec("reset role");
+    await db.query(
+      `insert into public.lead_magnets (id, name) values
+         ('e0000000-0000-4000-8000-000000000001', 'Sales magnet'),
+         ('e0000000-0000-4000-8000-000000000002', 'Human magnet')`,
+    );
+    await db.query(
+      `insert into public.lead_magnet_versions (id, magnet_id) values ($1, 'e0000000-0000-4000-8000-000000000001'),
+         ($2, 'e0000000-0000-4000-8000-000000000002')`,
+      [salesApproval, humanApproval],
+    );
+    await db.query(
+      `insert into public.lead_magnet_deliveries
+         (id, client_id, magnet_version_id, channel, recipient, status, attempts)
+       values
+         ('e1000000-0000-4000-8000-000000000001', $1, $2, 'email', 'lead@example.com', 'queued', 0),
+         ('e1000000-0000-4000-8000-000000000002', $1, $3, 'email', 'lead@example.com', 'queued', 0)`,
+      [CLIENT, salesApproval, humanApproval],
+    );
+    await db.query(
+      `insert into public.client_engine_settings (client_id, lead_magnet_delivery_enabled)
+       values ($1, true)
+       on conflict (client_id) do update set lead_magnet_delivery_enabled = true`,
+      [CLIENT],
+    );
+    const due = await db.query<{ magnet_version_id: string; blocker: string | null }>(
+      `select magnet_version_id::text, blocker from public.lead_magnet_due
+        where client_id = $1 order by magnet_version_id`,
+      [CLIENT],
+    );
+    const byVersion = new Map(due.rows.map((row) => [row.magnet_version_id, row.blocker]));
+    expect(byVersion.get(salesApproval)).toMatch(/A bot approved this magnet/);
+    expect(byVersion.get(humanApproval)).toBeNull();
   });
 
   it("purges a bot's sessions and refuses a human", async () => {

@@ -4040,7 +4040,7 @@ alter table public.client_media_assets
   add column if not exists bot_reviewed_at timestamptz;
 
 comment on column public.client_media_assets.bot_reviewed_at is
-  'When a bot approved this asset. Null when a bot rejected it. A bot never writes human_approved_at. A human schedule of a bot-reviewed asset is what stamps human_approved_at, which is what claim_posts_for_publishing still requires.';
+  'When a bot approved this asset. Null after a rejection. A bot never writes human_approved_at. A human schedule of a bot-reviewed asset calls review_media_asset, which stamps human_approved_at. organic_publication_source_snapshot_v6 is the publisher gate and still requires that human stamp; bot_reviewed_at is not publication authority.';
 
 -- review_media_asset (was 20261025120000_247_creative_decisions_have_a_seat.sql)
 -- ---------------------------------------------------------------------------
@@ -4105,7 +4105,7 @@ begin
       if v_director is null then
         raise exception 'This client requires creative director sign-off and nobody holds that seat. Assign one before approving creative.';
       end if;
-      if not coalesce(is_admin(), false) and auth.uid() is distinct from v_director then
+      if not coalesce(public.is_human_admin(), false) and auth.uid() is distinct from v_director then
         raise exception 'Only the assigned creative director or an admin can approve creative for this client.';
       end if;
     end if;
@@ -4144,9 +4144,9 @@ begin
   update client_media_assets set
     review_status = p_decision,
     human_approved_at = case
+      when p_decision is distinct from 'approved'::public.review_status then null
       when v_caller_is_bot then human_approved_at
-      when p_decision = 'approved' then now()
-      else null
+      else now()
     end,
     bot_reviewed_at = case
       when not v_caller_is_bot then bot_reviewed_at
@@ -4506,14 +4506,24 @@ begin
     raise exception 'Scheduling blocked: this campaign has no explicit organic route.' using errcode = 'P0001';
   end if;
 
-  -- The publisher still requires human_approved_at. Writing it here is the
-  -- human act. An asset a person already approved keeps that earlier stamp.
+  -- A bot review is not authority to publish. The human who schedules must
+  -- be a human admin, the creative director, or the active SMM, and the
+  -- approval goes back through review_media_asset so the seat, video and
+  -- staff gates run and a client_asset_reviews row records the actor.
+  -- An asset a person already approved keeps that earlier stamp.
   if v_asset.human_approved_at is null then
-    update public.client_media_assets
-       set human_approved_at = now()
-     where id = v_asset.id
-       and human_approved_at is null
-       and bot_reviewed_at is not null;
+    if not (
+      coalesce(public.is_human_admin(), false)
+      or coalesce(auth.uid() = public.active_creative_director(v_asset.client_id), false)
+      or coalesce(auth.uid() = public.active_video_approval_manager(v_asset.client_id), false)
+    ) then
+      raise exception 'Only a human admin, the creative director, or the active SMM may schedule a bot-reviewed asset.'
+        using errcode = '42501';
+    end if;
+    perform public.review_media_asset(
+      p_asset_id,
+      'approved'::public.review_status,
+      'Approved by scheduling a bot-reviewed asset');
   end if;
 
   insert into public.scheduled_posts
@@ -4529,12 +4539,108 @@ end
 $function$;
 
 comment on function public.schedule_asset(uuid, date, public.post_channel, public.post_platform, time) is
-  'Human scheduling. Accepts an asset a person approved or a bot reviewed, and a human schedule of a bot-reviewed asset stamps human_approved_at. Bots are refused. Publication still requires that stamp plus a matching approved Engine slot.';
+  'Human scheduling. A bot-reviewed asset may be scheduled only by a human admin, the creative director, or the active SMM, and that schedule re-enters review_media_asset so the human stamp and the review row are written there. Bots are refused. organic_publication_source_snapshot_v6 still requires human_approved_at and a matching scheduled Engine slot.';
 
 revoke all on function public.schedule_asset(uuid, date, public.post_channel, public.post_platform, time)
   from public, anon, service_role;
 grant execute on function public.schedule_asset(uuid, date, public.post_channel, public.post_platform, time)
   to authenticated;
+
+-- A bot-sales approval is internal. The courier reads lead_magnet_due, and
+-- claim_lead_magnet_deliveries only takes rows whose blocker is null.
+-- decided_by is_bot stays blocked until a human approval of that version
+-- is the live approved row. The per-client delivery switch is unchanged.
+create or replace view public.lead_magnet_due with (security_invoker = true) as
+select
+  d.id as delivery_id,
+  d.client_id,
+  d.submission_id,
+  d.lead_id,
+  d.magnet_version_id,
+  m.name as magnet_name,
+  d.channel,
+  d.recipient,
+  d.status,
+  d.attempts,
+  d.provider_ref,
+  d.last_error,
+  case
+    when a.id is null
+      then 'Nobody has approved this magnet.'
+    when a.status = 'revoked'
+      then 'The approval was revoked: ' || coalesce(a.revoked_reason, 'no reason recorded') || '.'
+    when a.status <> 'approved'
+      then 'The approval is ' || a.status || '.'
+    when exists (
+      select 1 from public.profiles decider
+       where decider.id = a.decided_by and decider.is_bot
+    )
+      then 'A bot approved this magnet. A person still has to approve this version before it can be sent.'
+    when a.payload_hash <> public.lead_magnet_payload_hash_v6(d.magnet_version_id)
+      then 'The file or the message changed after approval. Ask again.'
+    when not coalesce(ces.lead_magnet_delivery_enabled, false)
+      then 'Magnet delivery is off for this client.'
+    when d.status = 'sent' then 'Already sent.'
+    when d.status = 'cancelled' then 'Cancelled.'
+    when d.status = 'sending' and d.lease_until > now() then 'Being sent now.'
+    when d.attempts >= 5
+      then 'Failed ' || d.attempts::text || ' times. Last error: '
+           || coalesce(d.last_error, 'none recorded') || '.'
+    else null
+  end as blocker
+from public.lead_magnet_deliveries d
+join public.lead_magnet_versions v on v.id = d.magnet_version_id
+join public.lead_magnets m on m.id = v.magnet_id
+left join public.lead_magnet_approvals a
+  on a.magnet_version_id = d.magnet_version_id and a.status in ('approved', 'revoked')
+left join public.client_engine_settings ces on ces.client_id = d.client_id;
+
+comment on view public.lead_magnet_due is
+  'Every owed magnet and the one sentence saying why it has not gone. A null blocker means the courier would take it next. A bot approval is never a null blocker.';
+
+create or replace function public.claim_lead_magnet_deliveries(p_limit integer default 5)
+returns table (
+  delivery_id uuid, client_id uuid, magnet_version_id uuid, channel text,
+  recipient text, storage_path text, media_type text, content_sha256 text,
+  delivery_subject text, delivery_body text, magnet_name text, attempt integer)
+language plpgsql security definer set search_path = pg_catalog, public as $$
+begin
+  if auth.role() <> 'service_role' then
+    raise exception 'Only the internal service may claim a delivery.';
+  end if;
+  return query
+  with ready as (
+    select d.id from public.lead_magnet_deliveries d
+     where d.status in ('queued', 'failed')
+       and d.id in (select u.delivery_id from public.lead_magnet_due u where u.blocker is null)
+       and not exists (
+         select 1
+           from public.lead_magnet_approvals bot_approval
+           join public.profiles bot_decider on bot_decider.id = bot_approval.decided_by
+          where bot_approval.magnet_version_id = d.magnet_version_id
+            and bot_approval.status = 'approved'
+            and bot_decider.is_bot
+       )
+     order by d.created_at
+     limit greatest(coalesce(p_limit, 5), 1)
+     for update skip locked
+  ), claimed as (
+    update public.lead_magnet_deliveries d
+       set status = 'sending', claimed_at = now(),
+           lease_until = now() + interval '10 minutes', attempts = d.attempts + 1
+     where d.id in (select r.id from ready r)
+     returning d.*
+  )
+  select c.id, c.client_id, c.magnet_version_id, c.channel, c.recipient,
+         v.storage_path, v.media_type, v.content_sha256,
+         v.delivery_subject, v.delivery_body, m.name, c.attempts
+    from claimed c
+    join public.lead_magnet_versions v on v.id = c.magnet_version_id
+    join public.lead_magnets m on m.id = v.magnet_id;
+end $$;
+
+revoke all on function public.claim_lead_magnet_deliveries(integer) from public, anon, authenticated;
+grant execute on function public.claim_lead_magnet_deliveries(integer) to service_role;
 -- <<end security-review-preambles>>
 
 select public.lock_down_definer_functions();

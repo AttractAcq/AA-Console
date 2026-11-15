@@ -4,7 +4,7 @@
 -- The agent-runtime pglite suite covers the same checks in CI.
 
 begin;
-select plan(34);
+select plan(40);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -249,6 +249,19 @@ select results_eq(
   $$values (true, '11111111-1111-4111-8111-111111111111'::uuid)$$,
   'the human schedule stamps human_approved_at and records who scheduled'
 );
+select results_eq(
+  $$select decision::text, reviewed_by, decided_in_seat, reason
+      from public.client_asset_reviews
+     where asset_id = 'b4444444-4444-4444-8444-444444444441'
+       and reason = 'Approved by scheduling a bot-reviewed asset'$$,
+  $$values (
+    'approved'::text,
+    '11111111-1111-4111-8111-111111111111'::uuid,
+    'admin'::text,
+    'Approved by scheduling a bot-reviewed asset'::text
+  )$$,
+  'the human schedule writes the review row for that actor'
+);
 
 select lives_ok(
   $$select public.review_media_asset('b4444444-4444-4444-8444-444444444442', 'approved', null)$$,
@@ -362,6 +375,97 @@ select results_eq(
      where id = 'c2222222-2222-4222-8222-222222222222'$$,
   $$values ('approved'::text, '11111111-1111-4111-8111-111111111111'::uuid)$$,
   'the human lead-magnet decision is unchanged'
+);
+
+select set_config('request.jwt.claim.role', 'service_role', true);
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, recovery_token, email_change_token_new, email_change
+) values
+  ('00000000-0000-0000-0000-000000000000',
+   'e1111111-1111-4111-8111-111111111111',
+   'authenticated', 'authenticated', 'client-324@attractacq.com', '', now(),
+   '{}'::jsonb, '{}'::jsonb, now(), now(), '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000',
+   'e2222222-2222-4222-8222-222222222222',
+   'authenticated', 'authenticated', 'director-324@attractacq.com', '', now(),
+   '{}'::jsonb, '{}'::jsonb, now(), now(), '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000',
+   'e3333333-3333-4333-8333-333333333333',
+   'authenticated', 'authenticated', 'smm-324@attractacq.com', '', now(),
+   '{}'::jsonb, '{}'::jsonb, now(), now(), '', '', '', '');
+insert into public.profiles (id, role, full_name, email, is_bot, bot_key) values
+  ('e1111111-1111-4111-8111-111111111111', 'client', 'Client', 'client-324@attractacq.com', false, null),
+  ('e2222222-2222-4222-8222-222222222222', 'employee', 'Director', 'director-324@attractacq.com', false, null),
+  ('e3333333-3333-4333-8333-333333333333', 'employee', 'SMM', 'smm-324@attractacq.com', false, null);
+insert into public.client_users (client_id, user_id) values
+  ('44444444-4444-4444-8444-444444444401', 'e1111111-1111-4111-8111-111111111111');
+insert into public.team_members (id, user_id, category, name, initials) values
+  ('e2222222-2222-4222-8222-222222222221', 'e2222222-2222-4222-8222-222222222222', 'creative_director', 'Director', 'DR'),
+  ('e3333333-3333-4333-8333-333333333331', 'e3333333-3333-4333-8333-333333333333', 'smm', 'SMM', 'SM');
+insert into public.client_assignments (member_id, client_id) values
+  ('e2222222-2222-4222-8222-222222222221', '44444444-4444-4444-8444-444444444401'),
+  ('e3333333-3333-4333-8333-333333333331', '44444444-4444-4444-8444-444444444401');
+insert into public.client_engine_settings (client_id, creative_director_required)
+values ('44444444-4444-4444-8444-444444444401', true);
+insert into public.client_media_assets (
+  id, client_id, brief_id, media_type, storage_path, review_status, edit_stage,
+  content_format, bot_reviewed_at)
+values
+  ('f4444444-4444-4444-8444-444444444441',
+   '44444444-4444-4444-8444-444444444401',
+   'b3333333-3333-4333-8333-333333333333',
+   'image', 'client.jpg', 'approved', 'review_ready', 'single', now()),
+  ('f4444444-4444-4444-8444-444444444442',
+   '44444444-4444-4444-8444-444444444401',
+   'b3333333-3333-4333-8333-333333333333',
+   'image', 'seat.jpg', 'approved', 'review_ready', 'single', now()),
+  ('f4444444-4444-4444-8444-444444444443',
+   '44444444-4444-4444-8444-444444444401',
+   'b3333333-3333-4333-8333-333333333333',
+   'image', 'smm.jpg', 'approved', 'review_ready', 'single', now());
+
+select set_config('request.jwt.claim.sub', 'e1111111-1111-4111-8111-111111111111', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
+select set_config('request.jwt.claims', '{"aal":"aal2","role":"authenticated"}', true);
+select throws_ok(
+  $$select public.schedule_asset(
+      'f4444444-4444-4444-8444-444444444441', current_date, 'organic', null, '09:00')$$,
+  '42501',
+  'Only a human admin, the creative director, or the active SMM may schedule a bot-reviewed asset.',
+  'a client user cannot schedule a bot-reviewed asset'
+);
+
+select set_config('request.jwt.claim.sub', '77777777-7777-4777-8777-777777777771', true);
+select throws_ok(
+  $$select public.review_media_asset('f4444444-4444-4444-8444-444444444442', 'approved', null)$$,
+  'P0001',
+  'Only the assigned creative director or an admin can approve creative for this client.',
+  'a bot fails the creative-director seat'
+);
+
+select set_config('request.jwt.claim.sub', 'e3333333-3333-4333-8333-333333333333', true);
+select throws_ok(
+  $$select public.schedule_asset(
+      'f4444444-4444-4444-8444-444444444443', current_date, 'organic', null, '09:00')$$,
+  'P0001',
+  'Only the assigned creative director or an admin can approve creative for this client.',
+  'an SMM who is not the director is refused when a director is required'
+);
+
+select set_config('request.jwt.claim.sub', '77777777-7777-4777-8777-777777777771', true);
+select lives_ok(
+  $$select public.review_media_asset(
+      'b4444444-4444-4444-8444-444444444442', 'rejected', 'reopen')$$,
+  'a bot may reject'
+);
+select results_eq(
+  $$select human_approved_at is null
+      from public.client_media_assets
+     where id = 'b4444444-4444-4444-8444-444444444442'$$,
+  $$values (true)$$,
+  'a rejection clears human_approved_at'
 );
 
 select * from finish();

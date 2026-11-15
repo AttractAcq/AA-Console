@@ -130,11 +130,16 @@ and is executable only by service_role.
 
 `bot-production` may review an asset, approve an idea, and approve a
 campaign plan. A bot review sets `bot_reviewed_at` and does not set
-`human_approved_at`. `schedule_asset` is human-only. A human may schedule
-a bot-reviewed asset, and that schedule stamps `human_approved_at`, which
-publishing still requires. `approve_slot` stays human-only. `bot-sales`
-may decide a pending lead magnet. Turning delivery on, and the
-`lead_magnet_courier` worker, stay refused for every bot.
+`human_approved_at`. A rejection clears `human_approved_at`.
+`schedule_asset` is human-only. Scheduling a bot-reviewed asset is limited
+to a human admin, the creative director, or the active SMM, and that
+schedule calls `review_media_asset` so the seat gates run and a
+`client_asset_reviews` row records the human. `organic_publication_source_snapshot_v6`
+still requires `human_approved_at`. `approve_slot` stays human-only.
+`bot-sales` may decide a pending lead magnet, and that approval is not
+deliverable: `lead_magnet_due` stays blocked until a human approves the
+same version. Turning delivery on, and the `lead_magnet_courier` worker,
+stay refused for every bot.
 
 ```bash
 BOT_RESET_CONFIRM=reset-bot-password \
