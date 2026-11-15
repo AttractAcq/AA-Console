@@ -3097,6 +3097,88 @@ export type Database = {
           },
         ]
       }
+      campaign_page_readbacks_v6: {
+        Row: {
+          checked_at: string
+          checked_ref: string
+          client_id: string
+          execution_id: string
+          id: string
+          observed_sha256: string | null
+          repository_name: string
+          repository_owner: string
+          result: string
+          site_path: string
+        }
+        Insert: {
+          checked_at?: string
+          checked_ref: string
+          client_id: string
+          execution_id: string
+          id?: string
+          observed_sha256?: string | null
+          repository_name: string
+          repository_owner: string
+          result: string
+          site_path: string
+        }
+        Update: {
+          checked_at?: string
+          checked_ref?: string
+          client_id?: string
+          execution_id?: string
+          id?: string
+          observed_sha256?: string | null
+          repository_name?: string
+          repository_owner?: string
+          result?: string
+          site_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_route_packages_v6: {
         Row: {
           campaign_id: string
@@ -27000,6 +27082,88 @@ export type Database = {
           },
         ]
       }
+      campaign_page_readback_overview_v6: {
+        Row: {
+          checked_at: string | null
+          checked_ref: string | null
+          client_id: string | null
+          execution_id: string | null
+          id: string | null
+          observed_sha256: string | null
+          repository_name: string | null
+          repository_owner: string | null
+          result: string | null
+          site_path: string | null
+        }
+        Insert: {
+          checked_at?: string | null
+          checked_ref?: string | null
+          client_id?: string | null
+          execution_id?: string | null
+          id?: string | null
+          observed_sha256?: string | null
+          repository_name?: string | null
+          repository_owner?: string | null
+          result?: string | null
+          site_path?: string | null
+        }
+        Update: {
+          checked_at?: string | null
+          checked_ref?: string | null
+          client_id?: string | null
+          execution_id?: string | null
+          id?: string | null
+          observed_sha256?: string | null
+          repository_name?: string | null
+          repository_owner?: string | null
+          result?: string | null
+          site_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_route_actions: {
         Row: {
           acquisition_mode: string | null
@@ -32313,6 +32477,10 @@ export type Database = {
         Args: { p_client_id: string; p_execution_id: string }
         Returns: Json
       }
+      campaign_page_readback_target_v6: {
+        Args: { p_client_id: string; p_execution_id: string }
+        Returns: Json
+      }
       campaign_plan_fingerprint: {
         Args: {
           p_campaign: Database["public"]["Tables"]["client_campaigns"]["Row"]
@@ -36170,6 +36338,18 @@ export type Database = {
         }
         Returns: string
       }
+      record_campaign_page_readback_v6: {
+        Args: {
+          p_checked_ref: string
+          p_client_id: string
+          p_execution_id: string
+          p_observed_sha256: string
+          p_repository_name: string
+          p_repository_owner: string
+          p_site_path: string
+        }
+        Returns: string
+      }
       record_client_launch_asset_check: {
         Args: { p_asset_id: string; p_package_id: string; p_qa_evidence: Json }
         Returns: {
@@ -36914,6 +37094,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      request_campaign_page_readback_v6: {
+        Args: { p_execution_id: string }
+        Returns: string
       }
       request_campaign_proof_publish_v6: {
         Args: { p_actor: string; p_campaign_id: string }

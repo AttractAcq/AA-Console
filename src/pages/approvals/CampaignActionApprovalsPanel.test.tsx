@@ -47,6 +47,8 @@ function database(
     revocations?: unknown[];
     readbacks?: unknown[];
     budgetJobs?: unknown[];
+    pageReadbacks?: unknown[];
+    pageJobs?: unknown[];
     runtime?: unknown;
   } = {},
 ) {
@@ -83,9 +85,16 @@ function database(
         order: async () => ({ data: options.readbacks ?? [], error: null }) };
       return { select: () => query };
     }
+    if (table === "campaign_page_readback_overview_v6") {
+      const query = { in: () => query,
+        order: async () => ({ data: options.pageReadbacks ?? [], error: null }) };
+      return { select: () => query };
+    }
     if (table === "agent_jobs") {
-      const query = { eq: () => query, in: () => query,
-        order: async () => ({ data: options.budgetJobs ?? [], error: null }) };
+      let key = "";
+      const query = { eq: (_column: string, value: string) => { key = value; return query; }, in: () => query,
+        order: async () => ({ data: key === "campaign_page_reconciler"
+          ? options.pageJobs ?? [] : options.budgetJobs ?? [], error: null }) };
       return { select: () => query };
     }
     if (table === "campaign_action_revocations_v6") {
@@ -267,6 +276,25 @@ it("requests a read-only Meta budget check and labels a value match as observati
   expect(screen.getByText(/does not prove this action changed it/)).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Check current Meta budget" }));
   await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_campaign_budget_readback_v6", {
+    p_execution_id: "execution-1",
+  }));
+});
+
+it("requests a read-only GitHub page check and keeps intake unverified", async () => {
+  const user = userEvent.setup();
+  database({ due: [{ ...done, action_key: "page_deploy", execution_status: "uncertain",
+    external_id: null, external_url: null,
+    blocker: "Provider effect may have happened; inspect the repository." }],
+    pageReadbacks: [{ execution_id: "execution-1", result: "matches_expected",
+      checked_ref: "main", observed_sha256: "a".repeat(64),
+      checked_at: "2026-11-15T12:00:00Z", repository_owner: "Org",
+      repository_name: "site", site_path: "offer/index.html" }] });
+  render(<CampaignActionApprovalsPanel />);
+  expect(await screen.findByText(/Latest observation: matches expected/)).toBeInTheDocument();
+  expect(screen.getByText(/do not prove the page is publicly available or that its form works/))
+    .toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Check GitHub page bytes" }));
+  await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_campaign_page_readback_v6", {
     p_execution_id: "execution-1",
   }));
 });

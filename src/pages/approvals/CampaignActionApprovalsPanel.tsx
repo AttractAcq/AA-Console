@@ -20,6 +20,9 @@ type ActionRevocation = { approval_id: string; reason: string; revoked_at: strin
 type BudgetReadback = { execution_id: string; result: string; observed_currency: string;
   observed_daily_budget_minor: number; checked_at: string; account_id: string };
 type BudgetJob = { input_id: string; status: string };
+type PageReadback = { execution_id: string; result: string; checked_ref: string;
+  observed_sha256: string | null; checked_at: string; repository_owner: string;
+  repository_name: string; site_path: string };
 
 export function CampaignActionApprovalsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -30,6 +33,8 @@ export function CampaignActionApprovalsPanel() {
   const [revocations, setRevocations] = useState<Record<string, ActionRevocation>>({});
   const [budgetReadbacks, setBudgetReadbacks] = useState<Record<string, BudgetReadback>>({});
   const [budgetJobs, setBudgetJobs] = useState<Record<string, BudgetJob>>({});
+  const [pageReadbacks, setPageReadbacks] = useState<Record<string, PageReadback>>({});
+  const [pageJobs, setPageJobs] = useState<Record<string, BudgetJob>>({});
   const [actionsOn, setActionsOn] = useState(false);
   const [runtimeHold, setRuntimeHold] = useState<string | null>("Runtime state has not been verified.");
   const [loading, setLoading] = useState(true);
@@ -52,6 +57,8 @@ export function CampaignActionApprovalsPanel() {
       setRevocations({});
       setBudgetReadbacks({});
       setBudgetJobs({});
+      setPageReadbacks({});
+      setPageJobs({});
       setLoading(false);
       return;
     }
@@ -90,8 +97,10 @@ export function CampaignActionApprovalsPanel() {
         setAttemptsByExecution({});
         setBudgetReadbacks({});
         setBudgetJobs({});
+        setPageReadbacks({});
+        setPageJobs({});
       } else {
-        const [{ data: attemptRows, error: attemptError }, readbacks, jobs] = await Promise.all([
+        const [{ data: attemptRows, error: attemptError }, readbacks, jobs, pageChecks, pageJobRows] = await Promise.all([
           supabase.from("campaign_action_attempts_v6" as never)
             .select("execution_id,attempt_number,status,started_at,finished_at,external_id,external_url,error,legacy_inferred")
             .in("execution_id", executionIds).order("attempt_number", { ascending: true }),
@@ -101,10 +110,18 @@ export function CampaignActionApprovalsPanel() {
           supabase.from("agent_jobs").select("input_id,status")
             .eq("agent_key", "campaign_budget_reconciler").in("input_id", executionIds)
             .order("created_at", { ascending: false }),
+          supabase.from("campaign_page_readback_overview_v6")
+            .select("execution_id,result,checked_ref,observed_sha256,checked_at,repository_owner,repository_name,site_path")
+            .in("execution_id", executionIds).order("checked_at", { ascending: false }),
+          supabase.from("agent_jobs").select("input_id,status")
+            .eq("agent_key", "campaign_page_reconciler").in("input_id", executionIds)
+            .order("created_at", { ascending: false }),
         ]);
         if (attemptError) throw new Error(`Attempt receipts could not be read: ${attemptError.message}`);
         if (readbacks.error) throw new Error(`Budget readbacks could not be read: ${readbacks.error.message}`);
         if (jobs.error) throw new Error(`Budget readback jobs could not be read: ${jobs.error.message}`);
+        if (pageChecks.error) throw new Error(`Page readbacks could not be read: ${pageChecks.error.message}`);
+        if (pageJobRows.error) throw new Error(`Page readback jobs could not be read: ${pageJobRows.error.message}`);
         const grouped: Record<string, ActionAttempt[]> = {};
         for (const row of (attemptRows ?? []) as ActionAttempt[]) {
           (grouped[row.execution_id] ??= []).push(row);
@@ -120,11 +137,23 @@ export function CampaignActionApprovalsPanel() {
           if (row.input_id) latestJobs[row.input_id] ??= row;
         }
         setBudgetJobs(latestJobs);
+        const latestPage: Record<string, PageReadback> = {};
+        for (const row of (pageChecks.data ?? []) as PageReadback[]) {
+          latestPage[row.execution_id] ??= row;
+        }
+        setPageReadbacks(latestPage);
+        const latestPageJobs: Record<string, BudgetJob> = {};
+        for (const row of (pageJobRows.data ?? []) as BudgetJob[]) {
+          if (row.input_id) latestPageJobs[row.input_id] ??= row;
+        }
+        setPageJobs(latestPageJobs);
       }
     } catch (cause) {
       setAttemptsByExecution(null);
       setBudgetReadbacks({});
       setBudgetJobs({});
+      setPageReadbacks({});
+      setPageJobs({});
       setRuntimeHold("Runtime state has not been verified.");
       setError(cause instanceof Error ? cause.message : "Could not read what happened to approved actions.");
     }
@@ -210,6 +239,17 @@ export function CampaignActionApprovalsPanel() {
     setBusyId(executionId);
     setError(null);
     const { error: rpcError } = await supabase.rpc("request_campaign_budget_readback_v6", {
+      p_execution_id: executionId,
+    });
+    setBusyId(null);
+    if (rpcError) { setError(rpcError.message); return; }
+    await refresh();
+  }
+
+  async function requestPageReadback(executionId: string) {
+    setBusyId(executionId);
+    setError(null);
+    const { error: rpcError } = await supabase.rpc("request_campaign_page_readback_v6", {
       p_execution_id: executionId,
     });
     setBusyId(null);
@@ -404,6 +444,24 @@ export function CampaignActionApprovalsPanel() {
                       disabled={busyId === action.execution_id || ["queued", "claimed", "running", "paused"].includes(budgetJobs[action.execution_id]?.status ?? "")}
                       onClick={() => void requestBudgetReadback(action.execution_id!)}>
                       Check current Meta budget
+                    </button>
+                  </div>
+                )}
+                {action.action_key === "page_deploy" && action.execution_status === "uncertain" && action.execution_id && (
+                  <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-xs">
+                    <p className="font-medium">Read-only GitHub page check</p>
+                    <p className="mt-1">The check reads the frozen repository path and ref. Matching bytes do not prove the page is publicly available or that its form works. No publish is retried.</p>
+                    {pageReadbacks[action.execution_id] && <p className="mt-2 break-all">
+                      Latest observation: {pageReadbacks[action.execution_id].result.replaceAll("_", " ")}
+                      {` · ${pageReadbacks[action.execution_id].repository_owner}/${pageReadbacks[action.execution_id].repository_name}/${pageReadbacks[action.execution_id].site_path}`}
+                      {` at ${pageReadbacks[action.execution_id].checked_ref}`}
+                      {` · ${new Date(pageReadbacks[action.execution_id].checked_at).toLocaleString()}`}
+                    </p>}
+                    {pageJobs[action.execution_id] && <p className="mt-1">Latest readback job: {pageJobs[action.execution_id].status}</p>}
+                    <button type="button" className="mt-2 rounded-lg border border-border px-3 py-2 font-medium disabled:opacity-50"
+                      disabled={busyId === action.execution_id || ["queued", "claimed", "running", "paused"].includes(pageJobs[action.execution_id]?.status ?? "")}
+                      onClick={() => void requestPageReadback(action.execution_id!)}>
+                      Check GitHub page bytes
                     </button>
                   </div>
                 )}

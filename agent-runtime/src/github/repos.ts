@@ -18,6 +18,7 @@
 // atomic change; the Contents API is one request per file, and a failure
 // halfway leaves a repository holding half a site.
 
+import { createHash } from "node:crypto";
 import { GitHubApiError } from "./app-auth.js";
 
 const API = "https://api.github.com";
@@ -101,6 +102,35 @@ export async function getRepo(
   const { status, body } = await gh(token, "GET", `/repos/${owner}/${repo}`, undefined, fetchImpl, [404]);
   if (status === 404) return null;
   return toRepoInfo(body);
+}
+
+/** Read one frozen repository path at a branch or commit without writing. */
+export async function readRepoFile(
+  token: string, owner: string, repo: string, path: string, ref: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ sha256: string; blobSha: string } | null> {
+  if (![owner, repo].every((value) => /^[A-Za-z0-9_.-]+$/.test(value)
+      && value !== "." && !value.includes(".."))
+    || !/^[A-Za-z0-9_./-]+$/.test(path) || path.includes("..")
+    || !/^[A-Za-z0-9_.\/-]+$/.test(ref)) {
+    throw new GitHubApiError(null, "The GitHub readback target is invalid.");
+  }
+  const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+  const { status, body } = await gh(token, "GET",
+    `/repos/${owner}/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(ref)}`,
+    undefined, fetchImpl, [404]);
+  if (status === 404) return null;
+  const row = (body ?? {}) as Record<string, unknown>;
+  if (row.type !== "file" || row.path !== path || row.encoding !== "base64"
+    || typeof row.content !== "string" || typeof row.sha !== "string") {
+    throw new GitHubApiError(null, "GitHub returned an unreadable page file.");
+  }
+  const encoded = row.content.replace(/\s/g, "");
+  if (!encoded || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) {
+    throw new GitHubApiError(null, "GitHub returned invalid page file bytes.");
+  }
+  const bytes = Buffer.from(encoded, "base64");
+  return { sha256: createHash("sha256").update(bytes).digest("hex"), blobSha: row.sha };
 }
 
 /**

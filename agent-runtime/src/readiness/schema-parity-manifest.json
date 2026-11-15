@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "225804965dea8c00cf17cd7a3b7bca1ebe37f8b346e6483932bbe61c6ae6fc1f",
-  "generatedTypesSha256": "6174fb5a335925d9046575ca65054444487f65a4938bae0ec87881546b1922ab",
-  "generatedSchemaBodySha256": "7ae055faca4855a28de24ceea6eaed8e51650d9aa8d2c254f0a3ba1eca5e1bd9",
+  "migrationSourceDigest": "dc424258fbc34a88276ec00dee9e85d5c2b0f4a92b39c70eb47f362f670ba2c2",
+  "generatedTypesSha256": "5b27e7375a101d900da7ed7003537465ca63f77e6ae7ef737f2c806be06d5514",
+  "generatedSchemaBodySha256": "a0e852149f0c363a8d07b62fc445af615aad45e960ab64ff6e0a92695f6f69a4",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3573,6 +3573,13 @@
       "filename": "20261121090000_493_campaign_budget_readback.sql",
       "sha256": "29460419016936305a32f90e0bf33ef1db686d6a8630a456a7253ed46cfa0bf9",
       "trimmedMd5": "e118bc5f9983e7352630ad19092de623"
+    },
+    {
+      "version": "20261121100000",
+      "name": "494_campaign_page_readback",
+      "filename": "20261121100000_494_campaign_page_readback.sql",
+      "sha256": "b3ab46fc3d998e9c57309c1fc906d1ca58ab0a65e2b70a9f00bef3ee8c5e2c99",
+      "trimmedMd5": "f194a39bb3996a082720837abf4dc54c"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

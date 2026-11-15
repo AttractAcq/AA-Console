@@ -11,6 +11,7 @@ const ROUTES = {
   meta_profile_field_writer: { title: "Meta Page change", path: "meta-profile?tab=profile" },
   meta_profile_field_reconciler: { title: "Meta Page readback", path: "meta-profile?tab=profile" },
   campaign_budget_reconciler: { title: "Meta budget readback", path: "delivery/approval-inbox?tab=campaign-actions" },
+  campaign_page_reconciler: { title: "GitHub page readback", path: "delivery/approval-inbox?tab=campaign-actions" },
 } as const;
 
 type HeldJob = { id: string; client_id: string; agent_key: keyof typeof ROUTES; created_at: string };

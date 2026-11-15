@@ -38,6 +38,7 @@ import { runQaJob } from "../agents/qa/index.js";
 import { runPublisherJob } from "../agents/publisher/index.js";
 import { runCampaignActionJob } from "../campaigns/actions/executor.js";
 import { runCampaignBudgetReconciliationJob } from "../campaigns/actions/budget-reconciliation-job.js";
+import { runCampaignPageReconciliationJob } from "../campaigns/actions/page-reconciliation-job.js";
 import { runProofPlacerJob } from "../proof-distribution/placer.js";
 import { runLeadMagnetCourierJob } from "../lead-magnets/courier.js";
 import { runOutboundCourierJob } from "../outbound/courier.js";
@@ -188,6 +189,7 @@ const RUNNERS: Record<string, JobRunner> = {
   meta_profile_field_writer: runMetaProfileFieldJob,
   meta_profile_field_reconciler: runMetaProfileReconciliationJob,
   campaign_budget_reconciler: runCampaignBudgetReconciliationJob,
+  campaign_page_reconciler: runCampaignPageReconciliationJob,
   google_reply_sender: runGoogleReplySenderJob,
   google_reply_reconciler: runGoogleReplyReconciliationJob,
   brief_dispatch: runBriefDispatchJob,
