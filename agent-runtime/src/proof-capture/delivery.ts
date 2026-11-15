@@ -16,7 +16,8 @@ export async function dispatchProofDelivery(
   if (sendReady !== true) {
     const { error: stopError } = await sb.from("proof_request_deliveries")
       .update({ status: "cancelled", error: "Current exact Inbox approval or capture link is unavailable.", lease_until: null })
-      .eq("id", row.id).eq("status", "sending");
+      .eq("id", row.id).eq("status", "sending")
+      .eq("attempt_request_id", row.attempt_request_id);
     if (stopError) throw stopError;
     return;
   }
@@ -115,6 +116,7 @@ export async function dispatchProofDelivery(
       lease_until: null,
     })
     .eq("id", row.id)
-    .eq("status", "sending");
+    .eq("status", "sending")
+    .eq("attempt_request_id", row.attempt_request_id);
   if (saveError) throw saveError;
 }

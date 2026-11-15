@@ -22343,6 +22343,7 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          attempt_request_id: string | null
           attempts: number
           capture_url: string
           channel: string
@@ -22367,6 +22368,7 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          attempt_request_id?: string | null
           attempts?: number
           capture_url: string
           channel: string
@@ -22391,6 +22393,7 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          attempt_request_id?: string | null
           attempts?: number
           capture_url?: string
           channel?: string
@@ -22418,6 +22421,20 @@ export type Database = {
             columns: ["approved_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_attempt_request_id_fkey"
+            columns: ["attempt_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_attempt_request_id_fkey"
+            columns: ["attempt_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
           },
           {
@@ -33669,6 +33686,7 @@ export type Database = {
         Returns: {
           approved_at: string | null
           approved_by: string | null
+          attempt_request_id: string | null
           attempts: number
           capture_url: string
           channel: string

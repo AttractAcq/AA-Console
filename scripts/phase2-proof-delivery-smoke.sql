@@ -24,7 +24,7 @@ select set_config('request.jwt.claims',
  '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal1"}',true);
 do $checks$
 declare delivery uuid := 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
- request_id uuid; review_id uuid; second_id uuid; claimed_id uuid;
+ first_request_id uuid; review_id uuid; second_id uuid; claimed_id uuid;
 begin
  begin
   perform public.decide_proof_delivery(delivery,true);
@@ -36,28 +36,28 @@ begin
   raise exception 'Legacy status-only approval cleared the sender gate'; end if;
  update public.proof_request_deliveries set status='pending_approval',
   approved_by=null,approved_at=null where id=delivery;
- request_id := public.request_proof_delivery_review_v6(delivery);
- select id into review_id from public.proof_delivery_reviews_v6 where canonical_request_id=request_id;
- if request_id is null or public.request_proof_delivery_review_v6(delivery)<>request_id
-  or (select status from public.approval_inbox_v6 where id=request_id)<>'pending'
+ first_request_id := public.request_proof_delivery_review_v6(delivery);
+ select id into review_id from public.proof_delivery_reviews_v6 where canonical_request_id=first_request_id;
+ if first_request_id is null or public.request_proof_delivery_review_v6(delivery)<>first_request_id
+  or (select status from public.approval_inbox_v6 where id=first_request_id)<>'pending'
   then raise exception 'Exact review was not pending and deduplicated'; end if;
  begin
-  perform public.decide_proof_delivery_inbox_v6(review_id,request_id,true);
+  perform public.decide_proof_delivery_inbox_v6(review_id,first_request_id,true);
   raise exception 'AAL1 approved proof request';
  exception when insufficient_privilege then null; end;
  update public.proof_request_deliveries set recipient='other@example.invalid' where id=delivery;
- if public.proof_delivery_source_state_v6(request_id)<>'superseded' then
+ if public.proof_delivery_source_state_v6(first_request_id)<>'superseded' then
   raise exception 'Recipient change did not supersede request'; end if;
  perform set_config('request.jwt.claims',
   '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
  begin
-  perform public.decide_proof_delivery_inbox_v6(review_id,request_id,true);
+  perform public.decide_proof_delivery_inbox_v6(review_id,first_request_id,true);
   raise exception 'Stale recipient was approved';
  exception when check_violation then null; end;
  second_id := public.request_proof_delivery_review_v6(delivery);
- if second_id=request_id then raise exception 'Changed recipient reused old request'; end if;
+ if second_id=first_request_id then raise exception 'Changed recipient reused old request'; end if;
  update public.proof_request_deliveries set recipient='customer@example.invalid' where id=delivery;
- if public.proof_delivery_source_state_v6(request_id)<>'superseded' then
+ if public.proof_delivery_source_state_v6(first_request_id)<>'superseded' then
   raise exception 'Old proof delivery epoch revived after recipient reverted'; end if;
  update public.proof_request_deliveries set recipient='other@example.invalid' where id=delivery;
  select id into review_id from public.proof_delivery_reviews_v6 where canonical_request_id=second_id;
@@ -85,5 +85,24 @@ begin
    and e.source_kind='proof_delivery' and e.state='cancelled'
    and e.external_ref is null) then
   raise exception 'Unified proof delivery outcome did not show cancellation'; end if;
+ update public.proof_capture_links set revoked_at=null where id='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+ update public.proof_request_deliveries set status='approved',error=null where id=delivery;
+ perform set_config('request.jwt.claim.role','service_role',true);
+ perform set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"service_role"}',true);
+ select (public.claim_proof_delivery()).id into claimed_id;
+ if claimed_id is distinct from delivery
+  or (select attempt_request_id from public.proof_request_deliveries where id=delivery) is distinct from second_id
+  then raise exception 'Sender claim did not bind its exact approved request'; end if;
+ update public.proof_request_deliveries set status='sent',provider_id='fixture-provider-id',sent_at=now()
+  where id=delivery;
+ perform set_config('request.jwt.claim.role','authenticated',true);
+ perform set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+ if not exists(select 1 from public.proof_approval_execution_evidence_v6 e
+  where e.request_id=second_id and e.state='sent' and e.external_ref='fixture-provider-id')
+  or not exists(select 1 from public.proof_approval_execution_evidence_v6 e
+   where e.request_id=first_request_id and e.state='unattributed' and e.external_ref is null)
+  then raise exception 'Proof sender outcome leaked across review epochs'; end if;
 end $checks$;
 rollback;

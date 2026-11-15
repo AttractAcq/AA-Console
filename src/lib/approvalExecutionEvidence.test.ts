@@ -58,7 +58,7 @@ it("keeps proof placement and delivery outcomes tied to their own exact requests
     { request_id: "placement-card", client_id: "client-a", source_kind: "proof_placement",
       state: "retraction_required", detail: "Proof must be removed.", external_ref: "page-1" },
     { request_id: "delivery-card", client_id: "client-a", source_kind: "proof_delivery",
-      state: "sent", detail: "A provider send is recorded for this delivery. The attempt is not bound to this exact approval request; recipient receipt is not proved.",
+      state: "sent", detail: "A provider send is recorded under this exact approval request; recipient receipt is not proved.",
       external_ref: "message-1" },
     { request_id: "other-card", client_id: "other-client", source_kind: "proof_placement",
       state: "placed", detail: "Other tenant", external_ref: "page-2" },

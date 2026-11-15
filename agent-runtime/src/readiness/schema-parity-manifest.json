@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "13cb628509185afa6cf8684d5c54166951151e32da6b3babf8d9f260bbde8cfe",
-  "generatedTypesSha256": "bf49bfdca274d67089abe9dae8389537dbb172cd1251c6cb8213a76052628291",
-  "generatedSchemaBodySha256": "439cd6fef13205914d076ef4531739f07a87ce0ebb209d380c306efe8c44e057",
+  "migrationSourceDigest": "2af7bdc4610e1bb44b63875ac00673ddcdcfa701ec87470f8cdfb2d1d1b0cbe0",
+  "generatedTypesSha256": "c24d473593a97d0bbeb962ccf1ffc114c023cc436e9c6e89491c4958139fa189",
+  "generatedSchemaBodySha256": "47512bbaf8571d9aa7883697b427bf7e33169240f71523b1d6510777fbe50314",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3622,6 +3622,13 @@
       "filename": "20261121160000_500_proof_approval_execution_projection.sql",
       "sha256": "b450bdcdfbf9cc520e0e9af0c26a2d7bc466af01089096027f83fa2ab95fab14",
       "trimmedMd5": "3a3e81c74863b125c6f4cfe1b6dedb87"
+    },
+    {
+      "version": "20261121170000",
+      "name": "501_proof_delivery_attempt_request_binding",
+      "filename": "20261121170000_501_proof_delivery_attempt_request_binding.sql",
+      "sha256": "58ad3e00722f3215135592b48a380fd06941247605b0362e84c702fd67c4ce98",
+      "trimmedMd5": "1cf7ac4e26da090c67cf185dfd34a316"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
