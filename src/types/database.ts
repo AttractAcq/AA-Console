@@ -5698,6 +5698,7 @@ export type Database = {
           location_ref: string
           missing_fields: string[]
           primary_phone: string | null
+          profile_review_epoch_v6: number
           profile_snapshot: Json
           title: string
           updated_at: string
@@ -5716,6 +5717,7 @@ export type Database = {
           location_ref: string
           missing_fields?: string[]
           primary_phone?: string | null
+          profile_review_epoch_v6?: number
           profile_snapshot?: Json
           title: string
           updated_at?: string
@@ -5734,6 +5736,7 @@ export type Database = {
           location_ref?: string
           missing_fields?: string[]
           primary_phone?: string | null
+          profile_review_epoch_v6?: number
           profile_snapshot?: Json
           title?: string
           updated_at?: string
@@ -12658,6 +12661,7 @@ export type Database = {
           proposed_value: string
           reason: string | null
           rejection_reason: string | null
+          review_epoch_v6: number
           status: string
           updated_at: string
         }
@@ -12682,6 +12686,7 @@ export type Database = {
           proposed_value: string
           reason?: string | null
           rejection_reason?: string | null
+          review_epoch_v6?: number
           status?: string
           updated_at?: string
         }
@@ -12706,6 +12711,7 @@ export type Database = {
           proposed_value?: string
           reason?: string | null
           rejection_reason?: string | null
+          review_epoch_v6?: number
           status?: string
           updated_at?: string
         }
@@ -33714,6 +33720,10 @@ export type Database = {
           p_sheet: Database["public"]["Tables"]["google_ads_build_sheets"]["Row"]
         }
         Returns: Json
+      }
+      google_profile_prewrite_current_v6: {
+        Args: { p_change_id: string }
+        Returns: boolean
       }
       google_profile_review_hash_v6: {
         Args: {

@@ -62,7 +62,7 @@ const change = (over: Record<string, unknown> = {}) => ({
 function database(options: {
   locations?: unknown[]; due?: unknown[]; reviews?: unknown[];
   replies?: unknown[]; replyOutcomes?: unknown[]; replyJobs?: unknown[];
-  placements?: unknown[]; changes?: unknown[];
+  placements?: unknown[]; changes?: unknown[]; profileCards?: unknown[];
 } = {}) {
   from.mockImplementation((table: string) => {
     const payload = () => {
@@ -70,6 +70,7 @@ function database(options: {
         case "client_google_locations": return options.locations ?? [location()];
         case "google_profile_due": return options.due ?? [due()];
         case "google_profile_changes": return options.changes ?? [];
+        case "approval_inbox_v6": return options.profileCards ?? [];
         case "google_reviews": return options.reviews ?? [review()];
         case "google_review_replies": return options.replies ?? [];
         case "google_reply_execution_overview_v6": return options.replyOutcomes ?? [];
@@ -184,7 +185,16 @@ describe("the location", () => {
     expect(screen.getByText("Held; no field PATCH will be claimed.")).toBeInTheDocument();
     expect(screen.getByText(/exact-version AAL2 Approval Inbox decision/)).toBeInTheDocument();
     expect(from).toHaveBeenCalledWith("google_profile_changes");
-    expect(screen.getByText("Pre-Inbox approval")).toBeInTheDocument();
+    expect(screen.getByText("Pre-Inbox approval; review again")).toBeInTheDocument();
+  });
+
+  it("distinguishes a current exact decision from a stale one", async () => {
+    database({
+      changes: [change({ approved_request_id: "card-1" })],
+      profileCards: [{ id: "card-1", status: "superseded" }],
+    });
+    render(<GoogleProfilePanel tab="location" />);
+    expect(await screen.findByText("Inbox decision superseded; review again")).toBeInTheDocument();
   });
 
   it("requests exact Inbox review for a pending location proposal", async () => {

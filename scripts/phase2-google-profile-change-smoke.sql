@@ -22,7 +22,7 @@ select set_config('request.jwt.claims',
  '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal1"}',true);
 do $checks$
 declare change_id uuid := 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
- request_id uuid; review_id uuid; second_id uuid;
+ request_id uuid; review_id uuid; second_id uuid; third_id uuid;
 begin
  begin
   update public.google_profile_changes set status='approved' where id=change_id;
@@ -41,6 +41,10 @@ begin
   perform public.decide_google_profile_inbox_v6(review_id,request_id,true);
   raise exception 'AAL1 approved Google profile proposal';
  exception when insufficient_privilege then null; end;
+ update public.google_profile_changes set proposed_value='Temporary text' where id=change_id;
+ update public.google_profile_changes set proposed_value='New text' where id=change_id;
+ if public.google_profile_review_source_state_v6(request_id)<>'superseded' then
+  raise exception 'Reverted proposal words revived the same pending review'; end if;
  update public.google_profile_changes set proposed_value='Different text' where id=change_id;
  if public.google_profile_review_source_state_v6(request_id)<>'superseded' then
   raise exception 'Changed Google proposal did not supersede review'; end if;
@@ -56,17 +60,46 @@ begin
  if public.google_profile_review_source_state_v6(request_id)<>'superseded' then
   raise exception 'Old Google review revived when its text returned'; end if;
  update public.google_profile_changes set proposed_value='Different text' where id=change_id;
- select id into review_id from public.google_profile_review_requests_v6 where canonical_request_id=second_id;
- perform public.decide_google_profile_inbox_v6(review_id,second_id,true);
- if (select status from public.approval_inbox_v6 where id=second_id)<>'approved'
-  or (select approved_request_id from public.google_profile_changes where id=change_id)<>second_id
+ third_id:=public.request_google_profile_review_v6(change_id);
+ if third_id=second_id then raise exception 'Reverted edit reused stale review'; end if;
+ select id into review_id from public.google_profile_review_requests_v6 where canonical_request_id=third_id;
+ perform public.decide_google_profile_inbox_v6(review_id,third_id,true);
+ if (select status from public.approval_inbox_v6 where id=third_id)<>'approved'
+  or (select approved_request_id from public.google_profile_changes where id=change_id)<>third_id
   then raise exception 'Exact Google decision did not sign the source'; end if;
  perform set_config('request.jwt.claim.role','service_role',true);
  perform set_config('request.jwt.claims',
   '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"service_role"}',true);
+ if public.google_profile_prewrite_current_v6(change_id) then
+  raise exception 'Unreviewed Google credential passed profile prewrite'; end if;
  begin
   perform public.record_profile_change_applied(change_id,'unverified-provider-ref');
   raise exception 'Held Google profile field was marked applied';
  exception when insufficient_privilege then null; end;
 end $checks$;
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claims',
+ '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+do $prewrite$
+declare cid uuid:='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+ change_id uuid:='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+ loc_id uuid:='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+ integration_id uuid; request_id uuid; review_id uuid;
+begin
+ integration_id:=public.admin_store_integration_credential(
+  cid,'google_business','accounts/test_account','fixture-secret','write');
+ request_id:=public.request_integration_grant_v6(integration_id,false);
+ select id into review_id from public.integration_grant_reviews_v6
+  where canonical_request_id=request_id;
+ perform public.decide_integration_grant_v6(review_id,request_id,true);
+ if public.google_profile_prewrite_current_v6(change_id) then
+  raise exception 'Authenticated caller passed service-only profile prewrite'; end if;
+ perform set_config('request.jwt.claim.role','service_role',true);
+ if not public.google_profile_prewrite_current_v6(change_id) then
+  raise exception 'Exact approved proposal and write grant did not pass prewrite'; end if;
+ update public.client_google_locations set title='Changed title' where id=loc_id;
+ update public.client_google_locations set title='Test location' where id=loc_id;
+ if public.google_profile_prewrite_current_v6(change_id) then
+  raise exception 'Changed-and-restored location revived profile approval'; end if;
+end $prewrite$;
 rollback;

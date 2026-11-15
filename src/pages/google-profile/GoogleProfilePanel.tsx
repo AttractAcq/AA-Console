@@ -20,6 +20,8 @@ type Reply = Database["public"]["Tables"]["google_review_replies"]["Row"];
 type ReplyOutcome = Database["public"]["Views"]["google_reply_execution_overview_v6"]["Row"];
 type ReplyJob = Pick<Database["public"]["Tables"]["agent_jobs"]["Row"],
   "id" | "input_id" | "status" | "error">;
+type ProfileDecision = Pick<Database["public"]["Views"]["approval_inbox_v6"]["Row"],
+  "id" | "status">;
 type Placement = Database["public"]["Tables"]["proof_placements"]["Row"];
 
 type Tab = "location" | "reviews" | "posts" | "metrics";
@@ -53,6 +55,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
   const [locations, setLocations] = useState<Location[]>([]);
   const [due, setDue] = useState<ReadonlyMap<string, ProfileDue>>(new Map());
   const [changes, setChanges] = useState<ProfileChange[]>([]);
+  const [profileDecisions, setProfileDecisions] = useState<ReadonlyMap<string, ProfileDecision>>(new Map());
   const [reviews, setReviews] = useState<Review[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [replyOutcomes, setReplyOutcomes] = useState<ReplyOutcome[]>([]);
@@ -78,7 +81,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
       return;
     }
     try {
-      const [locs, board, proposed, revs, reps, outcomes, jobs, place] = await Promise.all([
+      const [locs, board, proposed, profileCards, revs, reps, outcomes, jobs, place] = await Promise.all([
         supabase
           .from("client_google_locations")
           .select("*")
@@ -88,6 +91,8 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
         supabase.from("google_profile_changes")
           .select("id,location_id,field,current_value,proposed_value,status,approved_request_id")
           .eq("client_id", clientId).order("created_at", { ascending: false }).limit(100),
+        supabase.from("approval_inbox_v6").select("id,status")
+          .eq("client_id", clientId).eq("source_kind", "google_profile_change"),
         supabase
           .from("google_reviews")
           .select("*")
@@ -106,13 +111,16 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           .eq("destination_key", "google_business_profile")
           .order("created_at", { ascending: false }),
       ]);
-      for (const result of [locs, board, proposed, revs, reps, outcomes, jobs, place]) {
+      for (const result of [locs, board, proposed, profileCards, revs, reps, outcomes, jobs, place]) {
         if (result.error) throw new Error(result.error.message);
       }
       if (!isCurrent()) return;
       setLocations(locs.data ?? []);
       setDue(new Map((board.data ?? []).map((r) => [String(r.location_id), r])));
       setChanges(proposed.data ?? []);
+      setProfileDecisions(new Map((profileCards.data ?? [])
+        .filter((row): row is ProfileDecision & { id: string } => Boolean(row.id))
+        .map((row) => [row.id, row])));
       setReviews(revs.data ?? []);
       setReplies(reps.data ?? []);
       setReplyOutcomes(outcomes.data ?? []);
@@ -314,7 +322,11 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                 <span key="status">
                   {change.status.replace(/_/g, " ")}
                   {change.status === "approved" && <span className="block text-xs text-muted-foreground">
-                    {change.approved_request_id ? "Exact Inbox decision" : "Pre-Inbox approval"}
+                    {change.approved_request_id
+                      ? profileDecisions.get(change.approved_request_id)?.status === "approved"
+                        ? "Current exact Inbox decision"
+                        : `Inbox decision ${profileDecisions.get(change.approved_request_id)?.status ?? "unavailable"}; review again`
+                      : "Pre-Inbox approval; review again"}
                   </span>}
                 </span>,
                 <span key="execution" className={change.status === "applied"
