@@ -32,6 +32,7 @@ export const SUMMARY_LIMIT = 1500;
 
 const API_BASE = "https://mybusiness.googleapis.com/v4";
 const LOCATION_API_BASE = "https://mybusinessbusinessinformation.googleapis.com/v1";
+const LOCATION_LIST_API_BASE = "https://mybusinessbusinessinformation.googleapis.com/v1alpha";
 const ACCOUNT_API_BASE = "https://mybusinessaccountmanagement.googleapis.com/v1";
 /** Long enough for a slow API, short enough that a sweep's lease outlives it. */
 const TIMEOUT_MS = 30_000;
@@ -313,6 +314,51 @@ export async function patchLocationField(
   const providerAccount = await accountResponse.json().catch(() => null) as Record<string, unknown> | null;
   if (providerAccount?.name !== accountRef) {
     throw new PlacementTransportError("Google did not confirm the reviewed Business Profile account.", false);
+  }
+  // A direct locations.get proves the token can see the location, but not
+  // that it belongs to the reviewed account. List under that exact account.
+  let pageToken: string | null = null;
+  let member = false;
+  for (let page = 0; page < 100 && !member; page += 1) {
+    const params = new URLSearchParams({ readMask: "name", pageSize: "100" });
+    if (pageToken) params.set("pageToken", pageToken);
+    let membershipResponse: Response;
+    try {
+      membershipResponse = await fetchImpl(
+        `${LOCATION_LIST_API_BASE}/${accountRef}/locations?${params}`,
+        { method: "GET", headers: { Authorization: `Bearer ${request.accessToken}` },
+          signal: AbortSignal.timeout(TIMEOUT_MS) },
+      );
+    } catch (thrown) {
+      throw new PlacementTransportError(
+        `Google location membership preflight failed: ${
+          thrown instanceof Error ? thrown.message : String(thrown)}`, true);
+    }
+    if (!membershipResponse.ok) {
+      throw new PlacementTransportError(
+        `Google location membership preflight refused (${membershipResponse.status}).`,
+        membershipResponse.status === 429 || membershipResponse.status >= 500);
+    }
+    const listing = await membershipResponse.json().catch(() => null) as Record<string, unknown> | null;
+    if (!listing || (listing.locations !== undefined && !Array.isArray(listing.locations))
+      || (listing.locations as unknown[] | undefined)?.some((item) => !item || typeof item !== "object"
+        || typeof (item as Record<string, unknown>).name !== "string")) {
+      throw new PlacementTransportError("Google returned an unreadable account location listing.", false);
+    }
+    member = ((listing.locations ?? []) as Record<string, unknown>[])
+      .some((item) => item.name === locationName);
+    const next = listing.nextPageToken;
+    if (next !== undefined && typeof next !== "string") {
+      throw new PlacementTransportError("Google returned an unreadable location page token.", false);
+    }
+    pageToken = typeof next === "string" && next ? next : null;
+    if (!member && !pageToken) break;
+    if (!member && page === 99) {
+      throw new PlacementTransportError("Google location membership exceeded the preflight page limit.", false);
+    }
+  }
+  if (!member) {
+    throw new PlacementTransportError("The reviewed location is absent from the reviewed Business Profile account.", false);
   }
   async function readLocation(afterWrite: boolean): Promise<Record<string, unknown>> {
     let response: Response;
