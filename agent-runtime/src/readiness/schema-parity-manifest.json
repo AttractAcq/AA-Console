@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "41129372ca6587adef9642762ad1429ad7777a0c29e2fe5658fdf1a6b4421757",
-  "generatedTypesSha256": "5004a9442c325299974f3a14462b73c8fb0e3c7376c0d09c637beada13362ac6",
-  "generatedSchemaBodySha256": "2651c189602e380f5d27321bb82d4a9c6538d9efe197c41d5c2d42456c41516d",
+  "migrationSourceDigest": "f4a21e2f88f513511ed09a55995e929ae62b6ce5dfd17cec5ad28f91f46bb218",
+  "generatedTypesSha256": "aa8f07d66bf8ae2abcbdf1d55c75ece591fd6fb11b9eb2f9e82bd6fbb67aef33",
+  "generatedSchemaBodySha256": "d2f3248d4edd94a3c2671467a3e27988af37227e4314f08485a6dc10c203bf7e",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2327,6 +2327,62 @@
       "filename": "20261111020000_315_compile_offer_and_version_atomically.sql",
       "sha256": "8b904e6c868b9db5559ab0fb30ceaabef48079f3b719b1abd611b49940e18ed1",
       "trimmedMd5": "abd6dc0e46bba5e6ebee65ef26db05c9"
+    },
+    {
+      "version": "20261114000000",
+      "name": "316_delivery_work_contract",
+      "filename": "20261114000000_316_delivery_work_contract.sql",
+      "sha256": "b47412577bd990eb90937e98e6dee8dd1ca554e04dc7abe7c5ac5b8a9535903f",
+      "trimmedMd5": "6f288e889cb2becd3338a6370a04e9a7"
+    },
+    {
+      "version": "20261114010000",
+      "name": "317_delivery_lineage_catalog",
+      "filename": "20261114010000_317_delivery_lineage_catalog.sql",
+      "sha256": "63edb57ae391aa0795224d78690b10f3927b60d4c8b3275110793fb70b95b514",
+      "trimmedMd5": "49e1c30bef1d7eb56e3f5042a7d8351b"
+    },
+    {
+      "version": "20261114020000",
+      "name": "318_delivery_lineage_links",
+      "filename": "20261114020000_318_delivery_lineage_links.sql",
+      "sha256": "2dfd78192d5ff456564686e908fb5d8cbfc850fd34e12a02afe37a774cdd9caf",
+      "trimmedMd5": "8647303909bd0aa4d25c8712bb66e3e2"
+    },
+    {
+      "version": "20261114030000",
+      "name": "319_delivery_dependency_invalidation",
+      "filename": "20261114030000_319_delivery_dependency_invalidation.sql",
+      "sha256": "af53e00facf0ec1c656f750fc88e6f334c102421821dbd476984480ddc23ef06",
+      "trimmedMd5": "f0ec45e5b051d94cbcf83c78d8ba1b34"
+    },
+    {
+      "version": "20261114040000",
+      "name": "320_delivery_live_lineage_guards",
+      "filename": "20261114040000_320_delivery_live_lineage_guards.sql",
+      "sha256": "4811f4986df356c3ddb7bc3d51f38223133a85007a3349793d1a02221a23a341",
+      "trimmedMd5": "28dc15bc4d2b2fa1b5356bf535bd8baa"
+    },
+    {
+      "version": "20261114050000",
+      "name": "321_delivery_asset_bytes",
+      "filename": "20261114050000_321_delivery_asset_bytes.sql",
+      "sha256": "6b651322f348f0f2dd644ec81cc2de07b940be5ee6d607d8b18415bb5d5ac23a",
+      "trimmedMd5": "78a3c93ca201e0dcf57ddfe0ae21e778"
+    },
+    {
+      "version": "20261114060000",
+      "name": "322_campaign_route_guard_insert",
+      "filename": "20261114060000_322_campaign_route_guard_insert.sql",
+      "sha256": "9249bf9848feffc86334d4a2ed4f0521ebcda99324c7ba887c017a957ae11d5d",
+      "trimmedMd5": "e03d44e8fd4fc2d491c15ff6866c94de"
+    },
+    {
+      "version": "20261114070000",
+      "name": "323_storage_change_invalidates_creative",
+      "filename": "20261114070000_323_storage_change_invalidates_creative.sql",
+      "sha256": "6bcfc81335cce5882c7a2c7500637c35ac384d5825d3864dfc807ae3becb98e3",
+      "trimmedMd5": "eb05c597d48abc6962629f52406662ea"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
