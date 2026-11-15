@@ -131,6 +131,19 @@ describe("the chain a plan implies", () => {
       plannedIdeaIds: ["idea-1"] })).toThrow(/disagree/);
   });
 
+  it("finishes video through motion and edit before it can count as produced", () => {
+    const steps = sweepSteps({ ...base, organicCount: 1, paidCount: 0,
+      plannedIdeaIds: ["idea-1"], pieces: [{ route: "organic", platform: "instagram",
+        media_type: "video", content_format: "reel" }] });
+    expect(steps.map((step) => step.stepKey)).toEqual([
+      "piece1_brief", "piece1_create", "piece1_motion", "piece1_edit",
+    ]);
+    expect(steps[2]).toMatchObject({ agentKey: "video_build",
+      dependencies: ["piece1_brief", "piece1_create"], inputFromStepKey: "piece1_brief" });
+    expect(steps[3]).toMatchObject({ agentKey: "video_edit",
+      dependencies: ["piece1_motion"], inputFromStepKey: "piece1_motion" });
+  });
+
   it("composes nothing from a plan with no pieces", () => {
     expect(sweepSteps({ ...base, organicCount: 0, paidCount: 0 })).toEqual([]);
   });

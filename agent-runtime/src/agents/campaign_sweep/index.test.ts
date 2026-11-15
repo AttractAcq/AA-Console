@@ -39,11 +39,13 @@ describe("campaign sweep uses planned ideas", () => {
     expect(result).toMatchObject({ ok: true });
     const steps = calls.filter((call) => call.name === "add_workflow_agent_step");
     expect(steps.map((step) => step.args.p_step_key)).toEqual([
-      "piece1_brief", "piece1_create", "piece2_brief", "piece2_create",
+      "piece1_brief", "piece1_create", "piece1_motion", "piece1_edit",
+      "piece2_brief", "piece2_create",
     ]);
     expect(steps[0]?.args).toMatchObject({ p_input_id: "idea-1", p_input_from_step_key: null });
-    expect(steps[2]?.args).toMatchObject({ p_input_id: "idea-2", p_input_from_step_key: null });
+    expect(steps[4]?.args).toMatchObject({ p_input_id: "idea-2", p_input_from_step_key: null });
     expect(calls.find((call) => call.name === "create_workflow_run")?.args.p_input_snapshot)
       .toMatchObject({ planned_idea_ids: ["idea-1", "idea-2"] });
+    expect(calls.at(-1)).toMatchObject({ name: "seal_workflow_run", args: { p_run_id: "run-1" } });
   });
 });

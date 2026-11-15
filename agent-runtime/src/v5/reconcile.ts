@@ -39,6 +39,16 @@ export function startWorkflowReconciler(sb: SupabaseClient, config: RuntimeConfi
         if (qa && (qa.steps_accepted || qa.steps_blocked)) {
           logger.info("v5_daily_internal_qa", qa);
         }
+        const { data: campaignQaData, error: campaignQaError } = await sb.rpc(
+          "accept_ready_campaign_workflow_steps_v7", { p_limit: 20 },
+        );
+        if (campaignQaError) throw new Error(campaignQaError.message);
+        const campaignQa = (Array.isArray(campaignQaData) ? campaignQaData[0] : campaignQaData) as {
+          steps_accepted?: number; steps_blocked?: number;
+        } | null;
+        if (campaignQa && (campaignQa.steps_accepted || campaignQa.steps_blocked)) {
+          logger.info("campaign_sweep_internal_qa", campaignQa);
+        }
         const { data: siblings, error: siblingError } = await sb.rpc(
           "settle_completed_blocked_daily_siblings", { p_limit: 5 },
         );

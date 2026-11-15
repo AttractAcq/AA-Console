@@ -113,6 +113,11 @@ export async function runCampaignSweepJob(
     if (spec.pieces.some((piece: { platform: string }) => piece.platform === "google_ads")) {
       return { ok: false, retryable: false, failureMessage: "Google search copy has no campaign sweep producer yet. Use the approved manual build sheet." };
     }
+    if (spec.pieces.some((piece: { media_type: string; content_format: string }) =>
+      piece.media_type === "video" && piece.content_format !== "reel")) {
+      return { ok: false, retryable: false,
+        failureMessage: "Video stories have no supported campaign sweep producer yet. Revise the plan or use a reel." };
+    }
     pieces = spec.pieces as SweepPiece[];
     if (c.content_ideas_generated_at) {
       const { data: ids, error: bindError } = await sb.rpc("bind_campaign_planned_ideas_v7", {
@@ -207,11 +212,13 @@ export async function runCampaignSweepJob(
     });
     if (error) throw new Error(`Could not add step ${step.stepKey}: ${error.message}`);
   }
+  const { error: sealError } = await sb.rpc("seal_workflow_run", { p_run_id: runId });
+  if (sealError) throw new Error(`Could not seal the campaign sweep: ${sealError.message}`);
 
   await appendEvent(
     sb,
     job.id,
-    `Swept ${c.name} into ${steps.length} steps. The reconciler drives them from here; nothing distributes without its own approval.`,
+    `Swept ${c.name} into ${steps.length} sealed steps. The reconciler drives them from here; nothing distributes without its own approval.`,
     "info",
     { run_id: runId, steps: steps.length, organic: organicCount, paid: paidCount },
   );

@@ -5403,6 +5403,7 @@ export type Database = {
           plan_approved_by: string | null
           plan_approved_fingerprint: string | null
           plan_review_note: string | null
+          planned_idea_epoch: number
           runs_organic: boolean
           runs_paid: boolean
           starts_on: string | null
@@ -5461,6 +5462,7 @@ export type Database = {
           plan_approved_by?: string | null
           plan_approved_fingerprint?: string | null
           plan_review_note?: string | null
+          planned_idea_epoch?: number
           runs_organic?: boolean
           runs_paid?: boolean
           starts_on?: string | null
@@ -5519,6 +5521,7 @@ export type Database = {
           plan_approved_by?: string | null
           plan_approved_fingerprint?: string | null
           plan_review_note?: string | null
+          planned_idea_epoch?: number
           runs_organic?: boolean
           runs_paid?: boolean
           starts_on?: string | null
@@ -33634,6 +33637,13 @@ export type Database = {
         }
         Returns: string
       }
+      accept_ready_campaign_workflow_steps_v7: {
+        Args: { p_limit?: number }
+        Returns: {
+          steps_accepted: number
+          steps_blocked: number
+        }[]
+      }
       accept_ready_daily_workflow_steps: {
         Args: { p_limit?: number }
         Returns: {
@@ -34629,6 +34639,18 @@ export type Database = {
         }
         Returns: string
       }
+      campaign_planned_idea_hash_v7: {
+        Args: { p_campaign_id: string }
+        Returns: string
+      }
+      campaign_planned_idea_selection_current_v7: {
+        Args: { p_idea_id: string }
+        Returns: boolean
+      }
+      campaign_planned_ideas_match_spec_v7: {
+        Args: { p_campaign_id: string }
+        Returns: boolean
+      }
       campaign_readiness: {
         Args: { p_campaign_id: string }
         Returns: {
@@ -35364,6 +35386,7 @@ export type Database = {
           plan_approved_by: string | null
           plan_approved_fingerprint: string | null
           plan_review_note: string | null
+          planned_idea_epoch: number
           runs_organic: boolean
           runs_paid: boolean
           starts_on: string | null

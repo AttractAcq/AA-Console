@@ -19,7 +19,7 @@ export type SweepPiece = {
 
 export type SweepStep = {
   stepKey: string;
-  agentKey: "ideation" | "brief" | "creative_build";
+  agentKey: "ideation" | "brief" | "creative_build" | "video_build" | "video_edit";
   dependencies: string[];
   /** Exactly one of these, which add_workflow_agent_step enforces. */
   inputTable: string;
@@ -139,6 +139,21 @@ export function sweepSteps(args: {
       usesClientAsInput: false,
       inputParams: {},
     });
+    if (piece.media_type === "video") {
+      const motionKey = `piece${n}_motion`;
+      steps.push({
+        stepKey: motionKey, agentKey: "video_build",
+        dependencies: [briefKey, createKey], inputTable: "client_briefs",
+        inputFromStepKey: briefKey, inputId: null, usesClientAsInput: false,
+        inputParams: {},
+      });
+      steps.push({
+        stepKey: `piece${n}_edit`, agentKey: "video_edit",
+        dependencies: [motionKey], inputTable: "client_media_assets",
+        inputFromStepKey: motionKey, inputId: null, usesClientAsInput: false,
+        inputParams: {},
+      });
+    }
 
     if (!plannedId) previousIdeaKey = ideaKey;
   });

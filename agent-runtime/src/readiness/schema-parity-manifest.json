@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "3fff67f8523a18b979bc074e9610e46461e59cf0de32a26545f8ffeb1e62d149",
-  "generatedTypesSha256": "f81cfb97aeecb0b9d51a954275ce22bbf3fb4691bfa1c0c54d25510a50541266",
-  "generatedSchemaBodySha256": "b1d9e3effee0cf251ca492f1c38c3279b5a2c94a6617a9a43084486d107a7b9b",
+  "migrationSourceDigest": "791034a383d31e7358c7b57ca93a1ad7a9d35212bbee1f3751b1ce1ed4898cf7",
+  "generatedTypesSha256": "c5ef044bc41162ac86b1a41b04fa394ecd28af3df47756933a2d59c9b20586ba",
+  "generatedSchemaBodySha256": "e9c82bb47a9d5b27732280f661139079a2212383f156cf6ec6f5f263186b3e11",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3713,6 +3713,20 @@
       "filename": "20261121235500_513_bind_campaign_planned_ideas.sql",
       "sha256": "9102fed729030b5a1184961ce78ac9e42f39c58f026dad97f13442d03caba053",
       "trimmedMd5": "24a64c206e8489528f2c0fa928d3c82b"
+    },
+    {
+      "version": "20261121235900",
+      "name": "514_campaign_sweep_qa_and_sibling_progress",
+      "filename": "20261121235900_514_campaign_sweep_qa_and_sibling_progress.sql",
+      "sha256": "c700e64c690b8684046695d5b86d8f1333e380e5beb56f32c11f5351f3cfc62e",
+      "trimmedMd5": "c618027c3f51483710fd76bd423fa747"
+    },
+    {
+      "version": "20261122000000",
+      "name": "515_campaign_plan_selects_exact_ideas",
+      "filename": "20261122000000_515_campaign_plan_selects_exact_ideas.sql",
+      "sha256": "f0da01d40bea85ded7fb01180e2e3c4c2542402e2a66796515ac5d679dbd4a69",
+      "trimmedMd5": "c7953d756ed6369ee6138109553da6dd"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

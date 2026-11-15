@@ -28,6 +28,7 @@ import { SalesOverviewPanel } from "../sales/SalesOverviewPanel";
 import { useCampaignV2Package } from "./useCampaignV2Package";
 
 type ContentSpecPiece = { route: string; platform: string; media_type: string; content_format: string };
+type PlannedIdea = { id: string; campaign_position: number | null; title: string; body: string | null };
 
 type Campaign = {
   id: string;
@@ -189,6 +190,7 @@ export function CampaignExecutionPanel() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [contentSpec, setContentSpec] = useState<ContentSpecPiece[] | null>(null);
   const [contentSpecError, setContentSpecError] = useState<string | null>(null);
+  const [plannedIdeas, setPlannedIdeas] = useState<PlannedIdea[] | null>(null);
   const [readiness, setReadiness] = useState<Record<string, Requirement[]>>({});
   /** Why each campaign exists, where an opportunity says so. */
   const [origins, setOrigins] = useState<ReadonlyMap<string, CampaignOrigin>>(new Map());
@@ -243,6 +245,7 @@ export function CampaignExecutionPanel() {
     setReadiness({});
     setContentSpec(null);
     setContentSpecError(null);
+    setPlannedIdeas(null);
     try {
       if (!clientId) {
         throw new Error("No client selected.");
@@ -273,6 +276,15 @@ export function CampaignExecutionPanel() {
           setContentSpecError(specError?.message ?? "The content requirements could not be read.");
         } else {
           setContentSpec(spec.pieces as ContentSpecPiece[]);
+        }
+        if (rows[0].content_ideas_generated_at) {
+          const { data: ideaRows, error: ideaError } = await supabase.from("client_ideas")
+            .select("id, campaign_position, title, body")
+            .eq("campaign_id", rows[0].id).eq("client_id", clientId)
+            .order("campaign_position", { ascending: true });
+          if (version !== request.current) return;
+          if (ideaError) setContentSpecError(ideaError.message);
+          else setPlannedIdeas(ideaRows ?? []);
         }
       }
 
@@ -721,7 +733,11 @@ export function CampaignExecutionPanel() {
                   <h4 className="font-medium">Content requirements to review</h4>
                   {contentSpecError && <p role="alert" className="mt-2 text-destructive">{contentSpecError}</p>}
                   {!contentSpec && !contentSpecError && <p className="mt-2 text-muted-foreground">No route and format requirements recorded. Run the planner before approval.</p>}
-                  {contentSpec && <ol className="mt-2 space-y-1">{contentSpec.map((piece, index) => <li key={index}>{index + 1}. {piece.route} · {piece.platform} · {piece.media_type} · {piece.content_format}</li>)}</ol>}
+                  {contentSpec && <ol className="mt-2 space-y-3">{contentSpec.map((piece, index) => <li key={index}>
+                    <p>{index + 1}. {piece.route} · {piece.platform} · {piece.media_type} · {piece.content_format}</p>
+                    {plannedIdeas?.[index] && <div className="mt-1 pl-4"><p className="font-medium">{plannedIdeas[index].title}</p><p className="whitespace-pre-wrap text-muted-foreground">{plannedIdeas[index].body}</p></div>}
+                  </li>)}</ol>}
+                  {c.content_ideas_generated_at && plannedIdeas?.length !== c.content_count && <p role="alert" className="mt-2 text-destructive">The saved idea batch is incomplete; plan approval is held.</p>}
                 </div>
               )}
               {/* The plan review gate (migration 309). Not a lock on this
@@ -745,7 +761,8 @@ export function CampaignExecutionPanel() {
                   <button
                     type="button"
                     className={buttonClass}
-                    disabled={busy || (c.acquisition_mode !== "legacy" && c.content_count > 0 && contentSpec?.length !== c.content_count)}
+                    disabled={busy || (c.acquisition_mode !== "legacy" && c.content_count > 0 &&
+                      (contentSpec?.length !== c.content_count || (c.content_ideas_generated_at !== null && plannedIdeas?.length !== c.content_count)))}
                     onClick={() => void approvePlan(c)}
                   >
                     {c.plan_approved_at === null ? "Approve this plan" : "Approve again"}
