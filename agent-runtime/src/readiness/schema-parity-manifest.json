@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "d2a470e8f89e4fb4157c4cdb64bd339881e42db18c44ae0a763da6bebe7ef6f8",
+  "migrationSourceDigest": "f060205b6f3c74b37d996d55f27188680b456d0cd0228abd78b79656832a8ada",
   "generatedTypesSha256": "1054c93668b7705daa2404627a714b38aea2e18d708a8a0dcd49d73fc82b30eb",
   "generatedSchemaBodySha256": "b8bdba77bd13523fcb7be257db6e0b9c6fc0d875834a822171062011f6e5f561",
   "localMigrations": [
@@ -3559,6 +3559,13 @@
       "filename": "20261121070000_491_campaign_action_uncertain_projection.sql",
       "sha256": "b85d090ce3c5ba2addc4b346527282c324393713363837e762731193592b00c9",
       "trimmedMd5": "057a45a0dbd597aef5e9fc367fe46639"
+    },
+    {
+      "version": "20261121080000",
+      "name": "492_campaign_action_expired_lease_alert",
+      "filename": "20261121080000_492_campaign_action_expired_lease_alert.sql",
+      "sha256": "7dcbe885b5ec5ef03913f682c9b5a2ebe7f11e57bf95603684ccdfb0d7a62156",
+      "trimmedMd5": "e11d005bb501215ea0cabd89877ab038"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

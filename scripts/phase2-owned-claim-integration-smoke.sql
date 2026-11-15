@@ -193,6 +193,16 @@ begin
     v_worker,v_sha,v_handlers,1);
   if v_unknown_claim.approval_id is distinct from v_unknown.id then
     raise exception 'Uncertain fixture action was not claimed'; end if;
+  update public.campaign_action_executions set lease_until=now()-interval '1 minute'
+    where id=v_unknown_claim.execution_id;
+  if (select d.execution_status from public.campaign_action_due d
+      where d.approval_id=v_unknown.id)<>'uncertain'
+    or (select d.blocker from public.campaign_action_due d
+      where d.approval_id=v_unknown.id) not like 'Execution lease expired;%'
+    or (select o.outcome from public.client_external_outcomes_v6 o
+      where o.outcome_id=v_unknown_claim.execution_id)<>'uncertain'
+    or exists(select 1 from public.claim_campaign_actions_owned_v6(v_worker,v_sha,v_handlers,1)) then
+    raise exception 'Expired action lease was hidden or could be reclaimed'; end if;
   perform public.record_campaign_action_uncertain_v6(v_unknown_claim.execution_id,
     'Provider write may have completed','fixture-unknown-id',null,
     '{"fixture":true}'::jsonb);
