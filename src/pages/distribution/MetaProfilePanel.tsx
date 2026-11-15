@@ -24,6 +24,8 @@ type ProfileChange = Pick<
 >;
 type ProfileDecision = Pick<Database["public"]["Views"]["approval_inbox_v6"]["Row"],
   "id" | "status">;
+type ProfileOutcome = Pick<Database["public"]["Views"]["meta_profile_execution_overview_v6"]["Row"],
+  "change_id" | "status" | "provider_ref">;
 
 type Tab = "identities" | "profile" | "presence";
 
@@ -66,6 +68,7 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
   const [presence, setPresence] = useState<Presence[]>([]);
   const [changes, setChanges] = useState<ProfileChange[]>([]);
   const [profileDecisions, setProfileDecisions] = useState<ReadonlyMap<string, ProfileDecision>>(new Map());
+  const [profileOutcomes, setProfileOutcomes] = useState<ProfileOutcome[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reviewBusy, setReviewBusy] = useState<string | null>(null);
@@ -76,7 +79,7 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
       return;
     }
     try {
-      const [health, posts, proposed, profileCards] = await Promise.all([
+      const [health, posts, proposed, profileCards, outcomes] = await Promise.all([
         supabase.from("meta_identity_health")
           .select("client_id,provider,account_ref,status,token_expires_at,days_left,posts_waiting")
           .eq("client_id", clientId),
@@ -93,8 +96,10 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
           .order("created_at", { ascending: false }),
         supabase.from("approval_inbox_v6").select("id,status")
           .eq("client_id", clientId).eq("source_kind", "meta_profile_change"),
+        supabase.from("meta_profile_execution_overview_v6")
+          .select("change_id,status,provider_ref").eq("client_id", clientId),
       ]);
-      for (const result of [health, posts, proposed, profileCards]) {
+      for (const result of [health, posts, proposed, profileCards, outcomes]) {
         if (result.error) throw new Error("Profile read failed.");
       }
       setIdentities(health.data ?? []);
@@ -103,6 +108,7 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
       setProfileDecisions(new Map((profileCards.data ?? [])
         .filter((row): row is ProfileDecision & { id: string } => Boolean(row.id))
         .map((row) => [row.id, row])));
+      setProfileOutcomes(outcomes.data ?? []);
       setError(null);
     } catch {
       setError("Could not load the profiles.");
@@ -226,7 +232,7 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
             <EmptyState label="No profile change has been proposed" />
           ) : (
             <DataTable
-              columns={["Field", "Says now", "Would say", "State", "Review"]}
+              columns={["Field", "Says now", "Would say", "State", "Execution", "Review"]}
               emptyLabel={loading ? "Loading…" : "Nothing proposed"}
               rows={changes.map((change) => [
                 <span key="f">
@@ -264,6 +270,19 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
                         : "Pre-Inbox approval; review again"}
                     </span>
                   )}
+                </span>,
+                <span key="execution" className="text-xs text-muted-foreground">
+                  {(() => {
+                    const outcome = profileOutcomes.find((row) => row.change_id === change.id);
+                    if (!outcome) return change.platform === "instagram"
+                      ? "Manual profile edit required; no API writer."
+                      : "No provider write requested; adapter held.";
+                    if (outcome.status === "confirmed") return `Provider readback confirmed · ${outcome.provider_ref ?? "reference unavailable"}`;
+                    if (outcome.status === "uncertain") return "Provider outcome uncertain; reconcile before retrying.";
+                    if (outcome.status === "refused") return "Provider write refused before start.";
+                    if (outcome.status === "started") return "Provider write started; awaiting readback.";
+                    return "One provider attempt reserved; prewrite pending.";
+                  })()}
                 </span>,
                 <span key="review">
                   {change.status === "drafted" && <button type="button"

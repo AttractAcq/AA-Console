@@ -19,6 +19,7 @@ do $test$
 declare cid uuid:='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
  change_id uuid:='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
  iid uuid; rid uuid; qid uuid; profile_rid uuid; profile_qid uuid;
+ claim jsonb; attempt_id uuid; claim_key uuid;
 begin
  iid:=public.admin_store_integration_credential(cid,'meta','Facebook Page','fixture-secret','write');
  update public.client_integrations set meta_page_id='123456' where id=iid;
@@ -37,6 +38,35 @@ begin
  perform set_config('request.jwt.claim.role','service_role',true);
  if not public.meta_profile_prewrite_current_v6(change_id) then
   raise exception 'Exact Facebook proposal and credential did not pass prewrite'; end if;
+ claim:=public.claim_meta_profile_execution_v6(change_id);
+ if claim is null or claim->>'page_id'<>'123456'
+  or claim->>'proposed_value'<>'New words'
+  or public.claim_meta_profile_execution_v6(change_id) is not null then
+  raise exception 'Meta Page proposal did not receive exactly one reservation'; end if;
+ attempt_id:=(claim->>'attempt_id')::uuid;
+ claim_key:=(claim->>'claim_key')::uuid;
+ if public.begin_meta_profile_write_v6(attempt_id,gen_random_uuid())
+  or not public.begin_meta_profile_write_v6(attempt_id,claim_key)
+  or public.begin_meta_profile_write_v6(attempt_id,claim_key) then
+  raise exception 'Meta Page write did not begin exactly once'; end if;
+ begin
+  perform public.finish_meta_profile_execution_v6(attempt_id,claim_key,
+   'confirmed','Wrong words','facebook_page:123456#about');
+  raise exception 'Wrong Facebook readback was confirmed';
+ exception when check_violation then null; end;
+ begin
+  perform public.finish_meta_profile_execution_v6(attempt_id,claim_key,
+   'refused',null,null,'After write');
+  raise exception 'Started Facebook write was falsely refused';
+ exception when check_violation then null; end;
+ if not public.finish_meta_profile_execution_v6(attempt_id,claim_key,
+  'confirmed','New words','facebook_page:123456#about')
+  or public.finish_meta_profile_execution_v6(attempt_id,claim_key,
+   'confirmed','New words','facebook_page:123456#about') then
+  raise exception 'Meta Page outcome was not immutable'; end if;
+ if (select v.status from public.meta_profile_execution_overview_v6 v
+  where v.change_id='cccccccc-cccc-4ccc-8ccc-cccccccccccc')<>'confirmed' then
+  raise exception 'Meta Page outcome was not visible to the client'; end if;
  update public.client_integrations set meta_page_id='222222' where id=iid;
  update public.client_integrations set meta_page_id='123456' where id=iid;
  if public.meta_profile_prewrite_current_v6(change_id)

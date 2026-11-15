@@ -16148,6 +16148,116 @@ export type Database = {
           },
         ]
       }
+      meta_profile_execution_attempts_v6: {
+        Row: {
+          approval_request_id: string
+          before_value: string | null
+          change_id: string
+          claim_key: string
+          client_id: string
+          field: string
+          finished_at: string | null
+          id: string
+          observed_value: string | null
+          outcome_note: string | null
+          page_id: string
+          proposed_value: string
+          provider_ref: string | null
+          reserved_at: string
+          source_hash: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          approval_request_id: string
+          before_value?: string | null
+          change_id: string
+          claim_key?: string
+          client_id: string
+          field: string
+          finished_at?: string | null
+          id?: string
+          observed_value?: string | null
+          outcome_note?: string | null
+          page_id: string
+          proposed_value: string
+          provider_ref?: string | null
+          reserved_at?: string
+          source_hash: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          approval_request_id?: string
+          before_value?: string | null
+          change_id?: string
+          claim_key?: string
+          client_id?: string
+          field?: string
+          finished_at?: string | null
+          id?: string
+          observed_value?: string | null
+          outcome_note?: string | null
+          page_id?: string
+          proposed_value?: string
+          provider_ref?: string | null
+          reserved_at?: string
+          source_hash?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_change_id_fkey"
+            columns: ["change_id"]
+            isOneToOne: true
+            referencedRelation: "meta_profile_changes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       meta_profile_review_requests_v6: {
         Row: {
           canonical_request_id: string | null
@@ -28747,6 +28857,104 @@ export type Database = {
           },
         ]
       }
+      meta_profile_execution_overview_v6: {
+        Row: {
+          approval_request_id: string | null
+          attempt_id: string | null
+          change_id: string | null
+          client_id: string | null
+          field: string | null
+          finished_at: string | null
+          observed_value: string | null
+          outcome_note: string | null
+          page_id: string | null
+          provider_ref: string | null
+          reserved_at: string | null
+          started_at: string | null
+          status: string | null
+        }
+        Insert: {
+          approval_request_id?: string | null
+          attempt_id?: string | null
+          change_id?: string | null
+          client_id?: string | null
+          field?: string | null
+          finished_at?: string | null
+          observed_value?: string | null
+          outcome_note?: string | null
+          page_id?: string | null
+          provider_ref?: string | null
+          reserved_at?: string | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          approval_request_id?: string | null
+          attempt_id?: string | null
+          change_id?: string | null
+          client_id?: string | null
+          field?: string | null
+          finished_at?: string | null
+          observed_value?: string | null
+          outcome_note?: string | null
+          page_id?: string | null
+          provider_ref?: string | null
+          reserved_at?: string | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_change_id_fkey"
+            columns: ["change_id"]
+            isOneToOne: true
+            referencedRelation: "meta_profile_changes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       meta_profile_presence: {
         Row: {
           asset_id: string | null
@@ -31633,6 +31841,10 @@ export type Database = {
         Args: { p_attempt_id: string; p_claim_key: string }
         Returns: boolean
       }
+      begin_meta_profile_write_v6: {
+        Args: { p_attempt_id: string; p_claim_key: string }
+        Returns: boolean
+      }
       bind_campaign_action_sources_v6: {
         Args: { p_request_id: string }
         Returns: undefined
@@ -32102,6 +32314,10 @@ export type Database = {
           recipient: string
           storage_path: string
         }[]
+      }
+      claim_meta_profile_execution_v6: {
+        Args: { p_change_id: string }
+        Returns: Json
       }
       claim_outbound_messages: {
         Args: { p_limit?: number }
@@ -33863,6 +34079,17 @@ export type Database = {
           p_outcome: string
           p_provider_state?: string
           p_provider_update_time?: string
+        }
+        Returns: boolean
+      }
+      finish_meta_profile_execution_v6: {
+        Args: {
+          p_attempt_id: string
+          p_claim_key: string
+          p_note?: string
+          p_observed_value?: string
+          p_outcome: string
+          p_provider_ref?: string
         }
         Returns: boolean
       }

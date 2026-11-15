@@ -49,12 +49,13 @@ const post = (over: Record<string, unknown> = {}) => ({
 });
 
 function database(options: { identities?: unknown[]; changes?: unknown[]; presence?: unknown[];
-  profileCards?: unknown[]; healthError?: string } = {}) {
+  profileCards?: unknown[]; profileOutcomes?: unknown[]; healthError?: string } = {}) {
   from.mockImplementation((table: string) => {
     const payload = () => {
       if (table === "meta_identity_health") return options.identities ?? [identity()];
       if (table === "meta_profile_changes") return options.changes ?? [];
       if (table === "approval_inbox_v6") return options.profileCards ?? [];
+      if (table === "meta_profile_execution_overview_v6") return options.profileOutcomes ?? [];
       return options.presence ?? [];
     };
     const response = () => ({
@@ -200,6 +201,21 @@ describe("proposed changes", () => {
     expect(await screen.findByText("Pre-Inbox approval; review again")).toBeInTheDocument();
     expect(screen.getByText(/exact-version AAL2 Approval Inbox decision/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+  });
+
+  it("shows a Meta attempt outcome without fetching provider error text", async () => {
+    const marker = "credential-marker-private-error";
+    database({ changes: [change({ id: "chg-1", platform: "facebook", field: "about",
+      status: "approved", approved_request_id: "card-1" })],
+      profileCards: [{ id: "card-1", status: "approved" }],
+      profileOutcomes: [{ change_id: "chg-1", status: "uncertain",
+        provider_ref: null, outcome_note: marker }] });
+    render(<MetaProfilePanel tab="profile" />);
+    expect(await screen.findByText("Provider outcome uncertain; reconcile before retrying."))
+      .toBeInTheDocument();
+    expect(select).toHaveBeenCalledWith("meta_profile_execution_overview_v6",
+      "change_id,status,provider_ref");
+    expect(document.body.textContent).not.toContain(marker);
   });
 
   it("labels a superseded Inbox decision as stale", async () => {
