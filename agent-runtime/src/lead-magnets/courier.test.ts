@@ -53,6 +53,7 @@ function database(
     body?: unknown;
     recordError?: string;
     noFetch?: boolean;
+    sendReady?: boolean;
   } = {},
 ) {
   const events: Record<string, unknown>[] = [];
@@ -61,6 +62,9 @@ function database(
     calls.push({ name, args });
     if (name === "claim_lead_magnet_deliveries") {
       return { data: options.claimed ?? [DELIVERY], error: null };
+    }
+    if (name === "lead_magnet_send_ready_v6") {
+      return { data: options.sendReady ?? true, error: null };
     }
     if (name === "record_lead_magnet_sent" && options.recordError) {
       return { data: null, error: { message: options.recordError } };
@@ -152,6 +156,18 @@ describe("the exact file, re-checked against its bytes", () => {
     expect(callsTo(calls, "record_lead_magnet_sent")).toEqual([
       { p_delivery_id: "del-1", p_provider_ref: "resend-42" },
     ]);
+    expect(callsTo(calls, "lead_magnet_send_ready_v6")).toEqual([
+      { p_delivery_id: "del-1", p_attempt: 1 },
+    ]);
+  });
+
+  it("stops before the provider when approval or consent changed after claim", async () => {
+    const { sb, calls, fetchImpl } = database({ sendReady: false });
+    await runLeadMagnetCourierJob(sb, on, agent, job);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(callsTo(calls, "record_lead_magnet_failure")[0]).toMatchObject({
+      p_delivery_id: "del-1", p_retryable: false,
+    });
   });
 
   it("refuses to send a file that no longer hashes to what was approved", async () => {

@@ -238,6 +238,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Proof delivery outcome alert checkpoint, 15 November 2026:** Proof-request sender attempts now record start and finish times. Their source-scoped outcomes enter the shared Dashboard and Approval Inbox alert ledger: provider acceptance remains unverified recipient delivery, failed and uncertain sends need reconciliation, and historical attempts without an exact approval binding are unattributed. The owner link opens Proof Production capture. This is an observed local sender state, not a live provider readback or recipient receipt. Class 9 and the Phase 2 external test receipt gate remain blocked.
 
+**Lead magnet courier checkpoint, 15 November 2026:** Each new courier claim now binds the delivery to its exact approved Inbox request and writes a separate attempt row. The courier rechecks that same approval, consent, client switch and lease after hashing the stored file and before contacting the provider. A stale lease becomes `uncertain` and cannot be claimed again automatically; historical approvals without an exact Inbox decision are held from new sends. The Unified Inbox shows the exact request's aggregate attempt outcomes, while the owning delivery view shows one row per recipient even after reapproval. The rollback fixture covers two separately bound recipients, revocation and reapproval after claim, failed pre-send recording, and quarantine of an interrupted attempt. This prevents an unreviewed automatic retry but does not prove provider delivery, recipient receipt or a live external test action. Class 7 and the Phase 2 exit gate remain blocked.
+
 ## Phase 3 — Intelligence, Market Opportunities, Offer Studio and proof inputs
 
 ### Intelligence OS

@@ -76,3 +76,22 @@ it("keeps proof placement and delivery outcomes tied to their own exact requests
   expect(evidence.get("delivery-card")?.detail).toContain("recipient receipt is not proved");
   expect(evidence.get("other-card")?.state).toBe("unknown");
 });
+
+it("shows aggregate courier attempts only on their exact lead magnet approval", async () => {
+  rows.set("lead_magnet_approval_execution_evidence_v6", { data: [
+    { request_id: "magnet-card", client_id: "client-a", source_kind: "lead_magnet",
+      state: "uncertain", detail: "2 attempt(s): 1 provider accepted, 0 failed, 1 uncertain. Provider acceptance does not prove recipient delivery.",
+      external_ref: null },
+    { request_id: "other-card", client_id: "other-client", source_kind: "lead_magnet",
+      state: "unverified", detail: "Another tenant", external_ref: null },
+  ], error: null });
+  const evidence = await loadApprovalExecutionEvidence([
+    { id: "magnet-card", client_id: "client-a", source_kind: "lead_magnet",
+      source_id: "approval-1", status: "revoked" },
+    { id: "other-card", client_id: "client-a", source_kind: "lead_magnet",
+      source_id: "approval-2", status: "approved" },
+  ]);
+  expect(evidence.get("magnet-card")).toMatchObject({ state: "uncertain", externalRef: null });
+  expect(evidence.get("magnet-card")?.detail).toContain("1 provider accepted");
+  expect(evidence.get("other-card")?.state).toBe("unknown");
+});

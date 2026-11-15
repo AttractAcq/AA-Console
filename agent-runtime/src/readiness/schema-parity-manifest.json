@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "fbc002a334978297947448f56329bcb7ef7dcd0e5aef9e0e7906163da7460d25",
-  "generatedTypesSha256": "5d030e3ff3c414c2a5c740b6e94c5425cd2cde69d1eeadfd7908ce3b2bb3d623",
-  "generatedSchemaBodySha256": "f684042f68c49fd5d51c5ed7d125b3c18a5efe07f7690678a1f35f8ba31f9573",
+  "migrationSourceDigest": "ce0aa2866807f55d339bd23ea6ccf7042c9fcbbb0f282e1104b49aab52576d1f",
+  "generatedTypesSha256": "d01bad424d05b6a448537e1e70dc716d4204b3684b53f25e9d7b5aecb084e0f1",
+  "generatedSchemaBodySha256": "075b5143e74162b095cdf9177acc7686b9d587ffd7ff15caa08de3613829f87a",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3636,6 +3636,13 @@
       "filename": "20261121180000_502_proof_delivery_outcome_alerts.sql",
       "sha256": "77c3fd53b032b12071c20b3a3e20d6376386194bb46510ae11c4cfd725305e00",
       "trimmedMd5": "2fd2471608dcf96e42c3094181db419c"
+    },
+    {
+      "version": "20261121190000",
+      "name": "503_lead_magnet_exact_send_attempts",
+      "filename": "20261121190000_503_lead_magnet_exact_send_attempts.sql",
+      "sha256": "da8fc3e219af42a6627dd3ee728de612104401b56f5d4d179316472fb97eac3c",
+      "trimmedMd5": "5f86d5af5c1aa4be9e6ead823f8e4cfe"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

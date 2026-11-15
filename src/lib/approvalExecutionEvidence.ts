@@ -16,7 +16,7 @@ export type ApprovalExecutionEvidence = {
 
 const JOINED_KINDS = new Set([
   "campaign_action", "google_review_reply", "google_profile_change", "meta_profile_change",
-  "proof_placement", "proof_delivery",
+  "proof_placement", "proof_delivery", "lead_magnet",
 ]);
 const VISIBLE_OUTCOME_STATES = new Set(["approved", "revoked", "source_decided", "stale", "superseded"]);
 
@@ -45,10 +45,14 @@ export async function loadApprovalExecutionEvidence(
     const ids = rows.map((row) => row[key]);
     const byId = new Map(rows.map((row) => [row[key], row]));
     try {
-      if (kind === "proof_placement" || kind === "proof_delivery") {
-        const { data, error } = await supabase.from("proof_approval_execution_evidence_v6")
-          .select("request_id,client_id,source_kind,state,detail,external_ref")
-          .in("request_id", ids);
+      if (kind === "proof_placement" || kind === "proof_delivery" || kind === "lead_magnet") {
+        const { data, error } = kind === "lead_magnet"
+          ? await supabase.from("lead_magnet_approval_execution_evidence_v6")
+            .select("request_id,client_id,source_kind,state,detail,external_ref")
+            .in("request_id", ids)
+          : await supabase.from("proof_approval_execution_evidence_v6")
+            .select("request_id,client_id,source_kind,state,detail,external_ref")
+            .in("request_id", ids);
         if (error) throw error;
         for (const item of data ?? []) {
           const request = item.request_id ? byId.get(item.request_id) : null;

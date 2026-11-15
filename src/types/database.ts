@@ -389,6 +389,13 @@ export type Database = {
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "approval_decision_events_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
         ]
       }
       approval_request_evidence_v6: {
@@ -448,6 +455,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_request_evidence_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
         ]
       }
@@ -4555,6 +4569,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_authority_assignment_reviews_v_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "client_authority_assignment_reviews_v6_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -6439,6 +6460,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_ideas_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "client_ideas_campaign_client_fkey"
@@ -8540,6 +8568,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_proof_assets_approved_rights_request_id_fkey"
+            columns: ["approved_rights_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "client_proof_assets_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -8864,6 +8899,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_sales_agents_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "client_sales_agents_client_id_fkey"
@@ -9320,6 +9362,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_switch_activation_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "client_switch_activation_reviews_v6_client_id_fkey"
@@ -10467,6 +10516,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "creative_requirement_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "creative_requirement_reviews_v6_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -10997,6 +11053,13 @@ export type Database = {
             referencedColumns: ["id", "client_id"]
           },
           {
+            foreignKeyName: "delivery_approval_dependencie_approval_request_id_client_i_fkey"
+            columns: ["approval_request_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id", "client_id"]
+          },
+          {
             foreignKeyName: "delivery_approval_dependencies_entity_version_id_client_id_fkey"
             columns: ["entity_version_id", "client_id"]
             isOneToOne: false
@@ -11075,6 +11138,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_approval_invalidations_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "delivery_approval_invalidations_v6_client_id_fkey"
@@ -11368,6 +11438,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "delivery_remediation_tasks_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "delivery_remediation_tasks_v6_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -11656,6 +11733,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "delivery_work_items_v6_campaign_id_client_id_fkey"
@@ -12479,6 +12563,13 @@ export type Database = {
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "gateway_tool_execution_receipts_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
         ]
       }
       gateway_tool_reviews_v6: {
@@ -12544,6 +12635,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "gateway_tool_reviews_v6_client_id_fkey"
@@ -12689,6 +12787,13 @@ export type Database = {
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "global_engine_activation_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
         ]
       }
       global_video_owner_reviews_v6: {
@@ -12739,6 +12844,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "global_video_owner_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "global_video_owner_reviews_v6_proposed_owner_fkey"
@@ -13303,6 +13415,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "google_profile_changes_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "google_profile_changes_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -13425,6 +13544,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "google_profile_execution_attempts_v6_change_id_fkey"
@@ -13583,6 +13709,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "google_profile_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "google_profile_review_requests_v6_change_id_fkey"
             columns: ["change_id"]
             isOneToOne: false
@@ -13655,6 +13788,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_context_bindings_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "google_reply_context_bindings_v6_reply_id_fkey"
@@ -13734,6 +13874,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "google_reply_execution_attempts_v6_client_id_fkey"
@@ -14140,6 +14287,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "human_idea_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "human_idea_review_requests_v6_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -14308,6 +14462,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_grant_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "integration_grant_reviews_v6_client_id_fkey"
@@ -15124,6 +15285,7 @@ export type Database = {
       }
       lead_magnet_deliveries: {
         Row: {
+          attempt_request_id: string | null
           attempts: number
           channel: string
           claimed_at: string | null
@@ -15142,6 +15304,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          attempt_request_id?: string | null
           attempts?: number
           channel: string
           claimed_at?: string | null
@@ -15160,6 +15323,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          attempt_request_id?: string | null
           attempts?: number
           channel?: string
           claimed_at?: string | null
@@ -15178,6 +15342,27 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_magnet_deliveries_attempt_request_id_fkey"
+            columns: ["attempt_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_deliveries_attempt_request_id_fkey"
+            columns: ["attempt_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_deliveries_attempt_request_id_fkey"
+            columns: ["attempt_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
           {
             foreignKeyName: "lead_magnet_deliveries_client_id_fkey"
             columns: ["client_id"]
@@ -15233,6 +15418,109 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "lead_submissions"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_magnet_delivery_attempts_v6: {
+        Row: {
+          attempt_no: number
+          client_id: string
+          delivery_id: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          outcome: string
+          provider_ref: string | null
+          request_id: string
+          started_at: string
+        }
+        Insert: {
+          attempt_no: number
+          client_id: string
+          delivery_id: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          outcome: string
+          provider_ref?: string | null
+          request_id: string
+          started_at?: string
+        }
+        Update: {
+          attempt_no?: number
+          client_id?: string
+          delivery_id?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          outcome?: string
+          provider_ref?: string | null
+          request_id?: string
+          started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_magnet_delivery_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_delivery_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_delivery_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_delivery_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_delivery_attempts_v6_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_delivery_attempts_v6_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_due"
+            referencedColumns: ["delivery_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_delivery_attempts_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_delivery_attempts_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_delivery_attempts_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
         ]
       }
@@ -15898,6 +16186,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "market_opportunities_activated_request_id_fkey"
+            columns: ["activated_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "market_opportunities_approved_request_id_fkey"
             columns: ["approved_request_id"]
             isOneToOne: false
@@ -15910,6 +16205,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "market_opportunities_client_id_fkey"
@@ -16312,6 +16614,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "message_template_approvals_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "message_template_approvals_channel_key_fkey"
             columns: ["channel_key"]
             isOneToOne: false
@@ -16410,6 +16719,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_template_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "message_template_review_requests_v6_client_id_fkey"
@@ -16812,6 +17128,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "meta_profile_changes_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "meta_profile_changes_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -16934,6 +17257,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "meta_profile_execution_attempts_v6_change_id_fkey"
@@ -17092,6 +17422,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "meta_profile_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "meta_profile_review_requests_v6_change_id_fkey"
             columns: ["change_id"]
             isOneToOne: false
@@ -17188,6 +17525,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metrics_backfill_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "metrics_backfill_reviews_v6_client_id_fkey"
@@ -17711,6 +18055,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "motion_render_candidates_accepted_request_id_fkey"
+            columns: ["accepted_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "motion_render_candidates_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -17827,6 +18178,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_render_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "motion_render_review_requests_v6_client_id_fkey"
@@ -17998,6 +18356,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "nurture_sequence_review_requests_v6_client_id_fkey"
@@ -18204,6 +18569,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "nurture_sequences_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "nurture_sequences_campaign_id_fkey"
             columns: ["campaign_id"]
             isOneToOne: false
@@ -18337,6 +18709,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "opportunity_activation_requests_v6_client_id_fkey"
@@ -19570,6 +19949,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ordinary_media_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "ordinary_media_review_requests_v6_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -19645,6 +20031,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "ordinary_media_signoffs_v6_asset_id_client_id_fkey"
@@ -20555,6 +20948,13 @@ export type Database = {
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "production_release_approval_bindings_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
         ]
       }
       production_release_attestations_v6: {
@@ -20599,6 +20999,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_release_attestations_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
         ]
       }
@@ -20750,6 +21157,13 @@ export type Database = {
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "production_release_merge_leases_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
         ]
       }
       profile_field_support: {
@@ -20861,6 +21275,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "proof_artifact_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "proof_artifact_review_requests_v6_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -20936,6 +21357,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_signoffs_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "proof_artifact_signoffs_artifact_version_id_client_id_fkey"
@@ -21358,6 +21786,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "proof_delivery_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "proof_delivery_reviews_v6_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -21528,6 +21963,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placement_approvals_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "proof_placement_approvals_client_id_fkey"
@@ -22444,6 +22886,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "proof_request_deliveries_attempt_request_id_fkey"
+            columns: ["attempt_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "proof_request_deliveries_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -22647,6 +23096,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "proof_rights_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "proof_rights_requests_v6_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -22736,6 +23192,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_revocations_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "proof_rights_revocations_v6_client_id_fkey"
@@ -24214,6 +24677,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "video_approval_signoffs_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "video_approval_signoffs_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
@@ -25396,6 +25866,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "video_seat_review_requests_v6_client_id_fkey"
@@ -28715,6 +29192,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "delivery_work_items_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "delivery_work_items_v6_campaign_id_client_id_fkey"
             columns: ["campaign_id", "client_id"]
             isOneToOne: false
@@ -29119,6 +29603,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "gateway_tool_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "gateway_tool_reviews_v6_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -29357,6 +29848,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "google_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "google_profile_execution_attempts_v6_change_id_fkey"
             columns: ["change_id"]
             isOneToOne: true
@@ -29425,6 +29923,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "google_reply_execution_attempts_v6_client_id_fkey"
@@ -29749,6 +30254,46 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pages_archive"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_magnet_approval_execution_evidence_v6: {
+        Row: {
+          client_id: string | null
+          detail: string | null
+          external_ref: string | null
+          request_id: string | null
+          source_kind: string | null
+          state: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "approval_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "approval_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -30211,6 +30756,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "meta_profile_execution_attempts_v6_change_id_fkey"
@@ -35661,6 +36213,10 @@ export type Database = {
       lead_magnet_payload_hash_v6: {
         Args: { p_version_id: string }
         Returns: string
+      }
+      lead_magnet_send_ready_v6: {
+        Args: { p_attempt: number; p_delivery_id: string }
+        Returns: boolean
       }
       lead_magnet_source_state_v6: {
         Args: { p_request_id: string }

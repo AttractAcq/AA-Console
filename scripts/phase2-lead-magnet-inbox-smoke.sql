@@ -27,7 +27,11 @@ declare m public.lead_magnets%rowtype;
   endpoint_id uuid;
   submission_id uuid;
   v_delivery_id uuid;
+  second_delivery_id uuid;
   new_version_id uuid;
+  replacement_id uuid;
+  claimed_count integer;
+  reaped_count integer;
 begin
   insert into public.lead_magnets(client_id,name,objective,format)
   values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Fixture guide','Show the guide','pdf_guide')
@@ -114,12 +118,71 @@ begin
   exception when raise_exception then
     if sqlerrm = 'Duplicate approval succeeded' then raise; end if;
   end;
+  insert into public.lead_submissions(client_id,endpoint_id,email,
+    consent_wording,consent_given_at,idempotency_key,status)
+  values (m.client_id,endpoint_id,'second@example.invalid',
+    'I agree to receive the guide by email.',now(),'fixture-second-optin','promoted')
+  returning id into submission_id;
+  insert into public.lead_magnet_deliveries(client_id,submission_id,
+    magnet_version_id,channel,recipient)
+  values (m.client_id,submission_id,v.id,'email','second@example.invalid')
+  returning id into second_delivery_id;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+  select count(*) into claimed_count from public.claim_lead_magnet_deliveries(5);
+  if claimed_count<>2 or not public.lead_magnet_send_ready_v6(v_delivery_id,1)
+    or (select count(*) from public.lead_magnet_delivery_attempts_v6
+      where request_id=r.id and outcome='sending')<>2 then
+    raise exception 'Courier claims were not bound to two exact approval attempts'; end if;
+  update public.lead_magnet_deliveries set lease_until=now()-interval '1 minute'
+    where id=second_delivery_id;
+  reaped_count:=public.reap_stale_lead_magnet_deliveries();
+  select count(*) into claimed_count from public.claim_lead_magnet_deliveries(5);
+  if reaped_count<>1
+    or (select status from public.lead_magnet_deliveries where id=second_delivery_id)<>'uncertain'
+    or (select outcome from public.lead_magnet_delivery_attempts_v6
+      where delivery_id=second_delivery_id)<>'uncertain'
+    or claimed_count<>0 then
+    raise exception 'Interrupted send quarantine failed (reaped %, delivery %, attempt %, reclaimed %)',
+      reaped_count,
+      (select status from public.lead_magnet_deliveries where id=second_delivery_id),
+      (select outcome from public.lead_magnet_delivery_attempts_v6 where delivery_id=second_delivery_id),
+      claimed_count; end if;
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
   perform public.revoke_lead_magnet_approval_v6(a.id,'Incorrect guide');
   if (select status from public.approval_inbox_v6 where id = r.id) <> 'revoked'
     then raise exception 'Revocation did not reach Inbox'; end if;
   if (select blocker from public.lead_magnet_due u where u.delivery_id = v_delivery_id)
     not like 'The approval was revoked:%'
     then raise exception 'Revoked magnet remained deliverable'; end if;
+  replacement_id:=public.request_lead_magnet_approval_v6(v.id);
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+  perform public.attest_lead_magnet_bytes_v6(replacement_id,repeat('a',64),16);
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  perform public.decide_lead_magnet_approval_v6(replacement_id,true);
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+  if (select count(*) from public.lead_magnet_due where delivery_id=v_delivery_id)<>1
+    or public.lead_magnet_send_ready_v6(v_delivery_id,1) then
+    raise exception 'New approval revived an in-flight send under the revoked request'; end if;
+  perform public.record_lead_magnet_failure(v_delivery_id,'Revoked before provider call',false);
+  if (select outcome from public.lead_magnet_delivery_attempts_v6
+    where delivery_id=v_delivery_id)<>'failed' then
+    raise exception 'Rejected pre-send attempt had no separate outcome'; end if;
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  if not exists(select 1 from public.lead_magnet_approval_execution_evidence_v6 e
+    where e.request_id=r.id and e.client_id=m.client_id
+      and e.source_kind='lead_magnet' and e.state='uncertain'
+      and e.detail like '2 attempt(s): 0 provider accepted, 1 failed, 1 uncertain.%')
+    then raise exception 'Exact Inbox card did not show both courier outcomes'; end if;
+  perform public.revoke_lead_magnet_approval_v6(replacement_id,'Fixture replacement retired');
   execute 'alter table public.lead_magnet_approvals disable trigger lead_magnet_inbox_cohort_insert_v6';
   insert into public.lead_magnet_approvals(client_id,magnet_version_id,
     payload_hash,scope,inbox_enforced_v6)
