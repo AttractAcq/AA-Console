@@ -7,6 +7,7 @@ import {
   asCount,
   asDate,
   campaignIdeas,
+  campaignContentSpec,
   normaliseChannels,
   planProblem,
   planRouteProblem,
@@ -87,7 +88,7 @@ describe("planner crash recovery", () => {
       id: "campaign-1", client_id: "client-1", acquisition_mode: "organic",
       offer_version_id: "offer-1", built_at: "2026-10-16T10:00:00Z",
       content_ideas_generated_at: "2026-10-16T10:01:00Z",
-      ideate_on_plan: true, job_id: "job-1",
+      ideate_on_plan: true, job_id: "job-1", content_spec_id: "spec-1",
     };
     const rpc = vi.fn(async (name: string) => {
       if (name === "capture_campaign_intelligence_snapshot_v6")
@@ -464,6 +465,41 @@ describe("the submit tool when a campaign runs pillars", () => {
 
   it("stays free of the keywords a strict schema rejects", () => {
     expect(unsupportedStrictKeywords(submitToolFor(pillars).inputSchema)).toEqual([]);
+  });
+});
+
+describe("approved campaign content requirements", () => {
+  const organic = { route: "organic", platform: "instagram", media_type: "video", content_format: "reel" };
+  const paid = { route: "paid", platform: "facebook", media_type: "image", content_format: "carousel" };
+
+  it("requires a route and format for each planned piece, including when ideation is deferred", () => {
+    const tool = submitToolFor([], false, true);
+    expect(tool.inputSchema.required).toContain("content_spec");
+    expect(tool.inputSchema.properties).not.toHaveProperty("ideas");
+    expect(unsupportedStrictKeywords(tool.inputSchema)).toEqual([]);
+    expect(campaignContentSpec([organic, paid], 2, "both", "meta", { organic: 1, paid: 1 }))
+      .toEqual([organic, paid]);
+  });
+
+  it("refuses a mismatched count, route or destination", () => {
+    expect(() => campaignContentSpec([organic], 2, "both", "meta", { organic: 1, paid: 1 })).toThrow(/exactly 2/);
+    expect(() => campaignContentSpec([paid], 1, "organic", null, { organic: 1, paid: 0 })).toThrow(/invalid route/);
+    expect(() => campaignContentSpec([{ ...paid, platform: "google_ads" }], 1, "paid", "meta", { organic: 0, paid: 1 })).toThrow(/invalid route/);
+    expect(() => campaignContentSpec([organic, paid], 2, "both", "meta", { organic: 2, paid: 0 })).toThrow(/volumes/);
+  });
+
+  it("refuses unsupported media and format pairs and disagreements with planned ideas", () => {
+    expect(() => campaignContentSpec([{ ...organic, media_type: "image" }], 1, "organic", null, { organic: 1, paid: 0 })).toThrow(/invalid route/);
+    expect(() => campaignContentSpec([{ ...organic, platform: "linkedin" }], 1, "organic", null, { organic: 1, paid: 0 })).toThrow(/invalid route/);
+    expect(() => campaignContentSpec([organic], 1, "organic", null, { organic: 1, paid: 0 }, [
+      { title: "A", body: "B", media_type: "image", channel: "instagram", strategic_reason: "C", pillar_id: null, content_format: "single" },
+    ])).toThrow(/disagrees/);
+  });
+
+  it("accepts Google search copy only as text/single", () => {
+    const search = { route: "paid", platform: "google_ads", media_type: "text", content_format: "single" };
+    expect(campaignContentSpec([search], 1, "paid", "google", { organic: 0, paid: 1 })).toEqual([search]);
+    expect(() => campaignContentSpec([{ ...search, media_type: "image" }], 1, "paid", "google", { organic: 0, paid: 1 })).toThrow(/invalid route/);
   });
 });
 

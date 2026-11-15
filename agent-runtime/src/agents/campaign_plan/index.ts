@@ -21,6 +21,7 @@ import { loadUpstreamRecords, renderContext, renderUpstream } from "../shared.js
 import type { BusinessContext, UpstreamRecord } from "../shared.js";
 import {
   campaignIdeas,
+  campaignContentSpec,
   asAmount,
   asCount,
   asDate,
@@ -51,7 +52,7 @@ import {
  * running — which lands in somebody else's calendar share with nothing to
  * flag it. Same discipline as proof_ref on a brief.
  */
-export function submitToolFor(pillars: readonly { id: string; name: string }[] = [], includeIdeas = true) {
+export function submitToolFor(pillars: readonly { id: string; name: string }[] = [], includeIdeas = true, includeSpec = false) {
   const ids = pillars.map((p) => p.id);
   return {
   name: "submit_campaign_plan",
@@ -77,6 +78,21 @@ export function submitToolFor(pillars: readonly { id: string; name: string }[] =
         type: "number",
         description: `How many distinct pieces of content this campaign needs. 0 if none. At most ${MAX_CONTENT}.`,
       },
+      ...(includeSpec ? { content_spec: {
+        type: "array",
+        description: "Exactly content_count entries in production order. Each assigns one piece to an organic or paid route, a destination, a media type and a format. Match ideas in the same order when ideas are included. Paid Google search is text/single on google_ads.",
+        items: {
+          type: "object",
+          properties: {
+            route: { type: "string", enum: ["organic", "paid"] },
+            platform: { type: "string", enum: ["instagram", "facebook", "tiktok", "linkedin", "youtube", "google_ads"] },
+            media_type: { type: "string", enum: ["image", "text", "video"] },
+            content_format: { type: "string", enum: ["single", "carousel", "story", "reel"] },
+          },
+          required: ["route", "platform", "media_type", "content_format"],
+          additionalProperties: false,
+        },
+      }} : {}),
       ...(includeIdeas ? { ideas: {
         type: "array",
         // No maxItems, and no maxLength on the title: the API rejects both on
@@ -135,7 +151,7 @@ export function submitToolFor(pillars: readonly { id: string; name: string }[] =
     },
     required: [
       "objective", "audience", "offer_summary", "core_message", "channels",
-      "kpi_metric", "content_count", ...(includeIdeas ? ["ideas"] : []), "needs_landing_page", "needs_sales_agent", "reasoning",
+      "kpi_metric", "content_count", ...(includeSpec ? ["content_spec"] : []), ...(includeIdeas ? ["ideas"] : []), "needs_landing_page", "needs_sales_agent", "reasoning",
     ],
     additionalProperties: false,
   },
@@ -222,7 +238,7 @@ export async function runCampaignPlanJob(
     || campaign.acquisition_mode === "both";
   // A committed batch survives worker crashes. The same job must still finish
   // package creation and links after a crash between the SQL save and return.
-  if (savedPlanNeedsFinalization(campaign, job.id)) {
+  if (savedPlanNeedsFinalization(campaign, job.id) && (!isV6 || campaign.content_spec_id || campaign.content_count === 0)) {
     if (isV6) {
       const { data: snapshot, error } = await sb.rpc("capture_campaign_intelligence_snapshot_v6", {
         p_campaign_id: campaign.id, p_job_id: job.id,
@@ -241,7 +257,7 @@ export async function runCampaignPlanJob(
     }
     return { ok: true, retryable: false };
   }
-  if (campaign.content_ideas_generated_at) return { ok: true, retryable: false };
+  if (campaign.content_ideas_generated_at && (!isV6 || campaign.content_spec_id || campaign.content_count === 0)) return { ok: true, retryable: false };
 
   if (!campaign.brief || campaign.brief.trim().length === 0) {
     return {
@@ -329,7 +345,7 @@ export async function runCampaignPlanJob(
   // the submit tool, so a piece cannot be filed under a pillar the campaign
   // is not running.
   const includeIdeas = campaign.built_at != null || campaign.ideate_on_plan !== false;
-  const submitTool = submitToolFor(pillars, includeIdeas);
+  const submitTool = submitToolFor(pillars, includeIdeas, isV6);
   const routeInstruction = campaign.acquisition_mode === "organic"
     ? "This is an ORGANIC campaign. Plan organic distribution only. No advertising, paid search, boosts or ad spend."
     : campaign.acquisition_mode === "paid" && campaign.paid_platform === "meta"
@@ -363,6 +379,7 @@ ABSOLUTE RULES
 - ${includeIdeas
     ? "Supply exactly content_count distinct ideas tailored to this campaign, its audience, offer, dates, channels and constraints. An idea is an angle and purpose, not a finished production brief."
     : "Plan the campaign and decide how many content pieces it needs, but do not ideate any content. Do not write titles, angles or concepts. The operator can generate campaign ideas later."}
+- ${isV6 ? "Supply exactly content_count content_spec entries. Each entry fixes its organic or paid route, destination, media type and format. Match each idea in order when ideas are included. Google search ads use only text/single on google_ads. Unsupported destination/format pairs are refused." : "Preserve legacy content routing."}
 - Ask only for what is needed. Every piece of content you request is real work for a real person.
 - Respect anything the offer strategy lists as a limit or a thing that cannot be promised.`;
 
@@ -501,13 +518,24 @@ Call ${submitTool.name} once when you are done.`;
     return { ok: false, retryable: true, failureMessage: volumes.error, usage };
   }
 
+  let ideas;
   if (includeIdeas) {
-    let ideas;
     try {
       ideas = campaignIdeas(result.submitted.ideas, plan.content_count, pillars.map((p) => p.id));
     } catch (error) {
       return { ok: false, retryable: true, failureMessage: (error as Error).message, usage };
     }
+  }
+  let contentSpec: ReturnType<typeof campaignContentSpec> | undefined;
+  if (isV6 && volumes && !("error" in volumes)) {
+    try {
+      contentSpec = campaignContentSpec(result.submitted.content_spec, plan.content_count,
+        campaign.acquisition_mode, campaign.paid_platform, volumes, ideas);
+    } catch (error) {
+      return { ok: false, retryable: true, failureMessage: (error as Error).message, usage };
+    }
+  }
+  if (includeIdeas) {
     // One transaction commits the plan and its exact idea batch, or neither.
     const { error } = await sb.rpc("save_campaign_plan_with_ideas", {
       p_campaign_id: campaign.id,
@@ -536,6 +564,13 @@ Call ${submitTool.name} once when you are done.`;
       p_paid: volumes.paid,
     });
     if (error) throw new Error(`Failed to record the route volumes: ${error.message}`);
+  }
+  if (contentSpec?.length) {
+    const { error } = await sb.rpc("set_campaign_content_spec_v7", {
+      p_campaign_id: campaign.id,
+      p_pieces: contentSpec,
+    });
+    if (error) throw new Error(`Failed to record the campaign content requirements: ${error.message}`);
   }
 
   if (isV6) {

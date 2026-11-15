@@ -233,6 +233,56 @@ export interface CampaignIdea {
   content_format: "single" | "carousel" | "story" | "reel";
 }
 
+export interface CampaignContentPiece {
+  route: "organic" | "paid";
+  platform: "instagram" | "facebook" | "tiktok" | "linkedin" | "youtube" | "google_ads";
+  media_type: CampaignIdea["media_type"];
+  content_format: CampaignIdea["content_format"];
+}
+
+/** The exact route and creative shape the approved plan asks producers to make. */
+export function campaignContentSpec(
+  raw: unknown, expected: number, mode: string, paidPlatform: string | null,
+  volumes: { organic: number; paid: number }, ideas?: readonly CampaignIdea[],
+): CampaignContentPiece[] {
+  if (!Array.isArray(raw) || raw.length !== expected) {
+    throw new Error(`The campaign needs exactly ${expected} route and format requirements.`);
+  }
+  const pieces = raw.map((value, index) => {
+    const item = value as Record<string, unknown> | null;
+    const route = str(item?.route);
+    const platform = str(item?.platform).toLowerCase();
+    const media = str(item?.media_type);
+    const format = str(item?.content_format);
+    const allowedMedia = FORMAT_MEDIA[format];
+    const social = ["instagram", "facebook", "tiktok", "linkedin", "youtube"];
+    if (!item || (route !== "organic" && route !== "paid")
+      || !allowedMedia?.includes(media)
+      || (platform !== "google_ads" && !platformAllowsFormat(platform, format))
+      || route === "organic" && (!social.includes(platform) || mode === "paid")
+      || route === "paid" && (mode === "organic"
+        || paidPlatform === "meta" && !["instagram", "facebook"].includes(platform)
+        || paidPlatform === "google" && (platform !== "google_ads" || media !== "text" || format !== "single"))
+      || route === "paid" && !["meta", "google"].includes(paidPlatform ?? "")) {
+      throw new Error(`Content requirement ${index + 1} has an invalid route, destination or format.`);
+    }
+    if (ideas?.[index] && (ideas[index]!.media_type !== media
+      || ideas[index]!.content_format !== format
+      || ideas[index]!.channel.toLowerCase() !== platform)) {
+      throw new Error(`Content requirement ${index + 1} disagrees with its planned idea.`);
+    }
+    return { route: route as CampaignContentPiece["route"],
+      platform: platform as CampaignContentPiece["platform"],
+      media_type: media as CampaignContentPiece["media_type"],
+      content_format: format as CampaignContentPiece["content_format"] };
+  });
+  if (pieces.filter((piece) => piece.route === "organic").length !== volumes.organic
+    || pieces.filter((piece) => piece.route === "paid").length !== volumes.paid) {
+    throw new Error("Content requirements do not match the campaign's organic and paid volumes.");
+  }
+  return pieces;
+}
+
 /** Reject incomplete batches rather than silently saving fewer ideas than promised. */
 /**
  * Assigns an idea to one of the campaign's pillars.

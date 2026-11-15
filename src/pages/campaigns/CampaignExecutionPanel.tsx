@@ -27,9 +27,11 @@ import { PageBuilderPanel } from "../conversion/PageBuilderPanel";
 import { SalesOverviewPanel } from "../sales/SalesOverviewPanel";
 import { useCampaignV2Package } from "./useCampaignV2Package";
 
+type ContentSpecPiece = { route: string; platform: string; media_type: string; content_format: string };
+
 type Campaign = {
   id: string;
-  acquisition_mode: "legacy" | "organic" | "paid";
+  acquisition_mode: "legacy" | "organic" | "paid" | "both";
   paid_platform: "meta" | "google" | null;
   cloned_from_campaign_id: string | null;
   name: string;
@@ -46,6 +48,7 @@ type Campaign = {
   kpi_metric: string | null;
   kpi_target: number | null;
   content_count: number;
+  content_spec_id: string | null;
   plan_approved_at: string | null;
   plan_approved_fingerprint: string | null;
   plan_review_note: string | null;
@@ -184,6 +187,8 @@ export function CampaignExecutionPanel() {
   const { clientId, campaignId } = useParams<{ clientId: string; campaignId?: string }>();
   const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [contentSpec, setContentSpec] = useState<ContentSpecPiece[] | null>(null);
+  const [contentSpecError, setContentSpecError] = useState<string | null>(null);
   const [readiness, setReadiness] = useState<Record<string, Requirement[]>>({});
   /** Why each campaign exists, where an opportunity says so. */
   const [origins, setOrigins] = useState<ReadonlyMap<string, CampaignOrigin>>(new Map());
@@ -236,6 +241,8 @@ export function CampaignExecutionPanel() {
     setReadinessError(null);
     setLoading(true);
     setReadiness({});
+    setContentSpec(null);
+    setContentSpecError(null);
     try {
       if (!clientId) {
         throw new Error("No client selected.");
@@ -243,7 +250,7 @@ export function CampaignExecutionPanel() {
       const query = supabase
         .from("client_campaigns")
         .select(
-          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, plan_approved_at, plan_approved_fingerprint, plan_review_note, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, ideate_on_plan, launched_at, created_at, template, mirrors_template, daily_budget, target_countries, conversion_event, meta_campaign_id, meta_ad_set_id, meta_built_at, acquisition_mode, paid_platform, cloned_from_campaign_id, offer_version_id",
+          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, content_spec_id, plan_approved_at, plan_approved_fingerprint, plan_review_note, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, ideate_on_plan, launched_at, created_at, template, mirrors_template, daily_budget, target_countries, conversion_event, meta_campaign_id, meta_ad_set_id, meta_built_at, acquisition_mode, paid_platform, cloned_from_campaign_id, offer_version_id",
         )
         .eq("client_id", clientId)
         // A campaign somebody archived is over. It reads from the archive.
@@ -255,6 +262,19 @@ export function CampaignExecutionPanel() {
       if (error) throw error;
       const rows = (data ?? []) as Campaign[];
       setCampaigns(rows);
+      if (campaignId && rows[0]?.content_spec_id) {
+        const { data: spec, error: specError } = await supabase
+          .from("campaign_content_spec_versions_v7")
+          .select("pieces")
+          .eq("id", rows[0].content_spec_id)
+          .maybeSingle();
+        if (version !== request.current) return;
+        if (specError || !spec || !Array.isArray(spec.pieces)) {
+          setContentSpecError(specError?.message ?? "The content requirements could not be read.");
+        } else {
+          setContentSpec(spec.pieces as ContentSpecPiece[]);
+        }
+      }
 
       // Lineage, not status: a campaign with no recorded commercial reason
       // is the normal case for everything made before the opportunity
@@ -696,6 +716,14 @@ export function CampaignExecutionPanel() {
             {v2Tab === "plan" && <section className="space-y-4 py-4" aria-label="Campaign plan">
               <div className="flex flex-wrap justify-between gap-2"><div><h3 className="font-semibold">Campaign plan</h3><p className="text-xs text-muted-foreground">{c.built_at ? `Generated ${new Date(c.built_at).toLocaleString()}` : "Awaiting planner"}</p></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => setEditingPlan(c)}>Edit plan</button><button type="button" className={buttonClass} disabled={busy || planning.has(c.id)} onClick={() => setConfirmAction({ campaign: c, kind: "plan" })}>{c.built_at ? "Regenerate plan" : "Run planner"}</button></div></div>
               <dl className="grid gap-4 rounded-lg border border-border bg-card p-4 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">Objective</dt><dd>{c.objective ?? "—"}</dd></div><div><dt className="text-muted-foreground">Audience</dt><dd>{c.audience ?? "—"}</dd></div><div><dt className="text-muted-foreground">Offer</dt><dd>{c.offer_summary ?? "—"}</dd></div><div><dt className="text-muted-foreground">Core message</dt><dd>{c.core_message ?? "—"}</dd></div><div><dt className="text-muted-foreground">Channels</dt><dd>{c.channels?.join(", ") || "—"}</dd></div><div><dt className="text-muted-foreground">Budget</dt><dd>{c.budget == null ? "—" : c.budget.toLocaleString()}</dd></div><div><dt className="text-muted-foreground">Dates</dt><dd>{c.starts_on ?? "—"} to {c.ends_on ?? "—"}</dd></div><div><dt className="text-muted-foreground">KPI</dt><dd>{c.kpi_metric ?? "—"}{c.kpi_target != null ? ` · target ${c.kpi_target}` : ""}</dd></div><div><dt className="text-muted-foreground">Content pieces</dt><dd>{c.content_count}</dd></div><div><dt className="text-muted-foreground">Required builds</dt><dd>{[c.needs_landing_page && "Landing page", c.needs_sales_agent && "Sales agent"].filter(Boolean).join(", ") || "None"}</dd></div></dl>
+              {c.acquisition_mode !== "legacy" && c.content_count > 0 && (
+                <div className="rounded-lg border border-border bg-card p-4 text-sm">
+                  <h4 className="font-medium">Content requirements to review</h4>
+                  {contentSpecError && <p role="alert" className="mt-2 text-destructive">{contentSpecError}</p>}
+                  {!contentSpec && !contentSpecError && <p className="mt-2 text-muted-foreground">No route and format requirements recorded. Run the planner before approval.</p>}
+                  {contentSpec && <ol className="mt-2 space-y-1">{contentSpec.map((piece, index) => <li key={index}>{index + 1}. {piece.route} · {piece.platform} · {piece.media_type} · {piece.content_format}</li>)}</ol>}
+                </div>
+              )}
               {/* The plan review gate (migration 309). Not a lock on this
                   screen: provision_campaign refuses an unreviewed plan and
                   refuses one that changed after approval, so correcting a plan
@@ -717,7 +745,7 @@ export function CampaignExecutionPanel() {
                   <button
                     type="button"
                     className={buttonClass}
-                    disabled={busy}
+                    disabled={busy || (c.acquisition_mode !== "legacy" && c.content_count > 0 && contentSpec?.length !== c.content_count)}
                     onClick={() => void approvePlan(c)}
                   >
                     {c.plan_approved_at === null ? "Approve this plan" : "Approve again"}

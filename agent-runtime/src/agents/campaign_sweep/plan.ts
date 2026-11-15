@@ -10,6 +10,12 @@ const PLATFORMS = ["facebook", "instagram", "tiktok", "linkedin", "youtube"] as 
 export type Platform = (typeof PLATFORMS)[number];
 
 export type Route = "organic" | "paid";
+export type SweepPiece = {
+  route: Route;
+  platform: Platform;
+  media_type: "image" | "text" | "video";
+  content_format: "single" | "carousel" | "story" | "reel";
+};
 
 export type SweepStep = {
   stepKey: string;
@@ -73,6 +79,7 @@ export function sweepSteps(args: {
   paidCount: number;
   platform: Platform;
   campaignId: string;
+  pieces?: readonly SweepPiece[];
 }): SweepStep[] {
   const routes: Route[] = [
     ...Array.from({ length: args.organicCount }, () => "organic" as Route),
@@ -82,7 +89,11 @@ export function sweepSteps(args: {
   const steps: SweepStep[] = [];
   let previousIdeaKey: string | null = null;
 
-  routes.forEach((route, index) => {
+  const pieces = args.pieces ?? routes.map((route) => ({
+    route, platform: args.platform, media_type: "image" as const, content_format: "single" as const,
+  }));
+  if (pieces.length !== routes.length) throw new Error("Sweep content requirements disagree with planned volume.");
+  pieces.forEach((piece, index) => {
     const n = index + 1;
     const ideaKey = `piece${n}_idea`;
     const briefKey = `piece${n}_brief`;
@@ -99,12 +110,12 @@ export function sweepSteps(args: {
       inputParams: {
         idea_count: 1,
         campaign_id: args.campaignId,
-        target_platform: args.platform,
-        media_type: "image",
-        content_format: "single",
+        target_platform: piece.platform,
+        media_type: piece.media_type,
+        content_format: piece.content_format,
         // Which half of a both-route campaign this piece serves. Migration 302
         // put acquisition_route on client_ideas for exactly this.
-        acquisition_route: route,
+        acquisition_route: piece.route,
       },
     });
 

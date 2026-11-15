@@ -291,6 +291,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Exit gate:** one organic and one paid route package can be prepared from a commercial campaign without manual record stitching. A failed page or video job holds only its dependent work and names the retry. No external write occurs during preparation.
 
+**Implementation checkpoint, 15 November 2026:** The planner now records an immutable per-piece route, destination, media and format specification for new route campaigns. A human can review that list on the campaign plan before approval; changing it withdraws approval and changes the plan fingerprint. The campaign sweep composes social production steps from the approved mix instead of defaulting every piece to a single image. Existing pre-spec approved campaigns retain their earlier sweep behaviour. Google search copy remains on the manual build-sheet path because the current content producer cannot execute it. This checkpoint does not yet close Phase 4: the sweep still generates new ideas rather than consuming the planner's exact idea rows, route packages and durable work items are not yet wired to the composer, and package QA, dependency-specific retries, page/agent/magnet orchestration and real-client exit evidence remain open.
+
 ## Phase 5 — Content Production, Proof Production and creative quality
 
 - Drive both campaign demand and recurring organic demand through Ideation → Brief → Create → Edit/Repurpose → QA → human review. Show requested, produced, rejected, revised and accepted counts by format, campaign and destination.

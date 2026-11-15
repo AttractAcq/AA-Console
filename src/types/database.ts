@@ -2529,6 +2529,96 @@ export type Database = {
           },
         ]
       }
+      campaign_content_spec_versions_v7: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          content_hash: string
+          created_at: string
+          created_by: string | null
+          id: string
+          pieces: Json
+          version: number
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          content_hash: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          pieces: Json
+          version: number
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          content_hash?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          pieces?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_content_spec_versions_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_content_spec_versions_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_content_spec_versions_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_content_spec_versions_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_content_spec_versions_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_content_spec_versions_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_content_spec_versions_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_content_spec_versions_v7_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_intelligence_snapshots: {
         Row: {
           acquisition_mode: string
@@ -5277,6 +5367,8 @@ export type Database = {
           cloned_from_campaign_id: string | null
           content_count: number
           content_ideas_generated_at: string | null
+          content_spec_hash: string | null
+          content_spec_id: string | null
           conversion_event: string | null
           core_message: string | null
           created_at: string
@@ -5333,6 +5425,8 @@ export type Database = {
           cloned_from_campaign_id?: string | null
           content_count?: number
           content_ideas_generated_at?: string | null
+          content_spec_hash?: string | null
+          content_spec_id?: string | null
           conversion_event?: string | null
           core_message?: string | null
           created_at?: string
@@ -5389,6 +5483,8 @@ export type Database = {
           cloned_from_campaign_id?: string | null
           content_count?: number
           content_ideas_generated_at?: string | null
+          content_spec_hash?: string | null
+          content_spec_id?: string | null
           conversion_event?: string | null
           core_message?: string | null
           created_at?: string
@@ -5515,6 +5611,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "meta_build_due"
             referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_content_spec_id_fkey"
+            columns: ["content_spec_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_content_spec_versions_v7"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_campaigns_feeds_from_campaign_id_fkey"
@@ -35221,6 +35324,8 @@ export type Database = {
           cloned_from_campaign_id: string | null
           content_count: number
           content_ideas_generated_at: string | null
+          content_spec_hash: string | null
+          content_spec_id: string | null
           conversion_event: string | null
           core_message: string | null
           created_at: string
@@ -40305,6 +40410,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      set_campaign_content_spec_v7: {
+        Args: { p_campaign_id: string; p_pieces: Json }
+        Returns: string
       }
       set_campaign_route_volumes_v6: {
         Args: { p_campaign_id: string; p_organic: number; p_paid: number }

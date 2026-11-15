@@ -38,7 +38,7 @@ import type { AgentRow } from "../../orchestration/registry.js";
 import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
-import { platformFor, sweepSteps } from "./plan.js";
+import { platformFor, sweepSteps, type SweepPiece } from "./plan.js";
 
 /** How long a sweep's run has to finish before the engine calls it overdue. */
 const DEADLINE_HOURS = 72;
@@ -76,7 +76,7 @@ export async function runCampaignSweepJob(
 
   const { data: campaign, error: campaignError } = await sb
     .from("client_campaigns")
-    .select("id, client_id, name, acquisition_mode, channels, content_count, organic_content_count, paid_content_count")
+    .select("id, client_id, name, acquisition_mode, channels, content_count, organic_content_count, paid_content_count, content_spec_id, content_spec_hash")
     .eq("id", job.input_id)
     .maybeSingle();
   if (campaignError) throw new Error(`Campaign lookup failed: ${campaignError.message}`);
@@ -87,13 +87,35 @@ export async function runCampaignSweepJob(
     id: string; client_id: string; name: string; acquisition_mode: string;
     channels: string[] | null; content_count: number;
     organic_content_count: number; paid_content_count: number;
+    content_spec_id: string | null; content_spec_hash: string | null;
   };
   if (c.client_id !== job.client_id) {
     return { ok: false, retryable: false, failureMessage: "That campaign belongs to another client." };
   }
 
+  // Pre-v7 approved route plans have no spec. Their original image sweep
+  // remains readable and runnable; every newly approved route plan has a spec.
+  let pieces: SweepPiece[] | undefined;
+  if (c.acquisition_mode !== "legacy" && c.content_spec_id) {
+    if (!c.content_spec_hash) {
+      return { ok: false, retryable: false, failureMessage: "The campaign's content requirements have no hash." };
+    }
+    const { data: spec, error: specError } = await sb.from("campaign_content_spec_versions_v7")
+      .select("client_id, campaign_id, content_hash, pieces")
+      .eq("id", c.content_spec_id).maybeSingle();
+    if (specError) throw new Error(`Campaign content requirements could not be read: ${specError.message}`);
+    if (!spec || spec.client_id !== c.client_id || spec.campaign_id !== c.id
+      || spec.content_hash !== c.content_spec_hash || !Array.isArray(spec.pieces)) {
+      return { ok: false, retryable: false, failureMessage: "The reviewed content requirements no longer match this campaign." };
+    }
+    if (spec.pieces.some((piece: { platform: string }) => piece.platform === "google_ads")) {
+      return { ok: false, retryable: false, failureMessage: "Google search copy has no campaign sweep producer yet. Use the approved manual build sheet." };
+    }
+    pieces = spec.pieces as SweepPiece[];
+  }
+
   const platform = platformFor(c.channels);
-  if (platform === null) {
+  if (platform === null && c.acquisition_mode === "legacy") {
     // Composing a chain whose pieces have nowhere to go would fail at the end,
     // after paying for every idea and brief in it.
     return {
@@ -110,8 +132,9 @@ export async function runCampaignSweepJob(
   const steps = sweepSteps({
     organicCount,
     paidCount,
-    platform,
+    platform: platform ?? pieces?.[0]?.platform ?? "instagram",
     campaignId: c.id,
+    pieces,
   });
   if (steps.length === 0) {
     return {
@@ -124,7 +147,7 @@ export async function runCampaignSweepJob(
   await appendEvent(
     sb,
     job.id,
-    `Composing a sweep for ${c.name}: ${organicCount} organic and ${paidCount} paid piece${organicCount + paidCount === 1 ? "" : "s"} on ${platform}, ${steps.length} steps.`,
+    `Composing a sweep for ${c.name}: ${organicCount} organic and ${paidCount} paid piece${organicCount + paidCount === 1 ? "" : "s"}, ${steps.length} steps.`,
   );
 
   // The job id as the idempotency key, so a retried job composes the same run
@@ -133,13 +156,15 @@ export async function runCampaignSweepJob(
   const { data: run, error: runError } = await sb.rpc("create_workflow_run", {
     p_client_id: c.client_id,
     p_kind: "campaign_sweep",
-    p_workflow_version: "v6.sweep.1",
+    p_workflow_version: pieces ? "v7.sweep.1" : "v6.sweep.1",
     p_idempotency_key: job.id,
     p_input_snapshot: {
       campaign_id: c.id,
       organic_content_count: organicCount,
       paid_content_count: paidCount,
       target_platform: platform,
+      content_spec_id: c.content_spec_id,
+      content_spec_hash: c.content_spec_hash,
     },
     p_deadline_at: new Date(Date.now() + DEADLINE_HOURS * 3_600_000).toISOString(),
     p_campaign_id: c.id,

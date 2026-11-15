@@ -101,6 +101,20 @@ describe("the chain a plan implies", () => {
     }
   });
 
+  it("carries a reviewed mix of routes, destinations and formats into production", () => {
+    const steps = sweepSteps({ ...base, organicCount: 1, paidCount: 1, pieces: [
+      { route: "organic", platform: "instagram", media_type: "video", content_format: "reel" },
+      { route: "paid", platform: "facebook", media_type: "image", content_format: "carousel" },
+    ] });
+    expect(steps.filter((step) => step.agentKey === "ideation").map((step) => step.inputParams))
+      .toEqual([
+        { idea_count: 1, campaign_id: "camp-1", acquisition_route: "organic",
+          target_platform: "instagram", media_type: "video", content_format: "reel" },
+        { idea_count: 1, campaign_id: "camp-1", acquisition_route: "paid",
+          target_platform: "facebook", media_type: "image", content_format: "carousel" },
+      ]);
+  });
+
   it("composes nothing from a plan with no pieces", () => {
     expect(sweepSteps({ ...base, organicCount: 0, paidCount: 0 })).toEqual([]);
   });
