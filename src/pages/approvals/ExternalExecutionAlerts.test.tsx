@@ -28,6 +28,9 @@ vi.mock("../../lib/supabase", () => ({
           { outcome_id: "c", client_id: "client-1", source_kind: "meta_profile_change",
             outcome: "refused", occurred_at: "2026-11-15T10:00:00Z",
             owning_path: "/clients/client-2/meta-profile?tab=profile" },
+          { outcome_id: "d", client_id: "client-1", source_kind: "google_review_reply",
+            outcome: "unverified", occurred_at: "2026-11-15T09:00:00Z",
+            owning_path: "/clients/client-1/google-profile?tab=reviews" },
         ], error: null }),
       };
       return query;
@@ -40,6 +43,8 @@ it("links a client only to its own failed or uncertain owning source", async () 
   clientFilters.length = 0;
   const { rerender } = render(<MemoryRouter><ExternalExecutionAlerts clientId="client-1" /></MemoryRouter>);
   expect(await screen.findByRole("link", { name: "google review reply · uncertain" }))
+    .toHaveAttribute("href", "/clients/client-1/google-profile?tab=reviews");
+  expect(screen.getByRole("link", { name: "google review reply · unverified" }))
     .toHaveAttribute("href", "/clients/client-1/google-profile?tab=reviews");
   expect(screen.queryByText(/meta profile change/)).not.toBeInTheDocument();
   expect(clientFilters).toEqual(["client-1"]);

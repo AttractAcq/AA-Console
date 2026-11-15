@@ -460,8 +460,10 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                   {r.captured_proof_id ? "captured" : "not captured"}
                 </span>,
                 <span key="y" className="text-xs">
-                  {!reply ? "none" : outcome?.status === "confirmed"
-                    ? `Provider readback confirmed${outcome.provider_state ? ` (${outcome.provider_state.toLowerCase()})` : ""}`
+                  {!reply ? "none" : outcome?.status === "confirmed" && outcome.provider_state === "APPROVED"
+                    ? "Provider readback confirmed (approved moderation)"
+                    : outcome?.status === "confirmed"
+                      ? "Historical confirmation lacks approved moderation; inspect the review."
                     : outcome?.status === "uncertain"
                       ? outcome.reconciliation_result === "matched"
                         ? `Later approved provider reply matched · ${dayOrDash(outcome.reconciled_at)}`
@@ -482,6 +484,8 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                                 ? "Send job failed — inspect the job"
                                 : sendJob
                                   ? `Send requested — ${sendJob.status.replace(/_/g, " ")}`
+                            : reply.status === "posted"
+                              ? "Legacy posted status; no one-shot provider receipt."
                             : reply.status === "approved"
                               ? "Approved — not sent"
                               : reply.status.replace(/_/g, " ")}

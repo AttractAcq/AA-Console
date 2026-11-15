@@ -479,6 +479,26 @@ describe("reviews", () => {
     expect(screen.queryByRole("menuitem", { name: "Request approved reply send" })).not.toBeInTheDocument();
   });
 
+  it("flags historical posted replies without a verified moderation receipt", async () => {
+    database({
+      replies: [{ id: "reply-1", client_id: "client-1", review_id: "rev-1", status: "posted" }],
+      replyOutcomes: [{ attempt_id: "attempt-1", reply_id: "reply-1",
+        client_id: "client-1", status: "confirmed", provider_state: "PENDING" }],
+    });
+    render(<GoogleProfilePanel tab="reviews" />);
+    expect(await screen.findByText(/Historical confirmation lacks approved moderation/))
+      .toBeInTheDocument();
+  });
+
+  it("flags a legacy posted reply without a one-shot provider receipt", async () => {
+    database({
+      replies: [{ id: "reply-1", client_id: "client-1", review_id: "rev-1", status: "posted" }],
+    });
+    render(<GoogleProfilePanel tab="reviews" />);
+    expect(await screen.findByText(/Legacy posted status; no one-shot provider receipt/))
+      .toBeInTheDocument();
+  });
+
   it("shows a held send job before any provider attempt exists", async () => {
     database({
       replies: [{ id: "reply-1", client_id: "client-1", review_id: "rev-1", status: "approved" }],
