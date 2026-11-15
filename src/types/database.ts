@@ -34751,6 +34751,10 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: string
       }
+      meta_budget_credential_eligible_v6: {
+        Args: { p_client_id: string }
+        Returns: boolean
+      }
       meta_build_payload_hash_v6: {
         Args: { p_campaign_id: string }
         Returns: string

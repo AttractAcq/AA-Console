@@ -24,6 +24,12 @@ do $request$
 declare aid uuid; rid uuid; cid uuid:='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
  change_id uuid;
 begin
+ begin
+  perform public.request_campaign_action_approval_v6(
+   'dddddddd-dddd-4ddd-8ddd-dddddddddddd','legacy-profile','profile_update',
+   'google_profile:fixture',repeat('b',64),'{}'::jsonb);
+  raise exception 'Unsourced generic profile action was accepted';
+ exception when check_violation then null; end;
  aid:=public.request_campaign_budget_change_v6(
   cid,75,'Raise after lead quality review','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
  select id into rid from public.approval_requests_v6
