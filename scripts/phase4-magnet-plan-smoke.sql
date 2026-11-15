@@ -22,6 +22,8 @@ select public.set_campaign_content_spec_v7('cccccccc-cccc-4ccc-8ccc-cccccccccccc
 do $checks$
 declare c_id uuid:='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
   old_hash text; new_hash text; readiness jsonb; refused boolean:=false;
+  v_run uuid; v_draft public.campaign_magnet_drafts_v7%rowtype;
+  v_again public.campaign_magnet_drafts_v7%rowtype;
 begin
   select public.campaign_plan_fingerprint(c) into old_hash
     from public.client_campaigns c where id=c_id;
@@ -32,7 +34,7 @@ begin
   perform public.approve_campaign_plan_v6(c_id);
   readiness:=public.campaign_package_readiness_v7(c_id);
   if readiness->>'status'<>'preparing' or readiness->>'expected'<>'2'
-    or not readiness->'blockers' @> '["Lead magnet: no plan-bound campaign sweep producer has completed internal QA."]'::jsonb then
+    or not readiness->'blockers' @> '["Lead magnet: plan-bound work missing."]'::jsonb then
     raise exception 'Required magnet did not hold package review: %',readiness;
   end if;
   begin
@@ -40,5 +42,22 @@ begin
   exception when check_violation then refused:=true;
   end;
   if not refused then raise exception 'Reviewed magnet requirement changed directly'; end if;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+  select id into v_run from public.create_workflow_run(
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','campaign_sweep','v7.magnet.fixture',
+    'magnet-plan-1',jsonb_build_object('plan_fingerprint',new_hash,
+      'content_spec_hash',(select content_spec_hash from public.client_campaigns where id=c_id),
+      'needs_lead_magnet',true),now()+interval '1 day',c_id);
+  select * into v_draft from public.ensure_campaign_magnet_draft_v7(c_id,v_run);
+  select * into v_again from public.ensure_campaign_magnet_draft_v7(c_id,v_run);
+  if v_draft.magnet_id<>v_again.magnet_id or v_draft.work_item_id<>v_again.work_item_id
+    or (select count(*) from public.lead_magnets where campaign_id=c_id)<>1
+    or (select owner_module from public.delivery_work_items_v6 where id=v_draft.work_item_id)
+      <> 'lead_magnet_studio' then
+    raise exception 'Magnet work was not durable and idempotent'; end if;
+  readiness:=public.campaign_package_readiness_v7(c_id);
+  if readiness->>'status'<>'preparing' or not readiness->'blockers' @> '["Lead magnet: awaiting production."]'::jsonb then
+    raise exception 'Draft magnet work was falsely ready: %',readiness; end if;
 end $checks$;
 rollback;

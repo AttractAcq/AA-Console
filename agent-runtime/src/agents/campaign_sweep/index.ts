@@ -316,6 +316,12 @@ export async function runCampaignSweepJob(
       });
       if (agentBindError) throw new Error(`Could not bind sales-agent work: ${agentBindError.message}`);
     }
+    if (c.needs_lead_magnet) {
+      const { error: magnetError } = await sb.rpc("ensure_campaign_magnet_draft_v7", {
+        p_campaign_id: c.id, p_run_id: runId,
+      });
+      if (magnetError) throw new Error(`Could not prepare campaign magnet work: ${magnetError.message}`);
+    }
   }
   const { error: sealError } = await sb.rpc("seal_workflow_run", { p_run_id: runId });
   if (sealError) throw new Error(`Could not seal the campaign sweep: ${sealError.message}`);

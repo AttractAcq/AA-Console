@@ -3187,6 +3187,149 @@ export type Database = {
           },
         ]
       }
+      campaign_magnet_drafts_v7: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          magnet_id: string
+          plan_fingerprint: string
+          run_id: string
+          work_item_id: string
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          created_at?: string
+          magnet_id: string
+          plan_fingerprint: string
+          run_id: string
+          work_item_id: string
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          created_at?: string
+          magnet_id?: string
+          plan_fingerprint?: string
+          run_id?: string
+          work_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_magnet_id_fkey"
+            columns: ["magnet_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_magnet_id_fkey"
+            columns: ["magnet_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: true
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: true
+            referencedRelation: "delivery_work_effective_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: true
+            referencedRelation: "delivery_work_items_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_manifest_intelligence: {
         Row: {
           campaign_id: string
@@ -37419,6 +37562,24 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "campaign_conversion_drafts_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      ensure_campaign_magnet_draft_v7: {
+        Args: { p_campaign_id: string; p_run_id: string }
+        Returns: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          magnet_id: string
+          plan_fingerprint: string
+          run_id: string
+          work_item_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_magnet_drafts_v7"
           isOneToOne: true
           isSetofReturn: false
         }
