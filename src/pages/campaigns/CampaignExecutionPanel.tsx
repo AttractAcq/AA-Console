@@ -27,6 +27,7 @@ import { PageBuilderPanel } from "../conversion/PageBuilderPanel";
 import { SalesOverviewPanel } from "../sales/SalesOverviewPanel";
 import { useCampaignV2Package } from "./useCampaignV2Package";
 import { CampaignSweepWork } from "./CampaignSweepWork";
+import { CampaignConversionWork } from "./CampaignConversionWork";
 
 type ContentSpecPiece = { route: string; platform: string; media_type: string; content_format: string };
 type PlannedIdea = { id: string; campaign_position: number | null; title: string; body: string | null };
@@ -721,6 +722,10 @@ export function CampaignExecutionPanel() {
             </section>
             {clientId && c.acquisition_mode !== "legacy" &&
               <CampaignSweepWork clientId={clientId} campaignId={c.id} />}
+            {clientId && c.acquisition_mode !== "legacy"
+              && (c.needs_landing_page || c.needs_sales_agent) &&
+              <CampaignConversionWork clientId={clientId} campaignId={c.id}
+                needsPage={c.needs_landing_page} needsAgent={c.needs_sales_agent} />}
             <div className="relative mt-4">
               <Button onClick={() => setActionsOpen((open) => !open)}>Action buttons</Button>
               {actionsOpen && <CampaignActions campaign={c} checks={reqs} busy={busy} planning={planning.has(c.id)} onChoose={(kind) => setConfirmAction({ campaign: c, kind })} />}
@@ -772,12 +777,9 @@ export function CampaignExecutionPanel() {
                   </button>
                 </div>
               )}
-              {/* The sweep (migration 310). One workflow run per approved plan:
-                  idea, brief and creative per planned piece, each carrying its
-                  route, driven by the reconciler that already runs the daily
-                  package. It does not create the landing page or the sales
-                  agent -- provision_campaign owns those, which is why Build
-                  remains its own action. */}
+              {/* The sweep prepares the reviewed content mix and any required
+                  page and sales-agent drafts. All remain inside the workflow
+                  until internal QA and human review. */}
               {c.built_at && (
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4">
                   <div>
@@ -787,7 +789,7 @@ export function CampaignExecutionPanel() {
                         ? "Approve the plan first. A sweep is the moment a plan becomes work, so it refuses an unreviewed one."
                         : sweeping.has(c.id)
                           ? "A sweep of this campaign is queued. One at a time, so two sweeps cannot compose the same steps twice."
-                          : `Composes a chain per planned piece (${c.content_count} ${c.content_count === 1 ? "piece" : "pieces"}): idea, brief, then creative. Nothing distributes without its own approval.`}
+                          : `Prepares ${c.content_count} ${c.content_count === 1 ? "piece" : "pieces"} of planned content${c.needs_landing_page ? ", a page" : ""}${c.needs_sales_agent ? ", and a sales agent" : ""}. Each output stops for review before public use.`}
                     </p>
                   </div>
                   <button

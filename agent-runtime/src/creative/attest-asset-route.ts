@@ -14,6 +14,10 @@ type Identity = {
   object_updated_at: string;
 };
 
+class AttestationError extends Error {
+  constructor(message: string, readonly status: number) { super(message); }
+}
+
 function validIdentity(value: unknown, clientId: string, assetId: string): value is Identity {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const v = value as Record<string, unknown>;
@@ -22,6 +26,46 @@ function validIdentity(value: unknown, clientId: string, assetId: string): value
     && typeof v.object_id === "string" && UUID.test(v.object_id)
     && (v.object_version === null || typeof v.object_version === "string")
     && typeof v.object_updated_at === "string" && !!v.object_updated_at;
+}
+
+/** Verify the current Storage object and register the digest of its bytes. */
+export async function attestCreativeAssetBytes(
+  sb: SupabaseClient, clientId: string, assetId: string,
+): Promise<void> {
+  const first = await sb.rpc("creative_storage_identity_v6", { p_asset_id: assetId });
+  if (first.error || !validIdentity(first.data, clientId, assetId)) {
+    throw new AttestationError("Could not verify this client's current asset file.", 409);
+  }
+  const file = await sb.storage.from("client-media").download(first.data.storage_path);
+  if (file.error || !file.data) {
+    throw new AttestationError("Could not download the stored asset file.", 503);
+  }
+  const digest = createHash("sha256");
+  let bytes = 0;
+  const reader = file.data.stream().getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytes += value.byteLength;
+    digest.update(value);
+  }
+  if (bytes === 0) throw new AttestationError("The asset file is empty.", 409);
+  const second = await sb.rpc("creative_storage_identity_v6", { p_asset_id: assetId });
+  if (second.error || !validIdentity(second.data, clientId, assetId)
+    || second.data.storage_path !== first.data.storage_path
+    || second.data.object_id !== first.data.object_id
+    || second.data.object_version !== first.data.object_version
+    || second.data.object_updated_at !== first.data.object_updated_at) {
+    throw new AttestationError("The asset file changed during verification. Try again.", 409);
+  }
+  const attested = await sb.rpc("attest_creative_storage_bytes_v6", {
+    p_asset_id: assetId, p_storage_path: first.data.storage_path,
+    p_sha256: digest.digest("hex"), p_file_bytes: bytes,
+    p_object_id: first.data.object_id,
+    p_object_version: first.data.object_version,
+    p_object_updated_at: first.data.object_updated_at,
+  });
+  if (attested.error) throw new AttestationError(attested.error.message, 409);
 }
 
 async function requireCreativeRequester(
@@ -73,42 +117,12 @@ export async function handleCreativeAssetAttestation(
     });
   }
   try {
-    const first = await sb.rpc("creative_storage_identity_v6", { p_asset_id: assetId });
-    if (first.error || !validIdentity(first.data, clientId, assetId)) {
-      return json(409, { ok: false, error: "Could not verify this client's current asset file." });
-    }
-    const file = await sb.storage.from("client-media").download(first.data.storage_path);
-    if (file.error || !file.data) {
-      return json(503, { ok: false, error: "Could not download the stored asset file." });
-    }
-    const digest = createHash("sha256");
-    let bytes = 0;
-    const reader = file.data.stream().getReader();
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      bytes += value.byteLength;
-      digest.update(value);
-    }
-    if (bytes === 0) return json(409, { ok: false, error: "The asset file is empty." });
-    const second = await sb.rpc("creative_storage_identity_v6", { p_asset_id: assetId });
-    if (second.error || !validIdentity(second.data, clientId, assetId)
-      || second.data.storage_path !== first.data.storage_path
-      || second.data.object_id !== first.data.object_id
-      || second.data.object_version !== first.data.object_version
-      || second.data.object_updated_at !== first.data.object_updated_at) {
-      return json(409, { ok: false, error: "The asset file changed during verification. Try again." });
-    }
-    const attested = await sb.rpc("attest_creative_storage_bytes_v6", {
-      p_asset_id: assetId, p_storage_path: first.data.storage_path,
-      p_sha256: digest.digest("hex"), p_file_bytes: bytes,
-      p_object_id: first.data.object_id,
-      p_object_version: first.data.object_version,
-      p_object_updated_at: first.data.object_updated_at,
-    });
-    if (attested.error) return json(409, { ok: false, error: attested.error.message });
+    await attestCreativeAssetBytes(sb, clientId, assetId);
     return json(200, { ok: true, assetId });
-  } catch {
+  } catch (cause) {
+    if (cause instanceof AttestationError) {
+      return json(cause.status, { ok: false, error: cause.message });
+    }
     return json(503, { ok: false, error: "Stored-file verification is unavailable." });
   }
 }

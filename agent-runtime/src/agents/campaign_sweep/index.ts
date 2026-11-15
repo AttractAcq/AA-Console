@@ -23,12 +23,8 @@
  * deliberate property of the engine. `request_campaign_sweep_v6` therefore
  * checks the gate and queues this agent, which composes as service_role.
  *
- * WHAT IT DOES NOT TOUCH
- *
- * The landing page and the sales agent. `provision_campaign` already creates
- * those and enqueues their agents, is tested, has a button, and is gated by
- * 309. A sweep that added the same two steps would duplicate it, and this phase
- * has already removed three duplications of that exact shape.
+ * Route-aware sweeps also prepare plan-bound page and sales-agent drafts.
+ * Those are internal artifacts; publishing and public enablement are separate.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -76,7 +72,7 @@ export async function runCampaignSweepJob(
 
   const { data: campaign, error: campaignError } = await sb
     .from("client_campaigns")
-    .select("id, client_id, name, acquisition_mode, channels, content_count, organic_content_count, paid_content_count, content_spec_id, content_spec_hash, content_ideas_generated_at")
+    .select("id, client_id, name, acquisition_mode, channels, content_count, organic_content_count, paid_content_count, content_spec_id, content_spec_hash, content_ideas_generated_at, plan_approved_fingerprint, needs_landing_page, needs_sales_agent")
     .eq("id", job.input_id)
     .maybeSingle();
   if (campaignError) throw new Error(`Campaign lookup failed: ${campaignError.message}`);
@@ -89,6 +85,8 @@ export async function runCampaignSweepJob(
     organic_content_count: number; paid_content_count: number;
     content_spec_id: string | null; content_spec_hash: string | null;
     content_ideas_generated_at: string | null;
+    plan_approved_fingerprint: string | null;
+    needs_landing_page: boolean; needs_sales_agent: boolean;
   };
   if (c.client_id !== job.client_id) {
     return { ok: false, retryable: false, failureMessage: "That campaign belongs to another client." };
@@ -171,13 +169,22 @@ export async function runCampaignSweepJob(
     `Composing a sweep for ${c.name}: ${organicCount} organic and ${paidCount} paid piece${organicCount + paidCount === 1 ? "" : "s"}, ${steps.length} steps.`,
   );
 
+  // A composer job can be retried after writing only part of its graph. Its
+  // workflow deadline is an immutable part of the idempotency contract, so
+  // reuse the first attempt's deadline rather than computing a new one.
+  const { data: priorRun, error: priorRunError } = await sb.from("workflow_runs")
+    .select("deadline_at").eq("client_id", c.client_id)
+    .eq("kind", "campaign_sweep").eq("idempotency_key", job.id)
+    .maybeSingle();
+  if (priorRunError) throw new Error(`Could not inspect the prior sweep: ${priorRunError.message}`);
+
   // The job id as the idempotency key, so a retried job composes the same run
   // rather than a second one. create_workflow_run returns the existing run on
   // conflict and raises idempotency_conflict if anything about it differs.
   const { data: run, error: runError } = await sb.rpc("create_workflow_run", {
     p_client_id: c.client_id,
     p_kind: "campaign_sweep",
-    p_workflow_version: pieces ? "v7.sweep.1" : "v6.sweep.1",
+    p_workflow_version: c.acquisition_mode !== "legacy" ? "v7.sweep.2" : "v6.sweep.1",
     p_idempotency_key: job.id,
     p_input_snapshot: {
       campaign_id: c.id,
@@ -187,8 +194,11 @@ export async function runCampaignSweepJob(
       content_spec_id: c.content_spec_id,
       content_spec_hash: c.content_spec_hash,
       planned_idea_ids: plannedIdeaIds ?? null,
+      plan_fingerprint: c.plan_approved_fingerprint,
+      needs_landing_page: c.needs_landing_page,
+      needs_sales_agent: c.needs_sales_agent,
     },
-    p_deadline_at: new Date(Date.now() + DEADLINE_HOURS * 3_600_000).toISOString(),
+    p_deadline_at: priorRun?.deadline_at ?? new Date(Date.now() + DEADLINE_HOURS * 3_600_000).toISOString(),
     p_campaign_id: c.id,
     p_root_request_id: job.id,
     p_created_by: null,
@@ -266,16 +276,58 @@ export async function runCampaignSweepJob(
       });
       if (bindError) throw new Error(`Could not bind ${pieceKey} to its final step: ${bindError.message}`);
     }
+
+    const { data: draft, error: draftError } = await sb.rpc(
+      "ensure_campaign_conversion_drafts_v7", { p_campaign_id: c.id, p_run_id: runId },
+    );
+    if (draftError) throw new Error(`Could not prepare conversion drafts: ${draftError.message}`);
+    const conversion = draft as { page_id: string | null; page_work_item_id: string | null;
+      sales_agent_id: string | null; sales_work_item_id: string | null } | null;
+    if (!conversion) throw new Error("Conversion preparation returned no draft record.");
+    if (c.needs_landing_page) {
+      if (!conversion.page_id || !conversion.page_work_item_id)
+        throw new Error("The required campaign page draft is missing.");
+      const { error: pageStepError } = await sb.rpc("add_workflow_agent_step", {
+        p_run_id: runId, p_step_key: "conversion_page", p_dependencies: [],
+        p_agent_key: "landing_page", p_input_table: "client_pages",
+        p_input_id: conversion.page_id, p_input_params: {}, p_input_from_step_key: null,
+      });
+      if (pageStepError) throw new Error(`Could not add campaign page work: ${pageStepError.message}`);
+      const { error: pageBindError } = await sb.rpc("bind_campaign_conversion_work_v7", {
+        p_work_item_id: conversion.page_work_item_id, p_run_id: runId,
+        p_step_key: "conversion_page",
+      });
+      if (pageBindError) throw new Error(`Could not bind campaign page work: ${pageBindError.message}`);
+    }
+    if (c.needs_sales_agent) {
+      if (!conversion.sales_agent_id || !conversion.sales_work_item_id)
+        throw new Error("The required sales-agent draft is missing.");
+      const { error: agentStepError } = await sb.rpc("add_workflow_agent_step", {
+        p_run_id: runId, p_step_key: "conversion_sales_agent",
+        p_dependencies: c.needs_landing_page ? ["conversion_page"] : [],
+        p_agent_key: "sales_agent", p_input_table: "client_sales_agents",
+        p_input_id: conversion.sales_agent_id, p_input_params: {}, p_input_from_step_key: null,
+      });
+      if (agentStepError) throw new Error(`Could not add sales-agent work: ${agentStepError.message}`);
+      const { error: agentBindError } = await sb.rpc("bind_campaign_conversion_work_v7", {
+        p_work_item_id: conversion.sales_work_item_id, p_run_id: runId,
+        p_step_key: "conversion_sales_agent",
+      });
+      if (agentBindError) throw new Error(`Could not bind sales-agent work: ${agentBindError.message}`);
+    }
   }
   const { error: sealError } = await sb.rpc("seal_workflow_run", { p_run_id: runId });
   if (sealError) throw new Error(`Could not seal the campaign sweep: ${sealError.message}`);
 
+  const totalSteps = steps.length + (c.acquisition_mode !== "legacy"
+    ? Number(c.needs_landing_page) + Number(c.needs_sales_agent) : 0);
+
   await appendEvent(
     sb,
     job.id,
-    `Swept ${c.name} into ${steps.length} sealed steps. The reconciler drives them from here; nothing distributes without its own approval.`,
+    `Swept ${c.name} into ${totalSteps} sealed steps. The reconciler drives them from here; nothing distributes without its own approval.`,
     "info",
-    { run_id: runId, steps: steps.length, organic: organicCount, paid: paidCount },
+    { run_id: runId, steps: totalSteps, organic: organicCount, paid: paidCount },
   );
 
   return { ok: true, retryable: false };

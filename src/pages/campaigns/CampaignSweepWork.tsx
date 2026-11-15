@@ -8,6 +8,8 @@ type Work = {
   item_key: string;
   state: string;
   blocker: string | null;
+  effective_state?: string;
+  effective_blocker?: string | null;
   qa_state: string;
   expected_output: { media_type?: string; content_format?: string; platform?: string };
 };
@@ -51,8 +53,8 @@ export function CampaignSweepWork({ clientId, campaignId }: { clientId: string; 
     if (!packageIds.length) {
       setPieces([]); setError(null); setLoading(false); return;
     }
-    const workResult = await supabase.from("delivery_work_items_v6")
-      .select("id, route_package_id, item_key, state, blocker, qa_state, expected_output")
+    const workResult = await supabase.from("delivery_work_effective_v6")
+      .select("id, route_package_id, item_key, state, blocker, effective_state, effective_blocker, qa_state, expected_output")
       .eq("client_id", clientId).eq("campaign_id", campaignId)
       .eq("owner_module", "content_production_factory")
       .in("route_package_id", packageIds);
@@ -123,18 +125,19 @@ export function CampaignSweepWork({ clientId, campaignId }: { clientId: string; 
     {!loading && !error && !pieces.length && <p className="mt-2 text-xs text-muted-foreground">No production pieces have been swept into the current route packages.</p>}
     {pieces.length > 0 && <ol className="mt-3 space-y-3">{pieces.map(({ work, route, version, steps }) => {
       const blocked = steps.filter((step) => step.status === "blocked" || step.status === "failed");
+      const shownState = work.effective_state ?? work.state;
       return <li key={work.id} className="rounded-md border border-border p-3 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="font-medium">{work.item_key.replaceAll("_", " ")} · {route} v{version}</p>
-          <span className="text-xs">{work.state.replaceAll("_", " ")}</span>
+          <span className="text-xs">{shownState.replaceAll("_", " ")}</span>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
           {[work.expected_output.platform, work.expected_output.media_type,
             work.expected_output.content_format].filter(Boolean).join(" · ")}
           {steps.length ? ` · ${steps.filter((step) => step.status === "completed").length}/${steps.length} steps complete` : ""}
         </p>
-        {work.state === "ready_for_review" && <p className="mt-2 text-xs">Internal QA passed. Review the exact asset before distribution.</p>}
-        {work.blocker && <p className="mt-2 text-xs text-destructive">{work.blocker}</p>}
+        {shownState === "ready_for_review" && <p className="mt-2 text-xs">Internal QA passed. Review the exact asset before distribution.</p>}
+        {(work.effective_blocker ?? work.blocker) && <p className="mt-2 text-xs text-destructive">{work.effective_blocker ?? work.blocker}</p>}
         {blocked.map((step) => <div key={step.id} className="mt-2 flex flex-wrap items-center gap-2 text-xs">
           <span>{step.step_key.replaceAll("_", " ")}: {step.blocker ?? step.status}</span>
           <button type="button" className={controlClass}

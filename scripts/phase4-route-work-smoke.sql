@@ -27,7 +27,7 @@ select set_config('request.jwt.claims','{"role":"service_role"}',true);
 do $checks$
 declare cid uuid:='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
   run1 uuid; run2 uuid; organic1 record; paid1 record; organic2 record;
-  work1 uuid; work2 uuid; n integer;
+  work1 uuid; work2 uuid; asset2 uuid; asset_fingerprint text; n integer;
 begin
   select id into run1 from public.create_workflow_run(
     'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','campaign_sweep','v7.fixture',
@@ -82,6 +82,33 @@ begin
   end;
   perform set_config('request.jwt.claim.role','service_role',true);
   perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+  insert into public.client_media_assets(client_id,media_type,title,storage_path)
+  values('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','image',
+    'Paid fixture creative','campaign-fixture/paid.png') returning id into asset2;
+  -- Synthetic fixture bytes: production uses the Storage verifier to attest
+  -- the actual object before this output link can be made.
+  update public.client_media_assets set delivery_bytes_sha256=repeat('a',64)
+    where id=asset2;
+  select fingerprint into asset_fingerprint from public.delivery_source_catalog_v6
+    where entity_kind='content_asset' and source_key=asset2::text;
+  update public.workflow_steps set status='completed'
+    where run_id=run1 and step_key='piece2_create';
+  insert into public.workflow_artifacts(run_id,step_id,artifact_kind,record_id,
+    version_key,qa_evidence)
+  select run1,s.id,'asset',asset2,'fixture-v1',
+    jsonb_build_object('result','pass','checks',jsonb_build_array('fixture_asset'),
+      'source_fingerprint',asset_fingerprint)
+  from public.workflow_steps s where s.run_id=run1 and s.step_key='piece2_create';
+  perform public.sync_campaign_sweep_work_v7(10);
+  if (select state from public.delivery_work_items_v6 where id=work2)<>'ready_for_review'
+    or (select output_fingerprint from public.delivery_work_items_v6 where id=work2)
+      is distinct from public.delivery_work_output_hash_v6(work2)
+    or (select count(*) from public.delivery_work_outputs_v6 where work_item_id=work2)<>1
+    then raise exception 'Accepted content asset did not reach relational review'; end if;
+  update public.client_media_assets set storage_path='campaign-fixture/revised.png'
+    where id=asset2;
+  if (select effective_state from public.delivery_work_effective_v6 where id=work2)<>'held'
+    then raise exception 'Changed output was still presented as reviewable'; end if;
   if (select id from public.ensure_campaign_route_packages_v7(cid,run1)
     where route='organic')<>organic1.id then
     raise exception 'Retry changed the package version'; end if;

@@ -2619,6 +2619,233 @@ export type Database = {
           },
         ]
       }
+      campaign_conversion_drafts_v7: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          page_id: string | null
+          page_work_item_id: string | null
+          plan_fingerprint: string
+          run_id: string
+          sales_agent_id: string | null
+          sales_work_item_id: string | null
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          created_at?: string
+          page_id?: string | null
+          page_work_item_id?: string | null
+          plan_fingerprint: string
+          run_id: string
+          sales_agent_id?: string | null
+          sales_work_item_id?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          created_at?: string
+          page_id?: string | null
+          page_work_item_id?: string | null
+          plan_fingerprint?: string
+          run_id?: string
+          sales_agent_id?: string | null
+          sales_work_item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "client_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_page_work_item_id_fkey"
+            columns: ["page_work_item_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_work_effective_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_page_work_item_id_fkey"
+            columns: ["page_work_item_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_work_items_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: true
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_sales_agent_id_fkey"
+            columns: ["sales_agent_id"]
+            isOneToOne: false
+            referencedRelation: "client_sales_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_sales_agent_id_fkey"
+            columns: ["sales_agent_id"]
+            isOneToOne: false
+            referencedRelation: "sales_agents_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_sales_work_item_id_fkey"
+            columns: ["sales_work_item_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_work_effective_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_sales_work_item_id_fkey"
+            columns: ["sales_work_item_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_work_items_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_conversion_work_bindings_v7: {
+        Row: {
+          created_at: string
+          run_id: string
+          step_key: string
+          work_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          run_id: string
+          step_key: string
+          work_item_id: string
+        }
+        Update: {
+          created_at?: string
+          run_id?: string
+          step_key?: string
+          work_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_conversion_work_bindings_v7_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_work_bindings_v7_run_id_step_key_fkey"
+            columns: ["run_id", "step_key"]
+            isOneToOne: true
+            referencedRelation: "workflow_steps"
+            referencedColumns: ["run_id", "step_key"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_work_bindings_v7_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: true
+            referencedRelation: "delivery_work_effective_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_work_bindings_v7_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: true
+            referencedRelation: "delivery_work_items_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_intelligence_snapshots: {
         Row: {
           acquisition_mode: string
@@ -33846,6 +34073,13 @@ export type Database = {
         }
         Returns: string
       }
+      accept_ready_campaign_conversion_steps_v7: {
+        Args: { p_limit?: number }
+        Returns: {
+          steps_accepted: number
+          steps_blocked: number
+        }[]
+      }
       accept_ready_campaign_workflow_steps_v7: {
         Args: { p_limit?: number }
         Returns: {
@@ -34683,6 +34917,21 @@ export type Database = {
       bind_campaign_action_sources_v6: {
         Args: { p_request_id: string }
         Returns: undefined
+      }
+      bind_campaign_conversion_work_v7: {
+        Args: { p_run_id: string; p_step_key: string; p_work_item_id: string }
+        Returns: {
+          created_at: string
+          run_id: string
+          step_key: string
+          work_item_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_conversion_work_bindings_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       bind_campaign_planned_ideas_v7: {
         Args: { p_campaign_id: string }
@@ -36997,6 +37246,26 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "lead_sequence_enrollments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      ensure_campaign_conversion_drafts_v7: {
+        Args: { p_campaign_id: string; p_run_id: string }
+        Returns: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          page_id: string | null
+          page_work_item_id: string | null
+          plan_fingerprint: string
+          run_id: string
+          sales_agent_id: string | null
+          sales_work_item_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_conversion_drafts_v7"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -40080,6 +40349,33 @@ export type Database = {
         }
       }
       resume_paused_jobs: { Args: never; Returns: number }
+      retry_campaign_conversion_step_v7: {
+        Args: { p_step_id: string }
+        Returns: {
+          agent_key: string
+          blocker: string | null
+          completed_at: string | null
+          created_at: string
+          dependencies: string[]
+          id: string
+          input_from_step_key: string | null
+          input_id: string | null
+          input_params: Json
+          input_table: string
+          job_id: string | null
+          resolved_input_id: string | null
+          run_id: string
+          status: string
+          step_key: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_steps"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       retry_campaign_sweep_step_v7: {
         Args: { p_step_id: string }
         Returns: {
@@ -41316,6 +41612,10 @@ export type Database = {
         Returns: string
       }
       sweep_expired_proof_placements: { Args: never; Returns: number }
+      sync_campaign_conversion_work_v7: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
       sync_campaign_sweep_work_v7: {
         Args: { p_limit?: number }
         Returns: number

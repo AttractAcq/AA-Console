@@ -130,6 +130,7 @@ declare
   v_step public.workflow_steps%rowtype;
   v_blocked public.workflow_steps%rowtype;
   v_artifact public.workflow_artifacts%rowtype;
+  v_entity_id uuid;
   v_fingerprint text;
   v_count integer := 0;
 begin
@@ -137,15 +138,23 @@ begin
     raise exception 'A trusted module worker is required.' using errcode = '42501';
   end if;
   for b in
-    select x.*, w.state from public.campaign_sweep_work_bindings_v7 x
+    select x.*, w.state, w.client_id from public.campaign_sweep_work_bindings_v7 x
     join public.delivery_work_items_v6 w on w.id = x.work_item_id
     join public.workflow_runs r on r.id = x.run_id
     where r.sealed_at is not null and w.state in ('draft','prepared','held')
       and (w.state = 'draft'
-        or exists (select 1 from public.workflow_artifacts a
+        or (w.state='prepared' and exists (select 1 from public.workflow_artifacts a
           join public.workflow_steps s on s.id = a.step_id
           where s.run_id = x.run_id and s.step_key = x.final_step_key
-            and s.status = 'completed')
+            and s.status = 'completed'))
+        or (w.state='held' and exists (select 1 from public.workflow_artifacts a
+          join public.workflow_steps s on s.id=a.step_id
+          join public.delivery_source_catalog_v6 source
+            on source.client_id=w.client_id and source.entity_kind='content_asset'
+              and source.source_key=a.record_id::text
+          where s.run_id=x.run_id and s.step_key=x.final_step_key
+            and s.status='completed' and a.artifact_kind='asset'
+            and a.qa_evidence->>'source_fingerprint'=source.fingerprint))
         or (w.state = 'prepared' and exists (
           select 1 from public.workflow_steps s where s.run_id = x.run_id
             and left(s.step_key, length(x.piece_key) + 1) = x.piece_key || '_'
@@ -153,7 +162,10 @@ begin
         or (w.state = 'held' and not exists (
           select 1 from public.workflow_steps s where s.run_id = x.run_id
             and left(s.step_key, length(x.piece_key) + 1) = x.piece_key || '_'
-            and s.status in ('blocked','failed'))))
+            and s.status in ('blocked','failed'))
+          and not exists (select 1 from public.workflow_artifacts a
+            join public.workflow_steps s on s.id=a.step_id
+            where s.run_id=x.run_id and s.step_key=x.final_step_key)))
     order by x.created_at limit greatest(1, least(coalesce(p_limit, 100), 500))
   loop
     select * into v_step from public.workflow_steps
@@ -162,10 +174,40 @@ begin
       select * into v_artifact from public.workflow_artifacts
         where step_id = v_step.id;
       if v_artifact.id is null then continue; end if;
-      v_fingerprint := encode(sha256(convert_to(jsonb_build_object(
-        'kind', v_artifact.artifact_kind, 'record_id', v_artifact.record_id,
-        'version', v_artifact.version_key, 'qa', v_artifact.qa_evidence
-      )::text, 'UTF8')), 'hex');
+      if v_artifact.artifact_kind <> 'asset' then
+        if b.state='draft' then
+          perform public.advance_delivery_work_item_v6(b.work_item_id,
+            'content_production_factory','prepared');
+        end if;
+        if b.state<>'held' then
+          perform public.advance_delivery_work_item_v6(b.work_item_id,
+            'content_production_factory','held',
+            '{"blocker":"The accepted workflow output is not a content asset."}'::jsonb);
+          v_count:=v_count+1;
+        end if;
+        continue;
+      end if;
+      if v_artifact.qa_evidence->>'source_fingerprint' is distinct from
+        (select fingerprint from public.delivery_source_catalog_v6
+          where client_id=b.client_id and entity_kind='content_asset'
+            and source_key=v_artifact.record_id::text) then
+        if b.state='draft' then
+          perform public.advance_delivery_work_item_v6(b.work_item_id,
+            'content_production_factory','prepared');
+        end if;
+        if b.state<>'held' then
+          perform public.advance_delivery_work_item_v6(b.work_item_id,
+            'content_production_factory','held',
+            '{"blocker":"Accepted campaign asset changed after internal QA; review or regenerate it."}'::jsonb);
+          v_count:=v_count+1;
+        end if;
+        continue;
+      end if;
+      v_entity_id:=public.refresh_delivery_entity_v6(
+        'content_asset',v_artifact.record_id::text,b.client_id);
+      perform public.link_delivery_work_output_v6(
+        b.work_item_id,'content_production_factory',v_entity_id);
+      v_fingerprint:=public.delivery_work_output_hash_v6(b.work_item_id);
       if b.state = 'draft' or b.state = 'held' then
         perform public.advance_delivery_work_item_v6(b.work_item_id,
           'content_production_factory', 'prepared', '{"blocker":null}'::jsonb);

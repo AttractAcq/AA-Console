@@ -246,6 +246,11 @@ begin
       v_blocked := v_blocked + 1;
       continue;
     end if;
+    if v_kind='asset' and nullif(v_output->>'delivery_bytes_sha256','') is null then
+      update workflow_steps set blocker='Waiting for exact stored-file SHA-256 attestation.',
+        updated_at=now() where id=v_step.id;
+      continue;
+    end if;
     v_record_id := (v_output->>'id')::uuid;
     v_version := case when v_step.agent_key = 'video_edit'
       then md5(v_candidate->>'render_path') else md5(v_output::text) end;
@@ -260,7 +265,11 @@ begin
       'candidate_id', v_candidate->>'id',
       'candidate_render_path', v_candidate->>'render_path',
       'media_probe', v_candidate->'media_probe',
-      'creative_review', v_candidate->'creative_review');
+      'creative_review', v_candidate->'creative_review',
+      'source_fingerprint', case when v_kind='asset' then
+        (select fingerprint from public.delivery_source_catalog_v6
+          where entity_kind='content_asset' and source_key=v_record_id::text
+            and client_id=v_run.client_id) else null end);
     perform accept_workflow_step(v_step.id, v_kind, v_record_id, v_version, v_evidence);
     v_accepted := v_accepted + 1;
   end loop;
