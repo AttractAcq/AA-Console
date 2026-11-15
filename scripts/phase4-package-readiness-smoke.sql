@@ -21,11 +21,21 @@ select public.set_campaign_content_spec_v7('cccccccc-cccc-4ccc-8ccc-cccccccccccc
 select public.approve_campaign_plan_v6('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
 do $checks$
 declare result jsonb;
+  refused boolean := false;
 begin
   result:=public.campaign_package_readiness_v7('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
   if result->>'status'<>'preparing' or result->>'expected'<>'2'
      or result->>'ready'<>'0' or jsonb_array_length(result->'blockers')<2 then
     raise exception 'Missing sweep and required page were falsely reviewable: %',result;
+  end if;
+  begin
+    perform public.assemble_campaign_preparation_package_v7(
+      'cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+  exception when check_violation then refused:=true;
+  end;
+  if not refused or exists(select 1 from public.campaign_preparation_packages_v7
+    where campaign_id='cccccccc-cccc-4ccc-8ccc-cccccccccccc') then
+    raise exception 'Incomplete work produced a frozen package';
   end if;
 end $checks$;
 rollback;

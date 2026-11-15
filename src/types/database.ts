@@ -3809,6 +3809,106 @@ export type Database = {
           },
         ]
       }
+      campaign_preparation_packages_v7: {
+        Row: {
+          assembled_at: string
+          assembled_by: string | null
+          campaign_id: string
+          client_id: string
+          id: string
+          run_id: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        Insert: {
+          assembled_at?: string
+          assembled_by?: string | null
+          campaign_id: string
+          client_id: string
+          id?: string
+          run_id: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        Update: {
+          assembled_at?: string
+          assembled_by?: string | null
+          campaign_id?: string
+          client_id?: string
+          id?: string
+          run_id?: string
+          snapshot?: Json
+          snapshot_hash?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_preparation_packages_v7_assembled_by_fkey"
+            columns: ["assembled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_preparation_packages_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_preparation_packages_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_preparation_packages_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_preparation_packages_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_preparation_packages_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_preparation_packages_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_preparation_packages_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_preparation_packages_v7_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: true
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_proof_retraction_demands_v6: {
         Row: {
           approval_id: string
@@ -34715,6 +34815,26 @@ export type Database = {
         Args: { p_lead_id: string; p_reason?: string }
         Returns: undefined
       }
+      assemble_campaign_preparation_package_v7: {
+        Args: { p_campaign_id: string }
+        Returns: {
+          assembled_at: string
+          assembled_by: string | null
+          campaign_id: string
+          client_id: string
+          id: string
+          run_id: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_preparation_packages_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       assert_budget_change_allowed_v6: {
         Args: { p_execution_id: string }
         Returns: {
@@ -35133,6 +35253,14 @@ export type Database = {
       campaign_planned_ideas_match_spec_v7: {
         Args: { p_campaign_id: string }
         Returns: boolean
+      }
+      campaign_preparation_package_current_v7: {
+        Args: { p_package_id: string }
+        Returns: boolean
+      }
+      campaign_preparation_snapshot_v7: {
+        Args: { p_campaign_id: string }
+        Returns: Json
       }
       campaign_readiness: {
         Args: { p_campaign_id: string }

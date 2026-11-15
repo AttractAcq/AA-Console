@@ -8,17 +8,51 @@ type Readiness = {
   ready?: number;
   blockers: string[];
 };
+type Package = {
+  id: string;
+  version: number;
+  snapshot_hash: string;
+  assembled_at: string;
+  snapshot: { outputs?: Array<{ item_key: string; route_key: string;
+    output_fingerprint: string; output_refs: unknown[] }> };
+};
 
 export function CampaignPackageReadiness({ campaignId }: { campaignId: string }) {
   const [readiness, setReadiness] = useState<Readiness | null>(null);
+  const [prepared, setPrepared] = useState<Package | null>(null);
+  const [current, setCurrent] = useState(false);
+  const [assembling, setAssembling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const refresh = useCallback(async () => {
     const { data, error: readError } = await supabase.rpc("campaign_package_readiness_v7",
       { p_campaign_id: campaignId });
     if (readError) { setError(readError.message); return; }
     setReadiness(data as Readiness);
+    const { data: packageData, error: packageError } = await supabase
+      .from("campaign_preparation_packages_v7")
+      .select("id, version, snapshot_hash, snapshot, assembled_at")
+      .eq("campaign_id", campaignId).order("version", { ascending: false })
+      .limit(1).maybeSingle();
+    if (packageError) { setError(packageError.message); return; }
+    const row = packageData as Package | null;
+    setPrepared(row);
+    if (row) {
+      const check = await supabase.rpc("campaign_preparation_package_current_v7",
+        { p_package_id: row.id });
+      if (check.error) { setError(check.error.message); return; }
+      setCurrent(check.data === true);
+    } else setCurrent(false);
     setError(null);
   }, [campaignId]);
+
+  const assemble = async () => {
+    setAssembling(true); setError(null);
+    const { error: assembleError } = await supabase.rpc(
+      "assemble_campaign_preparation_package_v7", { p_campaign_id: campaignId });
+    setAssembling(false);
+    if (assembleError) { setError(assembleError.message); return; }
+    void refresh();
+  };
 
   useEffect(() => {
     void refresh();
@@ -43,6 +77,19 @@ export function CampaignPackageReadiness({ campaignId }: { campaignId: string })
       {readiness.status === "ready_for_review" && <p className="mt-2 text-xs text-muted-foreground">
         Internal QA does not approve publication, paid activation, page publishing, or public agent enablement.
       </p>}
+      {readiness.status === "ready_for_review" && !current && <button type="button"
+        disabled={assembling}
+        className="mt-3 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50"
+        onClick={() => void assemble()}>
+        {assembling ? "Assembling…" : "Freeze exact package for review"}
+      </button>}
+      {prepared && <div className="mt-3 rounded-md border border-border p-3 text-xs">
+        <p className="font-medium">Frozen package v{prepared.version} · {current ? "Current" : "Superseded"}</p>
+        <p className="mt-1 text-muted-foreground">Assembled {new Date(prepared.assembled_at).toLocaleString()} · SHA-256 {prepared.snapshot_hash}</p>
+        {current && <p className="mt-1">Exact outputs: {(prepared.snapshot.outputs ?? []).length}. Human package review is still required.</p>}
+        {current && <ul className="mt-2 list-disc space-y-1 pl-5">{(prepared.snapshot.outputs ?? []).map((output) =>
+          <li key={output.item_key}>{output.item_key.replaceAll("_", " ")} · {output.route_key} · {output.output_fingerprint.slice(0, 12)}…</li>)}</ul>}
+      </div>}
       {readiness.blockers.length > 0 && <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-destructive">
         {readiness.blockers.map((blocker, index) => <li key={`${index}-${blocker}`}>{blocker}</li>)}
       </ul>}
