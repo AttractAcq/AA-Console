@@ -123,6 +123,10 @@ begin
   or public.begin_google_profile_write_v6(attempt_id,claim_key) then
   raise exception 'Google profile write did not begin exactly once'; end if;
  begin
+  perform public.record_profile_change_applied(change_id,'unverified-provider-ref');
+  raise exception 'Started but unconfirmed profile write marked source applied';
+ exception when insufficient_privilege then null; end;
+ begin
   perform public.finish_google_profile_execution_v6(
    attempt_id,claim_key,'confirmed','Wrong text','locations/test_location#description');
   raise exception 'Mismatched provider readback was confirmed';
@@ -140,8 +144,10 @@ begin
  if (select v.status from public.google_profile_execution_overview_v6 v
   where v.change_id='cccccccc-cccc-4ccc-8ccc-cccccccccccc') is distinct from 'confirmed' then
   raise exception 'Profile execution outcome was not readable'; end if;
- if (select status from public.google_profile_changes where id=change_id)<>'approved' then
-  raise exception 'A held profile worker falsely marked the source applied'; end if;
+ if (select status from public.google_profile_changes where id=change_id)<>'applied'
+  or (select external_ref from public.google_profile_changes where id=change_id)
+   is distinct from 'locations/test_location#description' then
+  raise exception 'Confirmed readback did not update the exact source status'; end if;
  update public.client_google_locations set title='Changed title' where id=loc_id;
  update public.client_google_locations set title='Test location' where id=loc_id;
  if public.google_profile_prewrite_current_v6(change_id) then
