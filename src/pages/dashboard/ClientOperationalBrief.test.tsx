@@ -63,3 +63,9 @@ it("keeps failed source counts unknown and scopes every brief read to its client
   expect(reads).toHaveLength(12);
   expect(reads.every((read) => read.clientId === "client-1")).toBe(true);
 });
+
+it("does not turn an unavailable job history into zero spend or failures", async () => {
+  render(<MemoryRouter><ClientOperationalBrief clientId="client-1" spend={null} failedRuns={null} activeRuns={null} /></MemoryRouter>);
+  expect(screen.getByText("Agent work").parentElement).toHaveTextContent("unknown active · unknown unresolved failures");
+  expect(screen.getByText("Agent spend").parentElement).toHaveTextContent("unknown");
+});

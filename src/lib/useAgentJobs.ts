@@ -27,26 +27,37 @@ const IN_FLIGHT = ["queued", "claimed", "running"];
  * runs while something is actually in flight.
  */
 export function useAgentJobs(clientId: string | undefined, onSettled?: () => void) {
-  const [jobs, setJobs] = useState<LiveJob[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [snapshot, setSnapshot] = useState<{
+    clientId: string | undefined; jobs: LiveJob[]; loaded: boolean; error: string | null;
+  }>({ clientId: undefined, jobs: [], loaded: false, error: null });
+  const requestId = useRef(0);
   // Keep the callback in a ref so a parent re-render does not tear down
   // and rebuild the realtime subscription on every keystroke.
   const settledRef = useRef(onSettled);
   settledRef.current = onSettled;
 
   const refresh = useCallback(async () => {
+    const request = ++requestId.current;
     if (!clientId) {
-      setLoaded(true);
+      setSnapshot({ clientId, jobs: [], loaded: true, error: null });
       return;
     }
-    const { data } = await supabase
+    const { data, error: readError } = await supabase
       .from("agent_jobs")
       .select("id, agent_key, input_id, status, attempts, error, created_at, started_at, completed_at")
       .eq("client_id", clientId)
       .order("created_at", { ascending: false })
       .limit(25);
-    setJobs((data ?? []) as LiveJob[]);
-    setLoaded(true);
+    if (readError || !data) {
+      if (request === requestId.current) setSnapshot({
+        clientId, jobs: [], loaded: true,
+        error: readError?.message ?? "Agent jobs returned no rows or error.",
+      });
+      return;
+    }
+    if (request === requestId.current) setSnapshot({
+      clientId, jobs: data as LiveJob[], loaded: true, error: null,
+    });
   }, [clientId]);
 
   useEffect(() => {
@@ -78,6 +89,9 @@ export function useAgentJobs(clientId: string | undefined, onSettled?: () => voi
   }, [clientId, refresh]);
 
   // Fallback poll, only while work is outstanding.
+  const jobs = snapshot.clientId === clientId ? snapshot.jobs : [];
+  const loaded = snapshot.clientId === clientId && snapshot.loaded;
+  const error = snapshot.clientId === clientId ? snapshot.error : null;
   const inFlight = jobs.filter((j) => IN_FLIGHT.includes(j.status));
   const inFlightCount = inFlight.length;
   useEffect(() => {
@@ -95,7 +109,7 @@ export function useAgentJobs(clientId: string | undefined, onSettled?: () => voi
       Date.now() - new Date(j.completed_at).getTime() < 30 * 60 * 1000,
   );
 
-  return { jobs, inFlight, recentFailures, loaded, refresh };
+  return { jobs, inFlight, recentFailures, loaded, error, refresh };
 }
 
 export function elapsedLabel(job: LiveJob): string {

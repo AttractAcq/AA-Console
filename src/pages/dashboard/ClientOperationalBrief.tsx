@@ -24,9 +24,9 @@ type Brief = {
 /** A source-backed brief. Each failed read remains unknown rather than zero. */
 export function ClientOperationalBrief({ clientId, spend, failedRuns, activeRuns }: {
   clientId: string;
-  spend: number;
-  failedRuns: number;
-  activeRuns: number;
+  spend: number | null;
+  failedRuns: number | null;
+  activeRuns: number | null;
 }) {
   const [brief, setBrief] = useState<Brief | null>(null);
   const refresh = useCallback(async () => {
@@ -89,8 +89,8 @@ export function ClientOperationalBrief({ clientId, spend, failedRuns, activeRuns
         Provider status below is recorded metadata, not a live account or rights check.
       </p>
       <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-        <div><dt className="text-muted-foreground">Agent work</dt><dd>{activeRuns} active · {failedRuns} unresolved failures</dd></div>
-        <div><dt className="text-muted-foreground">Agent spend</dt><dd>${spend.toFixed(2)} recorded</dd></div>
+        <div><dt className="text-muted-foreground">Agent work</dt><dd>{count(activeRuns)} active · {count(failedRuns)} unresolved failures</dd></div>
+        <div><dt className="text-muted-foreground">Agent spend</dt><dd>{spend == null ? "unknown" : `$${spend.toFixed(2)} recorded`}</dd></div>
         <div><dt className="text-muted-foreground">Approvals</dt><dd>{count(brief?.pendingApprovals)} pending · {count(brief?.heldApprovals)} source held · {count(brief?.staleApprovals)} stale <Link className="text-primary underline" to={`${base}/delivery/approval-inbox?tab=unified`}>Open inbox</Link></dd></div>
         <div><dt className="text-muted-foreground">Campaign actions</dt><dd>{count(brief?.heldActionCount)} held · {count(brief?.failedActions)} failed or uncertain · {count(brief?.executedActions)} executed <Link className="text-primary underline" to={`${base}/delivery/approval-inbox?tab=campaign-actions`}>View outcomes</Link></dd></div>
         <div><dt className="text-muted-foreground">Lead magnet deliveries owed</dt><dd>{count(brief?.owedDeliveries)} <Link className="text-primary underline" to={`${base}/delivery/lead-magnet-studio`}>Open studio</Link></dd></div>
