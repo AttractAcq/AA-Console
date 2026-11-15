@@ -26,6 +26,8 @@ type ProfileDecision = Pick<Database["public"]["Views"]["approval_inbox_v6"]["Ro
   "id" | "status">;
 type ProfileOutcome = Pick<Database["public"]["Views"]["meta_profile_execution_overview_v6"]["Row"],
   "change_id" | "status" | "provider_ref">;
+type ProfileJob = Pick<Database["public"]["Tables"]["agent_jobs"]["Row"],
+  "id" | "input_id" | "status">;
 
 type Tab = "identities" | "profile" | "presence";
 
@@ -69,6 +71,7 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
   const [changes, setChanges] = useState<ProfileChange[]>([]);
   const [profileDecisions, setProfileDecisions] = useState<ReadonlyMap<string, ProfileDecision>>(new Map());
   const [profileOutcomes, setProfileOutcomes] = useState<ProfileOutcome[]>([]);
+  const [profileJobs, setProfileJobs] = useState<ProfileJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reviewBusy, setReviewBusy] = useState<string | null>(null);
@@ -79,7 +82,7 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
       return;
     }
     try {
-      const [health, posts, proposed, profileCards, outcomes] = await Promise.all([
+      const [health, posts, proposed, profileCards, outcomes, jobs] = await Promise.all([
         supabase.from("meta_identity_health")
           .select("client_id,provider,account_ref,status,token_expires_at,days_left,posts_waiting")
           .eq("client_id", clientId),
@@ -98,8 +101,11 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
           .eq("client_id", clientId).eq("source_kind", "meta_profile_change"),
         supabase.from("meta_profile_execution_overview_v6")
           .select("change_id,status,provider_ref").eq("client_id", clientId),
+        supabase.from("agent_jobs").select("id,input_id,status")
+          .eq("client_id", clientId).eq("agent_key", "meta_profile_field_writer")
+          .eq("input_table", "meta_profile_changes"),
       ]);
-      for (const result of [health, posts, proposed, profileCards, outcomes]) {
+      for (const result of [health, posts, proposed, profileCards, outcomes, jobs]) {
         if (result.error) throw new Error("Profile read failed.");
       }
       setIdentities(health.data ?? []);
@@ -109,6 +115,7 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
         .filter((row): row is ProfileDecision & { id: string } => Boolean(row.id))
         .map((row) => [row.id, row])));
       setProfileOutcomes(outcomes.data ?? []);
+      setProfileJobs(jobs.data ?? []);
       setError(null);
     } catch {
       setError("Could not load the profiles.");
@@ -130,6 +137,20 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
       await refresh();
     } catch {
       setError("Could not open the exact Meta profile proposal for Inbox review.");
+    } finally {
+      setReviewBusy(null);
+    }
+  }
+
+  async function requestWrite(changeId: string) {
+    setReviewBusy(changeId);
+    setError(null);
+    try {
+      const result = await supabase.rpc("request_meta_profile_write_v6", { p_change_id: changeId });
+      if (result.error) throw result.error;
+      await refresh();
+    } catch {
+      setError("Could not queue the exact Facebook Page field proposal.");
     } finally {
       setReviewBusy(null);
     }
@@ -219,8 +240,8 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
             <h3 className="font-semibold">Proposed changes</h3>
             <p className="mt-1 text-sm text-muted-foreground">
               What the profile says now, beside what we would make it say. Request review of the
-              exact proposal in Approval Inbox. This runtime has no Meta profile-write adapter,
-              so approval does not apply a field change.
+              exact proposal in Approval Inbox. A Facebook Page field write needs a separate
+              request and runtime release; Instagram profile fields remain manual.
             </p>
             <p role="status" className="mt-2 text-sm text-destructive">{PROFILE_FIELD_PATCH_HOLD}</p>
             {clientId && <Link className="mt-2 inline-block text-sm underline"
@@ -274,9 +295,11 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
                 <span key="execution" className="text-xs text-muted-foreground">
                   {(() => {
                     const outcome = profileOutcomes.find((row) => row.change_id === change.id);
+                    const job = profileJobs.find((row) => row.input_id === change.id);
                     if (!outcome) return change.platform === "instagram"
                       ? "Manual profile edit required; no API writer."
-                      : "No provider write requested; adapter held.";
+                      : job ? `Queued job ${job.status.replace(/_/g, " ")}; runtime release may hold it.`
+                        : "No provider write requested; adapter held.";
                     if (outcome.status === "confirmed") return `Provider readback confirmed · ${outcome.provider_ref ?? "reference unavailable"}`;
                     if (outcome.status === "uncertain") return "Provider outcome uncertain; reconcile before retrying.";
                     if (outcome.status === "refused") return "Provider write refused before start.";
@@ -291,6 +314,17 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
                     onClick={() => void requestReview(change.id)}>
                     Request Inbox review
                   </button>}
+                  {change.platform === "facebook" && change.status === "approved"
+                    && change.approved_request_id
+                    && profileDecisions.get(change.approved_request_id)?.status === "approved"
+                    && !profileJobs.some((row) => row.input_id === change.id)
+                    && !profileOutcomes.some((row) => row.change_id === change.id)
+                    && <button type="button"
+                      className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50"
+                      disabled={reviewBusy !== null}
+                      onClick={() => void requestWrite(change.id)}>
+                      Request Page write
+                    </button>}
                 </span>,
               ])}
             />

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "aa939679f83d0cf9162c267e4be872fb9b146403890b2e01512d0f17d1d8143e",
-  "generatedTypesSha256": "d35a868e5d8abf8e72688a8c876e70c5249437ae3d1f365d1bad0f28d1e3e47d",
-  "generatedSchemaBodySha256": "05ab6364e2a17aa714bcd7969ca131ddba34dd48639c6985ea5c2e42aca4b663",
+  "migrationSourceDigest": "41127b3a3e29de2496a92132abe53e9ca09c008f93d40fd93f2c30737fef435f",
+  "generatedTypesSha256": "033c62792a490024d429703747aaa947cc59b8c7cf03168475fbceef651c554c",
+  "generatedSchemaBodySha256": "c9fdcebb706827318b98adba2b49a5873a98470bb3b09cf5116c7cfd338009a2",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3440,6 +3440,13 @@
       "filename": "20261120140000_474_meta_profile_attempt.sql",
       "sha256": "895e8d5d6e00076399968828dafd1aa31a57a6081b7dfcda9a08bf3eda17ce26",
       "trimmedMd5": "391cc10b0797fdb383fd47f4f1a67fe5"
+    },
+    {
+      "version": "20261120150000",
+      "name": "475_meta_profile_job",
+      "filename": "20261120150000_475_meta_profile_job.sql",
+      "sha256": "bdac584f55d8244d8d10145f4a717200ca9bab542eba721f41956a56fb93bb4a",
+      "trimmedMd5": "5da322a96d6730e750d6c8798dc50c25"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

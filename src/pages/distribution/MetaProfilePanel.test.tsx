@@ -49,13 +49,15 @@ const post = (over: Record<string, unknown> = {}) => ({
 });
 
 function database(options: { identities?: unknown[]; changes?: unknown[]; presence?: unknown[];
-  profileCards?: unknown[]; profileOutcomes?: unknown[]; healthError?: string } = {}) {
+  profileCards?: unknown[]; profileOutcomes?: unknown[]; profileJobs?: unknown[];
+  healthError?: string } = {}) {
   from.mockImplementation((table: string) => {
     const payload = () => {
       if (table === "meta_identity_health") return options.identities ?? [identity()];
       if (table === "meta_profile_changes") return options.changes ?? [];
       if (table === "approval_inbox_v6") return options.profileCards ?? [];
       if (table === "meta_profile_execution_overview_v6") return options.profileOutcomes ?? [];
+      if (table === "agent_jobs") return options.profileJobs ?? [];
       return options.presence ?? [];
     };
     const response = () => ({
@@ -216,6 +218,27 @@ describe("proposed changes", () => {
     expect(select).toHaveBeenCalledWith("meta_profile_execution_overview_v6",
       "change_id,status,provider_ref");
     expect(document.body.textContent).not.toContain(marker);
+  });
+
+  it("queues only a current approved Facebook Page proposal", async () => {
+    database({ changes: [change({ platform: "facebook", field: "about",
+      status: "approved", approved_request_id: "card-1" })],
+      profileCards: [{ id: "card-1", status: "approved" }] });
+    render(<MetaProfilePanel tab="profile" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Request Page write" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_meta_profile_write_v6", {
+      p_change_id: "chg-1",
+    }));
+  });
+
+  it("keeps Instagram profile changes on the manual path", async () => {
+    database({ changes: [change({ status: "approved", approved_request_id: "card-1" })],
+      profileCards: [{ id: "card-1", status: "approved" }] });
+    render(<MetaProfilePanel tab="profile" />);
+    expect(await screen.findByText("Manual profile edit required; no API writer."))
+      .toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Request Page write" }))
+      .not.toBeInTheDocument();
   });
 
   it("labels a superseded Inbox decision as stale", async () => {

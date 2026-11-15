@@ -80,6 +80,7 @@ export function startHeartbeat(
             proofPublish: config.proofPublishEnabled,
             googleReviewReply: config.googleReviewReplyEnabled,
             googleProfileFieldWrite: config.googleProfileFieldWriteEnabled,
+            metaProfileFieldWrite: config.metaProfileFieldWriteEnabled,
             campaignActions: config.campaignActionsEnabled,
             outboundMessaging: config.outboundMessagingEnabled,
             leadMagnetDelivery: config.leadMagnetDeliveryEnabled,

@@ -18,7 +18,7 @@ select set_config('request.jwt.claims',
 do $test$
 declare cid uuid:='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
  change_id uuid:='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
- iid uuid; rid uuid; qid uuid; profile_rid uuid; profile_qid uuid;
+ iid uuid; rid uuid; qid uuid; profile_rid uuid; profile_qid uuid; job_id uuid;
  claim jsonb; attempt_id uuid; claim_key uuid;
 begin
  iid:=public.admin_store_integration_credential(cid,'meta','Facebook Page','fixture-secret','write');
@@ -33,6 +33,20 @@ begin
  select id into profile_qid from public.meta_profile_review_requests_v6
   where canonical_request_id=profile_rid;
  perform public.decide_meta_profile_inbox_v6(profile_qid,profile_rid,true);
+ perform set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal1"}',true);
+ begin
+  perform public.request_meta_profile_write_v6(change_id);
+  raise exception 'AAL1 queued a Meta Page profile write';
+ exception when insufficient_privilege then null; end;
+ perform set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+ job_id:=public.request_meta_profile_write_v6(change_id);
+ if job_id is null or public.request_meta_profile_write_v6(change_id)<>job_id
+  or not exists(select 1 from public.agent_jobs j where j.id=job_id
+   and j.agent_key='meta_profile_field_writer'
+   and j.input_table='meta_profile_changes' and j.input_id=change_id) then
+  raise exception 'Exact Meta Page write did not queue one owned job'; end if;
  if public.meta_profile_prewrite_current_v6(change_id) then
   raise exception 'Authenticated caller passed service-only profile prewrite'; end if;
  perform set_config('request.jwt.claim.role','service_role',true);

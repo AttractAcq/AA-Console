@@ -36634,6 +36634,10 @@ export type Database = {
         Args: { p_change_id: string }
         Returns: string
       }
+      request_meta_profile_write_v6: {
+        Args: { p_change_id: string }
+        Returns: string
+      }
       request_metrics_backfill: {
         Args: {
           p_client_id: string
