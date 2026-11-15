@@ -20,6 +20,21 @@ export const BOT_KEYS = [
 
 export type BotKey = (typeof BOT_KEYS)[number];
 
+// Explicit mailbox names. Do not derive the local part from bot_key.
+// These addresses have no mailbox and must not depend on delivery.
+export const BOT_EMAILS: Record<BotKey, string> = {
+  "bot-cos": "cos@attractacq.com",
+  "bot-cdm": "delivery@attractacq.com",
+  "bot-marketing": "marketing@attractacq.com",
+  "bot-production": "production@attractacq.com",
+  "bot-distribution": "distribution@attractacq.com",
+  "bot-sales": "sales@attractacq.com",
+  "bot-admin": "ops-admin@attractacq.com",
+  "bot-finance": "finance@attractacq.com",
+  "bot-engineering": "engineering@attractacq.com",
+  "bot-security": "security@attractacq.com",
+};
+
 const BOT_KEY_PATTERN = /^bot-[a-z0-9-]+$/;
 const CONFIRM_VALUE = "create-bot-user";
 
@@ -48,6 +63,20 @@ export type BotProvisionClient = {
         data: { users: AuthUser[] } | null;
         error: AuthError | null;
       }>;
+      updateUserById: (
+        id: string,
+        attributes: { password: string },
+      ) => Promise<{ data: { user: AuthUser | null } | null; error: AuthError | null }>;
+      mfa: {
+        listFactors: (params: { userId: string }) => Promise<{
+          data: { factors: Array<{ id: string; factor_type?: string; status?: string }> } | null;
+          error: AuthError | null;
+        }>;
+        deleteFactor: (params: { id: string; userId: string }) => Promise<{
+          data: { id: string } | null;
+          error: AuthError | null;
+        }>;
+      };
     };
   };
   from: (table: "profiles") => {
@@ -87,7 +116,7 @@ function scrub(message: string, password: string): string {
 }
 
 export function botEmail(botKey: string): string {
-  return `${botKey}@attractacq.com`;
+  return BOT_EMAILS[assertBotKey(botKey)];
 }
 
 export function assertBotKey(value: string): BotKey {
@@ -157,7 +186,7 @@ export async function provisionBotUser(
   if (password.length < 16) {
     throw new ProvisionError("password must be at least 16 characters");
   }
-  const email = botEmail(botKey);
+  const email = BOT_EMAILS[botKey];
 
   const created = await client.auth.admin.createUser({
     email,
@@ -221,6 +250,53 @@ export async function provisionBotUser(
   }
 }
 
+async function requireBotAccount(client: BotProvisionClient, botKeyInput: string) {
+  const botKey = assertBotKey(botKeyInput.trim());
+  const email = BOT_EMAILS[botKey];
+  const user = await findUserByEmail(client, email);
+  if (!user) {
+    throw new ProvisionError(`No auth user for ${email}. Nothing was changed.`);
+  }
+  const profile = await readProfile(client, user.id);
+  const profileEmail = (profile?.email ?? "").toLowerCase();
+  if (!profile || profile.is_bot !== true || profile.bot_key !== botKey || (profileEmail !== "" && profileEmail !== email)) {
+    throw new ProvisionError(`Refusing ${email}: the profile is not bot ${botKey}. Nothing was changed.`);
+  }
+  return { botKey, email, userId: user.id };
+}
+
+export async function resetBotPassword(
+  client: BotProvisionClient,
+  input: { botKey: string; password: string; dryRun?: boolean },
+): Promise<{ status: "reset" | "dry_run"; botKey: BotKey; email: string; userId: string }> {
+  const account = await requireBotAccount(client, input.botKey);
+  if (input.dryRun) return { status: "dry_run", ...account };
+  if (input.password.length < 16) {
+    throw new ProvisionError("password must be at least 16 characters");
+  }
+  const updated = await client.auth.admin.updateUserById(account.userId, { password: input.password });
+  if (updated.error) throw new ProvisionError(scrub(updated.error.message, input.password));
+  return { status: "reset", ...account };
+}
+
+export async function unenrollBotMfa(
+  client: BotProvisionClient,
+  input: { botKey: string; dryRun?: boolean },
+): Promise<{ status: "unenrolled" | "dry_run"; botKey: BotKey; email: string; userId: string; factorIds: string[] }> {
+  const account = await requireBotAccount(client, input.botKey);
+  const listed = await client.auth.admin.mfa.listFactors({ userId: account.userId });
+  if (listed.error) throw new ProvisionError(listed.error.message);
+  const factorIds = (listed.data?.factors ?? []).map((factor) => factor.id);
+  if (input.dryRun) return { status: "dry_run", ...account, factorIds };
+  for (const id of factorIds) {
+    const removed = await client.auth.admin.mfa.deleteFactor({ id, userId: account.userId });
+    if (removed.error) {
+      throw new ProvisionError(`MFA factor ${id} was not deleted: ${removed.error.message}`);
+    }
+  }
+  return { status: "unenrolled", ...account, factorIds };
+}
+
 async function readPassword(): Promise<string> {
   const fromEnv = process.env.BOT_USER_PASSWORD;
   if (fromEnv) return fromEnv;
@@ -243,10 +319,16 @@ function arg(name: string): string {
   return value;
 }
 
+function commandName(): "provision" | "reset-password" | "unenroll-mfa" {
+  const first = process.argv[2];
+  if (first === "reset-password" || first === "unenroll-mfa" || first === "provision") return first;
+  return "provision";
+}
+
 async function main(): Promise<void> {
   if (process.env.BOT_PROVISION_CONFIRM !== CONFIRM_VALUE) {
     throw new ProvisionError(
-      `Refusing to create an auth user. Set BOT_PROVISION_CONFIRM=${CONFIRM_VALUE} after a separate CLEAR.`,
+      `Refusing to change Auth. Set BOT_PROVISION_CONFIRM=${CONFIRM_VALUE} after a separate CLEAR.`,
     );
   }
   const url = process.env.SUPABASE_URL;
@@ -254,12 +336,26 @@ async function main(): Promise<void> {
   if (!url || !key) {
     throw new ProvisionError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required");
   }
-  const password = await readPassword();
   const client = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
-  const result = await provisionBotUser(client as unknown as BotProvisionClient, {
-    botKey: arg("--bot-key"),
+  }) as unknown as BotProvisionClient;
+  const botKey = arg("--bot-key");
+  const dryRun = process.argv.includes("--dry-run");
+  const command = commandName();
+  if (command === "reset-password") {
+    const password = dryRun ? "" : await readPassword();
+    const result = await resetBotPassword(client, { botKey, password, dryRun });
+    process.stdout.write(`${result.status} ${result.botKey} ${result.email} ${result.userId}\n`);
+    return;
+  }
+  if (command === "unenroll-mfa") {
+    const result = await unenrollBotMfa(client, { botKey, dryRun });
+    process.stdout.write(`${result.status} ${result.botKey} ${result.email} ${result.userId} factors=${result.factorIds.length}\n`);
+    return;
+  }
+  const password = await readPassword();
+  const result = await provisionBotUser(client, {
+    botKey,
     fullName: arg("--full-name"),
     password,
   });

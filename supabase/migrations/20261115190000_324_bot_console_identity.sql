@@ -2024,7 +2024,1404 @@ create policy ec_admin_update on public.engine_controls
 create policy ec_admin_delete on public.engine_controls
   for delete to authenticated using (public.is_human_admin());
 
+
+-- Admin-or-manager writes: the admin branch is human-only. The manager
+-- branch is unchanged. Bots are not managers, so they do not take that branch.
+
+-- public.proof_capture_configs.proof_capture_write
+drop policy if exists proof_capture_write on public.proof_capture_configs;
+create policy proof_capture_write_select on public.proof_capture_configs
+  for select to authenticated
+  using (public.is_admin() or auth.uid() = public.active_video_approval_manager(client_id));
+create policy proof_capture_write_insert on public.proof_capture_configs
+  for insert to authenticated
+  with check (public.is_human_admin() or auth.uid() = public.active_video_approval_manager(client_id));
+create policy proof_capture_write_update on public.proof_capture_configs
+  for update to authenticated
+  using (public.is_human_admin() or auth.uid() = public.active_video_approval_manager(client_id))
+  with check (public.is_human_admin() or auth.uid() = public.active_video_approval_manager(client_id));
+create policy proof_capture_write_delete on public.proof_capture_configs
+  for delete to authenticated
+  using (public.is_human_admin() or auth.uid() = public.active_video_approval_manager(client_id));
+
+-- public.client_proof_destinations.client_proof_destinations_write
+drop policy if exists client_proof_destinations_write on public.client_proof_destinations;
+create policy client_proof_destinations_write_select on public.client_proof_destinations
+  for select to authenticated
+  using (public.is_admin() or auth.uid() = public.active_video_approval_manager(client_id));
+create policy client_proof_destinations_write_insert on public.client_proof_destinations
+  for insert to authenticated
+  with check (public.is_human_admin() or auth.uid() = public.active_video_approval_manager(client_id));
+create policy client_proof_destinations_write_update on public.client_proof_destinations
+  for update to authenticated
+  using (public.is_human_admin() or auth.uid() = public.active_video_approval_manager(client_id))
+  with check (public.is_human_admin() or auth.uid() = public.active_video_approval_manager(client_id));
+create policy client_proof_destinations_write_delete on public.client_proof_destinations
+  for delete to authenticated
+  using (public.is_human_admin() or auth.uid() = public.active_video_approval_manager(client_id));
+
+-- public.client_google_locations.client_google_locations_write
+drop policy if exists client_google_locations_write on public.client_google_locations;
+create policy client_google_locations_write_select on public.client_google_locations
+  for select to authenticated
+  using (public.is_admin() or auth.uid() = public.active_video_approval_manager(client_id));
+create policy client_google_locations_write_insert on public.client_google_locations
+  for insert to authenticated
+  with check (public.is_human_admin() or auth.uid() = public.active_video_approval_manager(client_id));
+create policy client_google_locations_write_update on public.client_google_locations
+  for update to authenticated
+  using (public.is_human_admin() or auth.uid() = public.active_video_approval_manager(client_id))
+  with check (public.is_human_admin() or auth.uid() = public.active_video_approval_manager(client_id));
+create policy client_google_locations_write_delete on public.client_google_locations
+  for delete to authenticated
+  using (public.is_human_admin() or auth.uid() = public.active_video_approval_manager(client_id));
+
+-- public.motion_scenes.motion_scenes_write
+drop policy if exists motion_scenes_write on public.motion_scenes;
+create policy motion_scenes_write_select on public.motion_scenes
+  for select to authenticated
+  using (public.is_admin() or auth.uid() = public.active_video_approval_manager(client_id));
+create policy motion_scenes_write_insert on public.motion_scenes
+  for insert to authenticated
+  with check (public.is_human_admin() or auth.uid() = public.active_video_approval_manager(client_id));
+create policy motion_scenes_write_update on public.motion_scenes
+  for update to authenticated
+  using (public.is_human_admin() or auth.uid() = public.active_video_approval_manager(client_id))
+  with check (public.is_human_admin() or auth.uid() = public.active_video_approval_manager(client_id));
+create policy motion_scenes_write_delete on public.motion_scenes
+  for delete to authenticated
+  using (public.is_human_admin() or auth.uid() = public.active_video_approval_manager(client_id));
+
+-- storage.objects admin gates. Reads stay is_admin(). Writes are human admins.
+-- client-media and proof are follow-on for per-tab RBAC; they are denied now.
+
+drop policy if exists sops_obj_admin_all on storage.objects;
+create policy sops_obj_admin_select on storage.objects
+  for select to authenticated
+  using (bucket_id = 'sops' and public.is_admin());
+create policy sops_obj_admin_insert on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'sops' and public.is_human_admin());
+create policy sops_obj_admin_update on storage.objects
+  for update to authenticated
+  using (bucket_id = 'sops' and public.is_human_admin())
+  with check (bucket_id = 'sops' and public.is_human_admin());
+create policy sops_obj_admin_delete on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'sops' and public.is_human_admin());
+
+drop policy if exists contracts_obj_admin_all on storage.objects;
+create policy contracts_obj_admin_select on storage.objects
+  for select to authenticated
+  using (bucket_id = 'contracts' and public.is_admin());
+create policy contracts_obj_admin_insert on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'contracts' and public.is_human_admin());
+create policy contracts_obj_admin_update on storage.objects
+  for update to authenticated
+  using (bucket_id = 'contracts' and public.is_human_admin())
+  with check (bucket_id = 'contracts' and public.is_human_admin());
+create policy contracts_obj_admin_delete on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'contracts' and public.is_human_admin());
+
+drop policy if exists media_obj_admin_all on storage.objects;
+create policy media_obj_admin_select on storage.objects
+  for select to authenticated
+  using (bucket_id = 'client-media' and public.is_admin());
+create policy media_obj_admin_insert on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'client-media' and public.is_human_admin());
+create policy media_obj_admin_update on storage.objects
+  for update to authenticated
+  using (bucket_id = 'client-media' and public.is_human_admin())
+  with check (bucket_id = 'client-media' and public.is_human_admin());
+create policy media_obj_admin_delete on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'client-media' and public.is_human_admin());
+
+drop policy if exists proof_obj_admin_all on storage.objects;
+create policy proof_obj_admin_select on storage.objects
+  for select to authenticated
+  using (bucket_id = 'proof' and public.is_admin());
+create policy proof_obj_admin_insert on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'proof' and public.is_human_admin());
+create policy proof_obj_admin_update on storage.objects
+  for update to authenticated
+  using (bucket_id = 'proof' and public.is_human_admin())
+  with check (bucket_id = 'proof' and public.is_human_admin());
+create policy proof_obj_admin_delete on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'proof' and public.is_human_admin());
+
 -- <<end rls-split>>
+
+-- <<approval-decisions>>
+-- AAL2 is not a human check. These decision RPCs refuse a bot before the
+-- assurance step. Manager branches stay. service_role callers are unchanged.
+
+-- record_approval_decision_v6 (was 20261030110000_273_canonical_approval_ledger.sql)
+-- This is a recording gate, not the owning decision. An adapter calls it
+-- after its source transition and while that transaction can still roll back.
+create or replace function public.record_approval_decision_v6(
+  p_request_id uuid, p_decision text, p_artifact_hash text,
+  p_source_decision_ref text, p_reason text default null
+) returns uuid language plpgsql volatile security definer
+set search_path = pg_catalog, public set timezone = 'UTC' as $$
+declare
+  v_request public.approval_requests_v6%rowtype;
+  v_evidence public.approval_request_evidence_v6%rowtype;
+  v_existing public.approval_decision_events_v6%rowtype;
+  v_latest public.approval_decision_events_v6%rowtype;
+  v_hash text;
+  v_blocker text;
+  v_id uuid;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  if auth.role() is distinct from 'authenticated' or auth.uid() is null
+    or public.current_role_of() is null
+    or coalesce(auth.jwt() ->> 'aal', '') <> 'aal2' then
+    raise exception 'A provisioned human with AAL2 must decide this approval.'
+      using errcode = '42501';
+  end if;
+  if p_decision not in ('approved','rejected','revoked') or p_decision is null
+    or nullif(btrim(coalesce(p_source_decision_ref, '')), '') is null
+    or (p_decision <> 'approved' and nullif(btrim(coalesce(p_reason, '')), '') is null) then
+    raise exception 'A valid decision, source reference and reason are required.'
+      using errcode = '22023';
+  end if;
+  select * into v_request from public.approval_requests_v6
+    where id = p_request_id for update;
+  if not found then raise exception 'Approval request not found.' using errcode = 'P0002'; end if;
+  if v_request.client_id is null then
+    if not coalesce(public.is_human_admin(), false) then
+      raise exception 'Only an admin may decide agency-wide approvals.' using errcode = '42501';
+    end if;
+  elsif not public.can_review_approval_request_v6(v_request.client_id, v_request.owner_role) then
+    raise exception 'Not the decision owner for this client.' using errcode = '42501';
+  end if;
+
+  select * into v_evidence from public.approval_request_evidence_v6
+    where request_id = p_request_id;
+  v_hash := coalesce(v_evidence.artifact_hash, v_request.artifact_hash);
+  if p_artifact_hash is distinct from v_hash then
+    raise exception 'The exact artifact hash changed; request a new approval.'
+      using errcode = '23514';
+  end if;
+
+  select * into v_existing from public.approval_decision_events_v6
+    where request_id = p_request_id and source_decision_ref = btrim(p_source_decision_ref);
+  if found then
+    if v_existing.decision = p_decision and v_existing.actor_id = auth.uid()
+      and v_existing.artifact_hash is not distinct from p_artifact_hash
+      and v_existing.reason is not distinct from nullif(btrim(p_reason), '') then
+      return v_existing.id;
+    end if;
+    raise exception 'Source decision reference already belongs to another decision.'
+      using errcode = '23505';
+  end if;
+
+  select * into v_latest from public.approval_decision_events_v6
+    where request_id = p_request_id order by event_order desc limit 1;
+  if p_decision = 'revoked' then
+    if v_latest.decision is distinct from 'approved' then
+      raise exception 'Only an approved request can be revoked.' using errcode = '23514';
+    end if;
+  elsif v_latest.id is not null then
+    raise exception 'This approval request has already been decided.' using errcode = '23514';
+  elsif p_decision = 'approved'
+    and v_request.expires_at is not null
+    and v_request.expires_at <= clock_timestamp() then
+    raise exception 'This approval request has expired.' using errcode = '23514';
+  end if;
+
+  if p_decision = 'approved' then
+    select i.preview_blocker into v_blocker from public.approval_inbox_v6 i
+      where i.id = p_request_id;
+    if v_blocker is not null or v_request.expires_at is null then
+      raise exception 'Incomplete exact-version evidence: %',
+        coalesce(v_blocker, 'expiry missing') using errcode = '23514';
+    end if;
+  end if;
+  insert into public.approval_decision_events_v6 (
+    request_id,decision,actor_id,actor_aal,artifact_hash,
+    source_decision_ref,reason
+  ) values (
+    p_request_id,p_decision,auth.uid(),'aal2',v_hash,
+    btrim(p_source_decision_ref),nullif(btrim(p_reason), '')
+  ) returning id into v_id;
+  return v_id;
+end;
+$$;
+
+-- sales_entitlement_inbox_request_guard_v6 (was 20261030130000_275_sales_entitlement_inbox_binding.sql)
+create or replace function public.sales_entitlement_inbox_request_guard_v6()
+returns trigger language plpgsql security definer
+set search_path = pg_catalog, public
+as $$
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  if tg_op = 'INSERT' then
+    if new.status <> 'pending' then
+      raise exception 'Sales entitlement requests must start pending for exact Inbox review.'
+        using errcode = '23514';
+    end if;
+    select c.name into new.client_name_snapshot from public.clients c
+      where c.id = new.client_id;
+    select tm.name into new.member_name_snapshot from public.team_members tm
+      where tm.id = new.member_id;
+    if nullif(btrim(coalesce(new.client_name_snapshot, '')), '') is null
+      or nullif(btrim(coalesce(new.member_name_snapshot, '')), '') is null then
+      raise exception 'Sales entitlement requires a named client and team member.';
+    end if;
+    return new;
+  end if;
+  if old.id is distinct from new.id
+    or old.client_id is distinct from new.client_id
+    or old.member_id is distinct from new.member_id
+    or old.bound_user_id is distinct from new.bound_user_id
+    or old.action is distinct from new.action
+    or old.scope_hash is distinct from new.scope_hash
+    or old.requested_by is distinct from new.requested_by
+    or old.requested_at is distinct from new.requested_at
+    or old.client_name_snapshot is distinct from new.client_name_snapshot
+    or old.member_name_snapshot is distinct from new.member_name_snapshot
+    or old.status <> 'pending'
+    or new.status not in ('approved','rejected')
+    or new.decided_at is null or new.decided_by is distinct from auth.uid() then
+    raise exception 'Sales entitlement request identity and decision are immutable.';
+  end if;
+  if auth.role() is distinct from 'authenticated'
+    or auth.uid() is null or not coalesce(public.is_human_admin(),false)
+    or coalesce(auth.jwt()->>'aal','') <> 'aal2' then
+    raise exception 'An admin with AAL2 must decide sales access.';
+  end if;
+  if new.scope_hash <> public.sales_entitlement_scope_hash(
+    new.client_id,new.member_id,new.bound_user_id,new.action) then
+    raise exception 'Sales access scope changed. Request a new decision.';
+  end if;
+  if new.status = 'rejected'
+    and nullif(btrim(coalesce(new.decision_note,'')), '') is null then
+    raise exception 'Rejection needs a reason.';
+  end if;
+  return new;
+end;
+$$;
+
+-- approve_recruitment_brief (was 20261030140000_276_recruitment_brief_inbox.sql)
+create or replace function public.approve_recruitment_brief(p_brief_id uuid)
+returns void language plpgsql volatile security definer
+set search_path = pg_catalog, public set timezone = 'UTC' as $$
+declare
+  v_brief public.client_briefs%rowtype;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  if auth.role() is distinct from 'authenticated' or auth.uid() is null
+    or public.current_role_of() is null or not coalesce(public.is_human_admin(), false)
+    or coalesce(auth.jwt() ->> 'aal', '') <> 'aal2' then
+    raise exception 'A provisioned human admin with AAL2 must approve the recruitment brief.'
+      using errcode = '42501';
+  end if;
+  select * into v_brief from public.client_briefs where id = p_brief_id for update;
+  if not found then raise exception 'That brief does not exist.' using errcode = 'P0002'; end if;
+  if v_brief.purpose <> 'recruitment' then
+    raise exception 'That is not a recruitment brief.' using errcode = '23514';
+  end if;
+  if v_brief.status <> 'draft' then
+    raise exception 'Only a draft recruitment brief can be approved.' using errcode = '23514';
+  end if;
+  if v_brief.archived_at is not null then
+    raise exception 'An archived recruitment draft cannot be approved.' using errcode = '23514';
+  end if;
+  update public.client_briefs set status = 'approved' where id = p_brief_id;
+end;
+$$;
+
+-- approve_recruitment_brief_from_inbox_v6 (was 20261030140000_276_recruitment_brief_inbox.sql)
+-- The user supplies the card they actually reviewed. Lock the brief, prove
+-- the card still describes its complete current bytes, then invoke the owning
+-- source approval in the same transaction. The trigger consumes this context
+-- and rejects any direct UPDATE or legacy ID-only call.
+create or replace function public.approve_recruitment_brief_from_inbox_v6(
+  p_brief_id uuid, p_request_id uuid,
+  p_expected_source_version text, p_expected_artifact_hash text
+) returns void language plpgsql volatile security definer
+set search_path = pg_catalog, public set timezone = 'UTC' as $$
+declare
+  v_brief public.client_briefs%rowtype;
+  v_request public.approval_requests_v6%rowtype;
+  v_hash text;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  if auth.role() is distinct from 'authenticated' or auth.uid() is null
+    or public.current_role_of() is null or not coalesce(public.is_human_admin(), false)
+    or coalesce(auth.jwt() ->> 'aal', '') <> 'aal2' then
+    raise exception 'A provisioned human admin with AAL2 must approve the recruitment brief.'
+      using errcode = '42501';
+  end if;
+  select * into v_brief from public.client_briefs
+    where id = p_brief_id for update;
+  if not found or v_brief.purpose <> 'recruitment'
+    or v_brief.status <> 'draft' or v_brief.archived_at is not null then
+    raise exception 'Only an active recruitment draft can be approved.'
+      using errcode = '23514';
+  end if;
+  v_hash := public.recruitment_brief_snapshot_hash_v6(v_brief);
+  select * into v_request from public.approval_requests_v6
+    where id = p_request_id;
+  if not found or v_request.source_system <> 'aa_console'
+    or v_request.source_kind <> 'recruitment_brief'
+    or v_request.source_id <> p_brief_id::text
+    or v_request.client_id is distinct from v_brief.client_id
+    or v_request.source_version is distinct from p_expected_source_version
+    or v_request.artifact_hash is distinct from p_expected_artifact_hash
+    or v_request.artifact_hash is distinct from v_hash
+    or v_request.preview is distinct from public.recruitment_brief_snapshot_v6(v_brief)
+    or v_request.preview_blocker is not null
+    or v_request.expires_at is null or v_request.expires_at <= now()
+    or exists (select 1 from public.approval_decision_events_v6 d
+      where d.request_id = p_request_id) then
+    raise exception 'The selected recruitment card is stale or incomplete; review the current exact version.'
+      using errcode = '23514';
+  end if;
+  insert into approval_private.recruitment_brief_decision_context_v6
+    (transaction_id,brief_id,request_id,source_version,artifact_hash,actor_id)
+    values (txid_current(),p_brief_id,p_request_id,p_expected_source_version,v_hash,auth.uid());
+  perform public.approve_recruitment_brief(p_brief_id);
+  delete from approval_private.recruitment_brief_decision_context_v6
+    where transaction_id=txid_current() and brief_id=p_brief_id;
+end;
+$$;
+
+-- decide_google_review_reply_v6 (was 20261024140000_240_google_business_profile.sql)
+create or replace function public.decide_google_review_reply_v6(
+  p_reply_id uuid, p_approved boolean, p_reason text default null)
+returns public.google_review_replies language plpgsql security definer
+set search_path = pg_catalog, public as $$
+declare v_reply public.google_review_replies%rowtype;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  select * into v_reply from public.google_review_replies where id = p_reply_id for update;
+  if not found then raise exception 'No such reply.' using errcode = 'P0001'; end if;
+  if auth.role() is distinct from 'authenticated'
+     or not (coalesce(public.is_human_admin(), false)
+             or coalesce(auth.uid() = public.active_video_approval_manager(v_reply.client_id), false)) then
+    raise exception 'A signed-in admin or the assigned client manager must decide this.'
+      using errcode = 'P0001';
+  end if;
+  if v_reply.status not in ('drafted', 'awaiting_approval') then
+    raise exception 'That reply is %, not waiting for a decision.', v_reply.status
+      using errcode = 'P0001';
+  end if;
+  -- The words may have been edited since they were read.
+  if v_reply.body_hash <> encode(sha256(convert_to(v_reply.body, 'UTF8')), 'hex') then
+    raise exception 'This reply was edited after it was read. Draft it again.' using errcode = 'P0001';
+  end if;
+
+  if not coalesce(p_approved, false) then
+    if nullif(btrim(coalesce(p_reason, '')), '') is null then
+      raise exception 'Say why it was rejected.' using errcode = 'P0001';
+    end if;
+    update public.google_review_replies
+       set status = 'rejected', rejection_reason = btrim(p_reason)
+     where id = p_reply_id returning * into v_reply;
+    return v_reply;
+  end if;
+
+  update public.google_review_replies
+     set status = 'approved', approved_by = auth.uid(), approved_at = now()
+   where id = p_reply_id returning * into v_reply;
+  return v_reply;
+end $$;
+
+-- decide_google_review_reply_from_inbox_v6 (was 20261030150000_278_google_review_reply_inbox.sql)
+-- The old owning RPC takes only a reply ID. A stale Inbox card must never
+-- approve newly edited words. The wrapper locks the source, checks the exact
+-- version selected by the human, then invokes that same owning RPC. Revoke
+-- direct browser execution so every page uses the version-bound path.
+create or replace function public.decide_google_review_reply_from_inbox_v6(
+  p_reply_id uuid, p_expected_source_version text,
+  p_expected_artifact_hash text, p_approved boolean,
+  p_reason text default null
+) returns public.google_review_replies language plpgsql volatile security definer
+set search_path = pg_catalog, public as $$
+declare
+  v_reply public.google_review_replies%rowtype;
+  v_payload jsonb;
+  v_request public.approval_requests_v6%rowtype;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  if auth.role() is distinct from 'authenticated' or auth.uid() is null
+    or public.current_role_of() is null
+    or coalesce(auth.jwt() ->> 'aal', '') <> 'aal2' then
+    raise exception 'A provisioned human with AAL2 must decide this reply.'
+      using errcode = '42501';
+  end if;
+  select * into v_reply from public.google_review_replies
+    where id = p_reply_id for update;
+  if not found or v_reply.status not in ('drafted', 'awaiting_approval') then
+    raise exception 'That reply is not waiting for a decision.' using errcode = '23514';
+  end if;
+  v_payload := public.google_reply_inbox_payload_v6(v_reply);
+  if p_expected_source_version is distinct from v_payload->>'source_version'
+    or p_expected_artifact_hash is distinct from v_payload->>'artifact_hash' then
+    raise exception 'The selected reply card is stale; review the new exact version.'
+      using errcode = '23514';
+  end if;
+  select * into v_request from public.approval_requests_v6
+    where source_system = 'aa_console'
+      and source_kind = 'google_review_reply'
+      and source_id = p_reply_id::text
+      and source_version = p_expected_source_version;
+  if not found or v_request.artifact_hash is distinct from p_expected_artifact_hash
+    or v_request.preview is distinct from v_payload->'preview'
+    or v_request.destination is distinct from v_payload->>'destination'
+    or v_request.account_ref is distinct from v_payload->>'account_ref'
+    or v_request.scope is distinct from v_payload->'scope' then
+    raise exception 'The selected reply card no longer matches the source.'
+      using errcode = '23514';
+  end if;
+  if p_approved and v_payload->>'preview_blocker' is not null then
+    raise exception 'The Google reply is not decision-ready: %',
+      v_payload->>'preview_blocker' using errcode = '23514';
+  end if;
+  return public.decide_google_review_reply_v6(p_reply_id, p_approved, p_reason);
+end;
+$$;
+
+-- record_console_auth_sender_verification_v6 (was 20261101032000_288_console_invitation_decision_and_send.sql)
+create or replace function public.record_console_auth_sender_verification_v6(
+  p_sender_email text, p_supabase_url_origin text,
+  p_redirect_origin text, p_template_subject text, p_template_body text,
+  p_evidence_ref text, p_evidence_sha256 text
+) returns uuid language plpgsql volatile security definer
+set search_path = pg_catalog, public set timezone = 'UTC' as $$
+declare v_id uuid;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  if auth.role() is distinct from 'authenticated' or auth.uid() is null
+    or coalesce(auth.jwt() ->> 'aal','') <> 'aal2'
+    or not public.is_human_admin() then
+    raise exception 'A provisioned admin with AAL2 must attest Auth SMTP settings.'
+      using errcode = '42501';
+  end if;
+  if p_sender_email is null or p_sender_email <> lower(btrim(p_sender_email))
+    or p_sender_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
+    or p_supabase_url_origin !~ '^https://[^/]+$'
+    or p_redirect_origin !~ '^https://[^/]+$'
+    or length(btrim(coalesce(p_template_subject,''))) not between 1 and 500
+    or length(btrim(coalesce(p_template_body,''))) not between 1 and 20000
+    or nullif(btrim(coalesce(p_evidence_ref,'')),'') is null
+    or length(p_evidence_ref) > 500
+    or p_evidence_sha256 !~ '^[0-9a-f]{64}$' then
+    raise exception 'Exact sender, project, redirect and retained read-back evidence are required.'
+      using errcode = '22023';
+  end if;
+  insert into public.console_auth_sender_verifications_v6 (
+    sender_email,supabase_url_origin,redirect_origin,
+    template_subject,template_body,template_sha256,evidence_ref,
+    evidence_sha256,verified_by,expires_at
+  ) values (
+    p_sender_email,p_supabase_url_origin,p_redirect_origin,
+    p_template_subject,p_template_body,
+    encode(sha256(convert_to(jsonb_build_object(
+      'subject',p_template_subject,'body',p_template_body)::text,'UTF8')),'hex'),
+    btrim(p_evidence_ref),p_evidence_sha256,auth.uid(),now()+interval '30 days'
+  ) returning id into v_id;
+  return v_id;
+end;
+$$;
+
+-- decide_console_invitation_v6 (was 20261101032000_288_console_invitation_decision_and_send.sql)
+create or replace function public.decide_console_invitation_v6(
+  p_request_id uuid, p_expected_source_version text,
+  p_expected_artifact_hash text, p_approved boolean, p_reason text default null
+) returns public.console_invitation_requests_v6
+language plpgsql volatile security definer
+set search_path = pg_catalog, public set timezone = 'UTC' as $$
+declare
+  v_request public.console_invitation_requests_v6%rowtype;
+  v_card public.approval_requests_v6%rowtype;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  if auth.role() is distinct from 'authenticated' or auth.uid() is null
+    or coalesce(auth.jwt() ->> 'aal','') <> 'aal2'
+    or not public.is_human_admin() then
+    raise exception 'A provisioned admin with AAL2 must decide this invitation.'
+      using errcode = '42501';
+  end if;
+  select * into v_request from public.console_invitation_requests_v6
+    where id = p_request_id for update;
+  if not found then raise exception 'Invitation not found.' using errcode = 'P0002'; end if;
+  if v_request.status <> 'requested'
+    or v_request.payload_hash is distinct from p_expected_source_version
+    or v_request.payload_hash is distinct from p_expected_artifact_hash then
+    raise exception 'Invitation state or exact version changed.' using errcode = '23514';
+  end if;
+  select * into v_card from public.approval_requests_v6
+    where source_system = 'auth' and source_kind = 'console_invitation'
+      and source_id = v_request.id::text
+      and source_version = v_request.payload_hash for update;
+  if not found or v_card.artifact_hash is distinct from v_request.payload_hash
+    or v_card.preview is distinct from v_request.payload
+    or v_card.destination is distinct from v_request.recipient_email
+    or v_card.account_ref is distinct from v_request.sender_account then
+    raise exception 'The frozen Inbox card does not match this invitation.'
+      using errcode = '23514';
+  end if;
+  if p_approved then
+    if v_request.expires_at <= now() then
+      raise exception 'Invitation expired.' using errcode = '23514';
+    end if;
+    if exists (select 1 from auth.users
+      where lower(email) = v_request.recipient_email) then
+      raise exception 'Auth email now exists; review provenance.' using errcode = '23505';
+    end if;
+    if v_request.target_role = 'employee' and not exists (
+      select 1 from public.team_members where id = v_request.target_member_id
+        and active and user_id is null and category = v_request.team_category
+        and name = v_request.full_name
+        and invitation_generation_v6 = (v_request.payload ->> 'team_member_generation')::bigint
+    ) then
+      raise exception 'Roster target changed; request a new invitation.' using errcode = '23514';
+    end if;
+    update public.console_invitation_requests_v6 set status = 'approved'
+      where id = v_request.id;
+  else
+    if nullif(btrim(coalesce(p_reason,'')),'') is null then
+      raise exception 'A rejection reason is required.' using errcode = '22023';
+    end if;
+    update public.console_invitation_requests_v6 set status = 'rejected'
+      where id = v_request.id;
+  end if;
+  perform public.record_approval_decision_v6(v_card.id,
+    case when p_approved then 'approved' else 'rejected' end,
+    v_request.payload_hash, 'console_invitation:' || v_request.id::text || ':decision',
+    p_reason);
+  insert into public.console_invitation_events_v6(request_id,state,actor_id,reason)
+    values (v_request.id, case when p_approved then 'approved' else 'rejected' end,
+      auth.uid(), case when p_approved then null else btrim(p_reason) end);
+  select * into v_request from public.console_invitation_requests_v6 where id = p_request_id;
+  return v_request;
+end;
+$$;
+
+-- cancel_console_invitation_v6 (was 20261101032000_288_console_invitation_decision_and_send.sql)
+create or replace function public.cancel_console_invitation_v6(
+  p_request_id uuid, p_reason text
+) returns public.console_invitation_requests_v6
+language plpgsql volatile security definer
+set search_path = pg_catalog, public set timezone = 'UTC' as $$
+declare
+  v_request public.console_invitation_requests_v6%rowtype;
+  v_card public.approval_requests_v6%rowtype;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  if auth.role() is distinct from 'authenticated' or auth.uid() is null
+    or coalesce(auth.jwt() ->> 'aal','') <> 'aal2'
+    or not public.is_human_admin() then
+    raise exception 'A provisioned admin with AAL2 must cancel.' using errcode = '42501';
+  end if;
+  if nullif(btrim(coalesce(p_reason,'')),'') is null then
+    raise exception 'A cancellation reason is required.' using errcode = '22023';
+  end if;
+  select * into v_request from public.console_invitation_requests_v6
+    where id = p_request_id for update;
+  if not found or v_request.status not in ('requested','approved','sent','conflict') then
+    raise exception 'Invitation cannot be cancelled from this state.' using errcode = '23514';
+  end if;
+  select * into v_card from public.approval_requests_v6
+    where source_system = 'auth' and source_kind = 'console_invitation'
+      and source_id = v_request.id::text and source_version = v_request.payload_hash;
+  update public.console_invitation_requests_v6 set status = 'cancelled'
+    where id = p_request_id;
+  perform public.record_approval_decision_v6(v_card.id,
+    case when v_request.status = 'requested' then 'rejected' else 'revoked' end,
+    v_request.payload_hash, 'console_invitation:' || v_request.id::text || ':cancel',
+    p_reason);
+  insert into public.console_invitation_events_v6(request_id,state,actor_id,reason)
+    values (v_request.id,'cancelled',auth.uid(),btrim(p_reason));
+  select * into v_request from public.console_invitation_requests_v6 where id = p_request_id;
+  return v_request;
+end;
+$$;
+
+-- resolve_console_invitation_uncertain_v6 (was 20261101032000_288_console_invitation_decision_and_send.sql)
+-- An in-flight or ambiguous provider outcome remains reserved. Only a human
+-- admin who has inspected retained provider evidence may attest that no
+-- invitation was issued. The Auth table absence is checked in this transaction.
+-- This never retries the external send.
+create or replace function public.resolve_console_invitation_uncertain_v6(
+  p_request_id uuid, p_expected_hash text, p_evidence_ref text,
+  p_evidence_sha256 text, p_reason text
+) returns public.console_invitation_requests_v6
+language plpgsql volatile security definer
+set search_path = pg_catalog, public set timezone = 'UTC' as $$
+declare
+  v_request public.console_invitation_requests_v6%rowtype;
+  v_card public.approval_requests_v6%rowtype;
+  v_claimed_at timestamptz;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  if auth.role() is distinct from 'authenticated' or auth.uid() is null
+    or coalesce(auth.jwt() ->> 'aal','') <> 'aal2' or not public.is_human_admin() then
+    raise exception 'A provisioned admin with AAL2 must resolve an uncertain send.'
+      using errcode = '42501';
+  end if;
+  if nullif(btrim(coalesce(p_evidence_ref,'')),'') is null
+    or length(p_evidence_ref) > 500
+    or p_evidence_sha256 !~ '^[0-9a-f]{64}$'
+    or nullif(btrim(coalesce(p_reason,'')),'') is null
+    or length(p_reason) > 500 then
+    raise exception 'Retained provider no-send evidence and reason are required.'
+      using errcode = '22023';
+  end if;
+  select * into v_request from public.console_invitation_requests_v6
+    where id = p_request_id for update;
+  if not found or v_request.status not in ('sending','reconcile')
+    or v_request.payload_hash is distinct from p_expected_hash then
+    raise exception 'Uncertain invitation state or exact version changed.'
+      using errcode = '23514';
+  end if;
+  select claimed_at into v_claimed_at from public.console_invitation_send_claims_v6
+    where request_id = p_request_id;
+  if v_claimed_at is null or v_claimed_at > now() - interval '15 minutes' then
+    raise exception 'Wait for the provider outcome before resolving this send.'
+      using errcode = '23514';
+  end if;
+  if exists (select 1 from auth.users where lower(email) = v_request.recipient_email) then
+    raise exception 'Auth user exists; resolve or disable that identity first.'
+      using errcode = '23505';
+  end if;
+  select * into v_card from public.approval_requests_v6
+    where source_system = 'auth' and source_kind = 'console_invitation'
+      and source_id = v_request.id::text and source_version = v_request.payload_hash
+      and artifact_hash = v_request.payload_hash;
+  if not found then
+    raise exception 'Exact invitation card is missing.' using errcode = '23514';
+  end if;
+  update public.console_invitation_requests_v6 set status = 'cancelled'
+    where id = p_request_id;
+  perform public.record_approval_decision_v6(v_card.id,'revoked',
+    v_request.payload_hash,
+    'console_invitation:' || v_request.id::text || ':uncertain-resolved',
+    'Provider no-send evidence ' || btrim(p_evidence_ref)
+      || ' sha256=' || p_evidence_sha256 || '; ' || btrim(p_reason));
+  insert into public.console_invitation_events_v6(request_id,state,actor_id,reason)
+    values (p_request_id,'cancelled',auth.uid(),
+      'no_send:' || btrim(p_evidence_ref) || ':' || p_evidence_sha256);
+  select * into v_request from public.console_invitation_requests_v6
+    where id = p_request_id;
+  return v_request;
+end;
+$$;
+
+-- submit_production_release_candidate_v6 (was 20261101050000_291_production_release_candidate_inbox.sql)
+create or replace function public.submit_production_release_candidate_v6(
+  p_candidate jsonb, p_expires_at timestamptz
+) returns uuid language plpgsql volatile security definer
+set search_path = pg_catalog, public set timezone = 'UTC' as $$
+declare
+  v_pr jsonb;
+  v_checks jsonb;
+  v_migrations jsonb;
+  v_schema jsonb;
+  v_deployment jsonb;
+  v_head text;
+  v_base text;
+  v_pr_number text;
+  v_version text;
+  v_id uuid;
+  v_check_names text[];
+  v_migration_count integer;
+  v_last_migration text;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  if auth.role() is distinct from 'authenticated' or auth.uid() is null
+    or not coalesce(public.is_human_admin(), false)
+    or coalesce(auth.jwt()->>'aal', '') <> 'aal2' then
+    raise exception 'Only a provisioned admin with AAL2 may submit a release candidate.'
+      using errcode = '42501';
+  end if;
+  if p_expires_at is null or p_expires_at <= clock_timestamp() + interval '5 minutes'
+    or p_expires_at > clock_timestamp() + interval '48 hours' then
+    raise exception 'Release candidate expiry must be between 5 minutes and 48 hours.'
+      using errcode = '22023';
+  end if;
+  if jsonb_typeof(p_candidate) is distinct from 'object' then
+    raise exception 'Release candidate must be a JSON object.'
+      using errcode = '22023';
+  end if;
+  if exists (
+    select 1 from jsonb_object_keys(p_candidate) k
+    where k not in ('repository','pr','checks','migrations','schema',
+      'deployment','switch_plan','rollback')
+  ) then
+    raise exception 'Release candidate has an invalid root shape.'
+      using errcode = '22023';
+  end if;
+  v_pr := p_candidate->'pr';
+  v_checks := p_candidate->'checks';
+  v_migrations := p_candidate->'migrations';
+  v_schema := p_candidate->'schema';
+  v_deployment := p_candidate->'deployment';
+  v_head := v_pr->>'head_sha';
+  v_base := v_pr->>'base_sha';
+  v_pr_number := v_pr->>'number';
+  if jsonb_typeof(v_pr) is distinct from 'object' then
+    raise exception 'Release candidate PR must be an object.'
+      using errcode = '22023';
+  end if;
+  if p_candidate->>'repository' is distinct from 'AttractAcq/AA-Console'
+    or exists (select 1 from jsonb_object_keys(v_pr) k
+      where k not in ('number','url','head_sha','base_sha','merge_method'))
+    or not coalesce(v_pr_number ~ '^[1-9][0-9]*$', false)
+    or v_pr->>'url' is distinct from
+      'https://github.com/AttractAcq/AA-Console/pull/' || v_pr_number
+    or not coalesce(v_head ~ '^[0-9a-f]{40}$', false)
+    or not coalesce(v_base ~ '^[0-9a-f]{40}$', false)
+    or not coalesce(v_pr->>'merge_method' in ('squash','merge','rebase'), false) then
+    raise exception 'Release candidate PR identity is incomplete or invalid.'
+      using errcode = '22023';
+  end if;
+  if jsonb_typeof(v_checks) is distinct from 'array' then
+    raise exception 'Release candidate checks must be an array.'
+      using errcode = '22023';
+  end if;
+  if jsonb_array_length(v_checks) <> 4
+    or exists (select 1 from jsonb_array_elements(v_checks) c
+      where jsonb_typeof(c) is distinct from 'object'
+        or c->>'head_sha' is distinct from v_head
+        or c->>'conclusion' is distinct from 'success'
+        or not coalesce(c->>'run_id' ~ '^[1-9][0-9]*$', false)) then
+    raise exception 'Release candidate must name four successful checks on the exact PR head.'
+      using errcode = '22023';
+  end if;
+  if exists (select 1 from jsonb_array_elements(v_checks) c,
+      lateral jsonb_object_keys(c) k
+      where k not in ('name','head_sha','run_id','conclusion')) then
+    raise exception 'Release candidate check contains an unknown field.'
+      using errcode = '22023';
+  end if;
+  select array_agg(c->>'name' order by c->>'name') into v_check_names
+    from jsonb_array_elements(v_checks) c;
+  if v_check_names is distinct from array[
+    'Agent runtime (typecheck, test, build)',
+    'Frontend (lint, typecheck, test, build)',
+    'MCP gateway (typecheck, test, build)',
+    'Schema replay (clean, upgrade, catalog, types)'
+  ]::text[] then
+    raise exception 'Release candidate check names do not match protected CI.'
+      using errcode = '22023';
+  end if;
+  if jsonb_typeof(v_migrations) is distinct from 'array'
+    or jsonb_typeof(v_schema) is distinct from 'object' then
+    raise exception 'Release candidate migrations and schema must have the required shape.'
+      using errcode = '22023';
+  end if;
+  if not coalesce(v_schema->>'current_head' ~ '^[0-9]{14}$', false)
+    or not coalesce(v_schema->>'target_head' ~ '^[0-9]{14}$', false)
+    or exists (select 1 from jsonb_object_keys(v_schema) k
+      where k not in ('current_head','target_head'))
+    or exists (select 1 from jsonb_array_elements(v_migrations) m
+      where jsonb_typeof(m) is distinct from 'object'
+        or not coalesce(m->>'version' ~ '^[0-9]{14}$', false)
+        or not coalesce(m->>'filename' ~ '^[0-9]{14}_[A-Za-z0-9_.-]+[.]sql$', false)
+        or left(m->>'filename', 14) is distinct from m->>'version'
+        or not coalesce(m->>'sha256' ~ '^[0-9a-f]{64}$', false)) then
+    raise exception 'Release candidate migration plan is incomplete or invalid.'
+      using errcode = '22023';
+  end if;
+  if exists (select 1 from jsonb_array_elements(v_migrations) m,
+      lateral jsonb_object_keys(m) k
+      where k not in ('version','filename','sha256')) then
+    raise exception 'Release candidate migration contains an unknown field.'
+      using errcode = '22023';
+  end if;
+  select count(*)::integer, max(m->>'version')
+    into v_migration_count, v_last_migration
+    from jsonb_array_elements(v_migrations) m;
+  if (v_migration_count = 0
+      and v_schema->>'target_head' is distinct from v_schema->>'current_head')
+    or (v_migration_count > 0 and (
+      v_schema->>'target_head' is distinct from v_last_migration
+      or v_migration_count <> (select count(distinct m->>'version')
+        from jsonb_array_elements(v_migrations) m)
+      or exists (select 1 from jsonb_array_elements(v_migrations) m
+        where m->>'version' <= v_schema->>'current_head')
+      or exists (select 1 from jsonb_array_elements(v_migrations)
+        with ordinality m(value, ordinal)
+        join jsonb_array_elements(v_migrations)
+        with ordinality prior(value, ordinal)
+          on prior.ordinal + 1 = m.ordinal
+        where prior.value->>'version' >= m.value->>'version')
+    )) then
+    raise exception 'Release candidate migration versions must be distinct and ordered.'
+      using errcode = '22023';
+  end if;
+  if jsonb_typeof(v_deployment) is distinct from 'object'
+    or jsonb_typeof(p_candidate->'switch_plan') is distinct from 'array'
+    or jsonb_typeof(p_candidate->'rollback') is distinct from 'object' then
+    raise exception 'Release deployment, switches and rollback must have the required shape.'
+      using errcode = '22023';
+  end if;
+  if exists (select 1 from jsonb_object_keys(v_deployment) k
+      where k not in ('browser_pr_head_sha','runtime_pin_sha','gateway_pin_sha',
+        'railway_environment_id','runtime_service_id','gateway_service_id',
+        'manifest_sha256'))
+    or v_deployment->>'browser_pr_head_sha' is distinct from v_head
+    or not coalesce(v_deployment->>'runtime_pin_sha' ~ '^[0-9a-f]{40}$', false)
+    or not coalesce(v_deployment->>'gateway_pin_sha' ~ '^[0-9a-f]{40}$', false)
+    or not coalesce(v_deployment->>'manifest_sha256' ~ '^[0-9a-f]{64}$', false)
+    or nullif(btrim(v_deployment->>'railway_environment_id'), '') is null
+    or nullif(btrim(v_deployment->>'runtime_service_id'), '') is null
+    or nullif(btrim(v_deployment->>'gateway_service_id'), '') is null
+    or jsonb_array_length(p_candidate->'switch_plan') <> 0
+    or exists (select 1 from jsonb_object_keys(p_candidate->'rollback') k
+      where k <> 'strategy')
+    or not coalesce(p_candidate->'rollback'->>'strategy'
+      in ('forward_fix','redeploy_prior_version'), false) then
+    raise exception 'Release deployment and rollback scope is incomplete or unsupported.'
+      using errcode = '22023';
+  end if;
+
+  -- PostgreSQL jsonb text has a deterministic key order. Include expiry in
+  -- the hash so resubmitting the same plan with another expiry is a new card.
+  v_version := encode(sha256(convert_to(jsonb_build_object(
+    'candidate', p_candidate, 'expires_at', p_expires_at
+  )::text, 'UTF8')), 'hex');
+  insert into public.production_release_candidates_v6 (
+    candidate, expires_at, version_hash, submitted_by
+  ) values (p_candidate, p_expires_at, v_version, auth.uid())
+    on conflict (version_hash) do nothing returning id into v_id;
+  if v_id is null then
+    select id into v_id from public.production_release_candidates_v6
+      where version_hash = v_version;
+    return v_id;
+  end if;
+  perform public.register_approval_request_v6(jsonb_build_object(
+    'source_system', 'aa_console',
+    'source_kind', 'production_release',
+    'source_id', v_id::text,
+    'source_version', v_version,
+    'title', 'Production release PR #' || v_pr_number,
+    'artifact_hash', v_version,
+    'preview', p_candidate,
+    'destination', 'AA-Console production release',
+    'account_ref', v_deployment->>'railway_environment_id',
+    'scope', jsonb_build_object(
+      'repository', 'AttractAcq/AA-Console',
+      'pr_head_sha', v_head,
+      'base_sha', v_base,
+      'migration_target_head', v_schema->>'target_head',
+      'railway_environment_id', v_deployment->>'railway_environment_id',
+      'switch_plan', p_candidate->'switch_plan'
+    ),
+    'owner_role', 'admin',
+    'expires_at', p_expires_at,
+    'preview_blocker',
+      'Release source and four checks are not independently attested. No merge, migration, Railway or Pages effect gate is connected.',
+    'requested_by', auth.uid(),
+    'requester_kind', 'human'
+  ));
+  return v_id;
+end;
+$$;
+
+-- decide_production_release_candidate_v6 (was 20261101120000_298_approved_release_proof_refresh.sql)
+create or replace function public.decide_production_release_candidate_v6(
+  p_request_id uuid, p_expected_source_version text,
+  p_expected_artifact_hash text, p_expected_packet_sha256 text,
+  p_decision text, p_reason text
+) returns uuid language plpgsql volatile security definer
+set search_path = pg_catalog, public set timezone = 'UTC' as $$
+declare
+  v_request public.approval_requests_v6%rowtype;
+  v_source public.production_release_candidates_v6%rowtype;
+  v_proof public.production_release_attestations_v6%rowtype;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  if auth.role() is distinct from 'authenticated' or auth.uid() is null
+    or not coalesce(public.is_human_admin(),false)
+    or coalesce(auth.jwt()->>'aal','') <> 'aal2' then
+    raise exception 'Only a provisioned admin with AAL2 can decide a release.'
+      using errcode = '42501';
+  end if;
+  if p_decision not in ('approved','rejected','revoked') or p_decision is null
+    or (p_decision <> 'approved' and nullif(btrim(coalesce(p_reason,'')),'') is null) then
+    raise exception 'A valid release decision and reason are required.'
+      using errcode = '22023';
+  end if;
+  select * into v_request from public.approval_requests_v6
+    where id = p_request_id for update;
+  if not found or v_request.source_system is distinct from 'aa_console'
+    or v_request.source_kind is distinct from 'production_release'
+    or v_request.client_id is not null or v_request.owner_role is distinct from 'admin'
+    or v_request.source_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    raise exception 'Production release request is invalid.' using errcode = '23514';
+  end if;
+  select * into v_source from public.production_release_candidates_v6
+    where id = v_request.source_id::uuid;
+  if not found or v_request.source_version is distinct from v_source.version_hash
+    or v_request.artifact_hash is distinct from v_source.version_hash
+    or v_request.preview is distinct from v_source.candidate
+    or v_request.expires_at is distinct from v_source.expires_at
+    or p_expected_source_version is distinct from v_source.version_hash
+    or p_expected_artifact_hash is distinct from v_source.version_hash then
+    raise exception 'Production release candidate version changed.' using errcode = '23514';
+  end if;
+  if p_decision = 'approved' then
+    if v_source.expires_at <= clock_timestamp()
+      or public.production_release_source_state_v6(p_request_id) <> 'pending' then
+      raise exception 'Release evidence is stale, held or expired.'
+        using errcode = '23514';
+    end if;
+    select * into v_proof from public.production_release_attestations_v6
+      where request_id = p_request_id order by event_order desc limit 1;
+    if not found or not coalesce(p_expected_packet_sha256 ~ '^[0-9a-f]{64}$',false)
+      or p_expected_packet_sha256 is distinct from v_proof.packet_sha256
+      or v_proof.source_version is distinct from v_source.version_hash
+      or v_proof.packet->>'packetSha256' is distinct from v_proof.packet_sha256 then
+      raise exception 'The exact GitHub proof changed after the Inbox review.'
+        using errcode = '23514';
+    end if;
+  end if;
+  return public.record_approval_decision_v6(
+    p_request_id,p_decision,v_source.version_hash,
+    'production_release:' || p_request_id::text || ':' || p_decision,
+    p_reason
+  );
+end;
+$$;
+
+-- bind_approved_production_release_packet_v6 (was 20261101120000_298_approved_release_proof_refresh.sql)
+-- The request-row lock in record_approval_decision_v6 serializes this trigger
+-- with the proof writer. The latest proof is therefore the exact packet the
+-- AAL2 admin saw when the approval event was appended.
+create or replace function public.bind_approved_production_release_packet_v6()
+returns trigger language plpgsql volatile security definer
+set search_path = pg_catalog, public set timezone = 'UTC' as $$
+declare
+  v_request public.approval_requests_v6%rowtype;
+  v_proof public.production_release_attestations_v6%rowtype;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  if new.decision is distinct from 'approved' then return new; end if;
+  select * into v_request from public.approval_requests_v6
+    where id = new.request_id;
+  if not found or v_request.source_system is distinct from 'aa_console'
+    or v_request.source_kind is distinct from 'production_release' then
+    return new;
+  end if;
+  if auth.role() is distinct from 'authenticated'
+    or auth.uid() is distinct from new.actor_id
+    or coalesce(auth.jwt()->>'aal','') <> 'aal2'
+    or new.actor_aal is distinct from 'aal2'
+    or not coalesce(public.is_human_admin(),false)
+    or v_request.source_version is distinct from new.artifact_hash
+    or v_request.artifact_hash is distinct from new.artifact_hash then
+    raise exception 'Only the exact human release decision can bind proof.'
+      using errcode = '42501';
+  end if;
+  select * into v_proof from public.production_release_attestations_v6
+    where request_id = new.request_id order by event_order desc limit 1;
+  if not found or v_proof.source_version is distinct from v_request.source_version
+    or v_proof.packet_sha256 is distinct from v_proof.packet->>'packetSha256'
+    or v_proof.attested_at < clock_timestamp() - interval '15 minutes'
+    or v_request.expires_at <= clock_timestamp() then
+    raise exception 'The exact release proof is stale or mismatched.'
+      using errcode = '23514';
+  end if;
+  insert into public.production_release_approval_bindings_v6 (
+    request_id,decision_id,attestation_id,source_version,packet_sha256
+  ) values (
+    new.request_id,new.id,v_proof.id,v_request.source_version,v_proof.packet_sha256
+  );
+  return new;
+end;
+$$;
+
+-- decide_campaign_action_approval_v6 (was 20261015230000_206_v6_action_approvals.sql)
+create or replace function public.decide_campaign_action_approval_v6(
+  p_request_id uuid, p_decision text, p_reason text default null
+) returns public.campaign_action_approvals
+language plpgsql volatile security definer
+set search_path = pg_catalog, public
+set timezone = 'UTC'
+as $$
+declare
+  v_request public.campaign_action_approvals%rowtype;
+  v_manifest public.campaign_manifest_versions%rowtype;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  if auth.role() <> 'authenticated' or auth.uid() is null then
+    raise exception 'A signed-in human must decide this action.';
+  end if;
+  select * into v_request from public.campaign_action_approvals
+    where id = p_request_id for update;
+  if not found then raise exception 'Approval request not found.'; end if;
+  if not (coalesce(public.is_human_admin(), false)
+    or coalesce(auth.uid() = public.active_video_approval_manager(v_request.client_id), false)) then
+    raise exception 'Only an admin or the active client manager may approve.';
+  end if;
+  if v_request.status <> 'pending' then
+    raise exception 'This request has already been decided.';
+  end if;
+  select * into v_manifest from public.campaign_manifest_versions
+    where id = v_request.manifest_id;
+  if exists (select 1 from public.campaign_manifest_versions v
+    where v.campaign_id = v_request.campaign_id and v.version > v_manifest.version) then
+    raise exception 'The campaign package changed. Request a new approval.';
+  end if;
+  if p_decision not in ('approved', 'rejected') or p_decision is null
+     or (p_decision = 'rejected' and nullif(btrim(coalesce(p_reason, '')), '') is null) then
+    raise exception 'Approve, or reject with a reason.';
+  end if;
+  update public.campaign_action_approvals set
+    status = p_decision, decided_at = now(), decided_by = auth.uid(),
+    rejection_reason = case when p_decision = 'rejected' then btrim(p_reason) else null end
+  where id = p_request_id returning * into v_request;
+  return v_request;
+end;
+$$;
+
+-- decide_proof_placement_approval_v6 (was 20261019090000_218_proof_distribution_spine.sql)
+create or replace function public.decide_proof_placement_approval_v6(
+  p_approval_id uuid, p_approved boolean, p_reason text default null)
+returns public.proof_placements language plpgsql security definer
+set search_path = pg_catalog, public as $$
+declare
+  v_approval public.proof_placement_approvals%rowtype;
+  v_placement public.proof_placements%rowtype;
+  v_mode text;
+  v_next text;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  select * into v_approval from public.proof_placement_approvals where id = p_approval_id for update;
+  if not found then raise exception 'No such approval.'; end if;
+  if auth.role() is distinct from 'authenticated'
+     or not (coalesce(public.is_human_admin(), false)
+             or coalesce(auth.uid() = public.active_video_approval_manager(v_approval.client_id), false)) then
+    raise exception 'Only an admin or assigned client manager can decide a placement.';
+  end if;
+  if v_approval.status <> 'pending' then
+    raise exception 'That approval was already %.', v_approval.status;
+  end if;
+  select * into v_placement from public.proof_placements where id = v_approval.placement_id for update;
+  -- The payload moved between asking and deciding. Approving now would sign
+  -- off something nobody read.
+  if v_placement.payload_hash <> v_approval.payload_hash then
+    raise exception 'This payload changed after approval was requested. Ask again.';
+  end if;
+
+  if not p_approved then
+    if nullif(btrim(p_reason), '') is null then raise exception 'Say why it was rejected.'; end if;
+    update public.proof_placement_approvals
+       set status = 'rejected', decided_at = now(), decided_by = auth.uid(), rejection_reason = btrim(p_reason)
+     where id = p_approval_id;
+    update public.proof_placements set status = 'rejected' where id = v_placement.id;
+    insert into public.proof_placement_events (placement_id, client_id, event, actor, detail)
+    values (v_placement.id, v_placement.client_id, 'rejected', 'human', btrim(p_reason));
+    select * into v_placement from public.proof_placements where id = v_placement.id;
+    return v_placement;
+  end if;
+
+  update public.proof_placement_approvals
+     set status = 'approved', decided_at = now(), decided_by = auth.uid()
+   where id = p_approval_id;
+  update public.proof_placements set status = 'approved' where id = v_placement.id;
+  insert into public.proof_placement_events (placement_id, client_id, event, actor)
+  values (v_placement.id, v_placement.client_id, 'approved', 'human');
+
+  -- Where it waits next depends on who performs the act. An assisted
+  -- destination has no sweep to wait for; an embed one waits for a page.
+  select mode into v_mode from public.proof_destinations where destination_key = v_placement.destination_key;
+  v_next := case v_mode
+              when 'api' then 'queued'
+              when 'reference' then 'queued'
+              when 'assisted' then 'awaiting_manual_placement'
+              else 'bound' end;
+  update public.proof_placements set status = v_next where id = v_placement.id;
+  if v_next = 'queued' then
+    insert into public.proof_placement_events (placement_id, client_id, event, actor)
+    values (v_placement.id, v_placement.client_id, 'queued', 'system');
+  end if;
+
+  select * into v_placement from public.proof_placements where id = v_placement.id;
+  return v_placement;
+end $$;
+
+-- decide_lead_magnet_approval_v6 (was 20261024100000_236_lead_magnets.sql)
+create or replace function public.decide_lead_magnet_approval_v6(
+  p_approval_id uuid, p_approved boolean, p_reason text default null)
+returns public.lead_magnet_approvals language plpgsql security definer
+set search_path = pg_catalog, public as $$
+declare v_approval public.lead_magnet_approvals%rowtype; v_current text;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  select * into v_approval from public.lead_magnet_approvals where id = p_approval_id for update;
+  if not found then raise exception 'No such approval.' using errcode = 'P0001'; end if;
+  if auth.role() is distinct from 'authenticated'
+     or not (coalesce(public.is_human_admin(), false)
+             or coalesce(auth.uid() = public.active_video_approval_manager(v_approval.client_id), false)) then
+    raise exception 'A signed-in admin or the assigned client manager must decide this.'
+      using errcode = 'P0001';
+  end if;
+  if v_approval.status <> 'pending' then
+    raise exception 'That approval was already %.', v_approval.status using errcode = 'P0001';
+  end if;
+
+  -- The file may have been re-exported between asking and deciding, which
+  -- would make this a decision about something nobody read.
+  v_current := public.lead_magnet_payload_hash_v6(v_approval.magnet_version_id);
+  if v_current <> v_approval.payload_hash then
+    raise exception 'This magnet changed after approval was requested. Ask again.'
+      using errcode = 'P0001';
+  end if;
+
+  if not coalesce(p_approved, false) then
+    if nullif(btrim(coalesce(p_reason, '')), '') is null then
+      raise exception 'Say why it was rejected.' using errcode = 'P0001';
+    end if;
+    update public.lead_magnet_approvals
+       set status = 'rejected', decided_at = now(), decided_by = auth.uid(),
+           rejection_reason = btrim(p_reason)
+     where id = p_approval_id returning * into v_approval;
+    return v_approval;
+  end if;
+
+  update public.lead_magnet_approvals
+     set status = 'approved', decided_at = now(), decided_by = auth.uid()
+   where id = p_approval_id returning * into v_approval;
+  return v_approval;
+end $$;
+-- <<end approval-decisions>>
+
 
 select public.lock_down_definer_functions();
 grant execute on function public.is_human_admin() to authenticated, service_role;

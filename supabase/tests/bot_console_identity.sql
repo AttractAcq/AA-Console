@@ -4,7 +4,7 @@
 -- The agent-runtime pglite suite covers the same checks in CI.
 
 begin;
-select plan(8);
+select plan(12);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -82,6 +82,40 @@ select lives_ok(
   $$update public.profiles set full_name = full_name
      where id = '11111111-1111-4111-8111-111111111111'$$,
   'service_role may touch a human profile without making it a bot'
+);
+
+select set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
+select set_config('request.jwt.claims', '{"aal":"aal2","role":"authenticated"}', true);
+select throws_ok(
+  $$select public.decide_console_invitation_v6(
+      '44444444-4444-4444-8444-444444444444', 'version', 'hash', true, null)$$,
+  '42501',
+  'Bot accounts cannot perform this action',
+  'aal2 does not let a bot decide an invitation'
+);
+select throws_ok(
+  $$select public.decide_campaign_action_approval_v6(
+      '44444444-4444-4444-8444-444444444444', 'rejected', 'no')$$,
+  '42501',
+  'Bot accounts cannot perform this action',
+  'a bot cannot decide a campaign action'
+);
+select throws_ok(
+  $$select public.record_approval_decision_v6(
+      '44444444-4444-4444-8444-444444444444', 'rejected', 'hash', 'ref', 'no')$$,
+  '42501',
+  'Bot accounts cannot perform this action',
+  'the approval ledger refuses a bot before AAL2'
+);
+
+select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
+select throws_ok(
+  $$select public.decide_console_invitation_v6(
+      '44444444-4444-4444-8444-444444444444', 'version', 'hash', true, null)$$,
+  'P0002',
+  'Invitation not found.',
+  'a human admin passes the invitation auth check'
 );
 
 select * from finish();

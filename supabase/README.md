@@ -95,14 +95,45 @@ node --experimental-strip-types scripts/provision-bot-user.ts \
   --full-name "Chief of Staff"
 ```
 
-`--bot-key` must be one of `bot-cos`, `bot-cdm`, `bot-marketing`,
-`bot-production`, `bot-distribution`, `bot-sales`, `bot-admin`,
-`bot-finance`, `bot-engineering`, `bot-security`. The Auth email is
-`<bot_key>@attractacq.com`. The script calls `auth.admin.createUser` with
-`email_confirm` and `app_metadata.is_bot` / `bot_key`, then inserts
-`profiles` (`role=admin`, `is_bot=true`). If that insert fails, it deletes
-the Auth user it just created. If the email already exists, it reports the
-user and does not change the password.
+`--bot-key` must be one of the keys below. The email is that mapped address.
+These addresses have no mailbox. Creation sets `email_confirm: true` and
+does not send confirmation, magic-link, or reset mail. Any other email and
+bot_key pair is rejected.
+
+| bot_key | email |
+| --- | --- |
+| `bot-cos` | `cos@attractacq.com` |
+| `bot-cdm` | `delivery@attractacq.com` |
+| `bot-marketing` | `marketing@attractacq.com` |
+| `bot-production` | `production@attractacq.com` |
+| `bot-distribution` | `distribution@attractacq.com` |
+| `bot-sales` | `sales@attractacq.com` |
+| `bot-admin` | `ops-admin@attractacq.com` |
+| `bot-finance` | `finance@attractacq.com` |
+| `bot-engineering` | `engineering@attractacq.com` |
+| `bot-security` | `security@attractacq.com` |
+
+The script calls `auth.admin.createUser` with `email_confirm` and
+`app_metadata.is_bot` / `bot_key`, then inserts `profiles` (`role=admin`,
+`is_bot=true`). If that insert fails, it deletes the Auth user it just
+created. If the mapped email already exists, it reports the user and does
+not change the password.
+
+Password resets and MFA removal use the same script. Both refuse a profile
+that is not `is_bot=true` with that `bot_key`. `--dry-run` does not write.
+
+```bash
+node --experimental-strip-types scripts/provision-bot-user.ts reset-password \
+  --bot-key bot-cos
+node --experimental-strip-types scripts/provision-bot-user.ts unenroll-mfa \
+  --bot-key bot-cos
+```
+
+`reset-password` reads the new password from `BOT_USER_PASSWORD` or stdin
+and passes it only to `auth.admin.updateUserById`. `unenroll-mfa` lists
+factors with `auth.admin.mfa.listFactors` and deletes each with
+`auth.admin.mfa.deleteFactor`. The same confirm, URL, and service-role
+variables are required.
 
 There is no database test job in CI. The same checks run in the agent-runtime
 test suite. A local pgTAP file is `supabase/tests/bot_console_identity.sql`,

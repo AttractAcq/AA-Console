@@ -57,6 +57,20 @@ async function asService() {
   await db.exec("reset role");
 }
 
+async function callReady(id: string, sql: string, params: unknown[] = []): Promise<string | null> {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await asUser(id, "aal2");
+    const error = await call(sql, params);
+    const missing = /(?:type|relation) "(?:public\.)?([^"]+)" does not exist/i.exec(error ?? "");
+    if (!missing) return error;
+    const raw = missing[1]!.split(".").pop() ?? "";
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(raw)) return error;
+    await db.exec("reset role");
+    await db.exec(`create table if not exists public.${raw} (id uuid primary key);`);
+  }
+  return "stub loop exhausted";
+}
+
 async function call(sql: string, params: unknown[] = []): Promise<string | null> {
   try {
     await db.query(sql, params);
@@ -90,6 +104,34 @@ const calls: Array<[string, string, unknown[]]> = [
     "select public.request_client_sales_entitlement($1,$1,'grant')", [CLIENT]],
   ["decide_client_sales_entitlement",
     "select public.decide_client_sales_entitlement($1,'hash',true,null)", [CLIENT]],
+];
+
+const approvalCalls: Array<[string, string, unknown[]]> = [
+  ["record_approval_decision_v6",
+    "select public.record_approval_decision_v6($1,'approved','hash','ref',null)", [CLIENT]],
+  ["approve_recruitment_brief", "select public.approve_recruitment_brief($1)", [CLIENT]],
+  ["approve_recruitment_brief_from_inbox_v6",
+    "select public.approve_recruitment_brief_from_inbox_v6($1,$1,'version','hash')", [CLIENT]],
+  ["decide_google_review_reply_v6", "select public.decide_google_review_reply_v6($1,true,null)", [CLIENT]],
+  ["decide_google_review_reply_from_inbox_v6",
+    "select public.decide_google_review_reply_from_inbox_v6($1,'version','hash',true,null)", [CLIENT]],
+  ["record_console_auth_sender_verification_v6",
+    "select public.record_console_auth_sender_verification_v6('sender@attractacq.com','https://project.supabase.co','https://console.attractacq.com','Subject','Body','evidence','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')", []],
+  ["decide_console_invitation_v6",
+    "select public.decide_console_invitation_v6($1,'version','hash',true,null)", [CLIENT]],
+  ["cancel_console_invitation_v6", "select public.cancel_console_invitation_v6($1,'cancelled')", [CLIENT]],
+  ["resolve_console_invitation_uncertain_v6",
+    "select public.resolve_console_invitation_uncertain_v6($1,'hash','evidence','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','no send')", [CLIENT]],
+  ["submit_production_release_candidate_v6",
+    "select public.submit_production_release_candidate_v6('{}'::jsonb, now() + interval '1 hour')", []],
+  ["decide_production_release_candidate_v6",
+    "select public.decide_production_release_candidate_v6($1,'version','artifact','packet','rejected','no')", [CLIENT]],
+  ["decide_campaign_action_approval_v6",
+    "select public.decide_campaign_action_approval_v6($1,'rejected','no')", [CLIENT]],
+  ["decide_proof_placement_approval_v6",
+    "select public.decide_proof_placement_approval_v6($1,false,'no')", [CLIENT]],
+  ["decide_lead_magnet_approval_v6",
+    "select public.decide_lead_magnet_approval_v6($1,false,'no')", [CLIENT]],
 ];
 
 beforeAll(async () => {
@@ -168,6 +210,7 @@ beforeAll(async () => {
   // only needs the auth gate, which is the first statement in each function.
   await db.exec("set check_function_bodies = off");
   await applyCreatingMissingTypes(section(sql, "hard-hold-rpcs"));
+  await applyCreatingMissingTypes(section(sql, "approval-decisions"));
   await db.exec("set check_function_bodies = on");
   // %rowtype variables are resolved before the function body, so the auth
   // gate is only reached once those tables exist.
@@ -178,7 +221,10 @@ beforeAll(async () => {
     await db.exec(`create table if not exists public.${table} (id uuid primary key);`);
   }
 
-  for (const table of ["client_billing", "finance_entries", "sops", "client_integrations", "engine_controls"]) {
+  for (const table of [
+    "client_billing", "finance_entries", "sops", "client_integrations", "engine_controls",
+    "proof_capture_configs", "client_proof_destinations", "client_google_locations", "motion_scenes",
+  ]) {
     await db.exec(`
       create table if not exists public.${table} (id uuid primary key default gen_random_uuid());
       alter table public.${table} enable row level security;
@@ -196,10 +242,29 @@ beforeAll(async () => {
       for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
   `);
   const rls = section(sql, "rls-split");
-  const wanted = ["profiles", "client_billing", "finance_entries", "sops", "client_integrations", "engine_controls"];
+  await db.exec(`
+    create schema if not exists storage;
+    grant usage on schema storage to authenticated;
+    create table if not exists storage.objects (
+      id uuid primary key default gen_random_uuid(),
+      bucket_id text,
+      name text
+    );
+    alter table storage.objects enable row level security;
+    grant select, insert, update, delete on storage.objects to authenticated;
+    alter table public.proof_capture_configs add column if not exists client_id uuid;
+    alter table public.client_proof_destinations add column if not exists client_id uuid;
+    alter table public.client_google_locations add column if not exists client_id uuid;
+    alter table public.motion_scenes add column if not exists client_id uuid;
+  `);
+  const wanted = [
+    "profiles", "client_billing", "finance_entries", "sops", "client_integrations", "engine_controls",
+    "proof_capture_configs", "client_proof_destinations", "client_google_locations", "motion_scenes",
+    "storage.objects",
+  ];
   const statements = rls.split(/;\s*\n/).map((part) => part.trim()).filter(Boolean);
   for (const statement of statements) {
-    if (wanted.some((table) => statement.includes(`public.${table}`))) {
+    if (wanted.some((table) => statement.includes(table.includes(".") ? table : `public.${table}`))) {
       await db.exec(`${statement};`);
     }
   }
@@ -328,5 +393,95 @@ describe("bot console identity", () => {
       "insert into public.sops (id) values ('66666666-6666-4666-8666-666666666666')",
     );
     expect(employeeInsert).toMatch(/row-level security/i);
+  });
+
+  it.each(approvalCalls)("%s denies a bot before AAL2 and lets a human admin past that check", async (_name, sql, params) => {
+    const botError = await callReady(BOT, sql, params);
+    expect(botError).toMatch(/Bot accounts cannot perform this action/);
+    const humanError = await callReady(HUMAN, sql, params);
+    expect(humanError ?? "").not.toMatch(/Bot accounts cannot perform this action/);
+    expect(humanError ?? "").not.toMatch(/AAL2|Admins only|Only an admin|Only an administrator/);
+  });
+
+  it("denies bot writes on admin-or-manager tables while a real manager can still write", async () => {
+    await asUser(BOT);
+    const botWrite = await call(
+      "insert into public.motion_scenes (id, client_id) values ('77777777-7777-4777-8777-777777777777', $1)",
+      [CLIENT],
+    );
+    expect(botWrite).toMatch(/row-level security/i);
+
+    await asUser(HUMAN);
+    const humanWrite = await call(
+      "insert into public.client_google_locations (id, client_id) values ('88888888-8888-4888-8888-888888888888', $1)",
+      [CLIENT],
+    );
+    expect(humanWrite).toBeNull();
+
+    await asUser(EMPLOYEE);
+    const employeeWrite = await call(
+      "insert into public.proof_capture_configs (id, client_id) values ('99999999-9999-4999-8999-999999999999', $1)",
+      [CLIENT],
+    );
+    expect(employeeWrite).toMatch(/row-level security/i);
+
+    await db.exec("reset role");
+    await db.exec(`create or replace function public.active_video_approval_manager(target uuid)
+      returns uuid language sql stable as $$ select '${EMPLOYEE}'::uuid $$`);
+    await asUser(EMPLOYEE);
+    const managerWrite = await call(
+      "insert into public.client_proof_destinations (id, client_id) values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', $1)",
+      [CLIENT],
+    );
+    expect(managerWrite).toBeNull();
+  });
+
+  it("lets a bot admin read storage and refuses admin-gated bucket writes", async () => {
+    await db.exec("reset role");
+    for (const bucket of ["sops", "contracts", "client-media", "proof"]) {
+      await db.query(
+        "insert into storage.objects (id, bucket_id, name) values (gen_random_uuid(), $1, 'existing')",
+        [bucket],
+      );
+      await asUser(BOT);
+      const visible = await db.query<{ bucket_id: string }>(
+        "select bucket_id from storage.objects where bucket_id = $1",
+        [bucket],
+      );
+      expect(visible.rows.map((row) => row.bucket_id)).toContain(bucket);
+      const inserted = await call(
+        "insert into storage.objects (id, bucket_id, name) values (gen_random_uuid(), $1, 'bot-write')",
+        [bucket],
+      );
+      expect(inserted, bucket).toMatch(/row-level security/i);
+    }
+    await asUser(HUMAN);
+    const humanWrite = await call(
+      "insert into storage.objects (id, bucket_id, name) values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'proof', 'human-write')",
+    );
+    expect(humanWrite).toBeNull();
+  });
+
+  it("fires the AAL2 decision triggers against a bot before they trust assurance", async () => {
+    await db.exec("reset role");
+    await db.exec(`
+      create table if not exists public.bot_sales_probe (id uuid primary key);
+      drop trigger if exists bot_sales_probe_guard on public.bot_sales_probe;
+      create trigger bot_sales_probe_guard before insert on public.bot_sales_probe
+        for each row execute function public.sales_entitlement_inbox_request_guard_v6();
+      create table if not exists public.bot_release_probe (id uuid primary key);
+      drop trigger if exists bot_release_probe_guard on public.bot_release_probe;
+      create trigger bot_release_probe_guard before insert on public.bot_release_probe
+        for each row execute function public.bind_approved_production_release_packet_v6();
+      grant insert on public.bot_sales_probe, public.bot_release_probe to authenticated;
+      grant execute on function public.sales_entitlement_inbox_request_guard_v6() to authenticated;
+      grant execute on function public.bind_approved_production_release_packet_v6() to authenticated;
+    `);
+    await asUser(BOT, "aal2");
+    const sales = await call("insert into public.bot_sales_probe (id) values (gen_random_uuid())");
+    expect(sales).toMatch(/Bot accounts cannot perform this action/);
+    await asUser(BOT, "aal2");
+    const release = await call("insert into public.bot_release_probe (id) values (gen_random_uuid())");
+    expect(release).toMatch(/Bot accounts cannot perform this action/);
   });
 });
