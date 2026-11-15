@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "83743bd3fd7749bde498d70c5f46956ef6d670199d77d6a13ca56ba0a53c5797",
-  "generatedTypesSha256": "795036cc35aa32ea0dc25243be3b7300e5d4aca171d5ff548dcf036fdb741c76",
-  "generatedSchemaBodySha256": "5e75994ddbf17bb2bc345044d86cbfb9dd6b8b790b1b654c9ba131f170a120ce",
+  "migrationSourceDigest": "b8a1fbdd4a890414bb2950eee19b3fcb178b299b29c7241b455f3ea76a72d41a",
+  "generatedTypesSha256": "84f692ce02fd4415bb8479afba49b57f486d24f381a7672b9873ad50fe885777",
+  "generatedSchemaBodySha256": "397fdc72b9e69aa80b29a4751cfe1f88cf44e3137dfa703e5b59434df05a3d00",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3468,6 +3468,27 @@
       "filename": "20261120180000_478_client_external_outcomes.sql",
       "sha256": "4d4f122ec798134a86aa890afc38ba47089ae40c4c5a9e57ce7d6a5c2bc0a1e6",
       "trimmedMd5": "242f08768eea422dd77efe34cf7686dd"
+    },
+    {
+      "version": "20261120190000",
+      "name": "479_meta_profile_uncertain_reconciliation",
+      "filename": "20261120190000_479_meta_profile_uncertain_reconciliation.sql",
+      "sha256": "b9de7b657a8cfabb110142be0b3db06c6724fe700e0ecd3db8af1f17bc7f2743",
+      "trimmedMd5": "eea4a741e26accbf5639575dbe3fb247"
+    },
+    {
+      "version": "20261120200000",
+      "name": "480_meta_profile_reconciliation_job",
+      "filename": "20261120200000_480_meta_profile_reconciliation_job.sql",
+      "sha256": "72e5804ac5d16e2ff17039cecaaf64d7e5a26828c9ca451b1abd6acc10fb94e6",
+      "trimmedMd5": "e9207ef4629485acfe7374f61fe16bd8"
+    },
+    {
+      "version": "20261120210000",
+      "name": "481_meta_reconciliation_outcome_projection",
+      "filename": "20261120210000_481_meta_reconciliation_outcome_projection.sql",
+      "sha256": "e50385dbffe4bf4be172344c40f0f11e7446d19efb84fea40094b97f360fe0d1",
+      "trimmedMd5": "fdd11ce609a7b9bfceceae8e89cc7277"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

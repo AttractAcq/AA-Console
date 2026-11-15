@@ -16258,6 +16258,79 @@ export type Database = {
           },
         ]
       }
+      meta_profile_reconciliation_checks_v6: {
+        Row: {
+          attempt_id: string
+          checked_at: string
+          client_id: string
+          id: string
+          observed_value: string | null
+          provider_ref: string
+          result: string
+        }
+        Insert: {
+          attempt_id: string
+          checked_at?: string
+          client_id: string
+          id?: string
+          observed_value?: string | null
+          provider_ref: string
+          result: string
+        }
+        Update: {
+          attempt_id?: string
+          checked_at?: string
+          client_id?: string
+          id?: string
+          observed_value?: string | null
+          provider_ref?: string
+          result?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_profile_reconciliation_checks_v6_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_execution_attempts_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_reconciliation_checks_v6_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_execution_overview_v6"
+            referencedColumns: ["attempt_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       meta_profile_review_requests_v6: {
         Row: {
           canonical_request_id: string | null
@@ -28881,39 +28954,11 @@ export type Database = {
           outcome_note: string | null
           page_id: string | null
           provider_ref: string | null
+          reconciled_at: string | null
+          reconciliation_result: string | null
           reserved_at: string | null
           started_at: string | null
           status: string | null
-        }
-        Insert: {
-          approval_request_id?: string | null
-          attempt_id?: string | null
-          change_id?: string | null
-          client_id?: string | null
-          field?: string | null
-          finished_at?: string | null
-          observed_value?: string | null
-          outcome_note?: string | null
-          page_id?: string | null
-          provider_ref?: string | null
-          reserved_at?: string | null
-          started_at?: string | null
-          status?: string | null
-        }
-        Update: {
-          approval_request_id?: string | null
-          attempt_id?: string | null
-          change_id?: string | null
-          client_id?: string | null
-          field?: string | null
-          finished_at?: string | null
-          observed_value?: string | null
-          outcome_note?: string | null
-          page_id?: string | null
-          provider_ref?: string | null
-          reserved_at?: string | null
-          started_at?: string | null
-          status?: string | null
         }
         Relationships: [
           {
@@ -35246,6 +35291,10 @@ export type Database = {
         Args: { p_change_id: string }
         Returns: boolean
       }
+      meta_profile_reconciliation_target_v6: {
+        Args: { p_attempt_id: string; p_client_id: string }
+        Returns: Json
+      }
       meta_profile_review_hash_v6: {
         Args: {
           q: Database["public"]["Tables"]["meta_profile_review_requests_v6"]["Row"]
@@ -35940,6 +35989,15 @@ export type Database = {
       record_lead_magnet_sent: {
         Args: { p_delivery_id: string; p_provider_ref: string }
         Returns: undefined
+      }
+      record_meta_profile_reconciliation_v6: {
+        Args: {
+          p_attempt_id: string
+          p_client_id: string
+          p_observed_value: string
+          p_provider_ref: string
+        }
+        Returns: string
       }
       record_outbound_message_failure: {
         Args: { p_message_id: string; p_reason: string; p_retryable?: boolean }
@@ -36640,6 +36698,10 @@ export type Database = {
       request_meta_build: { Args: { p_campaign_id: string }; Returns: string }
       request_meta_build_sheet: {
         Args: { p_campaign_id: string }
+        Returns: string
+      }
+      request_meta_profile_reconciliation_v6: {
+        Args: { p_attempt_id: string }
         Returns: string
       }
       request_meta_profile_review_v6: {

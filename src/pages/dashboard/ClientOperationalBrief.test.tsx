@@ -58,7 +58,7 @@ it("keeps failed source counts unknown and scopes every brief read to its client
   expect(screen.getByText("Lead magnet deliveries owed").parentElement).toHaveTextContent("3 Open studio");
   expect(screen.getByRole("alert")).toHaveTextContent("stale approval read denied");
   expect(screen.getByText(/meta: connected/)).toHaveTextContent("no check recorded");
-  expect(screen.getByText("External execution").parentElement).toHaveTextContent("2 refused, uncertain or failed");
+  expect(screen.getByText("External execution").parentElement).toHaveTextContent("2 requiring reconciliation");
   expect(screen.getByRole("link", { name: /google review reply/ })).toHaveAttribute("href", "/clients/client-1/google-profile?tab=reviews");
   expect(reads).toHaveLength(12);
   expect(reads.every((read) => read.clientId === "client-1")).toBe(true);

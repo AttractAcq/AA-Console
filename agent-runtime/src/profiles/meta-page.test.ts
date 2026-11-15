@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { updateMetaPageField } from "./meta-page.js";
+import { readMetaPageField, updateMetaPageField } from "./meta-page.js";
 
 const json = (value: unknown) => new Response(JSON.stringify(value), { status: 200 });
 const request = {
@@ -94,5 +94,26 @@ describe("isolated Facebook Page field transport", () => {
     }) as unknown as typeof fetch;
     await expect(updateMetaPageField({ ...request, assertPrewrite: vi.fn(), fetchImpl: stale }))
       .rejects.toThrow(/readback differs/);
+  });
+});
+
+describe("read-only uncertain Page reconciliation", () => {
+  it("reads the exact Page token and field without any POST", async () => {
+    const mock = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) =>
+      String(url).includes("/me?") ? json({ id: "123456" })
+        : json({ id: "123456", about: "After" }));
+    const fetchImpl = mock as unknown as typeof fetch;
+    await expect(readMetaPageField({ accessToken: "page-token", pageId: "123456",
+      field: "about", fetchImpl }))
+      .resolves.toEqual({ providerRef: "facebook_page:123456#about", observedValue: "After" });
+    expect(mock).toHaveBeenCalledTimes(2);
+    expect(mock.mock.calls.every((call) => (call[1] as RequestInit).method === "GET")).toBe(true);
+  });
+
+  it("refuses a token for another Page before reading the field", async () => {
+    const fetchImpl = vi.fn(async () => json({ id: "other" })) as unknown as typeof fetch;
+    await expect(readMetaPageField({ accessToken: "page-token", pageId: "123456",
+      field: "about", fetchImpl })).rejects.toThrow(/not the reviewed Facebook Page token/);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });

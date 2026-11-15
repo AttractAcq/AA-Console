@@ -42,7 +42,7 @@ export function ClientOperationalBrief({ clientId, spend, failedRuns, activeRuns
       supabase.from("lead_magnet_deliveries").select("id", { count: "exact", head: true }).eq("client_id", clientId).in("status", ["queued", "sending", "failed"]),
       supabase.from("client_integrations").select("provider,status,last_checked_at").eq("client_id", clientId),
       supabase.from("client_external_outcomes_v6").select("source_kind,outcome,occurred_at,owning_path,external_ref").eq("client_id", clientId).in("outcome", ["confirmed", "executed"]).order("occurred_at", { ascending: false }).limit(1),
-      supabase.from("client_external_outcomes_v6").select("outcome_id", { count: "exact", head: true }).eq("client_id", clientId).in("outcome", ["refused", "uncertain", "failed", "abandoned"]),
+      supabase.from("client_external_outcomes_v6").select("outcome_id", { count: "exact", head: true }).eq("client_id", clientId).in("outcome", ["refused", "uncertain", "different", "failed", "abandoned"]),
     ]);
     const errors = [pending.error, stale.error, sourceHeld.error, sourceHeldItems.error, held.error, failed.error, executed.error, actions.error, deliveries.error, integrations.error, lastOutcome.error, externalProblems.error]
       .filter((error): error is NonNullable<typeof error> => Boolean(error))
@@ -96,7 +96,7 @@ export function ClientOperationalBrief({ clientId, spend, failedRuns, activeRuns
         <div><dt className="text-muted-foreground">Lead magnet deliveries owed</dt><dd>{count(brief?.owedDeliveries)} <Link className="text-primary underline" to={`${base}/delivery/lead-magnet-studio`}>Open studio</Link></dd></div>
         <div><dt className="text-muted-foreground">Provider records</dt><dd>{count(brief?.integrations?.length)} recorded <Link className="text-primary underline" to={`${base}/account/integrations`}>Review access</Link></dd></div>
         <div><dt className="text-muted-foreground">External execution</dt><dd>
-          {count(brief?.externalProblems)} refused, uncertain or failed · latest receipt: {brief?.lastExternalOutcome === undefined ? "unknown" : brief.lastExternalOutcome === null ? "none recorded" : (
+          {count(brief?.externalProblems)} requiring reconciliation · latest receipt: {brief?.lastExternalOutcome === undefined ? "unknown" : brief.lastExternalOutcome === null ? "none recorded" : (
             <Link className="text-primary underline" to={brief.lastExternalOutcome.owning_path.startsWith(`${base}/`) ? brief.lastExternalOutcome.owning_path : `${base}/delivery/approval-inbox?tab=unified`}>
               {brief.lastExternalOutcome.source_kind.replaceAll("_", " ")} · {new Date(brief.lastExternalOutcome.occurred_at).toLocaleString()}
             </Link>

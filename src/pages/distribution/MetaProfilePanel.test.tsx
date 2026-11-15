@@ -70,6 +70,7 @@ function database(options: { identities?: unknown[]; changes?: unknown[]; presen
     Object.assign(chain, {
       select: (columns: string) => { select(table, columns); return chain; },
       eq: () => chain,
+      in: () => chain,
       order: () => chain,
       limit: async () => response(),
       then: (...a: Parameters<Promise<unknown>["then"]>) =>
@@ -210,14 +211,28 @@ describe("proposed changes", () => {
     database({ changes: [change({ id: "chg-1", platform: "facebook", field: "about",
       status: "approved", approved_request_id: "card-1" })],
       profileCards: [{ id: "card-1", status: "approved" }],
-      profileOutcomes: [{ change_id: "chg-1", status: "uncertain",
-        provider_ref: null, outcome_note: marker }] });
+      profileOutcomes: [{ attempt_id: "attempt-1", change_id: "chg-1", status: "uncertain",
+        provider_ref: null, reconciliation_result: null, reconciled_at: null,
+        outcome_note: marker }] });
     render(<MetaProfilePanel tab="profile" />);
-    expect(await screen.findByText("Provider outcome uncertain; reconcile before retrying."))
+    expect(await screen.findByText("Provider outcome uncertain; request a read-only Page check."))
       .toBeInTheDocument();
     expect(select).toHaveBeenCalledWith("meta_profile_execution_overview_v6",
-      "change_id,status,provider_ref");
+      "attempt_id,change_id,status,provider_ref,reconciliation_result,reconciled_at");
     expect(document.body.textContent).not.toContain(marker);
+    await userEvent.click(screen.getByRole("button", { name: "Check Page read-only" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_meta_profile_reconciliation_v6", {
+      p_attempt_id: "attempt-1",
+    }));
+  });
+
+  it("shows a later readback while preserving the uncertain original attempt", async () => {
+    database({ changes: [change({ platform: "facebook", field: "about", status: "applied" })],
+      profileOutcomes: [{ attempt_id: "attempt-1", change_id: "chg-1", status: "uncertain",
+        provider_ref: null, reconciliation_result: "matched", reconciled_at: "2026-11-15T12:00:00Z" }] });
+    render(<MetaProfilePanel tab="profile" />);
+    expect(await screen.findByText(/Later readback matched the approved Page field/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Check Page read-only" })).not.toBeInTheDocument();
   });
 
   it("queues only a current approved Facebook Page proposal", async () => {

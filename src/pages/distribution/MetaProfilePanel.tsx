@@ -25,9 +25,9 @@ type ProfileChange = Pick<
 type ProfileDecision = Pick<Database["public"]["Views"]["approval_inbox_v6"]["Row"],
   "id" | "status">;
 type ProfileOutcome = Pick<Database["public"]["Views"]["meta_profile_execution_overview_v6"]["Row"],
-  "change_id" | "status" | "provider_ref">;
+  "attempt_id" | "change_id" | "status" | "provider_ref" | "reconciliation_result" | "reconciled_at">;
 type ProfileJob = Pick<Database["public"]["Tables"]["agent_jobs"]["Row"],
-  "id" | "input_id" | "status">;
+  "id" | "agent_key" | "input_id" | "status">;
 
 type Tab = "identities" | "profile" | "presence";
 
@@ -100,10 +100,11 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
         supabase.from("approval_inbox_v6").select("id,status")
           .eq("client_id", clientId).eq("source_kind", "meta_profile_change"),
         supabase.from("meta_profile_execution_overview_v6")
-          .select("change_id,status,provider_ref").eq("client_id", clientId),
-        supabase.from("agent_jobs").select("id,input_id,status")
-          .eq("client_id", clientId).eq("agent_key", "meta_profile_field_writer")
-          .eq("input_table", "meta_profile_changes"),
+          .select("attempt_id,change_id,status,provider_ref,reconciliation_result,reconciled_at")
+          .eq("client_id", clientId),
+        supabase.from("agent_jobs").select("id,agent_key,input_id,status")
+          .eq("client_id", clientId)
+          .in("agent_key", ["meta_profile_field_writer", "meta_profile_field_reconciler"]),
       ]);
       for (const result of [health, posts, proposed, profileCards, outcomes, jobs]) {
         if (result.error) throw new Error("Profile read failed.");
@@ -151,6 +152,22 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
       await refresh();
     } catch {
       setError("Could not queue the exact Facebook Page field proposal.");
+    } finally {
+      setReviewBusy(null);
+    }
+  }
+
+  async function requestReconciliation(attemptId: string) {
+    setReviewBusy(attemptId);
+    setError(null);
+    try {
+      const result = await supabase.rpc("request_meta_profile_reconciliation_v6", {
+        p_attempt_id: attemptId,
+      });
+      if (result.error) throw result.error;
+      await refresh();
+    } catch {
+      setError("Could not queue a read-only check of the uncertain Page field.");
     } finally {
       setReviewBusy(null);
     }
@@ -295,13 +312,24 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
                 <span key="execution" className="text-xs text-muted-foreground">
                   {(() => {
                     const outcome = profileOutcomes.find((row) => row.change_id === change.id);
-                    const job = profileJobs.find((row) => row.input_id === change.id);
+                    const job = profileJobs.find((row) => row.input_id === change.id
+                      && row.agent_key === "meta_profile_field_writer");
+                    const readJob = outcome && profileJobs.find((row) => row.input_id === outcome.attempt_id
+                      && row.agent_key === "meta_profile_field_reconciler");
                     if (!outcome) return change.platform === "instagram"
                       ? "Manual profile edit required; no API writer."
                       : job ? `Queued job ${job.status.replace(/_/g, " ")}; runtime release may hold it.`
                         : "No provider write requested; adapter held.";
                     if (outcome.status === "confirmed") return `Provider readback confirmed · ${outcome.provider_ref ?? "reference unavailable"}`;
-                    if (outcome.status === "uncertain") return "Provider outcome uncertain; reconcile before retrying.";
+                    if (outcome.status === "uncertain") {
+                      if (outcome.reconciliation_result === "matched")
+                        return `Later readback matched the approved Page field · ${dayOrDash(outcome.reconciled_at)}`;
+                      if (outcome.reconciliation_result === "different")
+                        return `Later readback differs · ${dayOrDash(outcome.reconciled_at)}; inspect before any new proposal.`;
+                      return readJob
+                        ? `Provider outcome uncertain; read-only check ${readJob.status.replace(/_/g, " ")}.`
+                        : "Provider outcome uncertain; request a read-only Page check.";
+                    }
                     if (outcome.status === "refused") return "Provider write refused before start.";
                     if (outcome.status === "started") return "Provider write started; awaiting readback.";
                     return "One provider attempt reserved; prewrite pending.";
@@ -325,6 +353,20 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
                       onClick={() => void requestWrite(change.id)}>
                       Request Page write
                     </button>}
+                  {(() => {
+                    const outcome = profileOutcomes.find((row) => row.change_id === change.id);
+                    const activeRead = profileJobs.some((row) => row.agent_key === "meta_profile_field_reconciler"
+                      && row.input_id === outcome?.attempt_id
+                      && ["queued", "claimed", "running", "paused"].includes(row.status));
+                    return outcome?.status === "uncertain"
+                      && outcome.attempt_id && outcome.reconciliation_result !== "matched"
+                      && !activeRead && <button type="button"
+                        className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50"
+                        disabled={reviewBusy !== null}
+                        onClick={() => void requestReconciliation(outcome.attempt_id!)}>
+                        Check Page read-only
+                      </button>;
+                  })()}
                 </span>,
               ])}
             />

@@ -26,6 +26,50 @@ const FIELD: Readonly<Record<string, string>> = {
   website_url: "website",
 };
 
+/** Read-only reconciliation for a previously uncertain one-shot write. */
+export async function readMetaPageField(input: {
+  accessToken: string; pageId: string; field: string; fetchImpl?: typeof fetch;
+}): Promise<{ providerRef: string; observedValue: string | null }> {
+  const providerField = FIELD[input.field];
+  if (!providerField || !/^[0-9]+$/.test(input.pageId) || !input.accessToken) {
+    throw new MetaProfileTransportError("An exact supported Page field and credential are required.");
+  }
+  const fetchImpl = input.fetchImpl ?? fetch;
+  async function get(path: string): Promise<Record<string, unknown>> {
+    let response: Response;
+    try {
+      response = await fetchImpl(`${BASE}/${path}`, {
+        method: "GET", headers: { Authorization: `Bearer ${input.accessToken}` },
+        redirect: "error", signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    } catch {
+      throw new MetaProfileTransportError("Meta Page reconciliation read did not return an outcome.", true);
+    }
+    if (!response.ok) throw new MetaProfileTransportError(
+      `Meta Page reconciliation read returned ${response.status}.`,
+      response.status === 429 || response.status >= 500);
+    const body = await response.json().catch(() => null) as Record<string, unknown> | null;
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      throw new MetaProfileTransportError("Meta returned an unreadable Page response.");
+    }
+    return body;
+  }
+  const identity = await get("me?fields=id");
+  if (identity.id !== input.pageId) {
+    throw new MetaProfileTransportError("The credential is not the reviewed Facebook Page token.");
+  }
+  const page = await get(`${input.pageId}?fields=id%2C${providerField}`);
+  if (page.id !== input.pageId) {
+    throw new MetaProfileTransportError("Meta returned a different Page during reconciliation.");
+  }
+  const value = page[providerField];
+  if (value !== null && value !== undefined && typeof value !== "string") {
+    throw new MetaProfileTransportError("Meta returned an unreadable Page field value.");
+  }
+  return { providerRef: `facebook_page:${input.pageId}#${input.field}`,
+    observedValue: typeof value === "string" ? value : null };
+}
+
 export async function updateMetaPageField(request: MetaPageFieldRequest): Promise<{
   providerRef: string; readbackValue: string;
 }> {
