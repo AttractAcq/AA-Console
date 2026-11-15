@@ -209,6 +209,7 @@ export async function runOfferCompileJob(
   const { kind, source } = asked;
   let sourceBlock = "";
   let reviewedStrategyFingerprint = "";
+  let strategySnapshot: StrategySection[] | null = null;
   if (source === "micro_niche") {
     if (job.input_table !== "market_opportunities" || !job.input_id) {
       return {
@@ -238,14 +239,15 @@ Core problem: ${o.core_problem ?? "—"}
 Desired outcome: ${o.desired_outcome ?? "—"}
 Purchase trigger: ${o.purchase_trigger ?? "—"}`;
   } else {
-    const { data: records, error } = await sb
-      .from("model_section_review_state_v7")
-      .select("record_id,title,body,review_state,source_ref,observed_on,record_hash,model_job_id")
-      .eq("client_id", job.client_id)
-      .eq("domain", "offer_strategy")
-      .order("updated_at", { ascending: false });
-    if (error) throw new Error(`Offer strategy lookup failed: ${error.message}`);
-    const strategy = reviewedOfferStrategy((records ?? []) as StrategySection[]);
+    const { data: snapshot, error } = await sb.rpc("reviewed_offer_strategy_snapshot_v7", {
+      p_client_id: job.client_id,
+    });
+    if (error) return { ok: false, retryable: false,
+      failureMessage: `Offer Strategy source review is unavailable: ${error.message}` };
+    if (!Array.isArray(snapshot)) return { ok: false, retryable: false,
+      failureMessage: "Offer Strategy returned no reviewed source snapshot." };
+    strategySnapshot = snapshot as StrategySection[];
+    const strategy = reviewedOfferStrategy(strategySnapshot);
     if ("error" in strategy) return { ok: false, retryable: false, failureMessage: strategy.error };
     reviewedStrategyFingerprint = strategy.fingerprint;
     sourceBlock = strategy.sourceBlock;
@@ -327,14 +329,12 @@ ${existingLines.length > 0 ? `\nWHAT THIS BUSINESS ALREADY SELLS\n${existingLine
     return { ok: false, retryable: false, failureMessage: "The compile job has no approved opportunity evidence hash.", usage };
   }
   if (kind === "main") {
-    const { data: current, error } = await sb.from("model_section_review_state_v7")
-      .select("record_id,body,review_state,record_hash")
-      .eq("client_id", job.client_id).eq("domain", "offer_strategy");
-    if (error) throw new Error(`Offer strategy recheck failed: ${error.message}`);
-    const usable = (current ?? []).filter((row) => typeof row.body === "string" && row.body.trim());
-    const currentFingerprint = JSON.stringify(usable.map((row) => [row.record_id, row.record_hash]).sort());
-    if (usable.some((row) => row.review_state !== "supported") ||
-      currentFingerprint !== reviewedStrategyFingerprint) {
+    const { data: current, error } = await sb.rpc("reviewed_offer_strategy_snapshot_v7", {
+      p_client_id: job.client_id,
+    });
+    const latest = Array.isArray(current)
+      ? reviewedOfferStrategy(current as StrategySection[]) : { error: "No source snapshot." };
+    if (error || "error" in latest || latest.fingerprint !== reviewedStrategyFingerprint) {
       return { ok: false, retryable: false,
         failureMessage: "Offer Strategy changed or lost source review during compilation. Run the compiler again.", usage };
     }
@@ -352,7 +352,17 @@ ${existingLines.length > 0 ? `\nWHAT THIS BUSINESS ALREADY SELLS\n${existingLine
       p_exclusions: checked.exclusions,
       p_idempotency_key: `${job.id}:1`,
     })
-    : await sb.rpc("create_compiled_service_offer_v6", compiledOfferArgs(job.client_id, kind, job.id, checked));
+    : await sb.rpc("create_compiled_main_offer_v7", {
+      p_client_id: job.client_id,
+      p_strategy_snapshot: strategySnapshot,
+      p_job_id: job.id,
+      p_service_name: checked.serviceName,
+      p_audience: checked.audience,
+      p_promise: checked.promise,
+      p_inclusions: checked.inclusions,
+      p_exclusions: checked.exclusions,
+      p_idempotency_key: `${job.id}:1`,
+    });
   if (versionError) return {
     ok: false,
     retryable: false,

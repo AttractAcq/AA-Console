@@ -43,7 +43,7 @@ const drift = (over: Record<string, unknown> = {}) => ({
 
 function database(data: {
   offers?: unknown[]; versions?: unknown[]; signoffs?: unknown[]; drift?: unknown[]; jobs?: unknown[];
-  opportunities?: unknown[]; approvals?: unknown[]; sources?: unknown[];
+  opportunities?: unknown[]; approvals?: unknown[]; sources?: unknown[]; mainSources?: unknown[];
 }) {
   const byTable: Record<string, unknown[]> = {
     service_offers: data.offers ?? [],
@@ -54,6 +54,7 @@ function database(data: {
     market_opportunities: data.opportunities ?? [],
     opportunity_approval_state_v6: data.approvals ?? [],
     secondary_offer_sources_v7: data.sources ?? [],
+    main_offer_sources_v7: data.mainSources ?? [],
   };
   // The panel chains select -> eq -> order for some tables and select -> eq for
   // others, so the chain is a thenable rather than having one terminal method:
@@ -96,7 +97,8 @@ describe("the two buttons the notes ask for", () => {
     database({ offers: [] });
     show();
     await userEvent.click(await screen.findByRole("button", { name: "New main offer" }));
-    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ kind: "main" }));
+    expect(rpc).toHaveBeenCalledWith("create_main_offer_v7", { p_client_id: "client-1" });
+    expect(insert).not.toHaveBeenCalled();
   });
 
   it("creates a secondary offer as secondary", async () => {

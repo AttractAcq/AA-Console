@@ -16085,6 +16085,62 @@ export type Database = {
           },
         ]
       }
+      main_offer_sources_v7: {
+        Row: {
+          client_id: string
+          compile_job_id: string | null
+          created_at: string
+          offer_id: string
+          strategy_hash: string
+          strategy_snapshot: Json
+        }
+        Insert: {
+          client_id: string
+          compile_job_id?: string | null
+          created_at?: string
+          offer_id: string
+          strategy_hash: string
+          strategy_snapshot: Json
+        }
+        Update: {
+          client_id?: string
+          compile_job_id?: string | null
+          created_at?: string
+          offer_id?: string
+          strategy_hash?: string
+          strategy_snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "main_offer_sources_v7_compile_job_id_fkey"
+            columns: ["compile_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "main_offer_sources_v7_compile_job_id_fkey"
+            columns: ["compile_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "main_offer_sources_v7_compile_job_id_fkey"
+            columns: ["compile_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "main_offer_sources_v7_offer_id_client_id_fkey"
+            columns: ["offer_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "service_offers"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
       market_opportunities: {
         Row: {
           activated_content_hash: string | null
@@ -34906,6 +34962,42 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_compiled_main_offer_v7: {
+        Args: {
+          p_audience: string
+          p_client_id: string
+          p_exclusions: string[]
+          p_idempotency_key: string
+          p_inclusions: string[]
+          p_job_id: string
+          p_promise: string
+          p_service_name: string
+          p_strategy_snapshot: Json
+        }
+        Returns: {
+          audience: string
+          claims: Json
+          client_id: string
+          content_hash: string
+          created_at: string
+          currency: string | null
+          delivery_cost_estimate: number | null
+          exclusions: string[]
+          id: string
+          idempotency_key: string
+          inclusions: string[]
+          offer_id: string
+          price_amount: number | null
+          promise: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_offer_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_compiled_secondary_offer_v7: {
         Args: {
           p_audience: string
@@ -35112,6 +35204,22 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "lead_capture_endpoints"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_main_offer_v7: {
+        Args: { p_client_id: string }
+        Returns: {
+          client_id: string
+          created_at: string
+          id: string
+          kind: string
+          service_name: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_offers"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -36570,6 +36678,10 @@ export type Database = {
         }[]
       }
       lock_down_definer_functions: { Args: never; Returns: number }
+      main_offer_source_current_v7: {
+        Args: { p_offer_id: string }
+        Returns: boolean
+      }
       mark_console_invitation_conflict_v6: {
         Args: { p_expected_hash: string; p_request_id: string }
         Returns: {
@@ -39442,6 +39554,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      reviewed_offer_strategy_snapshot_v7: {
+        Args: { p_client_id: string }
+        Returns: Json
       }
       revoke_campaign_action_approval_v6: {
         Args: { p_approval_id: string; p_reason: string }

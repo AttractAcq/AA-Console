@@ -12,6 +12,7 @@ type Signoff = Database["public"]["Tables"]["service_offer_signoffs"]["Row"];
 type Drift = Database["public"]["Views"]["offer_version_drift"]["Row"];
 type Opportunity = Pick<Database["public"]["Tables"]["market_opportunities"]["Row"], "id" | "name" | "micro_market">;
 type SecondarySource = Database["public"]["Tables"]["secondary_offer_sources_v7"]["Row"];
+type MainSource = Database["public"]["Tables"]["main_offer_sources_v7"]["Row"];
 
 /**
  * Offer Studio, as one page.
@@ -55,6 +56,7 @@ export function OfferStudioPanel() {
   const [drift, setDrift] = useState<Drift[]>([]);
   const [approvedOpportunities, setApprovedOpportunities] = useState<Opportunity[]>([]);
   const [sources, setSources] = useState<SecondarySource[]>([]);
+  const [mainSources, setMainSources] = useState<MainSource[]>([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -68,7 +70,7 @@ export function OfferStudioPanel() {
       return;
     }
     setLoading(true);
-    const [offerResult, versionResult, signoffResult, driftResult, opportunityResult, approvalResult, sourceResult] = await Promise.all([
+    const [offerResult, versionResult, signoffResult, driftResult, opportunityResult, approvalResult, sourceResult, mainSourceResult] = await Promise.all([
       supabase.from("service_offers").select("*").eq("client_id", clientId)
         .order("created_at", { ascending: false }),
       supabase.from("service_offer_versions").select("*").eq("client_id", clientId)
@@ -78,11 +80,12 @@ export function OfferStudioPanel() {
       supabase.from("market_opportunities").select("id,name,micro_market").eq("client_id", clientId),
       supabase.from("opportunity_approval_state_v6").select("opportunity_id,approval_current").eq("client_id", clientId),
       supabase.from("secondary_offer_sources_v7").select("*").eq("client_id", clientId),
+      supabase.from("main_offer_sources_v7").select("*").eq("client_id", clientId),
     ]);
     setLoading(false);
     const queryError =
       offerResult.error ?? versionResult.error ?? signoffResult.error ?? driftResult.error
-      ?? opportunityResult.error ?? approvalResult.error ?? sourceResult.error;
+      ?? opportunityResult.error ?? approvalResult.error ?? sourceResult.error ?? mainSourceResult.error;
     if (queryError) {
       setError(queryError.message);
       return;
@@ -96,6 +99,7 @@ export function OfferStudioPanel() {
     const current = (opportunityResult.data ?? []).filter((row) => currentIds.has(row.id));
     setApprovedOpportunities(current);
     setSources(sourceResult.data ?? []);
+    setMainSources(mainSourceResult.data ?? []);
     setSelectedOpportunity((previous) => current.some((row) => row.id === previous) ? previous : (current[0]?.id ?? ""));
   }, [clientId]);
 
@@ -144,9 +148,7 @@ export function OfferStudioPanel() {
     setError(null);
     const { error: insertError } = kind === "secondary"
       ? await supabase.rpc("create_secondary_offer_v7", { p_opportunity_id: selectedOpportunity })
-      : await supabase.from("service_offers").insert({
-        client_id: clientId, kind, service_name: "New main offer",
-      });
+      : await supabase.rpc("create_main_offer_v7", { p_client_id: clientId });
     setBusy(null);
     if (insertError) {
       setError(insertError.message);
@@ -285,6 +287,7 @@ export function OfferStudioPanel() {
           const all = versionsFor(offer);
           const stale = driftingFor(offer);
           const source = sources.find((row) => row.offer_id === offer.id);
+          const mainSource = mainSources.find((row) => row.offer_id === offer.id);
           return (
             <div className="space-y-4 text-sm">
               <p className="text-muted-foreground">
@@ -301,6 +304,12 @@ export function OfferStudioPanel() {
                       {source.opportunity_id}
                     </Link>. Evidence is frozen at offer creation; changed evidence holds new sign-off.
                   </> : "No approved opportunity source is bound. This offer cannot be signed off until recreated from a current opportunity."}
+                </p>
+              )}
+
+              {offer.kind === "main" && mainSource && (
+                <p className="text-muted-foreground">
+                  Source: reviewed Offer Strategy snapshot {mainSource.strategy_hash.slice(0, 12)}. Later source edits hold new sign-off and campaign use.
                 </p>
               )}
 
