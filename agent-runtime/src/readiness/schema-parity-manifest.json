@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "dd42f569d5c8f332a1d1290c478336f87d7ddd30da9a1b8ff3ca98e3d6c96a0f",
+  "migrationSourceDigest": "458db962b2d99a1e7ce8c513ca63ec4287f536b10d9c5c4005fcd072d4d864e4",
   "generatedTypesSha256": "4df56dc1d490f52c760282e70a5eba3768dfbf556ab4622b09b1cfeed6d80f40",
   "generatedSchemaBodySha256": "2514cb64606565953b19bfef17323b2eb89ec2be2afbb84657c4c74db2dee9a2",
   "localMigrations": [
@@ -3671,6 +3671,13 @@
       "filename": "20261121230000_507_main_offer_strategy_source.sql",
       "sha256": "e5d185239e06dc83e5fe46f4be042a691a8ae0862d3429719e2ab45ad62ec628",
       "trimmedMd5": "54fb5cf82e4fb1e5d156b4573b74c11c"
+    },
+    {
+      "version": "20261121231000",
+      "name": "508_google_review_proof_source_gate",
+      "filename": "20261121231000_508_google_review_proof_source_gate.sql",
+      "sha256": "9772eaf98e2512e6a0c80bc998caac23a992a1a67e3991da320cf547d34c4f3f",
+      "trimmedMd5": "f17bc08c5c632616a88e599d917d2ddc"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

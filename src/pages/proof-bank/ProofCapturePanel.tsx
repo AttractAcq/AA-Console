@@ -1,4 +1,5 @@
 import { ProofCaptureDelivery } from "./ProofCaptureDelivery";
+import { ProofIntegrationCapture } from "./ProofIntegrationCapture";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
@@ -67,14 +68,14 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
         ))}
       </div>
     );
-  const placeholder =
-    method.id === "integration" || method.id === "outcome_followup";
+  const placeholder = method.id === "outcome_followup";
   return (
     <div className="space-y-4">
       <button type="button" className={button} onClick={() => choose()}>
         Back to capture
       </button>
       <h2 className="text-xl font-semibold">{method.label}</h2>
+      {method.id === "integration" && <ProofIntegrationCapture clientId={clientId} />}
       {placeholder && (
         <div role="status" className="rounded-lg border border-border bg-card p-4 text-sm">
           <p className="font-medium">Automatic capture is held</p>
@@ -85,7 +86,7 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
           </button>
         </div>
       )}
-      {!placeholder && (
+      {!placeholder && method.id !== "integration" && (
         <>
           <p className="text-sm text-muted-foreground">{method.description}</p>
           {error && (

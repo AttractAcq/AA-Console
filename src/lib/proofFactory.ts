@@ -14,7 +14,7 @@ export const CAPTURE_METHODS = [
     label: "Guided Interview Capture",
     description: "Prepare interview questions and an evidence capture script.",
   },
-  { id: "integration", label: "Integration Capture", description: "Provider import is held until a verified source connection and rights mapping are available." },
+  { id: "integration", label: "Integration Capture", description: "Capture ingested Google Business Profile reviews as uncleared raw proof, with their source URL and date. Other providers need verified connectors." },
   {
     id: "manual_import",
     label: "Manual Upload & Import",
