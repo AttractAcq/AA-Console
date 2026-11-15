@@ -182,6 +182,11 @@ begin
       and e.source_kind='lead_magnet' and e.state='uncertain'
       and e.detail like '2 attempt(s): 0 provider accepted, 1 failed, 1 uncertain.%')
     then raise exception 'Exact Inbox card did not show both courier outcomes'; end if;
+  if (select count(*) from public.client_external_outcomes_v6 e
+    where e.client_id=m.client_id and e.source_kind='lead_magnet'
+      and e.outcome in ('failed','uncertain')
+      and e.owning_path='/clients/'||m.client_id::text||'/delivery/lead-magnet-studio?magnet='||m.id::text)<>2
+    then raise exception 'Failed or ambiguous courier attempts were absent from owning alerts'; end if;
   perform public.revoke_lead_magnet_approval_v6(replacement_id,'Fixture replacement retired');
   execute 'alter table public.lead_magnet_approvals disable trigger lead_magnet_inbox_cohort_insert_v6';
   insert into public.lead_magnet_approvals(client_id,magnet_version_id,

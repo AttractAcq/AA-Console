@@ -34,6 +34,9 @@ vi.mock("../../lib/supabase", () => ({
           { outcome_id: "e", client_id: "client-1", source_kind: "proof_delivery",
             outcome: "unattributed", occurred_at: "2026-11-15T08:00:00Z",
             owning_path: "/clients/client-1/delivery/proof-production-factory?tab=capture" },
+          { outcome_id: "f", client_id: "client-1", source_kind: "lead_magnet",
+            outcome: "uncertain", occurred_at: "2026-11-15T07:00:00Z",
+            owning_path: "/clients/client-1/delivery/lead-magnet-studio?magnet=magnet-1" },
         ], error: null }),
       };
       return query;
@@ -51,6 +54,8 @@ it("links a client only to its own failed or uncertain owning source", async () 
     .toHaveAttribute("href", "/clients/client-1/google-profile?tab=reviews");
   expect(screen.getByRole("link", { name: "proof delivery · unattributed" }))
     .toHaveAttribute("href", "/clients/client-1/delivery/proof-production-factory?tab=capture");
+  expect(screen.getByRole("link", { name: "lead magnet · uncertain" }))
+    .toHaveAttribute("href", "/clients/client-1/delivery/lead-magnet-studio?magnet=magnet-1");
   expect(screen.queryByText(/meta profile change/)).not.toBeInTheDocument();
   expect(clientFilters).toEqual(["client-1"]);
   rerender(<MemoryRouter><ExternalExecutionAlerts clientId="client-2" /></MemoryRouter>);

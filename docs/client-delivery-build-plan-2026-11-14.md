@@ -240,6 +240,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Lead magnet courier checkpoint, 15 November 2026:** Each new courier claim now binds the delivery to its exact approved Inbox request and writes a separate attempt row. The courier rechecks that same approval, consent, client switch and lease after hashing the stored file and before contacting the provider. A stale lease becomes `uncertain` and cannot be claimed again automatically; historical approvals without an exact Inbox decision are held from new sends. The Unified Inbox shows the exact request's aggregate attempt outcomes, while the owning delivery view shows one row per recipient even after reapproval. The rollback fixture covers two separately bound recipients, revocation and reapproval after claim, failed pre-send recording, and quarantine of an interrupted attempt. This prevents an unreviewed automatic retry but does not prove provider delivery, recipient receipt or a live external test action. Class 7 and the Phase 2 exit gate remain blocked.
 
+**Lead magnet alert checkpoint, 15 November 2026:** The latest courier attempt per recipient now enters the client external-outcome ledger when it failed, is uncertain, exhausted retries, or has only provider acceptance. Dashboard reconciliation counts and the cross-client Approval Inbox alert link to the magnet's owning page. Earlier retry attempts do not keep a stale alert after a later outcome. Provider acceptance remains unverified recipient delivery, and class 7 and the Phase 2 live external receipt gate remain blocked.
+
 ## Phase 3 — Intelligence, Market Opportunities, Offer Studio and proof inputs
 
 ### Intelligence OS
