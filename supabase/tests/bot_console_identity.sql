@@ -4,7 +4,7 @@
 -- The agent-runtime pglite suite covers the same checks in CI.
 
 begin;
-select plan(51);
+select plan(53);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -484,9 +484,28 @@ select results_eq(
 select ok(
   not has_column_privilege('authenticated', 'public.lead_magnet_approvals', 'decided_by_bot', 'UPDATE')
   and not has_column_privilege('anon', 'public.lead_magnet_approvals', 'decided_by_bot', 'UPDATE')
-  and not has_column_privilege('service_role', 'public.lead_magnet_approvals', 'decided_by_bot', 'UPDATE'),
-  'no session can update decided_by_bot directly'
+  and not has_column_privilege('service_role', 'public.lead_magnet_approvals', 'decided_by_bot', 'UPDATE')
+  and not has_column_privilege('anon', 'public.lead_magnet_approvals', 'status', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.lead_magnet_approvals', 'status', 'UPDATE')
+  and has_column_privilege('service_role', 'public.lead_magnet_approvals', 'status', 'UPDATE'),
+  'decided_by_bot is not updatable, and only service_role keeps the other columns'
 );
+set role service_role;
+select lives_ok(
+  $$update public.lead_magnet_approvals
+       set rejection_reason = rejection_reason
+     where id = 'c1111111-1111-4111-8111-111111111111'$$,
+  'service_role can still update a non-bot column'
+);
+select throws_ok(
+  $$update public.lead_magnet_approvals
+       set decided_by_bot = false
+     where id = 'c1111111-1111-4111-8111-111111111111'$$,
+  '42501',
+  'permission denied for column decided_by_bot',
+  'service_role cannot write decided_by_bot'
+);
+reset role;
 select ok(
   not exists (
     select 1 from pg_policies

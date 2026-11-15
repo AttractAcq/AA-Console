@@ -3465,7 +3465,7 @@ alter table public.lead_magnet_approvals
   add column if not exists decided_by_bot boolean not null default false;
 
 comment on column public.lead_magnet_approvals.decided_by_bot is
-  'True when the caller who decided this row was a bot. Set only by decide_lead_magnet_approval_v6. Not recomputed from the profile. Authenticated has no write policy on this table, and UPDATE of this column is revoked from public, anon, authenticated, and service_role.';
+  'True when the caller who decided this row was a bot. Set only by decide_lead_magnet_approval_v6, which is security definer and runs as the owner. Table UPDATE is revoked, so a column revoke is not shadowed by relacl. anon and authenticated get no UPDATE: there is no write policy and no invoker update. service_role keeps column UPDATE on every other column because workers run as that role; decided_by_bot and id are excluded.';
 
 update public.lead_magnet_approvals a
    set decided_by_bot = true
@@ -3473,8 +3473,16 @@ update public.lead_magnet_approvals a
  where p.id = a.decided_by
    and p.is_bot;
 
-revoke update (decided_by_bot) on table public.lead_magnet_approvals
+-- A table-level UPDATE grant makes has_column_privilege true for every
+-- column, including one that was revoked by name. Take the table grant
+-- away, then give service_role back the columns a worker may still change.
+revoke update on table public.lead_magnet_approvals
   from public, anon, authenticated, service_role;
+grant update (
+  client_id, magnet_version_id, payload_hash, scope, status,
+  requested_at, requested_by, decided_at, decided_by,
+  rejection_reason, revoked_at, revoked_reason
+) on table public.lead_magnet_approvals to service_role;
 
 -- decide_lead_magnet_approval_v6 (was 20261024100000_236_lead_magnets.sql)
 create or replace function public.decide_lead_magnet_approval_v6(

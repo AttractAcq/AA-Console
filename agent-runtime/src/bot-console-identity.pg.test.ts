@@ -225,11 +225,15 @@ beforeAll(async () => {
       client_id uuid,
       magnet_version_id uuid,
       payload_hash text,
+      scope jsonb,
       status text,
+      requested_at timestamptz,
+      requested_by uuid,
       decided_at timestamptz,
       decided_by uuid,
       decided_by_bot boolean not null default false,
       rejection_reason text,
+      revoked_at timestamptz,
       revoked_reason text
     );
   `);
@@ -1002,6 +1006,29 @@ describe("bot console identity", () => {
       [salesApproval],
     );
     expect(frozen.rows[0]?.decided_by_bot).toBe(true);
+    const columnPriv = await db.query<{
+      anon: boolean; authn: boolean; service: boolean; service_status: boolean;
+    }>(`
+      select
+        has_column_privilege('anon', 'public.lead_magnet_approvals', 'decided_by_bot', 'UPDATE') as anon,
+        has_column_privilege('authenticated', 'public.lead_magnet_approvals', 'decided_by_bot', 'UPDATE') as authn,
+        has_column_privilege('service_role', 'public.lead_magnet_approvals', 'decided_by_bot', 'UPDATE') as service,
+        has_column_privilege('service_role', 'public.lead_magnet_approvals', 'status', 'UPDATE') as service_status
+    `);
+    expect(columnPriv.rows[0]).toEqual({
+      anon: false, authn: false, service: false, service_status: true,
+    });
+    await db.exec("grant select on public.lead_magnet_approvals to service_role");
+    await db.exec("set role service_role");
+    expect(await call(
+      "update public.lead_magnet_approvals set rejection_reason = rejection_reason where id = $1",
+      [salesApproval],
+    )).toBeNull();
+    await db.exec("set role service_role");
+    expect(await call(
+      "update public.lead_magnet_approvals set decided_by_bot = false where id = $1",
+      [salesApproval],
+    )).toMatch(/permission denied/);
 
     await asUser(HUMAN);
     const humanDecision = await db.query<{ status: string; decided_by: string }>(
