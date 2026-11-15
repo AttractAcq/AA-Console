@@ -62,6 +62,12 @@ begin
   or public.begin_google_reply_write_v6(v_id,v_key) then
   raise exception 'Google reply write did not begin exactly once'; end if;
  begin
+  update public.google_review_replies set status='posted',posted_at=clock_timestamp(),
+   external_ref='accounts/test_account/locations/test_location/reviews/review_1'
+   where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  raise exception 'Started but unconfirmed Google reply marked posted';
+ exception when insufficient_privilege then null; end;
+ begin
   perform public.finish_google_reply_execution_v6(v_id,v_key,'confirmed',repeat('0',64));
   raise exception 'Incorrect provider bytes confirmed a Google reply';
  exception when check_violation then null; end;
@@ -76,6 +82,12 @@ begin
  if not v_recorded or v_duplicate or v_status<>'confirmed' then
   raise exception 'Exact Google readback failed: first %, second %, status %',
     v_recorded,v_duplicate,v_status; end if;
+ if (select status from public.google_review_replies
+   where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')<>'posted'
+  or (select external_ref from public.google_review_replies
+   where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')
+   is distinct from 'accounts/test_account/locations/test_location/reviews/review_1' then
+  raise exception 'Confirmed Google reply readback did not update exact source'; end if;
  perform set_config('request.jwt.claim.role','authenticated',true);
  if (select status from public.google_reply_execution_overview_v6
    where attempt_id=v_id) is distinct from 'confirmed' then
