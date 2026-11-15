@@ -34,6 +34,16 @@ type Record_ = {
   display_order: number;
   status: string;
   edited_at: string | null;
+  job_id: string | null;
+};
+
+type SectionReview = {
+  record_id: string;
+  review_state: string;
+  source_ref: string | null;
+  observed_on: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
 };
 
 type Job = {
@@ -81,6 +91,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
 
   const [templates, setTemplates] = useState<Template[]>([]);
   const [records, setRecords] = useState<Record_[]>([]);
+  const [reviews, setReviews] = useState<SectionReview[]>([]);
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -88,6 +99,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
   const [editing, setEditing] = useState<{ itemKey: string; title: string; body: string } | null>(
     null,
   );
+  const [reviewing, setReviewing] = useState<Record_ | null>(null);
 
   const loadTemplates = useCallback(async () => {
     const { data, error } = await supabase
@@ -103,7 +115,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
     if (!clientId) return;
     const { data, error } = await supabase
       .from("client_agent_records")
-      .select("id, item_key, item_type, title, body, period, display_order, status, edited_at")
+      .select("id, item_key, item_type, title, body, period, display_order, status, edited_at, job_id")
       .eq("client_id", clientId)
       .eq("domain", domain)
       // Archived models live in the Archive (migration 312). This table holds
@@ -113,6 +125,15 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
       .order("display_order");
     if (error) throw error;
     setRecords((data ?? []) as Record_[]);
+  }, [clientId, domain]);
+
+  const loadReviews = useCallback(async () => {
+    if (!clientId) return;
+    const { data, error } = await supabase.from("model_section_review_state_v7")
+      .select("record_id,review_state,source_ref,observed_on,reviewed_at,review_note")
+      .eq("client_id", clientId).eq("domain", domain);
+    if (error) throw error;
+    setReviews((data ?? []) as SectionReview[]);
   }, [clientId, domain]);
 
   const loadJob = useCallback(async () => {
@@ -132,13 +153,13 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
   const loadAll = useCallback(async () => {
     setLoadError(null);
     try {
-      await Promise.all([loadTemplates(), loadRecords(), loadJob()]);
+      await Promise.all([loadTemplates(), loadRecords(), loadReviews(), loadJob()]);
     } catch (error) {
       setLoadError("Failed to load: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
     } finally {
       setLoading(false);
     }
-  }, [loadTemplates, loadRecords, loadJob]);
+  }, [loadTemplates, loadRecords, loadReviews, loadJob]);
 
   useEffect(() => {
     void loadAll();
@@ -157,14 +178,14 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
           const next = payload.new as Job & { agent_key?: string };
           if (next?.agent_key && next.agent_key !== config.agentKey) return;
           setJob(next);
-          if (next?.status === "completed") void loadRecords();
+          if (next?.status === "completed") void Promise.all([loadRecords(), loadReviews()]);
         },
       )
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [clientId, domain, config.agentKey, loadRecords]);
+  }, [clientId, domain, config.agentKey, loadRecords, loadReviews]);
 
   // Campaign Intelligence is the one domain with a period; show the most
   // recent year rather than stacking every year's quarters together.
@@ -211,6 +232,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
 
   const { inFlight: liveJobs, recentFailures: liveFailures } = useAgentJobs(clientId, () => {
     void loadRecords();
+    void loadReviews();
     void loadJob();
   });
 
@@ -258,6 +280,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {displayTemplates.map((t) => {
             const record = byKey.get(t.item_key);
+            const review = record && reviews.find((item) => item.record_id === record.id);
             const isReference = t.item_type === "reference";
             return (
               <CollapsiblePanel
@@ -288,6 +311,17 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
                   <EmptyState label={t.title} minHeight={100} />
                 )}
 
+                {record?.body && (
+                  <div className="mb-3 text-xs text-muted-foreground">
+                    <p className={review?.review_state === "supported" ? "text-brand-strong" : "text-destructive"}>
+                      Source review: {review?.review_state ?? "missing"}
+                    </p>
+                    {record.job_id && <p>Model run: {record.job_id}</p>}
+                    {review?.source_ref && <p>Source: {review.source_ref}{review.observed_on ? ` · observed ${review.observed_on}` : ""}</p>}
+                    {review?.review_note && <p>Review note: {review.review_note}</p>}
+                  </div>
+                )}
+
                 <div className="mt-auto flex items-center justify-between gap-2 pt-3">
                   <span className="text-xs text-muted-foreground">
                     {record?.edited_at
@@ -300,6 +334,11 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
                           ? "Generated"
                           : "Not generated"}
                   </span>
+                  <div className="flex items-center gap-3">
+                  {record?.body && <button type="button" onClick={() => setReviewing(record)}
+                    className="rounded text-xs font-medium text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    Review source
+                  </button>}
                   <button
                     type="button"
                     onClick={() =>
@@ -314,6 +353,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
                     <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                     Edit
                   </button>
+                  </div>
                 </div>
               </CollapsiblePanel>
             );
@@ -327,6 +367,37 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
         open={runOpen}
         onClose={() => setRunOpen(false)}
         onQueued={loadJob}
+      />
+
+      <FormModal
+        open={reviewing !== null}
+        onClose={() => setReviewing(null)}
+        title={reviewing ? `Review source for ${reviewing.title}` : "Review source"}
+        intro="Check the exact section against its source. Editing or rerunning the section makes this review stale."
+        fields={[
+          { name: "source_ref", label: "Source name or URL", kind: "text", required: true },
+          { name: "observed_on", label: "Source observation date", kind: "date", required: true },
+          { name: "confidence", label: "Factual confidence", kind: "select", required: true,
+            options: [
+              { value: "supported", label: "Supported by the source" },
+              { value: "uncertain", label: "Needs verification" },
+              { value: "unsupported", label: "Unsupported or false" },
+            ] },
+          { name: "review_note", label: "Correction or review note", kind: "textarea", rows: 4 },
+        ]}
+        initialValues={{ source_ref: "", observed_on: "", confidence: "", review_note: "" }}
+        onSubmit={async (values) => {
+          if (!reviewing) throw new Error("Choose a section to review.");
+          const { error } = await supabase.rpc("review_model_section_v7", {
+            p_record_id: reviewing.id,
+            p_source_ref: String(values.source_ref),
+            p_observed_on: String(values.observed_on),
+            p_confidence: String(values.confidence),
+            p_review_note: String(values.review_note ?? ""),
+          });
+          if (error) throw error;
+        }}
+        onSaved={loadReviews}
       />
 
       <FormModal
@@ -363,7 +434,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
           });
           if (error) throw error;
         }}
-        onSaved={loadRecords}
+        onSaved={() => void Promise.all([loadRecords(), loadReviews()])}
       />
     </div>
   );

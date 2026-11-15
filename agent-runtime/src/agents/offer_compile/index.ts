@@ -59,6 +59,33 @@ export type CompiledOffer = {
   exclusions: string[];
 };
 
+type StrategySection = {
+  record_id: string;
+  title: string | null;
+  body: string | null;
+  review_state: string;
+  source_ref: string | null;
+  observed_on: string | null;
+  record_hash: string;
+};
+
+export function reviewedOfferStrategy(records: StrategySection[]):
+  | { sourceBlock: string; fingerprint: string }
+  | { error: string } {
+  const usable = records.filter((row) => typeof row.body === "string" && row.body.trim());
+  if (usable.length === 0) {
+    return { error: "This client has no Offer Strategy sections yet. Run the strategist and review its sources first." };
+  }
+  if (usable.some((row) => row.review_state !== "supported" || !row.source_ref || !row.observed_on)) {
+    return { error: "Review every Offer Strategy section against dated source evidence before compiling a main offer." };
+  }
+  const sourceBlock = `OFFER STRATEGY\n${usable.map((row) =>
+    `${row.title ?? ""}\n${row.body ?? ""}\nSource: ${row.source_ref} · observed ${row.observed_on}`,
+  ).join("\n\n")}`;
+  return { sourceBlock,
+    fingerprint: JSON.stringify(usable.map((row) => [row.record_id, row.record_hash]).sort()) };
+}
+
 export function compiledOfferArgs(clientId: string, kind: OfferKind, jobId: string, offer: CompiledOffer) {
   return {
     p_client_id: clientId,
@@ -181,6 +208,7 @@ export async function runOfferCompileJob(
   }
   const { kind, source } = asked;
   let sourceBlock = "";
+  let reviewedStrategyFingerprint = "";
   if (source === "micro_niche") {
     if (job.input_table !== "market_opportunities" || !job.input_id) {
       return {
@@ -211,26 +239,16 @@ Desired outcome: ${o.desired_outcome ?? "—"}
 Purchase trigger: ${o.purchase_trigger ?? "—"}`;
   } else {
     const { data: records, error } = await sb
-      .from("client_agent_records")
-      .select("title, body")
+      .from("model_section_review_state_v7")
+      .select("record_id,title,body,review_state,source_ref,observed_on,record_hash,model_job_id")
       .eq("client_id", job.client_id)
       .eq("domain", "offer_strategy")
-      .order("created_at", { ascending: false })
-      .limit(10);
+      .order("updated_at", { ascending: false });
     if (error) throw new Error(`Offer strategy lookup failed: ${error.message}`);
-    const strategy = (records ?? []).map(
-      (row) => `${String((row as { title?: string }).title ?? "")}\n${String((row as { body?: string }).body ?? "")}`,
-    );
-    if (strategy.length === 0) {
-      // Compiling from nothing would produce an offer invented out of the
-      // client's name, which is the failure this refuses rather than ships.
-      return {
-        ok: false,
-        retryable: false,
-        failureMessage: "This client has no offer strategy yet. Run the Offer Strategist first, or compile from a micro-niche instead.",
-      };
-    }
-    sourceBlock = `OFFER STRATEGY\n${strategy.join("\n\n")}`;
+    const strategy = reviewedOfferStrategy((records ?? []) as StrategySection[]);
+    if ("error" in strategy) return { ok: false, retryable: false, failureMessage: strategy.error };
+    reviewedStrategyFingerprint = strategy.fingerprint;
+    sourceBlock = strategy.sourceBlock;
   }
 
   // What the client already sells, so a compiled offer is not a restatement of
@@ -307,6 +325,19 @@ ${existingLines.length > 0 ? `\nWHAT THIS BUSINESS ALREADY SELLS\n${existingLine
   const sourceHash = job.params?.opportunity_hash;
   if (kind === "secondary" && (typeof sourceHash !== "string" || !/^[0-9a-f]{64}$/.test(sourceHash))) {
     return { ok: false, retryable: false, failureMessage: "The compile job has no approved opportunity evidence hash.", usage };
+  }
+  if (kind === "main") {
+    const { data: current, error } = await sb.from("model_section_review_state_v7")
+      .select("record_id,body,review_state,record_hash")
+      .eq("client_id", job.client_id).eq("domain", "offer_strategy");
+    if (error) throw new Error(`Offer strategy recheck failed: ${error.message}`);
+    const usable = (current ?? []).filter((row) => typeof row.body === "string" && row.body.trim());
+    const currentFingerprint = JSON.stringify(usable.map((row) => [row.record_id, row.record_hash]).sort());
+    if (usable.some((row) => row.review_state !== "supported") ||
+      currentFingerprint !== reviewedStrategyFingerprint) {
+      return { ok: false, retryable: false,
+        failureMessage: "Offer Strategy changed or lost source review during compilation. Run the compiler again.", usage };
+    }
   }
   const { error: versionError } = kind === "secondary"
     ? await sb.rpc("create_compiled_secondary_offer_v7", {

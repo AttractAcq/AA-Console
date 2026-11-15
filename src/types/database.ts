@@ -17697,6 +17697,80 @@ export type Database = {
           },
         ]
       }
+      model_section_reviews_v7: {
+        Row: {
+          client_id: string
+          confidence: string
+          id: string
+          observed_on: string
+          record_hash: string
+          record_id: string
+          record_snapshot: Json
+          review_note: string
+          review_order: number
+          reviewed_at: string
+          reviewed_by: string
+          source_ref: string
+        }
+        Insert: {
+          client_id: string
+          confidence: string
+          id?: string
+          observed_on: string
+          record_hash: string
+          record_id: string
+          record_snapshot: Json
+          review_note?: string
+          review_order?: never
+          reviewed_at?: string
+          reviewed_by: string
+          source_ref: string
+        }
+        Update: {
+          client_id?: string
+          confidence?: string
+          id?: string
+          observed_on?: string
+          record_hash?: string
+          record_id?: string
+          record_snapshot?: Json
+          review_note?: string
+          review_order?: never
+          reviewed_at?: string
+          reviewed_by?: string
+          source_ref?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_section_reviews_v7_record_id_client_id_fkey"
+            columns: ["record_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "agent_models_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "model_section_reviews_v7_record_id_client_id_fkey"
+            columns: ["record_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_agent_records"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "model_section_reviews_v7_record_id_client_id_fkey"
+            columns: ["record_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "model_section_review_state_v7"
+            referencedColumns: ["record_id", "client_id"]
+          },
+          {
+            foreignKeyName: "model_section_reviews_v7_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       motion_design_attachments: {
         Row: {
           asset_id: string
@@ -19340,6 +19414,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_agent_records"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "model_section_review_state_v7"
+            referencedColumns: ["record_id"]
           },
         ]
       }
@@ -31073,6 +31154,86 @@ export type Database = {
           },
         ]
       }
+      model_section_review_state_v7: {
+        Row: {
+          body: string | null
+          client_id: string | null
+          confidence: string | null
+          domain: Database["public"]["Enums"]["record_domain"] | null
+          edited_at: string | null
+          item_key: string | null
+          model_job_id: string | null
+          observed_on: string | null
+          record_hash: string | null
+          record_id: string | null
+          review_id: string | null
+          review_note: string | null
+          review_state: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_ref: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_agent_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_agent_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_agent_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_agent_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_agent_records_job_id_fkey"
+            columns: ["model_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_agent_records_job_id_fkey"
+            columns: ["model_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "client_agent_records_job_id_fkey"
+            columns: ["model_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "model_section_reviews_v7_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       motion_candidate_due: {
         Row: {
           accepted_at: string | null
@@ -37340,6 +37501,18 @@ export type Database = {
         Args: { p_client_id: string; p_since: string; p_until: string }
         Returns: Json
       }
+      model_section_hash_v7: {
+        Args: {
+          p_record: Database["public"]["Tables"]["client_agent_records"]["Row"]
+        }
+        Returns: string
+      }
+      model_section_snapshot_v7: {
+        Args: {
+          p_record: Database["public"]["Tables"]["client_agent_records"]["Row"]
+        }
+        Returns: Json
+      }
       motion_render_acceptance_current_v6: {
         Args: { p_candidate_id: string }
         Returns: boolean
@@ -39240,6 +39413,35 @@ export type Database = {
           p_reason?: string
         }
         Returns: undefined
+      }
+      review_model_section_v7: {
+        Args: {
+          p_confidence: string
+          p_observed_on: string
+          p_record_id: string
+          p_review_note?: string
+          p_source_ref: string
+        }
+        Returns: {
+          client_id: string
+          confidence: string
+          id: string
+          observed_on: string
+          record_hash: string
+          record_id: string
+          record_snapshot: Json
+          review_note: string
+          review_order: number
+          reviewed_at: string
+          reviewed_by: string
+          source_ref: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "model_section_reviews_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       revoke_campaign_action_approval_v6: {
         Args: { p_approval_id: string; p_reason: string }

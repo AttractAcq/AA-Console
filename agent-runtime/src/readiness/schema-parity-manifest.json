@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "75efe80f202d0aa1ddf3fffd9dad017a30eb4b459fc1dce87f837fa98cc06f73",
-  "generatedTypesSha256": "c0b357a8e75505d0f3369ea98a0f2551b98cb3bae3629d0a8250fe6d934f83e7",
-  "generatedSchemaBodySha256": "81f95ea83f221e5a0cf7e390ee95f2b6c1a3460839916b9aa12fc67553e14b1b",
+  "migrationSourceDigest": "fa0c2e998abb9ff3de21457e92d90d64a6a85d42dba9b3879e9799c0abd3f433",
+  "generatedTypesSha256": "3d678b7941a508290ad367a8236da0d0d89c8a34c444c8793752b3a8fec41b64",
+  "generatedSchemaBodySha256": "00abba65504eaab9cbc613aedcf8bbde5dbedc9d88a7eec930eb5e015bd905ba",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3657,6 +3657,13 @@
       "filename": "20261121210000_505_secondary_offer_opportunity_source.sql",
       "sha256": "2fbed3737b75487c7b83fefb0d1a754a8fcf22d60c54de7c02a785446ad48f8f",
       "trimmedMd5": "06477c28fa19c7c0d5d3478db774bf40"
+    },
+    {
+      "version": "20261121220000",
+      "name": "506_model_section_source_review",
+      "filename": "20261121220000_506_model_section_source_review.sql",
+      "sha256": "798cd96f1456c2b5f11c7b017941b62349c01ce89d586813b501c1fce6eaeffc",
+      "trimmedMd5": "f056bdac8723ad7cd49e4af56450f7d0"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
