@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "f572d7aa6de2945689c46cc1d51157e3564e0f2fc992d3a3b8667dee2158bb0f",
-  "generatedTypesSha256": "a68c633d48521023f0a2d83c710d02e6f02cbd08552be03170349cb4ef0720ee",
-  "generatedSchemaBodySha256": "6a6f6553124b60a516a70557bcff1e55d3a894cfe0edd8a66100e07ba924bbc9",
+  "migrationSourceDigest": "f260f5b4e77b99f93428c0d560e1799bf8c9220b66c6ae316dece808411582da",
+  "generatedTypesSha256": "eb9f2639218868650c75ef533fd30b9c8be9e334c2db46742630b00f40593678",
+  "generatedSchemaBodySha256": "029c21e090a8ff50b21f000a40e0e2821dd58de4224c3eea414a0c512a6d2bbb",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3405,6 +3405,13 @@
       "filename": "20261120090000_469_meta_profile_review_epoch.sql",
       "sha256": "50d0c6cca5bca8d0dcd3c7add0bea0435d2d7308d4dce4d9b0a901f65891c3ec",
       "trimmedMd5": "7a33ae7de900f3b0d4349f8f97b8ef9e"
+    },
+    {
+      "version": "20261120100000",
+      "name": "470_meta_profile_target_prewrite",
+      "filename": "20261120100000_470_meta_profile_target_prewrite.sql",
+      "sha256": "38c61f9b0f3ef4651065029df8d063b2042314ea12f5823197818ee2f88d203d",
+      "trimmedMd5": "6514e4f75435a015c135d9fb0cd624e3"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

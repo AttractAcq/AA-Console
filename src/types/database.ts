@@ -6049,6 +6049,7 @@ export type Database = {
           last_checked_at: string | null
           meta_page_id: string | null
           meta_pixel_id: string | null
+          profile_scope_epoch_v6: number
           provider: string
           status: string
           token_expires_at: string | null
@@ -6068,6 +6069,7 @@ export type Database = {
           last_checked_at?: string | null
           meta_page_id?: string | null
           meta_pixel_id?: string | null
+          profile_scope_epoch_v6?: number
           provider: string
           status?: string
           token_expires_at?: string | null
@@ -6087,6 +6089,7 @@ export type Database = {
           last_checked_at?: string | null
           meta_page_id?: string | null
           meta_pixel_id?: string | null
+          profile_scope_epoch_v6?: number
           provider?: string
           status?: string
           token_expires_at?: string | null
@@ -34773,6 +34776,10 @@ export type Database = {
         Args: { p_campaign_id: string }
         Returns: string
       }
+      meta_profile_prewrite_current_v6: {
+        Args: { p_change_id: string }
+        Returns: boolean
+      }
       meta_profile_review_hash_v6: {
         Args: {
           q: Database["public"]["Tables"]["meta_profile_review_requests_v6"]["Row"]
@@ -34794,6 +34801,14 @@ export type Database = {
       meta_profile_review_source_state_v6: {
         Args: { p_request_id: string }
         Returns: string
+      }
+      meta_profile_target_snapshot_v6: {
+        Args: { p_client_id: string; p_platform: string }
+        Returns: Json
+      }
+      meta_profile_write_credential_eligible_v6: {
+        Args: { p_client_id: string }
+        Returns: boolean
       }
       metrics_backfill_accounts_v6: {
         Args: { p_client_id: string; p_surface: string }
