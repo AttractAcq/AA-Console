@@ -72,11 +72,16 @@ begin
   raise exception 'Incorrect provider bytes confirmed a Google reply';
  exception when check_violation then null; end;
  begin
+  perform public.finish_google_reply_execution_v6(v_id,v_key,'confirmed',a->>'body_hash',
+   null,'PENDING');
+  raise exception 'Pending moderation confirmed a Google reply';
+ exception when check_violation then null; end;
+ begin
   perform public.finish_google_reply_execution_v6(v_id,v_key,'refused',null,null,null,'After write');
   raise exception 'Started Google write was falsely recorded as refused';
  exception when check_violation then null; end;
  v_recorded:=public.finish_google_reply_execution_v6(v_id,v_key,'confirmed',a->>'body_hash',
-  '2026-11-15T00:00:00Z','PUBLISHED');
+  '2026-11-15T00:00:00Z','APPROVED');
  v_duplicate:=public.finish_google_reply_execution_v6(v_id,v_key,'confirmed',a->>'body_hash');
  select status into v_status from public.google_reply_execution_attempts_v6 where id=v_id;
  if not v_recorded or v_duplicate or v_status<>'confirmed' then

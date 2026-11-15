@@ -452,21 +452,40 @@ describe("reviews", () => {
   it("shows an uncertain provider attempt as requiring reconciliation", async () => {
     database({
       replies: [{ id: "reply-1", client_id: "client-1", review_id: "rev-1", status: "approved" }],
-      replyOutcomes: [{ reply_id: "reply-1", client_id: "client-1", status: "uncertain" }],
+      replyOutcomes: [{ attempt_id: "attempt-1", reply_id: "reply-1",
+        client_id: "client-1", status: "uncertain", reconciliation_result: null }],
     });
     render(<GoogleProfilePanel tab="reviews" />);
-    expect(await screen.findByText("Provider outcome uncertain — reconcile before retrying"))
+    expect(await screen.findByText("Outcome uncertain; request a read-only review check."))
       .toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Actions for/i }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Check review read-only" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_google_reply_reconciliation_v6", {
+      p_attempt_id: "attempt-1",
+    }));
+  });
+
+  it("shows a later provider-approved match without requesting another send", async () => {
+    database({
+      replies: [{ id: "reply-1", client_id: "client-1", review_id: "rev-1", status: "posted" }],
+      replyOutcomes: [{ attempt_id: "attempt-1", reply_id: "reply-1",
+        client_id: "client-1", status: "uncertain", reconciliation_result: "matched",
+        reconciled_at: "2026-11-15T09:00:00Z", reconciled_provider_state: "APPROVED" }],
+    });
+    render(<GoogleProfilePanel tab="reviews" />);
+    expect(await screen.findByText(/Later approved provider reply matched/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Actions for/i }));
+    expect(screen.queryByRole("menuitem", { name: "Check review read-only" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Request approved reply send" })).not.toBeInTheDocument();
   });
 
   it("shows a held send job before any provider attempt exists", async () => {
     database({
       replies: [{ id: "reply-1", client_id: "client-1", review_id: "rev-1", status: "approved" }],
-      replyJobs: [{ id: "job-1", input_id: "reply-1", status: "paused",
-        error: "Google review replies are held by GOOGLE_REVIEW_REPLY_ENABLED." }],
+      replyJobs: [{ id: "job-1", agent_key: "google_reply_sender", input_id: "reply-1", status: "paused" }],
     });
     render(<GoogleProfilePanel tab="reviews" />);
-    expect(await screen.findByText(/Send held — Google review replies are held/))
+    expect(await screen.findByText("Send held — inspect the job"))
       .toBeInTheDocument();
   });
 });

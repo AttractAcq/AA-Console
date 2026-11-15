@@ -32,6 +32,13 @@ export interface ReviewReplyReceipt {
   alreadyPresent: boolean;
 }
 
+export interface ReviewReplyObservation {
+  reviewRef: string;
+  bodySha256: string | null;
+  providerUpdateTime: string | null;
+  providerState: string | null;
+}
+
 interface ProviderReview {
   name?: unknown;
   reviewReply?: { comment?: unknown; updateTime?: unknown; reviewReplyState?: unknown };
@@ -83,6 +90,34 @@ async function requestJson(
   } catch {
     throw new GoogleReplyTransportError("Google returned an unreadable review response.", method === "PUT");
   }
+}
+
+/** Reads the exact account and review reply without invoking a second PUT. */
+export async function readApprovedReviewReply(input: {
+  accessToken: string; locationRef: string; reviewRef: string; fetchImpl?: typeof fetch;
+}): Promise<ReviewReplyObservation> {
+  const name = resourceName(input.locationRef, input.reviewRef);
+  if (!input.accessToken) throw new GoogleReplyTransportError("No Google Business credential is available.");
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const accountRef = input.locationRef.split("/locations/")[0]!;
+  const account = await requestJson(fetchImpl, `${ACCOUNT_API_ROOT}/${accountRef}`,
+    input.accessToken, "GET", undefined, "account");
+  if (account.name !== accountRef) {
+    throw new GoogleReplyTransportError("Google did not confirm the reviewed Business Profile account.");
+  }
+  const review = await requestJson(fetchImpl, `${API_ROOT}/${name}`,
+    input.accessToken, "GET");
+  if (review.name !== name) {
+    throw new GoogleReplyTransportError("Google returned a different review during reconciliation.");
+  }
+  const reply = review.reviewReply;
+  const comment = typeof reply?.comment === "string" ? reply.comment : null;
+  return {
+    reviewRef: name,
+    bodySha256: comment === null ? null : createHash("sha256").update(comment, "utf8").digest("hex"),
+    providerUpdateTime: typeof reply?.updateTime === "string" ? reply.updateTime : null,
+    providerState: typeof reply?.reviewReplyState === "string" ? reply.reviewReplyState : null,
+  };
 }
 
 /** PUT is preceded by an exact approval check and followed by a GET readback. */

@@ -47,6 +47,7 @@ import { runGoogleProfileReconciliationJob } from "../profiles/google-profile-re
 import { runMetaProfileFieldJob } from "../profiles/meta-profile-job.js";
 import { runMetaProfileReconciliationJob } from "../profiles/meta-profile-reconciliation-job.js";
 import { runGoogleReplySenderJob } from "../google-profile/reply-job.js";
+import { runGoogleReplyReconciliationJob } from "../google-profile/reply-reconciliation-job.js";
 import { runGoogleAdsSheetJob } from "../agents/google_ads_sheet/index.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
 import { runClientApprovalDispatchJob } from "../agents/client_approval_dispatch/index.js";
@@ -186,6 +187,7 @@ const RUNNERS: Record<string, JobRunner> = {
   meta_profile_field_writer: runMetaProfileFieldJob,
   meta_profile_field_reconciler: runMetaProfileReconciliationJob,
   google_reply_sender: runGoogleReplySenderJob,
+  google_reply_reconciler: runGoogleReplyReconciliationJob,
   brief_dispatch: runBriefDispatchJob,
   client_approval_dispatch: runClientApprovalDispatchJob,
   // Approved assets become a paused Meta campaign. No model; launching stays

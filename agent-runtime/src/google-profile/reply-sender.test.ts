@@ -56,7 +56,7 @@ describe("trusted Google reply sender", () => {
       .mockResolvedValueOnce(json({ name: "accounts/a1" }))
       .mockResolvedValueOnce(json({ name }))
       .mockResolvedValueOnce(json({ comment: body }))
-      .mockResolvedValueOnce(json({ name, reviewReply: { comment: body, reviewReplyState: "PUBLISHED" } })) as unknown as typeof fetch;
+      .mockResolvedValueOnce(json({ name, reviewReply: { comment: body, reviewReplyState: "APPROVED" } })) as unknown as typeof fetch;
     const result = await sendApprovedGoogleReply(sb, "reply-1", fetchImpl);
     expect(result).toMatchObject({ status: "confirmed", attemptId: "attempt-1" });
     expect(calls).toEqual(["google_reply_credential_eligible_v6", "integration_secret",
@@ -89,5 +89,21 @@ describe("trusted Google reply sender", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(3);
     expect(rpc).toHaveBeenLastCalledWith("finish_google_reply_execution_v6",
       expect.objectContaining({ p_outcome: "uncertain" }));
+  });
+
+  it("does not mark a read-back reply posted while moderation is pending", async () => {
+    const { sb, rpc } = database();
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(json({ name: "accounts/a1" }))
+      .mockResolvedValueOnce(json({ name }))
+      .mockResolvedValueOnce(json({ comment: body }))
+      .mockResolvedValueOnce(json({ name, reviewReply: {
+        comment: body, reviewReplyState: "PENDING",
+      } })) as unknown as typeof fetch;
+    const result = await sendApprovedGoogleReply(sb, "reply-1", fetchImpl);
+    expect(result).toMatchObject({ status: "uncertain" });
+    expect(rpc).toHaveBeenLastCalledWith("finish_google_reply_execution_v6",
+      expect.objectContaining({ p_outcome: "uncertain" }));
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
   });
 });

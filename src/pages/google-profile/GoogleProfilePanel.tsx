@@ -21,9 +21,11 @@ type ProfileJob = Pick<Database["public"]["Tables"]["agent_jobs"]["Row"],
   "id" | "agent_key" | "input_id" | "status">;
 type Review = Database["public"]["Tables"]["google_reviews"]["Row"];
 type Reply = Database["public"]["Tables"]["google_review_replies"]["Row"];
-type ReplyOutcome = Database["public"]["Views"]["google_reply_execution_overview_v6"]["Row"];
+type ReplyOutcome = Pick<Database["public"]["Views"]["google_reply_execution_overview_v6"]["Row"],
+  "attempt_id" | "reply_id" | "status" | "provider_state" | "reconciliation_result"
+  | "reconciled_at" | "reconciled_provider_state">;
 type ReplyJob = Pick<Database["public"]["Tables"]["agent_jobs"]["Row"],
-  "id" | "input_id" | "status" | "error">;
+  "id" | "agent_key" | "input_id" | "status">;
 type ProfileDecision = Pick<Database["public"]["Views"]["approval_inbox_v6"]["Row"],
   "id" | "status">;
 type Placement = Database["public"]["Tables"]["proof_placements"]["Row"];
@@ -113,10 +115,12 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           .order("reviewed_at", { ascending: false })
           .limit(100),
         supabase.from("google_review_replies").select("*").eq("client_id", clientId),
-        supabase.from("google_reply_execution_overview_v6").select("*").eq("client_id", clientId),
-        supabase.from("agent_jobs").select("id,input_id,status,error")
-          .eq("client_id", clientId).eq("agent_key", "google_reply_sender")
-          .eq("input_table", "google_review_replies"),
+        supabase.from("google_reply_execution_overview_v6")
+          .select("attempt_id,reply_id,status,provider_state,reconciliation_result,reconciled_at,reconciled_provider_state")
+          .eq("client_id", clientId),
+        supabase.from("agent_jobs").select("id,agent_key,input_id,status")
+          .eq("client_id", clientId)
+          .in("agent_key", ["google_reply_sender", "google_reply_reconciler"]),
         supabase
           .from("proof_placements")
           .select("*")
@@ -433,7 +437,10 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
             rows={reviews.map((r) => {
               const reply = replyFor(r.id);
               const outcome = replyOutcomes.find((x) => x.reply_id === reply?.id);
-              const sendJob = replyJobs.find((x) => x.input_id === reply?.id);
+              const sendJob = replyJobs.find((x) => x.input_id === reply?.id
+                && x.agent_key === "google_reply_sender");
+              const readJob = replyJobs.find((x) => x.input_id === outcome?.attempt_id
+                && x.agent_key === "google_reply_reconciler");
               return [
                 <span key="r">
                   {r.author_name ?? "A Google reviewer"}
@@ -456,7 +463,13 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                   {!reply ? "none" : outcome?.status === "confirmed"
                     ? `Provider readback confirmed${outcome.provider_state ? ` (${outcome.provider_state.toLowerCase()})` : ""}`
                     : outcome?.status === "uncertain"
-                      ? "Provider outcome uncertain — reconcile before retrying"
+                      ? outcome.reconciliation_result === "matched"
+                        ? `Later approved provider reply matched · ${dayOrDash(outcome.reconciled_at)}`
+                        : outcome.reconciliation_result
+                          ? `Later readback ${outcome.reconciliation_result.replace(/_/g, " ")}${outcome.reconciled_provider_state ? ` (${outcome.reconciled_provider_state.toLowerCase()})` : ""}; inspect the review.`
+                          : readJob
+                            ? `Outcome uncertain; read-only check ${readJob.status.replace(/_/g, " ")}.`
+                            : "Outcome uncertain; request a read-only review check."
                       : outcome?.status === "started"
                         ? "Provider write started — awaiting readback"
                         : outcome?.status === "refused"
@@ -464,9 +477,9 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                           : outcome?.status === "reserved"
                             ? "Send reserved — no provider write yet"
                             : sendJob?.status === "paused"
-                              ? `Send held — ${sendJob.error ?? "inspect the job"}`
+                              ? "Send held — inspect the job"
                               : sendJob?.status === "failed"
-                                ? `Send job failed — ${sendJob.error ?? "inspect the job"}`
+                                ? "Send job failed — inspect the job"
                                 : sendJob
                                   ? `Send requested — ${sendJob.status.replace(/_/g, " ")}`
                             : reply.status === "approved"
@@ -518,6 +531,21 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                             },
                             "Reply send requested. Check the recorded outcome; approval alone does not prove delivery.",
                           ),
+                        }]
+                      : []),
+                    ...(outcome?.status === "uncertain" && outcome.attempt_id
+                      && outcome.reconciliation_result !== "matched"
+                      && !replyJobs.some((row) => row.agent_key === "google_reply_reconciler"
+                        && row.input_id === outcome.attempt_id
+                        && ["queued", "claimed", "running", "paused"].includes(row.status))
+                      ? [{
+                          label: "Check review read-only",
+                          onSelect: () => void act(r.id, async () => {
+                            const result = await supabase.rpc("request_google_reply_reconciliation_v6", {
+                              p_attempt_id: outcome.attempt_id!,
+                            });
+                            if (result.error) throw result.error;
+                          }, "Read-only review check queued."),
                         }]
                       : []),
                   ]}

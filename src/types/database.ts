@@ -13210,6 +13210,85 @@ export type Database = {
           },
         ]
       }
+      google_reply_reconciliation_checks_v6: {
+        Row: {
+          attempt_id: string
+          checked_at: string
+          client_id: string
+          id: string
+          observed_body_hash: string | null
+          provider_state: string | null
+          provider_update_time: string | null
+          result: string
+          review_ref: string
+        }
+        Insert: {
+          attempt_id: string
+          checked_at?: string
+          client_id: string
+          id?: string
+          observed_body_hash?: string | null
+          provider_state?: string | null
+          provider_update_time?: string | null
+          result: string
+          review_ref: string
+        }
+        Update: {
+          attempt_id?: string
+          checked_at?: string
+          client_id?: string
+          id?: string
+          observed_body_hash?: string | null
+          provider_state?: string | null
+          provider_update_time?: string | null
+          result?: string
+          review_ref?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_reply_reconciliation_checks_v6_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "google_reply_execution_attempts_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_reconciliation_checks_v6_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "google_reply_execution_overview_v6"
+            referencedColumns: ["attempt_id"]
+          },
+          {
+            foreignKeyName: "google_reply_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_reply_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_reply_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       google_review_replies: {
         Row: {
           approved_at: string | null
@@ -28186,38 +28265,13 @@ export type Database = {
           outcome_note: string | null
           provider_state: string | null
           provider_update_time: string | null
+          reconciled_at: string | null
+          reconciled_provider_state: string | null
+          reconciliation_result: string | null
           reply_id: string | null
           reserved_at: string | null
           started_at: string | null
           status: string | null
-        }
-        Insert: {
-          approval_request_id?: string | null
-          attempt_id?: string | null
-          client_id?: string | null
-          finished_at?: string | null
-          observed_body_hash?: string | null
-          outcome_note?: string | null
-          provider_state?: string | null
-          provider_update_time?: string | null
-          reply_id?: string | null
-          reserved_at?: string | null
-          started_at?: string | null
-          status?: string | null
-        }
-        Update: {
-          approval_request_id?: string | null
-          attempt_id?: string | null
-          client_id?: string | null
-          finished_at?: string | null
-          observed_body_hash?: string | null
-          outcome_note?: string | null
-          provider_state?: string | null
-          provider_update_time?: string | null
-          reply_id?: string | null
-          reserved_at?: string | null
-          started_at?: string | null
-          status?: string | null
         }
         Relationships: [
           {
@@ -34328,6 +34382,10 @@ export type Database = {
         Args: { p_reply_id: string }
         Returns: boolean
       }
+      google_reply_reconciliation_target_v6: {
+        Args: { p_attempt_id: string; p_client_id: string }
+        Returns: Json
+      }
       has_client_sales_entitlement: {
         Args: { p_client_id: string }
         Returns: boolean
@@ -36024,6 +36082,17 @@ export type Database = {
         }
         Returns: string
       }
+      record_google_reply_reconciliation_v6: {
+        Args: {
+          p_attempt_id: string
+          p_client_id: string
+          p_observed_body_hash: string
+          p_provider_state: string
+          p_provider_update_time: string
+          p_review_ref: string
+        }
+        Returns: string
+      }
       record_inbound_dm_v6: {
         Args: {
           p_body: string
@@ -36727,6 +36796,10 @@ export type Database = {
       }
       request_google_profile_write_v6: {
         Args: { p_change_id: string }
+        Returns: string
+      }
+      request_google_reply_reconciliation_v6: {
+        Args: { p_attempt_id: string }
         Returns: string
       }
       request_google_reply_send_v6: {

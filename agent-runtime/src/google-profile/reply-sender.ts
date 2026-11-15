@@ -86,6 +86,10 @@ export async function sendApprovedGoogleReply(
     if (receipt.bodySha256 !== claim.body_hash) {
       throw new GoogleReplyTransportError("Google readback hash did not match the approved reply.", true);
     }
+    if (receipt.providerState !== "APPROVED") {
+      throw new GoogleReplyTransportError(
+        "Google returned the exact reply, but moderation is not approved. Recheck the review before claiming publication.", true);
+    }
     const { data: saved, error: saveError } = await sb.rpc("finish_google_reply_execution_v6", {
       p_attempt_id: claim.attempt_id, p_claim_key: claim.claim_key,
       p_outcome: "confirmed", p_observed_body_hash: receipt.bodySha256,

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { GoogleReplyTransportError, putApprovedReviewReply } from "./review-reply.js";
+import { GoogleReplyTransportError, putApprovedReviewReply, readApprovedReviewReply } from "./review-reply.js";
 
 const name = "accounts/a1/locations/l2/reviews/r3";
 const reviewUrl = `https://mybusiness.googleapis.com/v4/${name}`;
@@ -41,7 +41,7 @@ describe("Google review reply provider transport", () => {
       .mockResolvedValueOnce(json({ name }))
       .mockResolvedValueOnce(json({ comment: body }))
       .mockResolvedValueOnce(json({ name, reviewReply: {
-        comment: body, updateTime: "2026-11-15T00:00:00Z", reviewReplyState: "PUBLISHED",
+        comment: body, updateTime: "2026-11-15T00:00:00Z", reviewReplyState: "APPROVED",
       } })) as unknown as typeof fetch;
     const assertPrewrite = vi.fn(async () => {});
     const receipt = await putApprovedReviewReply({ ...base, fetchImpl, assertPrewrite });
@@ -50,7 +50,7 @@ describe("Google review reply provider transport", () => {
       method: "PUT", body: JSON.stringify({ comment: body }),
     }));
     expect(receipt).toMatchObject({ reviewRef: name, alreadyPresent: false,
-      providerState: "PUBLISHED", providerUpdateTime: "2026-11-15T00:00:00Z" });
+      providerState: "APPROVED", providerUpdateTime: "2026-11-15T00:00:00Z" });
     expect(receipt.bodySha256).toMatch(/^[0-9a-f]{64}$/);
   });
 
@@ -88,5 +88,28 @@ describe("Google review reply provider transport", () => {
       .rejects.toThrow(/did not confirm access/);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(fetchImpl).not.toHaveBeenCalledWith(replyUrl, expect.anything());
+  });
+
+  it("reconciles a reply with two GETs and records its moderation state", async () => {
+    const fetchImpl = vi.fn(async (url: string) => json(url === accountUrl
+      ? { name: "accounts/a1" }
+      : { name, reviewReply: { comment: body, reviewReplyState: "PENDING",
+        updateTime: "2026-11-15T01:00:00Z" } })) as unknown as typeof fetch;
+    const observation = await readApprovedReviewReply({
+      accessToken: "fixture-token", locationRef: base.locationRef,
+      reviewRef: base.reviewRef, fetchImpl,
+    });
+    expect(observation).toMatchObject({ reviewRef: name, providerState: "PENDING" });
+    expect(observation.bodySha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(fetchImpl.mock.calls.every(([, init]) => init?.method === "GET")).toBe(true);
+  });
+
+  it("does not treat a missing or wrong review as the approved reply", async () => {
+    const fetchImpl = vi.fn(async (url: string) => json(url === accountUrl
+      ? { name: "accounts/a1" } : { name: "accounts/other/locations/l2/reviews/r3" })) as unknown as typeof fetch;
+    await expect(readApprovedReviewReply({ accessToken: "fixture-token",
+      locationRef: base.locationRef, reviewRef: base.reviewRef, fetchImpl }))
+      .rejects.toThrow(/different review/);
   });
 });

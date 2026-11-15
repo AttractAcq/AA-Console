@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "b5ad0ce0de63ba887babb5140ad5ac3fe8ef7436e9b616555f6aa957b862b330",
-  "generatedTypesSha256": "fe97be446d7a814c642800343eeb072c17121981fc02823f1f3c60dedeff63c1",
-  "generatedSchemaBodySha256": "a74d2d8bc399c2f9eb8cfd4f9cc3e2b9f29dede8a47542ba68fcdb8de9d27726",
+  "migrationSourceDigest": "0b4c7241ab486514de2a6f56b4dc2f9efb6fc35310f96068af1d2d944e512220",
+  "generatedTypesSha256": "f7f248f2b35d7691031ada2449977ea12eb1273fdae5476e36a49f9b94c9379e",
+  "generatedSchemaBodySha256": "8b99262aeb4e44058cc740ecacf0c9ee2ecf7b5fe4b8d110564dd3f1070132a4",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3510,6 +3510,34 @@
       "filename": "20261121000000_484_google_profile_reconciliation_projection.sql",
       "sha256": "3387b865b1edf2bf9e56d20a82a10a424e5bc3e3b2146f8c5032f8ae7ad971f1",
       "trimmedMd5": "8b921c27f4c5e909b04cf8766bc65fde"
+    },
+    {
+      "version": "20261121010000",
+      "name": "485_google_reply_uncertain_reconciliation",
+      "filename": "20261121010000_485_google_reply_uncertain_reconciliation.sql",
+      "sha256": "517f87b0b0e69c738971ea4c3fe41123c352019eabcc7b84663155daa9b19f66",
+      "trimmedMd5": "fee93767742ee938e26c9b95f7e5ee70"
+    },
+    {
+      "version": "20261121020000",
+      "name": "486_google_reply_reconciliation_job",
+      "filename": "20261121020000_486_google_reply_reconciliation_job.sql",
+      "sha256": "dcd87a34416ea6c638dc38666e8b272ac36ee25d055382b44d374868a01a0360",
+      "trimmedMd5": "67ad53eba6951852d63d429e9873f8d0"
+    },
+    {
+      "version": "20261121030000",
+      "name": "487_google_reply_reconciliation_projection",
+      "filename": "20261121030000_487_google_reply_reconciliation_projection.sql",
+      "sha256": "4195f8f4f9a9e8ee5ebccd99ed2e7a20cf1b739c86b5e37096fa5c330502a4b0",
+      "trimmedMd5": "d08c67d932ec008be9e4a08ac290ee85"
+    },
+    {
+      "version": "20261121040000",
+      "name": "488_google_reply_moderation_gate",
+      "filename": "20261121040000_488_google_reply_moderation_gate.sql",
+      "sha256": "6ce1badbce70a8a14eba0ca68ed55f6b79c2ad6f591c5d3b9b8e429fd41f2a6a",
+      "trimmedMd5": "130e49f6a679854ba695dbc6668156c1"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
