@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "ad29db5d77d783e791428634af6c442d53393d726b84ff8a5045463436845b91",
-  "generatedTypesSha256": "6cb26f17b2473c79b208210fff935275e8064cebd5efc5ea22105fc28d8f3888",
-  "generatedSchemaBodySha256": "4e7fa9ff2c7ce0f372ba78923d0a5b6d873204d9ac9908d8046754255f48a8c9",
+  "migrationSourceDigest": "7fdf58c9f1f9cd0b8becb22b7319d14251401d489b4921df6db75bcd0388d9b2",
+  "generatedTypesSha256": "f4873398954b023d79b75472bb707480e9d368e3d9f6ebae9993bfc29736581e",
+  "generatedSchemaBodySha256": "86cf97896f853f650ae6d0acb88617662bc20a8435bc1096b8114beb3b7066ae",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3594,6 +3594,13 @@
       "filename": "20261121120000_496_campaign_lead_enrolment_source_audit.sql",
       "sha256": "f352628aae445f1a237dbfba275c5a1072b039281394700edf658dc151dcd2c4",
       "trimmedMd5": "5327ebed9b0bced2b9f816d68706d3b7"
+    },
+    {
+      "version": "20261121130000",
+      "name": "497_campaign_proof_retraction_demand",
+      "filename": "20261121130000_497_campaign_proof_retraction_demand.sql",
+      "sha256": "f8a347e1c19d3c441250f0f0843a1a4e6b7583a3ba45208c9c20a02b3aaf7255",
+      "trimmedMd5": "f921813d133acfc3060b1e8364fbe6d6"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

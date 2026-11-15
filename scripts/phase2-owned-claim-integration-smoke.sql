@@ -264,7 +264,29 @@ begin
   v_revoke := public.request_campaign_action_approval_v6(
     'dddddddd-dddd-4ddd-8ddd-dddddddddddd','revoke-one','proof_publish',
     'proof:approved_placements',repeat('f',64),
-    '{"placements":[{"placement_id":"withdrawn","payload_hash":"ffff"}]}'::jsonb);
+    jsonb_build_object('placements',jsonb_build_array(
+      jsonb_build_object('placement_id','22222222-2222-4222-8222-222222222222',
+        'payload_hash',repeat('f',64)),
+      jsonb_build_object('placement_id','33333333-3333-4333-8333-333333333333',
+        'payload_hash',repeat('f',64)))));
+  insert into public.proof_placements(id,client_id,destination_key,proof_id,
+    source_proof_id,payload_hash,idempotency_key,status)
+  values
+    ('22222222-2222-4222-8222-222222222222',
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','third_party_directory',
+      v_proof_id,v_proof_id,repeat('f',64),'fixture-proof-queued','queued'),
+    ('33333333-3333-4333-8333-333333333333',
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','third_party_directory',
+      v_proof_id,v_proof_id,repeat('f',64),'fixture-proof-placing','placing');
+  insert into public.proof_placement_approvals(client_id,placement_id,
+    destination_key,payload_hash,scope,campaign_action_approval_id)
+  values
+    ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      '22222222-2222-4222-8222-222222222222',
+      'third_party_directory',repeat('f',64),'{}'::jsonb,v_revoke.id),
+    ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      '33333333-3333-4333-8333-333333333333',
+      'third_party_directory',repeat('f',64),'{}'::jsonb,v_revoke.id);
   select * into v_revoke_request from public.approval_requests_v6
     where source_kind = 'campaign_action' and source_id = v_revoke.id::text;
   perform public.attach_approval_evidence_v6(v_revoke_request.id,v_revoke_request.source_version,
@@ -287,6 +309,31 @@ begin
   perform set_config('request.jwt.claims',
     '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
   perform public.revoke_campaign_action_approval_v6(v_revoke.id,'Synthetic withdrawal');
+  if (select count(*) from public.campaign_proof_retraction_demands_v6 d
+      where d.approval_id=v_revoke.id)<>2
+    or (select status from public.proof_placements
+      where id='22222222-2222-4222-8222-222222222222')<>'retraction_required'
+    or (select status from public.proof_placements
+      where id='33333333-3333-4333-8333-333333333333')<>'placing'
+    or not exists(select 1 from public.proof_placement_events e
+      where e.placement_id='22222222-2222-4222-8222-222222222222'
+        and e.event='retraction_required') then
+    raise exception 'Withdrawal did not open exact proof removal demands'; end if;
+  update public.proof_placements set status='placed',
+    external_url='https://fixture.example/late-proof',placed_at=now()
+    where id='33333333-3333-4333-8333-333333333333';
+  insert into public.proof_placement_events
+    (placement_id,client_id,event,actor,external_ref)
+  values ('33333333-3333-4333-8333-333333333333',
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','placed','agent',
+    'https://fixture.example/late-proof');
+  set constraints campaign_proof_late_placement_retraction_v6 immediate;
+  if (select status from public.proof_placements
+      where id='33333333-3333-4333-8333-333333333333')<>'retraction_required'
+    or not exists(select 1 from public.proof_placement_events
+      where placement_id='33333333-3333-4333-8333-333333333333'
+        and event='retraction_required') then
+    raise exception 'Late provider placement was not routed into removal'; end if;
   begin
     perform public.revoke_campaign_action_approval_v6(v_revoke.id,'Duplicate withdrawal');
     raise exception 'The same action was revoked twice';

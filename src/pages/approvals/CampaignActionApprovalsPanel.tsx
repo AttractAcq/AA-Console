@@ -31,6 +31,9 @@ type ProofReleaseObservation = { execution_id: string; placement_ref: string | n
 type LeadEnrollmentSource = { execution_id: string; sequence_name: string | null;
   started_at: string | null; finished_at: string | null; observed_count: number | null;
   skipped_count: number | null; current_observation_rows: number };
+type ProofRetractionDemand = { approval_id: string; placement_id: string;
+  destination_key: string; placement_status: string; demand_status: string;
+  external_url: string | null; external_id: string | null; reason: string };
 
 export function CampaignActionApprovalsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -45,6 +48,7 @@ export function CampaignActionApprovalsPanel() {
   const [pageJobs, setPageJobs] = useState<Record<string, BudgetJob>>({});
   const [proofObservations, setProofObservations] = useState<Record<string, ProofReleaseObservation[]>>({});
   const [leadSources, setLeadSources] = useState<Record<string, LeadEnrollmentSource>>({});
+  const [proofRetractions, setProofRetractions] = useState<Record<string, ProofRetractionDemand[]>>({});
   const [actionsOn, setActionsOn] = useState(false);
   const [runtimeHold, setRuntimeHold] = useState<string | null>("Runtime state has not been verified.");
   const [loading, setLoading] = useState(true);
@@ -71,6 +75,7 @@ export function CampaignActionApprovalsPanel() {
       setPageJobs({});
       setProofObservations({});
       setLeadSources({});
+      setProofRetractions({});
       setLoading(false);
       return;
     }
@@ -86,15 +91,26 @@ export function CampaignActionApprovalsPanel() {
       ]);
       setDecided(due);
       if (due.length > 0) {
-        const { data: revokedRows, error: revokedError } = await supabase
-          .from("campaign_action_revocations_v6")
-          .select("approval_id,reason,revoked_at")
-          .in("approval_id", due.map((action) => action.approval_id));
+        const [{ data: revokedRows, error: revokedError }, retractionRows] = await Promise.all([
+          supabase.from("campaign_action_revocations_v6")
+            .select("approval_id,reason,revoked_at")
+            .in("approval_id", due.map((action) => action.approval_id)),
+          supabase.from("campaign_proof_retraction_status_v6" as never)
+            .select("approval_id,placement_id,destination_key,placement_status,demand_status,external_url,external_id,reason")
+            .in("approval_id", due.map((action) => action.approval_id)),
+        ]);
         if (revokedError) throw new Error(`Action revocations could not be read: ${revokedError.message}`);
+        if (retractionRows.error) throw new Error(`Proof retraction demands could not be read: ${retractionRows.error.message}`);
         setRevocations(Object.fromEntries(((revokedRows ?? []) as ActionRevocation[])
           .map((row) => [row.approval_id, row])));
+        const groupedRetractions: Record<string, ProofRetractionDemand[]> = {};
+        for (const row of (retractionRows.data ?? []) as ProofRetractionDemand[]) {
+          (groupedRetractions[row.approval_id] ??= []).push(row);
+        }
+        setProofRetractions(groupedRetractions);
       } else {
         setRevocations({});
+        setProofRetractions({});
       }
       setActionsOn(on);
       const control = runtime.data as { state?: string; reason?: string; workerEnabled?: boolean;
@@ -185,6 +201,7 @@ export function CampaignActionApprovalsPanel() {
       setPageJobs({});
       setProofObservations({});
       setLeadSources({});
+      setProofRetractions({});
       setRuntimeHold("Runtime state has not been verified.");
       setError(cause instanceof Error ? cause.message : "Could not read what happened to approved actions.");
     }
@@ -514,6 +531,20 @@ export function CampaignActionApprovalsPanel() {
                           {!item.external_url && item.external_id && <span className="block break-all font-mono">External ID: {item.external_id}</span>}
                         </li>
                       ))}</ul>}
+                  </div>
+                )}
+                {action.action_key === "proof_publish" && (proofRetractions[action.approval_id] ?? []).length > 0 && (
+                  <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-xs">
+                    <p className="font-medium">Proof removal demands</p>
+                    <p className="mt-1">Withdrawal has opened a removal task for each linked placement. Check the destination before recording it as taken down.</p>
+                    <ul className="mt-2 space-y-1">{proofRetractions[action.approval_id].map((item) => (
+                      <li key={item.placement_id} className="break-all">
+                        {`${item.placement_id} · ${item.destination_key} · ${item.demand_status.replaceAll("_", " ")}`}
+                        {` · placement ${item.placement_status}`}
+                        {item.external_url && <a href={item.external_url} target="_blank" rel="noreferrer" className="ml-1 text-primary underline">Destination record</a>}
+                        {!item.external_url && item.external_id && ` · ${item.external_id}`}
+                      </li>
+                    ))}</ul>
                   </div>
                 )}
                 {action.action_key === "lead_message" && action.execution_id && (

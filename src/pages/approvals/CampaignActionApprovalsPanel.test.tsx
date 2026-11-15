@@ -51,6 +51,7 @@ function database(
     pageJobs?: unknown[];
     proofRows?: unknown[];
     leadRows?: unknown[];
+    proofRetractions?: unknown[];
     runtime?: unknown;
   } = {},
 ) {
@@ -107,6 +108,9 @@ function database(
     }
     if (table === "campaign_action_revocations_v6") {
       return { select: () => ({ in: async () => ({ data: options.revocations ?? [], error: null }) }) };
+    }
+    if (table === "campaign_proof_retraction_status_v6") {
+      return { select: () => ({ in: async () => ({ data: options.proofRetractions ?? [], error: null }) }) };
     }
     const query = {
       select: () => query,
@@ -365,4 +369,20 @@ it("shows a revoked decision without offering a second revocation", async () => 
   expect(await screen.findByText(/Revoked: Client withdrew approval/)).toBeInTheDocument();
   expect(screen.getByText(/external effect already recorded remains live/)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Revoke future execution" })).not.toBeInTheDocument();
+});
+
+it("shows an in-flight proof removal demand after withdrawal", async () => {
+  database({ revocations: [{ approval_id: "approval-0", reason: "Withdrawn",
+    revoked_at: "2026-11-15T09:00:00Z" }], proofRetractions: [{
+      approval_id: "approval-0", placement_id: "placement-2",
+      destination_key: "google_business_profile", placement_status: "placing",
+      demand_status: "in_flight_inspect_provider", external_url: null,
+      external_id: null, reason: "Withdrawn",
+    }] });
+  render(<CampaignActionApprovalsPanel />);
+  expect(await screen.findByText("Proof removal demands")).toBeInTheDocument();
+  expect(screen.getByText(/placement-2 · google_business_profile · in flight inspect provider/))
+    .toBeInTheDocument();
+  expect(screen.getByText(/Check the destination before recording it as taken down/))
+    .toBeInTheDocument();
 });
