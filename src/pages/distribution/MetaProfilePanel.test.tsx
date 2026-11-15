@@ -48,11 +48,13 @@ const post = (over: Record<string, unknown> = {}) => ({
   carries_placed_proof: true, ...over,
 });
 
-function database(options: { identities?: unknown[]; changes?: unknown[]; presence?: unknown[]; healthError?: string } = {}) {
+function database(options: { identities?: unknown[]; changes?: unknown[]; presence?: unknown[];
+  profileCards?: unknown[]; healthError?: string } = {}) {
   from.mockImplementation((table: string) => {
     const payload = () => {
       if (table === "meta_identity_health") return options.identities ?? [identity()];
       if (table === "meta_profile_changes") return options.changes ?? [];
+      if (table === "approval_inbox_v6") return options.profileCards ?? [];
       return options.presence ?? [];
     };
     const response = () => ({
@@ -195,9 +197,18 @@ describe("proposed changes", () => {
     render(<MetaProfilePanel tab="profile" />);
     // The older decision cannot authorize the provider write; the runtime
     // hold is visible even where the profile has a recorded approval.
-    expect(await screen.findByText("Pre-Inbox approval; provider write held")).toBeInTheDocument();
+    expect(await screen.findByText("Pre-Inbox approval; review again")).toBeInTheDocument();
     expect(screen.getByText(/exact-version AAL2 Approval Inbox decision/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+  });
+
+  it("labels a superseded Inbox decision as stale", async () => {
+    database({
+      changes: [change({ status: "approved", approved_request_id: "card-1" })],
+      profileCards: [{ id: "card-1", status: "superseded" }],
+    });
+    render(<MetaProfilePanel tab="profile" />);
+    expect(await screen.findByText("Inbox decision superseded; review again")).toBeInTheDocument();
   });
 
   it("holds direct legacy decisions until exact AAL2 Inbox binding exists", async () => {

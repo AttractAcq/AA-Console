@@ -22,6 +22,8 @@ type ProfileChange = Pick<
   Database["public"]["Tables"]["meta_profile_changes"]["Row"],
   "id" | "platform" | "field" | "current_value" | "proposed_value" | "offer_version_id" | "status" | "approved_request_id" | "created_at"
 >;
+type ProfileDecision = Pick<Database["public"]["Views"]["approval_inbox_v6"]["Row"],
+  "id" | "status">;
 
 type Tab = "identities" | "profile" | "presence";
 
@@ -63,6 +65,7 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
   const [identities, setIdentities] = useState<Identity[]>([]);
   const [presence, setPresence] = useState<Presence[]>([]);
   const [changes, setChanges] = useState<ProfileChange[]>([]);
+  const [profileDecisions, setProfileDecisions] = useState<ReadonlyMap<string, ProfileDecision>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reviewBusy, setReviewBusy] = useState<string | null>(null);
@@ -73,7 +76,7 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
       return;
     }
     try {
-      const [health, posts, proposed] = await Promise.all([
+      const [health, posts, proposed, profileCards] = await Promise.all([
         supabase.from("meta_identity_health")
           .select("client_id,provider,account_ref,status,token_expires_at,days_left,posts_waiting")
           .eq("client_id", clientId),
@@ -88,13 +91,18 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
           .select("id,platform,field,current_value,proposed_value,offer_version_id,status,approved_request_id,created_at")
           .eq("client_id", clientId)
           .order("created_at", { ascending: false }),
+        supabase.from("approval_inbox_v6").select("id,status")
+          .eq("client_id", clientId).eq("source_kind", "meta_profile_change"),
       ]);
-      for (const result of [health, posts, proposed]) {
+      for (const result of [health, posts, proposed, profileCards]) {
         if (result.error) throw new Error("Profile read failed.");
       }
       setIdentities(health.data ?? []);
       setPresence(posts.data ?? []);
       setChanges(proposed.data ?? []);
+      setProfileDecisions(new Map((profileCards.data ?? [])
+        .filter((row): row is ProfileDecision & { id: string } => Boolean(row.id))
+        .map((row) => [row.id, row])));
       setError(null);
     } catch {
       setError("Could not load the profiles.");
@@ -250,8 +258,10 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
                   {change.status === "approved" && (
                     <span className="block text-xs text-muted-foreground">
                       {change.approved_request_id
-                        ? "Exact Inbox decision; provider write held"
-                        : "Pre-Inbox approval; provider write held"}
+                        ? profileDecisions.get(change.approved_request_id)?.status === "approved"
+                          ? "Current exact Inbox decision; provider write held"
+                          : `Inbox decision ${profileDecisions.get(change.approved_request_id)?.status ?? "unavailable"}; review again`
+                        : "Pre-Inbox approval; review again"}
                     </span>
                   )}
                 </span>,

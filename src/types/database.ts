@@ -15906,6 +15906,7 @@ export type Database = {
           proposed_value: string
           reason: string | null
           rejection_reason: string | null
+          review_epoch_v6: number
           status: string
           updated_at: string
         }
@@ -15931,6 +15932,7 @@ export type Database = {
           proposed_value: string
           reason?: string | null
           rejection_reason?: string | null
+          review_epoch_v6?: number
           status?: string
           updated_at?: string
         }
@@ -15956,6 +15958,7 @@ export type Database = {
           proposed_value?: string
           reason?: string | null
           rejection_reason?: string | null
+          review_epoch_v6?: number
           status?: string
           updated_at?: string
         }
@@ -33081,6 +33084,7 @@ export type Database = {
           proposed_value: string
           reason: string | null
           rejection_reason: string | null
+          review_epoch_v6: number
           status: string
           updated_at: string
         }

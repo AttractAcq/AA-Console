@@ -16,7 +16,7 @@ select set_config('request.jwt.claims',
  '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal1"}',true);
 do $checks$
 declare change_id uuid := 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
- request_id uuid; review_id uuid; second_id uuid;
+ request_id uuid; review_id uuid; second_id uuid; third_id uuid;
 begin
  begin
   perform public.decide_meta_profile_change_v6(change_id,true);
@@ -36,6 +36,10 @@ begin
   perform public.decide_meta_profile_inbox_v6(review_id,request_id,true);
   raise exception 'AAL1 approved Meta proposal';
  exception when insufficient_privilege then null; end;
+ update public.meta_profile_changes set proposed_value='Temporary bio' where id=change_id;
+ update public.meta_profile_changes set proposed_value='New bio' where id=change_id;
+ if public.meta_profile_review_source_state_v6(request_id)<>'superseded' then
+  raise exception 'Reverted Meta words revived the same pending review'; end if;
  update public.meta_profile_changes set proposed_value='Different bio' where id=change_id;
  if public.meta_profile_review_source_state_v6(request_id)<>'superseded' then
   raise exception 'Changed proposal did not supersede review'; end if;
@@ -51,10 +55,12 @@ begin
  if public.meta_profile_review_source_state_v6(request_id)<>'superseded' then
   raise exception 'Old Meta review epoch revived after proposal reverted'; end if;
  update public.meta_profile_changes set proposed_value='Different bio' where id=change_id;
- select id into review_id from public.meta_profile_review_requests_v6 where canonical_request_id=second_id;
- perform public.decide_meta_profile_inbox_v6(review_id,second_id,true);
- if (select status from public.approval_inbox_v6 where id=second_id)<>'approved'
-  or (select approved_request_id from public.meta_profile_changes where id=change_id)<>second_id
+ third_id:=public.request_meta_profile_review_v6(change_id);
+ if third_id=second_id then raise exception 'Reverted Meta edit reused stale review'; end if;
+ select id into review_id from public.meta_profile_review_requests_v6 where canonical_request_id=third_id;
+ perform public.decide_meta_profile_inbox_v6(review_id,third_id,true);
+ if (select status from public.approval_inbox_v6 where id=third_id)<>'approved'
+  or (select approved_request_id from public.meta_profile_changes where id=change_id)<>third_id
   then raise exception 'Exact Meta profile decision did not sign source'; end if;
  perform set_config('request.jwt.claim.role','service_role',true);
  perform set_config('request.jwt.claims',
