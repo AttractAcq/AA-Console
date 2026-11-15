@@ -200,6 +200,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Client external-outcome brief checkpoint, 15 November 2026:** A client-scoped terminal-outcome view brings campaign actions, Google review replies, Google profile changes and Meta Page changes into one Dashboard summary. The brief shows the latest recorded external receipt and counts refused, uncertain, failed or abandoned attempts; an absent or failed read remains unknown or “none recorded.” Queued work and approval decisions do not count as receipts. Campaign executions without an external reference are excluded from the receipt result. The frontend build, focused brief test, full disposable schema replay, generated types and all **40** rollback fixtures pass. This remains local evidence; the view does not establish a live provider action.
 
+**Owning-queue outcome alert checkpoint, 15 November 2026:** The Unified Inbox now surfaces recent refused, uncertain, failed and abandoned external attempts above the approval list, with a link to each owning client page. Client views filter by client, and the component rejects mismatched links even if a returned row is malformed. A failed outcome read is reported rather than displayed as an empty queue. These are inspection alerts; they do not retry a provider action or change a human approval. The route remains local until the normal release gate.
+
 ## Phase 3 — Intelligence, Market Opportunities, Offer Studio and proof inputs
 
 ### Intelligence OS

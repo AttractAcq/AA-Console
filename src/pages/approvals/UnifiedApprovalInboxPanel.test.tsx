@@ -13,6 +13,7 @@ vi.mock("../../lib/supabase", () => ({ supabase: {
   from, rpc, auth: { mfa: { getAuthenticatorAssuranceLevel: getAAL } },
 } }));
 vi.mock("./ApprovalCoveragePanel", () => ({ ApprovalCoveragePanel: () => null }));
+vi.mock("./ExternalExecutionAlerts", () => ({ ExternalExecutionAlerts: () => null }));
 vi.mock("react-router-dom", async (original) => ({
   ...(await original<typeof import("react-router-dom")>()),
   useParams: () => ({ clientId: "client-1" }),

@@ -7,6 +7,7 @@ import { downloadVerifiedProofFile } from "../../lib/proofRights";
 import { downloadVerifiedCreativeFile } from "../../lib/creativeReview";
 import type { Database } from "../../types/database";
 import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
+import { ExternalExecutionAlerts } from "./ExternalExecutionAlerts";
 
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
@@ -1823,6 +1824,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
       </div>
 
       {global && <ApprovalCoveragePanel />}
+      <ExternalExecutionAlerts clientId={multiClient ? undefined : clientId} />
 
       <div className="flex flex-wrap gap-3 rounded-xl border border-border bg-card p-4">
         <label className="min-w-40 flex-1 text-sm font-medium">Status
