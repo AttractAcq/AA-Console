@@ -23046,6 +23046,7 @@ export type Database = {
           link_id: string
           message: string
           outcome_consent_id: string | null
+          outcome_event_id: string | null
           outcome_lead_id: string | null
           provider_id: string | null
           recipient: string
@@ -23075,6 +23076,7 @@ export type Database = {
           link_id: string
           message: string
           outcome_consent_id?: string | null
+          outcome_event_id?: string | null
           outcome_lead_id?: string | null
           provider_id?: string | null
           recipient: string
@@ -23104,6 +23106,7 @@ export type Database = {
           link_id?: string
           message?: string
           outcome_consent_id?: string | null
+          outcome_event_id?: string | null
           outcome_lead_id?: string | null
           provider_id?: string | null
           recipient?: string
@@ -23190,6 +23193,13 @@ export type Database = {
             columns: ["outcome_consent_id"]
             isOneToOne: false
             referencedRelation: "proof_outcome_followup_consents_v7"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_outcome_event_id_fkey"
+            columns: ["outcome_event_id"]
+            isOneToOne: false
+            referencedRelation: "proof_service_outcomes_v7"
             referencedColumns: ["id"]
           },
           {
@@ -23589,6 +23599,114 @@ export type Database = {
             columns: ["rights_request_id"]
             isOneToOne: true
             referencedRelation: "proof_rights_requests_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proof_service_outcomes_v7: {
+        Row: {
+          client_id: string
+          evidence_note: string
+          evidence_source: string
+          evidence_url: string | null
+          id: string
+          lead_id: string
+          occurred_at: string
+          outcome_summary: string
+          recorded_at: string
+          recorded_by: string
+          verified_at: string | null
+          verified_by: string | null
+          withdrawal_reason: string | null
+          withdrawn_at: string | null
+        }
+        Insert: {
+          client_id: string
+          evidence_note: string
+          evidence_source: string
+          evidence_url?: string | null
+          id?: string
+          lead_id: string
+          occurred_at: string
+          outcome_summary: string
+          recorded_at?: string
+          recorded_by: string
+          verified_at?: string | null
+          verified_by?: string | null
+          withdrawal_reason?: string | null
+          withdrawn_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          evidence_note?: string
+          evidence_source?: string
+          evidence_url?: string | null
+          id?: string
+          lead_id?: string
+          occurred_at?: string
+          outcome_summary?: string
+          recorded_at?: string
+          recorded_by?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          withdrawal_reason?: string | null
+          withdrawn_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_service_outcomes_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_service_outcomes_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_service_outcomes_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_service_outcomes_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_service_outcomes_v7_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_service_outcomes_v7_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
+          },
+          {
+            foreignKeyName: "proof_service_outcomes_v7_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_service_outcomes_v7_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -32487,6 +32605,7 @@ export type Database = {
           client_id: string | null
           delivery_id: string | null
           lead_id: string | null
+          outcome_event_id: string | null
           proof_id: string | null
           submission_id: string | null
           submitted_at: string | null
@@ -32533,6 +32652,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_outcome_event_id_fkey"
+            columns: ["outcome_event_id"]
+            isOneToOne: false
+            referencedRelation: "proof_service_outcomes_v7"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "proof_request_deliveries_outcome_lead_id_fkey"
@@ -34782,6 +34908,7 @@ export type Database = {
           link_id: string
           message: string
           outcome_consent_id: string | null
+          outcome_event_id: string | null
           outcome_lead_id: string | null
           provider_id: string | null
           recipient: string

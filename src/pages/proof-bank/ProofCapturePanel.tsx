@@ -1,6 +1,7 @@
 import { ProofCaptureDelivery } from "./ProofCaptureDelivery";
 import { ProofIntegrationCapture } from "./ProofIntegrationCapture";
 import { ProofOutcomeConsentPanel } from "./ProofOutcomeConsentPanel";
+import { ProofServiceOutcomePanel } from "./ProofServiceOutcomePanel";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
@@ -76,7 +77,10 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
       </button>
       <h2 className="text-xl font-semibold">{method.label}</h2>
       {method.id === "integration" && <ProofIntegrationCapture clientId={clientId} />}
-      {method.id === "outcome_followup" && <ProofOutcomeConsentPanel clientId={clientId} onChange={() => setRevision((n) => n + 1)} />}
+      {method.id === "outcome_followup" && <>
+        <ProofServiceOutcomePanel clientId={clientId} onChange={() => setRevision((n) => n + 1)} />
+        <ProofOutcomeConsentPanel clientId={clientId} onChange={() => setRevision((n) => n + 1)} />
+      </>}
       {method.id !== "integration" && (
         <>
           <p className="text-sm text-muted-foreground">{method.description}</p>
@@ -113,7 +117,7 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
             {method.id === "guided_interview"
               ? "Save the questions here, then share a capture link for written answers, recordings and supporting evidence."
               : method.id === "outcome_followup"
-                ? "Record specific customer consent above, then prepare an outcome-bound request from a saved setup. Every request needs exact Inbox approval before delivery."
+                ? "Verify the service result and record specific customer consent above, then prepare a bound request. Every request needs exact Inbox approval before delivery."
               : "Create a private capture link for this setup. Submissions enter Raw for review and permission clearance. A website can link to the capture portal."}
           </p>
           {configs
@@ -164,7 +168,7 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
                       kind: method.id === "outcome_followup" ? "select" as const : "text" as const,
                       required: true,
                       ...(method.id === "outcome_followup" ? { options: [
-                        { value: "sale", label: "Sale recorded" }, { value: "cash", label: "Cash recorded" },
+                        { value: "service_completed", label: "Service completion verified" },
                       ] } : {}),
                     },
                     {

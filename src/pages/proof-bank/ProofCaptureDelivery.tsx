@@ -38,6 +38,10 @@ type OutcomeConsent = {
   withdrawn_at: string | null;
 };
 type OutcomeLead = { id: string; name: string | null; stage: string };
+type ServiceOutcome = {
+  id: string; lead_id: string; outcome_summary: string;
+  verified_at: string | null; withdrawn_at: string | null;
+};
 const button =
   "rounded-md border border-border px-3 py-2 text-sm hover:bg-accent disabled:opacity-50";
 export function ProofCaptureDelivery({
@@ -59,18 +63,26 @@ export function ProofCaptureDelivery({
   const [queue, setQueue] = useState(false);
   const [outcomeConsents, setOutcomeConsents] = useState<OutcomeConsent[]>([]);
   const [outcomeLeads, setOutcomeLeads] = useState<OutcomeLead[]>([]);
+  const [serviceOutcomes, setServiceOutcomes] = useState<ServiceOutcome[]>([]);
   const refreshOutcome = useCallback(async () => {
     if (setup.method !== "outcome_followup") return;
-    const [c, l] = await Promise.all([
+    const [c, l, o] = await Promise.all([
       supabase.from("proof_outcome_followup_consents_v7")
         .select("id,lead_id,channel,recipient,withdrawn_at")
         .eq("client_id", clientId).is("withdrawn_at", null).limit(100),
       supabase.from("client_leads").select("id,name,stage")
         .eq("client_id", clientId).in("stage", ["sale", "cash"]).limit(100),
+      supabase.from("proof_service_outcomes_v7")
+        .select("id,lead_id,outcome_summary,verified_at,withdrawn_at")
+        .eq("client_id", clientId).not("verified_at", "is", null)
+        .is("withdrawn_at", null).limit(100),
     ]);
-    if (c.error || l.error) { setError(c.error?.message ?? l.error?.message ?? "Could not load outcomes."); return; }
+    if (c.error || l.error || o.error) {
+      setError(c.error?.message ?? l.error?.message ?? o.error?.message ?? "Could not load outcomes."); return;
+    }
     setOutcomeConsents(c.data ?? []);
     setOutcomeLeads(l.data ?? []);
+    setServiceOutcomes(o.data ?? []);
   }, [clientId, setup.method]);
   const refresh = useCallback(async () => {
     try {
@@ -274,9 +286,14 @@ export function ProofCaptureDelivery({
         title="Prepare evidence request"
         submitLabel="Prepare for approval"
         fields={setup.method === "outcome_followup" ? [
-          { name: "consentId", label: "Sale and recorded proof follow-up consent", kind: "select", required: true,
+          { name: "eventId", label: "Verified service outcome", kind: "select", required: true,
+            options: serviceOutcomes.filter((outcome) => outcome.verified_at && !outcome.withdrawn_at)
+              .map((outcome) => ({ value: outcome.id,
+                label: `${outcomeLeads.find((lead) => lead.id === outcome.lead_id)?.name ?? "Lead"} · ${outcome.outcome_summary}` })) },
+          { name: "consentId", label: "Matching proof follow-up consent", kind: "select", required: true,
             options: outcomeConsents.filter((c) => data.channels.includes(c.channel)
-              && outcomeLeads.some((l) => l.id === c.lead_id && l.stage === setup.trigger_event))
+              && outcomeLeads.some((l) => l.id === c.lead_id && (setup.trigger_event === "service_completed" || l.stage === setup.trigger_event))
+              && serviceOutcomes.some((outcome) => outcome.lead_id === c.lead_id && outcome.verified_at && !outcome.withdrawn_at))
               .map((c) => ({ value: c.id, label: `${outcomeLeads.find((l) => l.id === c.lead_id)?.name ?? "Lead"} · ${c.channel} · ${c.recipient}` })) },
           { name: "scheduledAt", label: "Send after (ISO date and time, optional)", kind: "text" },
         ] : [
@@ -311,10 +328,12 @@ export function ProofCaptureDelivery({
         onSubmit={async (v) => {
           if (setup.method === "outcome_followup") {
             const consent = outcomeConsents.find((c) => c.id === v.consentId);
+            const event = serviceOutcomes.find((o) => o.id === v.eventId);
             if (!consent) throw new Error("Select current follow-up consent.");
+            if (!event || event.lead_id !== consent.lead_id) throw new Error("Select an outcome and consent for the same customer.");
             await callRuntime("/admin/proof-capture", {
               action: "queue_delivery", clientId, configId: setup.id,
-              leadId: consent.lead_id, consentId: consent.id,
+              leadId: consent.lead_id, consentId: consent.id, eventId: event.id,
               scheduledAt: v.scheduledAt,
             });
             return;

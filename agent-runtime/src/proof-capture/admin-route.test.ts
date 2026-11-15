@@ -72,6 +72,7 @@ it("refuses an outcome request when consent no longer matches the lead contact",
   const leadId = "00000000-0000-0000-0000-000000000002";
   const consentId = "00000000-0000-0000-0000-000000000003";
   const configId = "00000000-0000-0000-0000-000000000004";
+  const eventId = "00000000-0000-0000-0000-000000000005";
   const from = vi.fn((table: string) => {
     const rows: Record<string, unknown> = {
       profiles: { role: "admin" },
@@ -83,6 +84,10 @@ it("refuses an outcome request when consent no longer matches the lead contact",
       proof_outcome_followup_consents_v7: {
         id: consentId, lead_id: leadId, channel: "email",
         recipient: "old@example.invalid", withdrawn_at: null,
+      },
+      proof_service_outcomes_v7: {
+        id: eventId, lead_id: leadId, verified_at: new Date().toISOString(),
+        withdrawn_at: null,
       },
     };
     const chain = {
@@ -98,7 +103,7 @@ it("refuses an outcome request when consent no longer matches the lead contact",
     rpc: async () => ({ data: null, error: null }),
   } as unknown as SupabaseClient;
   expect(await call(sb, "/admin/proof-capture", "test", {
-    clientId, action: "queue_delivery", configId, leadId, consentId,
+    clientId, action: "queue_delivery", configId, leadId, consentId, eventId,
   })).toBe(400);
   expect(from).not.toHaveBeenCalledWith("proof_capture_links");
   expect(from).not.toHaveBeenCalledWith("proof_request_deliveries");

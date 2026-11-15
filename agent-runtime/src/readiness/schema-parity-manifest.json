@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "558842f03d970fa6bb5636489066f12e002119784605f4bc473c7ac40a3db44d",
-  "generatedTypesSha256": "1bf0d48693204cfe26cfb73870c5dad150fb4f54a200ed8119f37032103b9eca",
-  "generatedSchemaBodySha256": "152bb8129e13379be369de07fa0169f09f1c765be7ea98764da18aa7cdf2e7f4",
+  "migrationSourceDigest": "afb7420b82eae8de8dcc3a91182c99108a837e1d958122612a7a5bf9cd9abc9e",
+  "generatedTypesSha256": "cdb492d13f7a55b02f5ed1ef4f90c2ff0ab98d8aca1ddf6d232c601f37242d4a",
+  "generatedSchemaBodySha256": "752906703308f2cd534804c8db91902d72f4d50cf22e8b2be0c577176f9b5c65",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3692,6 +3692,13 @@
       "filename": "20261121233000_510_outcome_followup_consent.sql",
       "sha256": "8dfa41c4d19b050569bae1cd830095d6f46ce17117bfab945938b75e4410924e",
       "trimmedMd5": "c0dee991d5cb4821c205293385e8db6c"
+    },
+    {
+      "version": "20261121234000",
+      "name": "511_service_outcome_followup_source",
+      "filename": "20261121234000_511_service_outcome_followup_source.sql",
+      "sha256": "63788d6089409f27cc5c4b58395c5ce00a22435a9e9dbb67d4cb6a499b3eb590",
+      "trimmedMd5": "d37e709d83f94cc6e26fb3c3bcc4743a"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

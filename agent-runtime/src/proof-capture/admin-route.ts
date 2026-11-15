@@ -152,6 +152,7 @@ export async function handleProofCaptureAdmin(
       eventKey = "";
     let outcomeLeadId: string | null = null;
     let outcomeConsentId: string | null = null;
+    let outcomeEventId: string | null = null;
     let outcomeCustomerName = "";
     if (body.action === "queue_delivery") {
       if (setup.method !== "automated_requests" && setup.method !== "outcome_followup") {
@@ -161,32 +162,39 @@ export async function handleProofCaptureAdmin(
       if (setup.method === "outcome_followup") {
         outcomeLeadId = String(body.leadId ?? "");
         outcomeConsentId = String(body.consentId ?? "");
-        if (!UUID.test(outcomeLeadId) || !UUID.test(outcomeConsentId)) {
-          json(400, { ok: false, error: "Select a sale and its separate proof follow-up consent." });
+        outcomeEventId = String(body.eventId ?? "");
+        if (!UUID.test(outcomeLeadId) || !UUID.test(outcomeConsentId) || !UUID.test(outcomeEventId)) {
+          json(400, { ok: false, error: "Select a verified service result and its separate proof follow-up consent." });
           return;
         }
-        const [{ data: lead, error: leadError }, { data: consent, error: consentError }] = await Promise.all([
+        const [{ data: lead, error: leadError }, { data: consent, error: consentError },
+          { data: event, error: eventError }] = await Promise.all([
           sb.from("client_leads").select("id,name,stage,email,phone")
             .eq("id", outcomeLeadId).eq("client_id", clientId).maybeSingle(),
           sb.from("proof_outcome_followup_consents_v7")
             .select("id,lead_id,channel,recipient,withdrawn_at")
             .eq("id", outcomeConsentId).eq("client_id", clientId).maybeSingle(),
+          sb.from("proof_service_outcomes_v7")
+            .select("id,lead_id,verified_at,withdrawn_at")
+            .eq("id", outcomeEventId).eq("client_id", clientId).maybeSingle(),
         ]);
-        if (leadError || consentError) throw leadError ?? consentError;
-        if (!lead || !consent || !["sale", "cash"].includes(lead.stage)
+        if (leadError || consentError || eventError) throw leadError ?? consentError ?? eventError;
+        if (!lead || !consent || !event || !["sale", "cash"].includes(lead.stage)
             || consent.lead_id !== lead.id || consent.withdrawn_at
+            || event.lead_id !== lead.id || !event.verified_at || event.withdrawn_at
             || (consent.channel === "email" &&
               consent.recipient.trim().toLowerCase() !== String(lead.email ?? "").trim().toLowerCase())
             || (consent.channel !== "email" &&
               consent.recipient.trim() !== String(lead.phone ?? "").trim())
-            || (setup.trigger_event && setup.trigger_event !== lead.stage)) {
-          json(400, { ok: false, error: "The sale, contact or proof follow-up consent is no longer current." });
+            || (setup.trigger_event && setup.trigger_event !== "service_completed"
+              && setup.trigger_event !== lead.stage)) {
+          json(400, { ok: false, error: "The service result, sale, contact or proof follow-up consent is no longer current." });
           return;
         }
         channel = consent.channel;
         recipient = consent.recipient.trim();
         outcomeCustomerName = String(lead.name ?? "").slice(0, 200);
-        eventKey = `outcome:${setup.id}:${lead.id}:${consent.id}`;
+        eventKey = `outcome:${setup.id}:${event.id}:${consent.id}`;
       } else {
         channel = String(body.channel ?? "email");
         recipient = String(body.recipient ?? "").trim();
@@ -341,6 +349,7 @@ export async function handleProofCaptureAdmin(
         event_key: eventKey,
         outcome_lead_id: outcomeLeadId,
         outcome_consent_id: outcomeConsentId,
+        outcome_event_id: outcomeEventId,
         recipient,
         channel,
         subject: setup.name,
