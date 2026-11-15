@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // The point of these tests is ordering: the ceiling must refuse BEFORE the
 // model is called and before anything is written to the thread. Unit tests
 // on checkBudget cannot show that — only the wiring can.
-const { requireAdmin, runChatTurn, rpc, inserted } = vi.hoisted(() => ({
-  requireAdmin: vi.fn(),
+const { requireHumanAdmin, runChatTurn, rpc, inserted } = vi.hoisted(() => ({
+  requireHumanAdmin: vi.fn(),
   runChatTurn: vi.fn(),
   rpc: vi.fn(),
   inserted: [] as Array<{ table: string; row: unknown }>,
@@ -14,7 +14,7 @@ const { requireAdmin, runChatTurn, rpc, inserted } = vi.hoisted(() => ({
 
 vi.mock("./auth.js", async () => {
   const actual = await vi.importActual<typeof import("./auth.js")>("./auth.js");
-  return { ...actual, requireAdmin };
+  return { ...actual, requireHumanAdmin };
 });
 vi.mock("./chat.js", () => ({ runChatTurn }));
 
@@ -92,7 +92,7 @@ function spendIs(dayUsd: number, conversationUsd: number) {
 beforeEach(() => {
   vi.clearAllMocks();
   inserted.length = 0;
-  requireAdmin.mockResolvedValue({ userId: "admin-1", email: "a@example.com" });
+  requireHumanAdmin.mockResolvedValue({ userId: "admin-1", email: "a@example.com", isBot: false });
   runChatTurn.mockResolvedValue({ reply: "done", toolCalls: [], costUsd: 0.09, turns: 1 });
 });
 

@@ -9,7 +9,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../config.js";
 import { logger } from "../logging/logger.js";
-import { AuthError, requireAdmin } from "./auth.js";
+import { AuthError, BOT_FORBIDDEN_CODE, requireHumanAdmin } from "./auth.js";
 import { runChatTurn } from "./chat.js";
 import { checkBudget, readSpend } from "./budget.js";
 import type { MasterScope } from "./scope.js";
@@ -45,7 +45,7 @@ export async function handleMasterChat(
   };
 
   try {
-    const caller = await requireAdmin(sb, req.headers.authorization);
+    const caller = await requireHumanAdmin(sb, req.headers.authorization);
     const body = await readBody(req);
 
     const message = String(body.message ?? "").trim();
@@ -172,6 +172,8 @@ export async function handleMasterChat(
       history,
       lastUserMessageAt: userMessage.created_at as string,
       actorId: caller.userId,
+      isBot: caller.isBot === true,
+      humanAdmin: true,
       budgetRemainingUsd: budget.remainingUsd,
     });
 
@@ -220,7 +222,10 @@ export async function handleMasterChat(
     });
   } catch (error) {
     if (error instanceof AuthError) {
-      return json(error.status, { ok: false, error: error.message });
+      return json(error.status, {
+        ok: false,
+        error: error.code === BOT_FORBIDDEN_CODE ? BOT_FORBIDDEN_CODE : error.message,
+      });
     }
     const message = error instanceof Error ? error.message : String(error);
     logger.error("master_ai_request_failed", { error: message });
