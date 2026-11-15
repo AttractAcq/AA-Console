@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "7fdf58c9f1f9cd0b8becb22b7319d14251401d489b4921df6db75bcd0388d9b2",
-  "generatedTypesSha256": "f4873398954b023d79b75472bb707480e9d368e3d9f6ebae9993bfc29736581e",
-  "generatedSchemaBodySha256": "86cf97896f853f650ae6d0acb88617662bc20a8435bc1096b8114beb3b7066ae",
+  "migrationSourceDigest": "3302dcb28b508182994246867398b8c1f1b2811a876addc7c71719e230fae8db",
+  "generatedTypesSha256": "ae6bb9609c39b820e83f50f1d02eec4f833c03abec24f5c357682011431c0b2c",
+  "generatedSchemaBodySha256": "286cf00db25e443f7e32e470eb76fef2a50d908e1c4fb6258fc3d4482070d419",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3601,6 +3601,13 @@
       "filename": "20261121130000_497_campaign_proof_retraction_demand.sql",
       "sha256": "f8a347e1c19d3c441250f0f0843a1a4e6b7583a3ba45208c9c20a02b3aaf7255",
       "trimmedMd5": "f921813d133acfc3060b1e8364fbe6d6"
+    },
+    {
+      "version": "20261121140000",
+      "name": "498_proof_retraction_receipts",
+      "filename": "20261121140000_498_proof_retraction_receipts.sql",
+      "sha256": "01a36eae1223db9808d4fca03152678d44480e19f6eb370d5a7adb88852c9909",
+      "trimmedMd5": "8cba58cd2d4be7b155a711254e327e7c"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

@@ -65,6 +65,7 @@ export interface Placement {
   approval_id: string | null;
   /** The campaign this placement belongs to, where it belongs to one. */
   campaign_id: string | null;
+  external_id: string | null;
   external_url: string | null;
   attempts: number;
   placed_at: string | null;
@@ -112,7 +113,7 @@ export async function fetchClientDestinations(clientId: string): Promise<Map<str
 export async function fetchPlacements(clientId: string): Promise<Placement[]> {
   const { data, error } = await supabase
     .from("proof_placements")
-    .select("id, client_id, destination_key, status, source_proof_id, artifact_version_id, proof_id, asset_id, approval_id, campaign_id, external_url, attempts, placed_at, created_at, last_error")
+    .select("id, client_id, destination_key, status, source_proof_id, artifact_version_id, proof_id, asset_id, approval_id, campaign_id, external_id, external_url, attempts, placed_at, created_at, last_error")
     .eq("client_id", clientId)
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
@@ -188,10 +189,16 @@ export async function markPlacedByHand(placementId: string, url: string): Promis
   if (error) throw new Error(error.message);
 }
 
-export async function recordRetracted(placementId: string, detail?: string): Promise<void> {
-  const { error } = await supabase.rpc("record_proof_retracted_v6", {
+export async function recordRetracted(
+  placementId: string,
+  confirmation: { method: "cancelled_before_placement" | "human_checked";
+    reason: string; evidenceRef?: string | null },
+): Promise<void> {
+  const { error } = await supabase.rpc("record_proof_retraction_confirmation_v6", {
     p_placement_id: placementId,
-    ...(detail ? { p_detail: detail } : {}),
+    p_method: confirmation.method,
+    p_reason: confirmation.reason,
+    p_evidence_ref: confirmation.evidenceRef ?? "",
   });
   if (error) throw new Error(error.message);
 }

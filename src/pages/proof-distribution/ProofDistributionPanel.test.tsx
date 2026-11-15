@@ -196,6 +196,47 @@ describe("rights", () => {
     const section = (await screen.findByText("Needs taking down")).parentElement!;
     expect(within(section).getByText("https://directory.example/9")).toBeInTheDocument();
   });
+
+  it("requires a human removal reference before recording a live proof as retracted", async () => {
+    state.placements = [placement({ status: "retraction_required",
+      placed_at: "2026-11-14T09:00:00Z", external_url: "https://directory.example/9" })];
+    const prompt = vi.spyOn(window,"prompt").mockReturnValueOnce("Rights withdrawn")
+      .mockReturnValueOnce(null);
+    render(<ProofDistributionPanel tab="rights" />);
+    await userEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Confirm removal" }));
+    expect(rpc).not.toHaveBeenCalledWith("record_proof_retraction_confirmation_v6", expect.anything());
+    prompt.mockRestore();
+  });
+
+  it("records the human check method and its evidence reference", async () => {
+    state.placements = [placement({ status: "retraction_required",
+      placed_at: "2026-11-14T09:00:00Z", external_url: "https://directory.example/9" })];
+    const prompt = vi.spyOn(window,"prompt").mockReturnValueOnce("Rights withdrawn")
+      .mockReturnValueOnce("https://directory.example/removal-ticket");
+    render(<ProofDistributionPanel tab="rights" />);
+    await userEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Confirm removal" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("record_proof_retraction_confirmation_v6", {
+      p_placement_id: "pl1", p_method: "human_checked", p_reason: "Rights withdrawn",
+      p_evidence_ref: "https://directory.example/removal-ticket",
+    }));
+    prompt.mockRestore();
+  });
+
+  it("records an unplaced cancellation without claiming a provider removal", async () => {
+    state.placements = [placement({ status: "retraction_required" })];
+    const prompt = vi.spyOn(window,"prompt").mockReturnValueOnce("Permission ended");
+    render(<ProofDistributionPanel tab="rights" />);
+    await userEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Cancel unplaced proof" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("record_proof_retraction_confirmation_v6", {
+      p_placement_id: "pl1", p_method: "cancelled_before_placement",
+      p_reason: "Permission ended", p_evidence_ref: "",
+    }));
+    expect(prompt).toHaveBeenCalledTimes(1);
+    prompt.mockRestore();
+  });
 });
 
 describe("asking for the decision", () => {

@@ -21670,6 +21670,89 @@ export type Database = {
           },
         ]
       }
+      proof_placement_retraction_receipts_v6: {
+        Row: {
+          client_id: string
+          evidence_ref: string | null
+          id: string
+          method: string
+          placement_id: string
+          reason: string
+          recorded_at: string
+          recorded_by: string | null
+        }
+        Insert: {
+          client_id: string
+          evidence_ref?: string | null
+          id?: string
+          method: string
+          placement_id: string
+          reason: string
+          recorded_at?: string
+          recorded_by?: string | null
+        }
+        Update: {
+          client_id?: string
+          evidence_ref?: string | null
+          id?: string
+          method?: string
+          placement_id?: string
+          reason?: string
+          recorded_at?: string
+          recorded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_placement_retraction_receipts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_retraction_receipts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_retraction_receipts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placement_retraction_receipts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_retraction_receipts_v6_placement_id_fkey"
+            columns: ["placement_id"]
+            isOneToOne: true
+            referencedRelation: "proof_placement_due"
+            referencedColumns: ["placement_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_retraction_receipts_v6_placement_id_fkey"
+            columns: ["placement_id"]
+            isOneToOne: true
+            referencedRelation: "proof_placements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placement_retraction_receipts_v6_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proof_placement_transitions: {
         Row: {
           from_status: string
@@ -37334,6 +37417,15 @@ export type Database = {
       record_proof_retracted_v6: {
         Args: { p_detail?: string; p_placement_id: string }
         Returns: undefined
+      }
+      record_proof_retraction_confirmation_v6: {
+        Args: {
+          p_evidence_ref: string
+          p_method: string
+          p_placement_id: string
+          p_reason: string
+        }
+        Returns: string
       }
       record_qa_result: {
         Args: {

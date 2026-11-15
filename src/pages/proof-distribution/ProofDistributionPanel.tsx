@@ -40,6 +40,24 @@ import {
 
 type Tab = "destinations" | "placements" | "rights";
 
+function confirmProofRemoval(
+  placement: Placement,
+  onAct: (key: string, work: () => Promise<void>, said: string) => Promise<void>,
+) {
+  const reason = window.prompt("Why is this proof placement being removed?")?.trim();
+  if (!reason) return;
+  const wasLive = LIVE_STATUSES.has(placement.status) || Boolean(
+    placement.placed_at || placement.external_id || placement.external_url);
+  const evidenceRef = wasLive
+    ? window.prompt("Where did you confirm removal? Paste the provider URL, ticket, or screenshot reference.")?.trim()
+    : null;
+  if (wasLive && !evidenceRef) return;
+  void onAct(placement.id, () => recordRetracted(placement.id, {
+    method: wasLive ? "human_checked" : "cancelled_before_placement",
+    reason, evidenceRef,
+  }), wasLive ? "Human removal confirmation recorded." : "Unplaced proof cancelled.");
+}
+
 export function ProofDistributionPanel({ tab }: { tab: Tab }) {
   const { clientId } = useParams<{ clientId: string }>();
   const [destinations, setDestinations] = useState<Destination[]>([]);
@@ -390,16 +408,10 @@ function PlacementsTab({
                 : []),
               ...(LIVE_STATUSES.has(placement.status) || placement.status === "retraction_required"
                 ? [{
-                    label: "Record as taken down",
+                    label: LIVE_STATUSES.has(placement.status) || placement.placed_at || placement.external_id || placement.external_url
+                      ? "Confirm removal" : "Cancel unplaced proof",
                     destructive: true,
-                    onSelect: () => {
-                      const why = window.prompt("Why is it coming down?");
-                      void onAct(
-                        placement.id,
-                        () => recordRetracted(placement.id, why?.trim() || undefined),
-                        "Recorded as retracted.",
-                      );
-                    },
+                    onSelect: () => confirmProofRemoval(placement, onAct),
                   }]
                 : []),
             ]}
@@ -463,16 +475,10 @@ function RightsTab({
                 name={titleOf(placement.source_proof_id)}
                 busy={busy === placement.id}
                 items={[{
-                  label: "Record as taken down",
+                  label: LIVE_STATUSES.has(placement.status) || placement.placed_at || placement.external_id || placement.external_url
+                    ? "Confirm removal" : "Cancel unplaced proof",
                   destructive: true,
-                  onSelect: () => {
-                    const why = window.prompt("Why is it coming down?");
-                    void onAct(
-                      placement.id,
-                      () => recordRetracted(placement.id, why?.trim() || undefined),
-                      "Recorded as retracted.",
-                    );
-                  },
+                  onSelect: () => confirmProofRemoval(placement, onAct),
                 }]}
               />,
             ])}

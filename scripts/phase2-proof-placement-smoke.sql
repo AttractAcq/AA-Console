@@ -23,6 +23,7 @@ declare p public.client_proof_assets%rowtype;
   rights_request uuid;
   rights_source uuid;
   placement_id uuid;
+  confirmation_placement_id uuid;
   request_id uuid;
   placement_approval_id uuid;
   stale_placement_id uuid;
@@ -114,5 +115,47 @@ begin
   if (select status from public.proof_placements where id=placement_id) <> 'retraction_required'
     or (select status from public.approval_inbox_v6 where id=request_id) = 'approved'
     then raise exception 'Revoked proof still appeared releasable'; end if;
+  if has_function_privilege('authenticated',
+    'public.record_proof_retracted_v6(uuid,text)','execute')
+    or has_function_privilege('service_role',
+      'public.record_proof_retracted_v6(uuid,text)','execute') then
+    raise exception 'Status-only proof retraction RPC remains callable'; end if;
+  begin
+    update public.proof_placements set status='retracted' where id=placement_id;
+    raise exception 'A placement was retracted without a receipt';
+  exception when check_violation then null; end;
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal1"}',true);
+  begin
+    perform public.record_proof_retraction_confirmation_v6(placement_id,
+      'human_checked','https://example.invalid/removal-ticket','Rights withdrawn');
+    raise exception 'AAL1 confirmed external proof removal';
+  exception when insufficient_privilege then null; end;
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  begin
+    perform public.record_proof_retraction_confirmation_v6(placement_id,
+      'cancelled_before_placement',null,'Rights withdrawn');
+    raise exception 'A placed proof was cancelled as if never published';
+  exception when check_violation then null; end;
+  begin
+    perform public.record_proof_retraction_confirmation_v6(placement_id,
+      'human_checked',null,'Rights withdrawn');
+    raise exception 'A live proof was retracted without removal evidence';
+  exception when check_violation then null; end;
+  perform public.record_proof_retraction_confirmation_v6(placement_id,
+    'human_checked','https://example.invalid/removal-ticket','Rights withdrawn');
+  confirmation_placement_id := placement_id;
+  if (select status from public.proof_placements where id=placement_id)<>'retracted'
+    or not exists(select 1 from public.proof_placement_retraction_receipts_v6 r
+      where r.placement_id=confirmation_placement_id and r.method='human_checked'
+        and r.evidence_ref='https://example.invalid/removal-ticket'
+        and r.recorded_by='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') then
+    raise exception 'Removal confirmation did not atomically record its receipt'; end if;
+  begin
+    perform public.record_proof_retraction_confirmation_v6(placement_id,
+      'human_checked','https://example.invalid/removal-ticket','Again');
+    raise exception 'A duplicate removal confirmation succeeded';
+  exception when check_violation then null; end;
 end $checks$;
 rollback;
