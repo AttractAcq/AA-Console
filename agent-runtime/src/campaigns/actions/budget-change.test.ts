@@ -29,6 +29,7 @@ function db(recordError = false) {
       ad_set_external_id: "23848", current_daily_budget: 50,
       proposed_daily_budget: 75, currency: "GBP",
     }, error: null };
+    if (name === "meta_budget_credential_eligible_v6") return { data: true, error: null };
     if (name === "integration_secret") return { data: "token", error: null };
     if (name === "record_budget_change_applied" && recordError) {
       return { data: null, error: { message: "database unavailable" } };
@@ -68,6 +69,18 @@ it("refuses a different live budget before any Meta write", async () => {
   await expect(changeAdSetBudget(sb, config, action)).rejects.toThrow(/differs from the reviewed/);
   expect(updateAdSetDailyBudget).not.toHaveBeenCalled();
   expect(rpc).not.toHaveBeenCalledWith("record_budget_change_applied", expect.anything());
+});
+
+it("requires the credential grant before a Meta read or write", async () => {
+  const { sb, rpc } = db();
+  rpc.mockImplementationOnce(async () => ({ data: {
+    id: "change-1", client_id: "client-1", campaign_id: "campaign-1",
+    ad_set_external_id: "23848", current_daily_budget: 50,
+    proposed_daily_budget: 75, currency: "GBP",
+  }, error: null })).mockImplementationOnce(async () => ({ data: false, error: null }));
+  await expect(changeAdSetBudget(sb, config, action)).rejects.toThrow(/AAL2-reviewed Meta write credential/);
+  expect(readAdSetBudget).not.toHaveBeenCalled();
+  expect(updateAdSetDailyBudget).not.toHaveBeenCalled();
 });
 
 it("holds an unconfirmed provider response for manual reconciliation", async () => {

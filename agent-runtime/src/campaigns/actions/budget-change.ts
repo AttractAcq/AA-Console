@@ -40,6 +40,15 @@ async function accountFor(
   sb: SupabaseClient,
   clientId: string,
 ): Promise<{ accessToken: string; accountId: string }> {
+  const { data: eligible, error: grantError } = await sb.rpc("meta_budget_credential_eligible_v6", {
+    p_client_id: clientId,
+  } as never);
+  if (grantError) {
+    throw new ActionError(`Could not check the Meta budget credential grant: ${grantError.message}`, false);
+  }
+  if (eligible !== true) {
+    throw new ActionError("A current, AAL2-reviewed Meta write credential is required.", false);
+  }
   const { data, error } = await sb
     .from("client_integrations")
     .select("*")

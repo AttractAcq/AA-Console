@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "93327bbe4b7df94b05a4ac9be3fa0ed4f73f7bc3a1461459be34a46aeaa4e107",
+  "migrationSourceDigest": "a623cc920c66041d87d79167dcf2e525845992f53d5eec6c892f5476df909274",
   "generatedTypesSha256": "f8a4a93c8cdeeafe599708c66e7d3f8e74050f16dc3025a5299fe36f21e92aa2",
   "generatedSchemaBodySha256": "e476840f5c1fb54688a2d839699799e48d11b4ec555fd386575148c98ffe4d4b",
   "localMigrations": [
@@ -3377,6 +3377,13 @@
       "filename": "20261120050000_465_campaign_budget_review_coverage.sql",
       "sha256": "24d3f7dd71704032ee9e7059275102c2ef329fb636865b29bea45b3bb3502821",
       "trimmedMd5": "babf324ab0d03dcbf6cf0c8aaa5acdd1"
+    },
+    {
+      "version": "20261120060000",
+      "name": "466_meta_budget_credential_gate",
+      "filename": "20261120060000_466_meta_budget_credential_gate.sql",
+      "sha256": "b86be20987a5c1f5699d7fc0cc7c1c784ebb7c632f22bcaeac3c20c47d875f2b",
+      "trimmedMd5": "da9ab1a1d31bd40d6b59b62e04473cfe"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
