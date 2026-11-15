@@ -37,16 +37,22 @@ function client(options: {
   const updateUserById = vi.fn(async () => ({ data: { user: { id: options.userId ?? "user-1" } }, error: null }));
   const deleteFactor = vi.fn(async ({ id }: { id: string }) => ({ data: { id }, error: null }));
   const listFactors = vi.fn(async () => ({ data: { factors: options.factors ?? [] }, error: null }));
+  const revokeAllSessions = vi.fn(async () => ({ error: null }));
   const insert = vi.fn(async () => ({ error: options.insertError ?? null }));
   const maybeSingle = vi.fn(async () => ({ data: options.profile ?? null, error: null }));
   const fake = {
-    auth: { admin: { createUser, deleteUser, listUsers, updateUserById, mfa: { listFactors, deleteFactor } } },
+    auth: {
+      admin: {
+        createUser, deleteUser, listUsers, updateUserById, revokeAllSessions,
+        mfa: { listFactors, deleteFactor },
+      },
+    },
     from: () => ({
       select: () => ({ eq: () => ({ maybeSingle }) }),
       insert,
     }),
   } as unknown as BotProvisionClient;
-  return { fake, createUser, deleteUser, listUsers, insert, updateUserById, deleteFactor, listFactors };
+  return { fake, createUser, deleteUser, listUsers, insert, updateUserById, deleteFactor, listFactors, revokeAllSessions };
 }
 
 describe("provisionBotUser", () => {
@@ -97,46 +103,23 @@ describe("provisionBotUser", () => {
     expect(BOT_EMAILS["bot-cos"]).not.toBe("bot-cos@attractacq.com");
   });
 
-  it("reports an existing user and does not change the password or profile", async () => {
+  it("refuses to promote a pre-existing auth account into a bot", async () => {
     const { fake, deleteUser, insert } = client({
       createError: { message: "A user with this email address has already been registered", code: "email_exists" },
       users: [{ id: "existing-1", email: "sales@attractacq.com" }],
       profile: {
         id: "existing-1",
         role: "admin",
-        is_bot: true,
-        bot_key: "bot-sales",
+        is_bot: false,
+        bot_key: null,
         email: "sales@attractacq.com",
       },
     });
-    const result = await provisionBotUser(fake, {
+    await expect(provisionBotUser(fake, {
       botKey: "bot-sales",
       fullName: "Sales",
       password: PASSWORD,
-    });
-    expect(result.status).toBe("already_provisioned");
-    expect(result.userId).toBe("existing-1");
-    expect(insert).not.toHaveBeenCalled();
-    expect(deleteUser).not.toHaveBeenCalled();
-  });
-
-  it("does not overwrite a conflicting profile", async () => {
-    const { fake, insert, deleteUser } = client({
-      createError: { code: "email_exists", message: "already been registered" },
-      users: [{ id: "existing-2", email: "ops-admin@attractacq.com" }],
-      profile: {
-        id: "existing-2",
-        role: "employee",
-        is_bot: false,
-        bot_key: null,
-        email: "ops-admin@attractacq.com",
-      },
-    });
-    await expect(provisionBotUser(fake, {
-      botKey: "bot-admin",
-      fullName: "Admin",
-      password: PASSWORD,
-    })).rejects.toThrow(/were not changed/);
+    })).rejects.toThrow(/Refusing to promote an existing account/);
     expect(insert).not.toHaveBeenCalled();
     expect(deleteUser).not.toHaveBeenCalled();
   });
@@ -180,6 +163,7 @@ describe("bot credential maintenance", () => {
     const result = await resetBotPassword(bot.fake, { botKey: "bot-cos", password: PASSWORD });
     expect(result.status).toBe("reset");
     expect(bot.updateUserById).toHaveBeenCalledWith("user-1", { password: PASSWORD });
+    expect(bot.revokeAllSessions).toHaveBeenCalledWith("user-1");
     expect(JSON.stringify(result)).not.toContain(PASSWORD);
 
     const human = client({
@@ -192,13 +176,14 @@ describe("bot credential maintenance", () => {
   });
 
   it("does not change a password on dry-run", async () => {
-    const { fake, updateUserById } = client({
+    const { fake, updateUserById, revokeAllSessions } = client({
       users: [{ id: "user-1", email: "cos@attractacq.com" }],
       profile: botProfile,
     });
     const result = await resetBotPassword(fake, { botKey: "bot-cos", password: "", dryRun: true });
     expect(result.status).toBe("dry_run");
     expect(updateUserById).not.toHaveBeenCalled();
+    expect(revokeAllSessions).not.toHaveBeenCalled();
   });
 
   it("deletes MFA factors for a bot and refuses a non-bot", async () => {
@@ -214,6 +199,7 @@ describe("bot credential maintenance", () => {
     expect(result.factorIds).toEqual(["factor-1", "factor-2"]);
     expect(bot.deleteFactor).toHaveBeenCalledTimes(2);
     expect(bot.deleteFactor).toHaveBeenCalledWith({ id: "factor-1", userId: "user-1" });
+    expect(bot.revokeAllSessions).toHaveBeenCalledWith("user-1");
 
     const dry = client({
       users: [{ id: "user-1", email: "finance@attractacq.com" }],
@@ -223,6 +209,7 @@ describe("bot credential maintenance", () => {
     const preview = await unenrollBotMfa(dry.fake, { botKey: "bot-finance", dryRun: true });
     expect(preview.status).toBe("dry_run");
     expect(dry.deleteFactor).not.toHaveBeenCalled();
+    expect(dry.revokeAllSessions).not.toHaveBeenCalled();
 
     const human = client({
       users: [{ id: "human-1", email: "finance@attractacq.com" }],

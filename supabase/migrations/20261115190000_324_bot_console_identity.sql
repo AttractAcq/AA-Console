@@ -123,6 +123,40 @@ grant execute on function public.is_human_admin() to authenticated, service_role
 -- raw_app_meta_data.is_bot = false and bot_key = null.
 update public.profiles set is_bot = is_bot;
 
+
+-- Product allowlist. bot-production may approve content, assets, and a
+-- production-release decision. bot-sales may approve a lead-magnet version.
+-- Publishing, distribution, and delivery are not on this list.
+create or replace function public.bot_may(p_action text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+      from public.profiles p
+     where p.id = auth.uid()
+       and p.is_bot
+       and (p.bot_key, p_action) in (
+         ('bot-production', 'approve_content'),
+         ('bot-production', 'approve_asset'),
+         ('bot-production', 'approve_production_release'),
+         ('bot-sales', 'approve_lead_magnet')
+       )
+  );
+$$;
+
+comment on function public.bot_may(text) is
+  'True only when the caller is a bot whose bot_key is allowed this action. Humans are false. AAL2 is not consulted.';
+
+revoke execute on function public.bot_may(text) from public, anon;
+grant execute on function public.bot_may(text) to authenticated, service_role;
+
+
+revoke truncate, trigger, references on table public.profiles from public, anon, authenticated;
+
 -- <<end bot-identity>>
 
 -- Extend the exposure inventory when adding a gate, or signed-in definer
@@ -134,7 +168,7 @@ returns text language sql immutable set search_path to 'public' as $$
     || '|may_advance_slot|may_touch_assignment|may_manage_client_leads'
     || '|has_client_sales_entitlement|can_read_client_sales_data|can_read_workflow_lead_attribution'
     || '|advance_slot|advance_assignment'
-    || '|require_active_bot|require_bot_client_grant'
+    || '|require_active_bot|require_bot_client_grant|bot_may\('
 $$;
 
 -- <<hard-hold-rpcs>>
@@ -2092,8 +2126,11 @@ create policy motion_scenes_write_delete on public.motion_scenes
   for delete to authenticated
   using (public.is_human_admin() or auth.uid() = public.active_video_approval_manager(client_id));
 
--- storage.objects admin gates. Reads stay is_admin(). Writes are human admins.
--- client-media and proof are follow-on for per-tab RBAC; they are denied now.
+-- storage.objects admin gates. Reads stay is_admin(). Admin writes are human
+-- admins. client-media uploads are also closed to bots by
+-- media_obj_employee_insert below: can_access_client() is true for every
+-- admin, including a bot, so that insert policy has to exclude is_bot.
+-- proof client inserts stay a client policy. Per-tab bot uploads are follow-on.
 
 drop policy if exists sops_obj_admin_all on storage.objects;
 create policy sops_obj_admin_select on storage.objects
@@ -2155,6 +2192,30 @@ create policy proof_obj_admin_delete on storage.objects
   for delete to authenticated
   using (bucket_id = 'proof' and public.is_human_admin());
 
+
+-- Employee upload into a client folder. A bot admin also passes
+-- can_access_client(), so is_bot is excluded explicitly.
+drop policy if exists media_obj_employee_insert on storage.objects;
+create policy media_obj_employee_insert on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'client-media'
+    and public.can_access_client(public.try_uuid((storage.foldername(name))[1]))
+    and not exists (
+      select 1 from public.profiles p
+       where p.id = auth.uid() and p.is_bot
+    )
+  );
+
+-- Offer Studio create. The read policy is unchanged. A bot admin cannot insert.
+drop policy if exists service_offers_create on public.service_offers;
+create policy service_offers_create on public.service_offers
+  for insert to authenticated
+  with check (
+    coalesce(public.is_human_admin(), false)
+    or auth.uid() = public.active_video_approval_manager(client_id)
+  );
+
 -- <<end rls-split>>
 
 -- <<approval-decisions>>
@@ -2177,20 +2238,26 @@ declare
   v_hash text;
   v_blocker text;
   v_id uuid;
+  v_kind text;
 begin
 
   -- Bot console users are admins so agency reads keep working, and AAL2 does
   -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
   -- service_role executors are unchanged.
   if auth.role() is distinct from 'service_role'
-     and not coalesce(public.is_human_admin(), false)
      and exists (
        select 1
          from public.profiles as bot_identity
         where bot_identity.id = auth.uid()
           and bot_identity.is_bot
      ) then
-    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+    select r.source_kind into v_kind
+      from public.approval_requests_v6 r
+     where r.id = p_request_id;
+    if v_kind is distinct from 'production_release'
+       or not public.bot_may('approve_production_release') then
+      raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+    end if;
   end if;
 
   if auth.role() is distinct from 'authenticated' or auth.uid() is null
@@ -2209,7 +2276,11 @@ begin
     where id = p_request_id for update;
   if not found then raise exception 'Approval request not found.' using errcode = 'P0002'; end if;
   if v_request.client_id is null then
-    if not coalesce(public.is_human_admin(), false) then
+    if not coalesce(public.is_human_admin(), false)
+       and not (
+         v_request.source_kind = 'production_release'
+         and public.bot_may('approve_production_release')
+       ) then
       raise exception 'Only an admin may decide agency-wide approvals.' using errcode = '42501';
     end if;
   elsif not public.can_review_approval_request_v6(v_request.client_id, v_request.owner_role) then
@@ -2888,7 +2959,8 @@ begin
          from public.profiles as bot_identity
         where bot_identity.id = auth.uid()
           and bot_identity.is_bot
-     ) then
+     )
+     and not public.bot_may('approve_production_release') then
     raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
   end if;
 
@@ -3106,7 +3178,8 @@ begin
          from public.profiles as bot_identity
         where bot_identity.id = auth.uid()
           and bot_identity.is_bot
-     ) then
+     )
+     and not public.bot_may('approve_production_release') then
     raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
   end if;
 
@@ -3380,7 +3453,8 @@ begin
          from public.profiles as bot_identity
         where bot_identity.id = auth.uid()
           and bot_identity.is_bot
-     ) then
+     )
+     and not public.bot_may('approve_lead_magnet') then
     raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
   end if;
 
@@ -3422,6 +3496,874 @@ begin
 end $$;
 -- <<end approval-decisions>>
 
+
+-- <<security-review-preambles>>
+-- approve_service_offer_version_v6 (was 20261016010000_208_v6_offer_studio.sql; preamble only)
+create or replace function public.approve_service_offer_version_v6(p_version_id uuid)
+returns public.service_offer_signoffs
+language plpgsql volatile security definer
+set search_path = pg_catalog, public
+set timezone = 'UTC'
+as $$
+declare
+  v_version public.service_offer_versions%rowtype;
+  v_claim jsonb;
+  v_proof public.client_proof_assets%rowtype;
+  v_signoff public.service_offer_signoffs%rowtype;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  if auth.role() <> 'authenticated' or auth.uid() is null then
+    raise exception 'A signed-in human must approve this offer.';
+  end if;
+  select * into v_version from public.service_offer_versions where id = p_version_id;
+  if not found then raise exception 'Offer version not found.'; end if;
+  if not (coalesce(public.is_admin(), false) or
+    coalesce(auth.uid() = public.active_video_approval_manager(v_version.client_id), false)) then
+    raise exception 'Only an admin or the active client manager may approve.';
+  end if;
+  if exists (select 1 from public.service_offer_signoffs where offer_version_id = p_version_id) then
+    raise exception 'This offer version is already approved.';
+  end if;
+  for v_claim in select * from jsonb_array_elements(v_version.claims) loop
+    if v_claim->>'kind' = 'quantified' then
+      select * into v_proof from public.client_proof_assets
+        where id = (v_claim->>'proof_asset_id')::uuid;
+      if not found or v_proof.client_id <> v_version.client_id
+         or v_proof.usage_rights <> 'approved'
+         or (v_proof.expires_on is not null and v_proof.expires_on < current_date) then
+        raise exception 'A quantified claim needs current, cleared proof for this client.';
+      end if;
+    end if;
+  end loop;
+  insert into public.service_offer_signoffs(offer_version_id,client_id,approved_by)
+  values (p_version_id,v_version.client_id,auth.uid()) returning * into v_signoff;
+  return v_signoff;
+end;
+$$;
+
+-- decide_meta_profile_change_v6 (was 20261024150000_241_meta_profile_presence.sql; preamble only)
+create or replace function public.decide_meta_profile_change_v6(
+  p_change_id uuid, p_approved boolean, p_reason text default null)
+returns public.meta_profile_changes language plpgsql security definer
+set search_path = pg_catalog, public as $$
+declare v_change public.meta_profile_changes%rowtype;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  select * into v_change from public.meta_profile_changes where id = p_change_id for update;
+  if not found then raise exception 'No such change.' using errcode = 'P0001'; end if;
+  if auth.role() is distinct from 'authenticated'
+     or not (coalesce(public.is_admin(), false)
+             or coalesce(auth.uid() = public.active_video_approval_manager(v_change.client_id), false)) then
+    raise exception 'A signed-in admin or the assigned client manager must decide this.'
+      using errcode = 'P0001';
+  end if;
+  if v_change.status <> 'drafted' then
+    raise exception 'That change is %, not a draft.', v_change.status using errcode = 'P0001';
+  end if;
+
+  if not coalesce(p_approved, false) then
+    if nullif(btrim(coalesce(p_reason, '')), '') is null then
+      raise exception 'Say why it was rejected.' using errcode = 'P0001';
+    end if;
+    update public.meta_profile_changes
+       set status = 'rejected', rejection_reason = btrim(p_reason)
+     where id = p_change_id returning * into v_change;
+    return v_change;
+  end if;
+
+  update public.meta_profile_changes
+     set status = 'approved', approved_by = auth.uid(), approved_at = now()
+   where id = p_change_id returning * into v_change;
+  return v_change;
+end $$;
+
+-- decide_proof_delivery (was 20261018110000_216_proof_capture_delivery.sql; preamble only)
+create or replace function public.decide_proof_delivery(p_delivery_id uuid,p_approve boolean) returns void
+language plpgsql security definer set search_path=pg_catalog,public as $$
+declare d public.proof_request_deliveries%rowtype;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+ select * into d from public.proof_request_deliveries where id=p_delivery_id for update;
+ if not found or auth.role() is distinct from 'authenticated' or not(coalesce(public.is_admin(),false) or coalesce(auth.uid()=public.active_video_approval_manager(d.client_id),false)) then raise exception 'Not permitted'; end if;
+ if d.status not in ('pending_approval','approved','failed') then raise exception 'This delivery can no longer be changed'; end if;
+ update public.proof_request_deliveries set status=case when p_approve then 'approved' else 'cancelled' end,
+ approved_by=case when p_approve then auth.uid() end,approved_at=case when p_approve then now() end,error=null where id=d.id;
+end $$;
+
+-- approve_message_template_v6 (was 20261025140000_249_the_send_path.sql; preamble only)
+-- ---------------------------------------------------------------------------
+-- Approving a version for a channel and a purpose
+-- ---------------------------------------------------------------------------
+
+create or replace function public.approve_message_template_v6(
+  p_template_version_id uuid, p_consent_basis text)
+returns public.message_template_approvals language plpgsql security definer
+set search_path = pg_catalog, public as $$
+declare
+  v public.message_template_versions%rowtype;
+  t public.message_templates%rowtype;
+  a public.message_template_approvals%rowtype;
+  v_supported boolean;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  select * into v from public.message_template_versions where id = p_template_version_id;
+  if not found then raise exception 'No such message version.' using errcode = 'P0001'; end if;
+  select * into t from public.message_templates where id = v.template_id;
+
+  if auth.role() is distinct from 'authenticated'
+     or not (coalesce(public.is_admin(), false)
+             or coalesce(auth.uid() = public.active_video_approval_manager(t.client_id), false)) then
+    raise exception 'A signed-in admin or the assigned client manager must approve a message.'
+      using errcode = 'P0001';
+  end if;
+
+  -- Stated, not inferred. Nothing reads consent_wording, so this sentence is
+  -- the record of the judgement that the consent covers a message like this.
+  if nullif(btrim(coalesce(p_consent_basis, '')), '') is null then
+    raise exception 'Say why the consent these leads gave covers a message of this purpose.'
+      using errcode = 'P0001';
+  end if;
+
+  select supported into v_supported from public.message_channels
+   where channel_key = t.channel_key;
+  if not coalesce(v_supported, false) then
+    raise exception 'There is no transport for %. Approving it would authorise something that cannot happen.',
+      t.channel_key using errcode = 'P0001';
+  end if;
+
+  insert into public.message_template_approvals (
+    template_version_id, client_id, channel_key, purpose, consent_basis, approved_by)
+  values (p_template_version_id, t.client_id, t.channel_key, t.purpose,
+          btrim(p_consent_basis), auth.uid())
+  on conflict (template_version_id, channel_key) do update
+    set status = 'approved', consent_basis = excluded.consent_basis,
+        approved_by = excluded.approved_by, approved_at = now(),
+        revoked_by = null, revoked_at = null, revoked_reason = null
+  returning * into a;
+  return a;
+end $$;
+
+-- approve_nurture_sequence_v6 (was 20261025170000_252_walking_the_sequence.sql; preamble only)
+-- G11, the engine: approving a sequence, enrolling leads, and walking them.
+--
+-- The one thing in here worth reading twice is `sequence_exit_reason_v6`.
+-- Everything else is bookkeeping; that function is what stops the system
+-- asking somebody who booked a call on Tuesday whether they are still
+-- thinking it over.
+
+-- ---------------------------------------------------------------------------
+-- Approving the shape
+-- ---------------------------------------------------------------------------
+
+create or replace function public.approve_nurture_sequence_v6(p_sequence_id uuid)
+returns public.nurture_sequences language plpgsql security definer
+set search_path = pg_catalog, public as $$
+declare
+  s public.nurture_sequences%rowtype;
+  v_steps integer;
+  v_unapproved text;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  select * into s from public.nurture_sequences where id = p_sequence_id for update;
+  if not found then raise exception 'No such sequence.' using errcode = 'P0001'; end if;
+  if auth.role() is distinct from 'authenticated'
+     or not (coalesce(public.is_admin(), false)
+             or coalesce(auth.uid() = public.active_video_approval_manager(s.client_id), false)) then
+    raise exception 'A signed-in admin or the assigned client manager must approve a sequence.'
+      using errcode = 'P0001';
+  end if;
+
+  select count(*)::int into v_steps from public.nurture_sequence_steps
+   where sequence_id = p_sequence_id;
+  if v_steps = 0 then
+    raise exception 'That sequence has no steps.' using errcode = 'P0001';
+  end if;
+
+  -- Approving the shape must not quietly authorise unapproved words.
+  select string_agg('step ' || st.position::text, ', ' order by st.position)
+    into v_unapproved
+    from public.nurture_sequence_steps st
+   where st.sequence_id = p_sequence_id
+     and not exists (
+       select 1 from public.message_template_approvals a
+        where a.template_version_id = st.template_version_id and a.status = 'approved');
+  if v_unapproved is not null then
+    raise exception 'These steps carry words nobody has approved: %. Approve each message version first.',
+      v_unapproved using errcode = 'P0001';
+  end if;
+
+  update public.nurture_sequences
+     set approved_at = now(), approved_by = auth.uid()
+   where id = p_sequence_id returning * into s;
+  return s;
+end $$;
+
+-- create_booking_link_v6 (was 20261029200000_269_authenticated_sales_rpc_scope.sql; preamble only)
+-- B005 guarded RPC: create_booking_link_v6 (latest definition from 20261025210000_256_taking_a_slot.sql).
+create or replace function public.create_booking_link_v6(
+  p_client_id uuid, p_purpose text, p_token_hash text,
+  p_campaign_id uuid default null, p_expires_at timestamptz default null)
+returns public.booking_links
+language plpgsql security definer
+set search_path = pg_catalog, public as $$
+declare v public.booking_links%rowtype;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  if not (coalesce(public.is_admin(), false)
+          or coalesce(public.may_manage_client_leads(p_client_id), false)) then
+    raise exception 'Not permitted for this client.' using errcode = 'P0001';
+  end if;
+  if p_campaign_id is not null and not exists (
+    select 1 from public.client_campaigns c
+     where c.id = p_campaign_id and c.client_id = p_client_id) then
+    raise exception 'That campaign belongs to a different client.' using errcode = 'P0001';
+  end if;
+  if p_token_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'A booking token hash is 64 hex characters.' using errcode = 'P0001';
+  end if;
+  insert into public.booking_links (
+    client_id, campaign_id, purpose, token_hash, expires_at, created_by)
+  values (
+    p_client_id, p_campaign_id, btrim(p_purpose), p_token_hash, p_expires_at, auth.uid())
+  returning * into v;
+  return v;
+end $$;
+
+-- release_proof_to_sales_agent_v6 (was 20261025110000_246_proof_reaches_the_surfaces_it_was_made_for.sql; preamble only)
+-- ---------------------------------------------------------------------------
+-- G10: which proof a sales agent may cite
+-- ---------------------------------------------------------------------------
+
+-- A reference placement, and the one of the three that is a decision rather
+-- than bookkeeping: releasing proof to an agent is a person saying it may be
+-- quoted in conversations nobody reads one by one. So it goes through the
+-- normal approval path and this only records the release.
+create or replace function public.release_proof_to_sales_agent_v6(p_placement_id uuid, p_deployment_id uuid)
+returns public.proof_placements
+language plpgsql security definer
+set search_path = pg_catalog, public as $$
+declare
+  v public.proof_placements%rowtype;
+  v_deployment public.client_sales_agent_deployments%rowtype;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  select * into v from public.proof_placements where id = p_placement_id for update;
+  if not found then raise exception 'No such placement.' using errcode = 'P0001'; end if;
+  if coalesce(auth.role(), '') <> 'service_role'
+     and not (coalesce(public.is_admin(), false)
+              or coalesce(auth.uid() = public.active_video_approval_manager(v.client_id), false)) then
+    raise exception 'Only an admin or the assigned client manager can release proof to an agent.'
+      using errcode = 'P0001';
+  end if;
+  if v.destination_key <> 'sales_conversation' then
+    raise exception 'That placement is for %, not a sales conversation.', v.destination_key
+      using errcode = 'P0001';
+  end if;
+  if v.status <> 'approved' then
+    raise exception 'That placement is %, not approved.', v.status using errcode = 'P0001';
+  end if;
+
+  select * into v_deployment from public.client_sales_agent_deployments where id = p_deployment_id;
+  if not found then raise exception 'No such deployment.' using errcode = 'P0001'; end if;
+  if v_deployment.client_id <> v.client_id then
+    raise exception 'That deployment belongs to a different client.' using errcode = 'P0001';
+  end if;
+  if not v_deployment.enabled then
+    raise exception 'That deployment is disabled, so nothing would cite the proof.'
+      using errcode = 'P0001';
+  end if;
+
+  update public.proof_placements
+     set status = 'placed', external_id = p_deployment_id::text, placed_at = now(),
+         placed_by = auth.uid()
+   where id = p_placement_id returning * into v;
+
+  insert into public.proof_placement_events (placement_id, client_id, kind, detail)
+  values (p_placement_id, v.client_id, 'placed',
+          'Released to sales agent deployment ' || p_deployment_id::text || '.');
+  return v;
+end $$;
+
+-- create_lead_capture_endpoint_v6 (was 20261024090000_235_a_lead_can_arrive_from_outside.sql; preamble only)
+-- ---------------------------------------------------------------------------
+-- Creating the endpoint
+-- ---------------------------------------------------------------------------
+
+-- The token is returned once, here, and never stored. Whoever calls this is
+-- responsible for putting it somewhere useful; the database keeps only the
+-- hash, so losing it means issuing a new one rather than reading the old one
+-- back out.
+create or replace function public.create_lead_capture_endpoint_v6(
+  p_client_id uuid,
+  p_purpose text,
+  p_token_hash text,
+  p_consent_wording text,
+  p_campaign_id uuid default null,
+  p_page_id uuid default null,
+  p_source_channel text default null,
+  p_days integer default 90,
+  p_max_submissions integer default 500
+) returns public.lead_capture_endpoints
+language plpgsql security definer
+set search_path = pg_catalog, public as $$
+declare v_row public.lead_capture_endpoints%rowtype;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  if coalesce(auth.role(), '') <> 'service_role'
+     and not (coalesce(public.is_admin(), false)
+              or coalesce(auth.uid() = public.active_video_approval_manager(p_client_id), false)) then
+    raise exception 'Only an admin or the assigned client manager can open a capture endpoint.'
+      using errcode = 'P0001';
+  end if;
+  if p_token_hash is null or p_token_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'A hashed token is required.' using errcode = 'P0001';
+  end if;
+  -- The campaign has to belong to the client, or an endpoint could attribute
+  -- one client's leads to another's campaign.
+  if p_campaign_id is not null and not exists (
+    select 1 from public.client_campaigns
+     where id = p_campaign_id and client_id = p_client_id) then
+    raise exception 'That campaign does not belong to this client.' using errcode = 'P0001';
+  end if;
+  if p_page_id is not null and not exists (
+    select 1 from public.client_pages where id = p_page_id and client_id = p_client_id) then
+    raise exception 'That page does not belong to this client.' using errcode = 'P0001';
+  end if;
+
+  insert into public.lead_capture_endpoints (
+    client_id, purpose, token_hash, campaign_id, page_id, source_channel,
+    consent_wording, expires_at, max_submissions, created_by)
+  values (
+    p_client_id, p_purpose, p_token_hash, p_campaign_id, p_page_id, p_source_channel,
+    btrim(p_consent_wording),
+    now() + make_interval(days => greatest(coalesce(p_days, 90), 1)),
+    greatest(coalesce(p_max_submissions, 500), 1),
+    nullif(auth.uid(), null))
+  returning * into v_row;
+  return v_row;
+end $$;
+
+-- approve_proof_artifact_v6 (was 20261016020000_209_v6_proof_artifacts.sql; preamble only)
+create or replace function public.approve_proof_artifact_v6(p_artifact_version_id uuid)
+returns public.proof_artifact_signoffs
+language plpgsql volatile security definer
+set search_path = pg_catalog, public
+set timezone = 'UTC'
+as $$
+declare
+  v_artifact public.proof_artifact_versions%rowtype;
+  v_proof public.client_proof_assets%rowtype;
+  v_signoff public.proof_artifact_signoffs%rowtype;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     )
+     and not public.bot_may('approve_asset') then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  if auth.role() <> 'authenticated' or auth.uid() is null then
+    raise exception 'A signed-in human must approve a proof artifact.';
+  end if;
+  select * into v_artifact from public.proof_artifact_versions where id = p_artifact_version_id;
+  if not found then raise exception 'Proof artifact not found.'; end if;
+  if not (coalesce(public.is_admin(), false) or
+    coalesce(auth.uid() = public.active_video_approval_manager(v_artifact.client_id), false)) then
+    raise exception 'Only an admin or the active client manager may approve.';
+  end if;
+  select * into v_proof from public.client_proof_assets
+    where id = v_artifact.source_proof_id and client_id = v_artifact.client_id for share;
+  if not found or v_proof.usage_rights <> 'approved'
+     or nullif(btrim(v_proof.permission_basis), '') is null
+     or (v_proof.expires_on is not null and v_proof.expires_on < current_date)
+     or public.proof_snapshot_hash_v6(public.proof_source_snapshot_v6(v_proof)) <> v_artifact.source_hash then
+    raise exception 'The proof source is uncleared, expired or changed. Refresh the artifact.';
+  end if;
+  if exists (select 1 from public.proof_artifact_signoffs
+    where artifact_version_id = p_artifact_version_id) then
+    raise exception 'This proof artifact is already approved.';
+  end if;
+  insert into public.proof_artifact_signoffs(artifact_version_id, client_id, approved_by)
+  values (p_artifact_version_id, v_artifact.client_id, auth.uid()) returning * into v_signoff;
+  return v_signoff;
+end;
+$$;
+
+-- review_media_asset (was 20261025120000_247_creative_decisions_have_a_seat.sql; preamble only)
+-- ---------------------------------------------------------------------------
+-- The decision, now recording its seat
+-- ---------------------------------------------------------------------------
+
+-- Replaced in full rather than wrapped. Every existing refusal is kept
+-- verbatim and in the same order, so the sentence a person already knows is
+-- the sentence they still get; the two additions are the opt-in creative
+-- director gate and the seat written onto the review row.
+create or replace function public.review_media_asset(
+  p_asset_id uuid, p_decision review_status, p_reason text default null)
+returns void language plpgsql security definer
+set search_path = public as $function$
+declare
+  a client_media_assets%rowtype;
+  v_state jsonb;
+  v_seat text;
+  v_required boolean;
+  v_director uuid;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     )
+     and not public.bot_may('approve_content') then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  select * into a from client_media_assets where id = p_asset_id for update;
+  if a.id is null then raise exception 'Asset not found'; end if;
+  if not can_access_client(a.client_id) then raise exception 'Not permitted for this client'; end if;
+  if a.media_type = 'video' and a.human_approved_at is not null then
+    raise exception 'This video version has already been finalized.';
+  end if;
+  if p_decision = 'pending' then raise exception 'Decision must be approved or rejected'; end if;
+  if p_decision = 'approved' and a.edit_stage <> 'review_ready' then
+    raise exception 'Edit the source footage before approving a finished video.';
+  end if;
+  if p_decision = 'approved' and a.content_format = 'reel'
+     and nullif(btrim(a.render_path), '') is null then
+    raise exception 'Finish the reel cut before approving it';
+  end if;
+
+  -- G12: the opt-in seat gate. Only on approval, and only where a client has
+  -- asked for it -- a rejection should never be blocked, because refusing
+  -- work is not an act that needs authority.
+  if p_decision = 'approved' then
+    select coalesce(creative_director_required, false) into v_required
+      from client_engine_settings where client_id = a.client_id;
+    if coalesce(v_required, false) then
+      v_director := active_creative_director(a.client_id);
+      if v_director is null then
+        raise exception 'This client requires creative director sign-off and nobody holds that seat. Assign one before approving creative.';
+      end if;
+      if not coalesce(is_admin(), false) and auth.uid() is distinct from v_director then
+        raise exception 'Only the assigned creative director or an admin can approve creative for this client.';
+      end if;
+    end if;
+  end if;
+
+  if p_decision = 'approved' and a.media_type = 'video' then
+    v_state := video_approval_state(a.id);
+    if (v_state->>'owner_user_id') is null then
+      raise exception 'Configure an owner account before approving video.';
+    end if;
+    if (v_state->>'manager_user_id') is null then
+      raise exception 'Assign an active SMM to this client before approving video.';
+    end if;
+    if auth.uid() is distinct from (v_state->>'owner_user_id')::uuid
+       and auth.uid() is distinct from (v_state->>'manager_user_id')::uuid then
+      raise exception 'Only the owner or active SMM can finalize video approval.';
+    end if;
+    if not coalesce((v_state->>'owner_approved')::boolean, false)
+       or not coalesce((v_state->>'manager_approved')::boolean, false)
+       or ((v_state->>'client_user_id') is not null
+           and not coalesce((v_state->>'client_approved')::boolean, false)) then
+      raise exception 'Wait for the owner, SMM and requested client sign-offs.';
+    end if;
+  end if;
+
+  v_seat := creative_seat_of(a.client_id, auth.uid());
+
+  update client_media_assets set review_status = p_decision,
+    human_approved_at = case when p_decision = 'approved' then now() else null end
+    where id = p_asset_id;
+  insert into client_asset_reviews (asset_id, decision, reason, reviewed_by, decided_in_seat)
+    values (p_asset_id, p_decision, p_reason, auth.uid(), v_seat);
+end;
+$function$;
+
+-- approve_idea_and_generate_brief (was 20260903104816_05_content_chain_proof_ideas_briefs_media.sql; preamble only)
+-- Approve an idea and enqueue its brief in one call. This is the
+-- trigger the mapping doc is missing — Briefs renders a table that
+-- nothing currently writes.
+create or replace function public.approve_idea_and_generate_brief(p_idea_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_client uuid;
+  v_job    uuid;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     )
+     and not public.bot_may('approve_content') then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  select client_id into v_client from client_ideas where id = p_idea_id;
+  if v_client is null then
+    raise exception 'Idea not found';
+  end if;
+  if not can_access_client(v_client) then
+    raise exception 'Not permitted for this client';
+  end if;
+
+  update client_ideas set status = 'approved' where id = p_idea_id;
+  v_job := enqueue_agent_job('brief', v_client, 'client_ideas', p_idea_id);
+  update client_ideas set status = 'briefed' where id = p_idea_id;
+  return v_job;
+end;
+$$;
+
+-- approve_campaign_plan_v6 (was 20261105010000_309_a_plan_is_reviewed_before_the_agents_run.sql; preamble only)
+create or replace function public.approve_campaign_plan_v6(
+  p_campaign_id uuid,
+  p_note text default null
+) returns void
+language plpgsql security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  c public.client_campaigns%rowtype;
+  v_fingerprint text;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     )
+     and not public.bot_may('approve_content') then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  select * into c from public.client_campaigns where id = p_campaign_id;
+  if c.id is null then
+    raise exception 'That campaign no longer exists.' using errcode = 'P0001';
+  end if;
+  -- Approving a plan releases real work: pages written, agents built, content
+  -- briefed. It takes the standing the rest of a campaign's shape needs, and
+  -- deliberately no service_role branch -- the whole point is that a machine
+  -- does not approve its own plan.
+  if auth.role() is distinct from 'authenticated'
+     or not public.can_access_client(c.client_id) then
+    raise exception 'Only a person with access to this client can approve its plan.'
+      using errcode = 'P0001';
+  end if;
+  if c.built_at is null then
+    raise exception 'This campaign has no plan yet. There is nothing to approve.'
+      using errcode = 'P0001';
+  end if;
+
+  v_fingerprint := public.campaign_plan_fingerprint(c);
+  if c.plan_approved_at is not null and c.plan_approved_fingerprint = v_fingerprint then
+    raise exception 'This exact plan is already approved.' using errcode = 'P0001';
+  end if;
+
+  update public.client_campaigns
+     set plan_approved_at = now(),
+         plan_approved_by = auth.uid(),
+         plan_approved_fingerprint = v_fingerprint,
+         plan_review_note = nullif(btrim(p_note), ''),
+         updated_at = now()
+   where id = p_campaign_id;
+end $$;
+
+-- approve_slot (was 20261006220000_159_approval_inbox.sql; preamble only)
+-- The one human commit.
+--
+-- M4. Everything before this point can happen without a person: the engine
+-- plans a slot, picks an idea, approves it by policy, briefs it, builds it,
+-- writes its copy and checks its own work. This is where that stops.
+--
+-- `human_approved_at` has been the gate since migration 105 and nothing in
+-- the engine touches it — migration 152 has a test asserting the string does
+-- not appear in the policy functions at all. What was missing is the other
+-- half: a person approving an asset did not move the slot that produced it,
+-- so the engine's work could be signed off and still never reach a calendar.
+--
+-- Two acts, and they are deliberately not one function with a flag. Approving
+-- creates a scheduled post; rejecting sends the work back to be remade. They
+-- share a slot and nothing else, and a single `review_slot(decision)` would
+-- read as though they were variations of each other.
+
+-- ---------------------------------------------------------------------------
+-- Yes
+-- ---------------------------------------------------------------------------
+
+create or replace function public.approve_slot(p_slot_id uuid, p_note text default null)
+returns content_slots
+language plpgsql
+security definer
+set search_path to 'public'
+as $$
+declare
+  v_slot content_slots;
+  v_post uuid;
+begin
+
+  -- Bot console users are admins so agency reads keep working, and AAL2 does
+  -- not make them human. Refuse before any later admin, manager, or AAL2 gate.
+  -- service_role executors are unchanged.
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     )
+     and not public.bot_may('approve_content') then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  select * into v_slot from content_slots where id = p_slot_id for update;
+  if not found then
+    raise exception 'No such slot: %.', p_slot_id using errcode = 'P0001';
+  end if;
+  if not can_access_client(v_slot.client_id) then
+    raise exception 'Not permitted for this client';
+  end if;
+  if v_slot.stage <> 'awaiting_approval' then
+    raise exception 'That slot is %, not waiting for approval.', v_slot.stage using errcode = 'P0001';
+  end if;
+  if v_slot.asset_id is null then
+    raise exception 'That slot has no asset to approve.' using errcode = 'P0001';
+  end if;
+
+  -- The commit itself, through the same function every other screen uses, so
+  -- the decision is recorded in client_asset_reviews and attributed to the
+  -- person exactly as a hand-made asset's approval is.
+  perform review_media_asset(v_slot.asset_id, 'approved'::review_status, p_note);
+
+  -- The calendar entry. scheduled_at is what the planner chose, in the
+  -- client's own time (migration 144), so an approved post goes out when it
+  -- was planned to rather than whenever it was approved.
+  -- client_id set here rather than left to sync_scheduled_post_from_asset:
+  -- this function already knows it, and post_copy's own trigger resolves a
+  -- post's client from this column the moment the copy below is inserted.
+  insert into scheduled_posts (client_id, asset_id, scheduled_for, scheduled_at, channel, platform, created_by)
+  values (
+    v_slot.client_id,
+    v_slot.asset_id,
+    (v_slot.scheduled_at at time zone client_timezone(v_slot.client_id))::date,
+    v_slot.scheduled_at,
+    'organic'::post_channel,
+    v_slot.platform,
+    auth.uid()
+  )
+  returning id into v_post;
+
+  -- Copy written against the asset becomes copy for this post, so the
+  -- publisher reads one row rather than resolving the fallback itself.
+  insert into post_copy (scheduled_post_id, platform, caption, hashtags, alt_text,
+                         link_url, first_comment, cta, source)
+  select v_post, pc.platform, pc.caption, pc.hashtags, pc.alt_text,
+         pc.link_url, pc.first_comment, pc.cta, pc.source
+    from post_copy pc
+   where pc.asset_id = v_slot.asset_id
+  on conflict (scheduled_post_id, platform) where scheduled_post_id is not null
+  do nothing;
+
+  perform advance_slot(
+    p_slot_id, 'scheduled', 'human',
+    coalesce(p_note, 'Approved.'), null, null, null, null, null, null, v_post);
+
+  select * into v_slot from content_slots where id = p_slot_id;
+  return v_slot;
+end;
+$$;
+
+-- enqueue_agent_job (was 20261101070000_293_meta_legacy_producer_containment.sql; preamble only)
+-- B010 / 290: contain every legacy browser Meta build producer while the
+-- exact AAL2 Inbox decision and per-provider-write attestation are absent.
+-- Existing jobs and Meta IDs remain readable for assisted reconciliation.
+
+create or replace function public.enqueue_agent_job(
+  p_agent_key text, p_client_id uuid default null,
+  p_input_table text default null, p_input_id uuid default null
+)
+returns uuid language plpgsql security definer set search_path = public as $$
+begin
+
+  -- Live delivery, spend, credential, and profile workers stay human-only.
+  -- Other workers remain available to a bot admin.
+  if exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     )
+     and p_agent_key in (
+       'publisher', 'proof_placer', 'outbound_courier', 'lead_magnet_courier',
+       'profile_updater', 'campaign_action_executor', 'token_health'
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  if public.current_role_of() is null then
+    raise exception 'A provisioned console account is required.' using errcode = '42501';
+  end if;
+  if p_agent_key in ('meta_build', 'recruitment_meta_build') then
+    raise exception 'Meta object creation requires an exact AAL2 Approval Inbox decision and a bound prewrite executor.'
+      using errcode = '42501';
+  end if;
+  if p_client_id is null and not public.is_admin() then
+    raise exception 'Only an admin may queue agency-wide work.' using errcode = '42501';
+  end if;
+  if p_client_id is not null and not public.can_access_client(p_client_id) then
+    raise exception 'Not permitted for this client' using errcode = '42501';
+  end if;
+  return public.enqueue_agent_job_internal(
+    p_agent_key, p_client_id, p_input_table, p_input_id, auth.uid()
+  );
+end;
+$$;
+-- <<end security-review-preambles>>
 
 select public.lock_down_definer_functions();
 grant execute on function public.is_human_admin() to authenticated, service_role;

@@ -4,7 +4,7 @@
 -- The agent-runtime pglite suite covers the same checks in CI.
 
 begin;
-select plan(12);
+select plan(17);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -116,6 +116,69 @@ select throws_ok(
   'P0002',
   'Invitation not found.',
   'a human admin passes the invitation auth check'
+);
+
+select set_config('request.jwt.claim.role', 'service_role', true);
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, recovery_token, email_change_token_new, email_change
+) values
+  ('00000000-0000-0000-0000-000000000000',
+   '77777777-7777-4777-8777-777777777771',
+   'authenticated', 'authenticated', 'production@attractacq.com', '', now(),
+   '{}'::jsonb, '{}'::jsonb, now(), now(), '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000',
+   '77777777-7777-4777-8777-777777777773',
+   'authenticated', 'authenticated', 'marketing@attractacq.com', '', now(),
+   '{}'::jsonb, '{}'::jsonb, now(), now(), '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000',
+   '77777777-7777-4777-8777-777777777772',
+   'authenticated', 'authenticated', 'sales@attractacq.com', '', now(),
+   '{}'::jsonb, '{}'::jsonb, now(), now(), '', '', '', '');
+insert into public.profiles (id, role, full_name, email, is_bot, bot_key) values
+  ('77777777-7777-4777-8777-777777777771', 'admin', 'Production', 'production@attractacq.com', true, 'bot-production'),
+  ('77777777-7777-4777-8777-777777777773', 'admin', 'Marketing', 'marketing@attractacq.com', true, 'bot-marketing'),
+  ('77777777-7777-4777-8777-777777777772', 'admin', 'Sales', 'sales@attractacq.com', true, 'bot-sales');
+
+select set_config('request.jwt.claim.sub', '77777777-7777-4777-8777-777777777771', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
+select set_config('request.jwt.claims', '{"aal":"aal2","role":"authenticated"}', true);
+select throws_ok(
+  $$select public.review_media_asset('44444444-4444-4444-8444-444444444444', 'approved', null)$$,
+  'P0001',
+  'Asset not found',
+  'bot-production may pass the asset-approval gate'
+);
+select throws_ok(
+  $$select public.set_publishing_enabled('44444444-4444-4444-8444-444444444444', false)$$,
+  '42501',
+  'Bot accounts cannot perform this action',
+  'bot-production cannot publish'
+);
+
+select set_config('request.jwt.claim.sub', '77777777-7777-4777-8777-777777777772', true);
+select throws_ok(
+  $$select public.decide_lead_magnet_approval_v6(
+      '44444444-4444-4444-8444-444444444444', false, 'no')$$,
+  'P0001',
+  'No such approval.',
+  'bot-sales may pass the lead-magnet approval gate'
+);
+
+select set_config('request.jwt.claim.sub', '77777777-7777-4777-8777-777777777773', true);
+select throws_ok(
+  $$select public.approve_slot('44444444-4444-4444-8444-444444444444', null)$$,
+  '42501',
+  'Bot accounts cannot perform this action',
+  'bot-marketing cannot approve a slot'
+);
+select throws_ok(
+  $$select public.decide_lead_magnet_approval_v6(
+      '44444444-4444-4444-8444-444444444444', false, 'no')$$,
+  '42501',
+  'Bot accounts cannot perform this action',
+  'bot-marketing cannot approve a lead magnet'
 );
 
 select * from finish();

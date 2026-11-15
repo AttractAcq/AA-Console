@@ -82,17 +82,19 @@ the bot users. `create_console_user` is not the path for that.
 Run the provisioner only with a service-role key, and only after a separate
 CLEAR for the target project. Do not point it at staging
 (`vmmertwoboqiazcsougw`) or production (`bancbdztffokwiifzoiv`) from this
-change. The password is read from `BOT_USER_PASSWORD` or from stdin. It is
-not accepted from an interactive prompt, not logged, and not written to disk.
+change. The password is piped on stdin. It is not read from the
+environment, not accepted from an interactive prompt, not logged, and not
+written to disk.
 
 ```bash
 BOT_PROVISION_CONFIRM=create-bot-user \
 SUPABASE_URL=https://<project>.supabase.co \
 SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
-BOT_USER_PASSWORD=<at-least-16-chars> \
 node --experimental-strip-types scripts/provision-bot-user.ts \
   --bot-key bot-cos \
-  --full-name "Chief of Staff"
+  --full-name "Chief of Staff" <<'EOF'
+<at-least-16-chars>
+EOF
 ```
 
 `--bot-key` must be one of the keys below. The email is that mapped address.
@@ -116,24 +118,31 @@ bot_key pair is rejected.
 The script calls `auth.admin.createUser` with `email_confirm` and
 `app_metadata.is_bot` / `bot_key`, then inserts `profiles` (`role=admin`,
 `is_bot=true`). If that insert fails, it deletes the Auth user it just
-created. If the mapped email already exists, it reports the user and does
-not change the password.
+created. If that email already belongs to an Auth user, the script
+refuses and does not promote the account into a bot.
 
-Password resets and MFA removal use the same script. Both refuse a profile
-that is not `is_bot=true` with that `bot_key`. `--dry-run` does not write.
+Password resets and MFA removal use the same script. Without their own
+confirm value they dry-run and do not write. Both refuse a profile that is
+not `is_bot=true` with that `bot_key`. After a real reset or unenroll, the
+script revokes every session for that user through the Auth admin logout
+route.
 
 ```bash
+BOT_RESET_CONFIRM=reset-bot-password \
 node --experimental-strip-types scripts/provision-bot-user.ts reset-password \
-  --bot-key bot-cos
+  --bot-key bot-cos <<'EOF'
+<new-password>
+EOF
+BOT_MFA_CONFIRM=unenroll-bot-mfa \
 node --experimental-strip-types scripts/provision-bot-user.ts unenroll-mfa \
   --bot-key bot-cos
 ```
 
-`reset-password` reads the new password from `BOT_USER_PASSWORD` or stdin
-and passes it only to `auth.admin.updateUserById`. `unenroll-mfa` lists
-factors with `auth.admin.mfa.listFactors` and deletes each with
-`auth.admin.mfa.deleteFactor`. The same confirm, URL, and service-role
-variables are required.
+`reset-password` passes the stdin password only to
+`auth.admin.updateUserById`. `unenroll-mfa` lists factors with
+`auth.admin.mfa.listFactors` and deletes each with
+`auth.admin.mfa.deleteFactor`. Each command has its own confirm string.
+`BOT_PROVISION_CONFIRM` does not authorize a reset or an unenroll.
 
 There is no database test job in CI. The same checks run in the agent-runtime
 test suite. A local pgTAP file is `supabase/tests/bot_console_identity.sql`,

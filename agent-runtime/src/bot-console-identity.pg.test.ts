@@ -211,7 +211,21 @@ beforeAll(async () => {
   await db.exec("set check_function_bodies = off");
   await applyCreatingMissingTypes(section(sql, "hard-hold-rpcs"));
   await applyCreatingMissingTypes(section(sql, "approval-decisions"));
+  await db.exec(`
+    do $$ begin
+      create type public.review_status as enum ('pending', 'approved', 'rejected');
+    exception when duplicate_object then null;
+    end $$;
+  `);
+  await applyCreatingMissingTypes(section(sql, "security-review-preambles"));
   await db.exec("set check_function_bodies = on");
+  await db.exec(`
+    create table if not exists public.approval_requests_v6 (
+      id uuid primary key,
+      source_kind text,
+      client_id uuid
+    );
+  `);
   // %rowtype variables are resolved before the function body, so the auth
   // gate is only reached once those tables exist.
   for (const table of [
@@ -224,6 +238,7 @@ beforeAll(async () => {
   for (const table of [
     "client_billing", "finance_entries", "sops", "client_integrations", "engine_controls",
     "proof_capture_configs", "client_proof_destinations", "client_google_locations", "motion_scenes",
+    "service_offers",
   ]) {
     await db.exec(`
       create table if not exists public.${table} (id uuid primary key default gen_random_uuid());
@@ -245,6 +260,14 @@ beforeAll(async () => {
   await db.exec(`
     create schema if not exists storage;
     grant usage on schema storage to authenticated;
+    create or replace function storage.foldername(p text) returns text[]
+      language sql immutable as $$ select string_to_array(coalesce(p, ''), '/') $$;
+    create or replace function public.try_uuid(p text) returns uuid
+      language sql immutable as $$
+        select case
+          when p ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          then p::uuid else null end
+      $$;
     create table if not exists storage.objects (
       id uuid primary key default gen_random_uuid(),
       bucket_id text,
@@ -256,11 +279,12 @@ beforeAll(async () => {
     alter table public.client_proof_destinations add column if not exists client_id uuid;
     alter table public.client_google_locations add column if not exists client_id uuid;
     alter table public.motion_scenes add column if not exists client_id uuid;
+    alter table public.service_offers add column if not exists client_id uuid;
   `);
   const wanted = [
     "profiles", "client_billing", "finance_entries", "sops", "client_integrations", "engine_controls",
     "proof_capture_configs", "client_proof_destinations", "client_google_locations", "motion_scenes",
-    "storage.objects",
+    "storage.objects", "service_offers",
   ];
   const statements = rls.split(/;\s*\n/).map((part) => part.trim()).filter(Boolean);
   for (const statement of statements) {
@@ -460,6 +484,112 @@ describe("bot console identity", () => {
       "insert into storage.objects (id, bucket_id, name) values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'proof', 'human-write')",
     );
     expect(humanWrite).toBeNull();
+  });
+
+  it("allowlists content approval for bot-production and refuses every other bot", async () => {
+    const production = "77777777-7777-4777-8777-777777777771";
+    const sales = "77777777-7777-4777-8777-777777777772";
+    const marketing = "77777777-7777-4777-8777-777777777773";
+    await db.exec("reset role");
+    await asService();
+    for (const [id, key, email] of [
+      [production, "bot-production", "production@attractacq.com"],
+      [sales, "bot-sales", "sales@attractacq.com"],
+      [marketing, "bot-marketing", "marketing@attractacq.com"],
+    ] as const) {
+      await db.query("insert into auth.users (id, email) values ($1, $2)", [id, email]);
+      await db.query(
+        `insert into public.profiles (id, role, full_name, email, is_bot, bot_key)
+         values ($1, 'admin', $2, $3, true, $2)`,
+        [id, key, email],
+      );
+    }
+    await db.exec("reset role");
+
+    const content: Array<[string, string, unknown[]]> = [
+      ["review_media_asset", "select public.review_media_asset($1, 'approved', null)", [CLIENT]],
+      ["approve_idea_and_generate_brief", "select public.approve_idea_and_generate_brief($1)", [CLIENT]],
+      ["approve_campaign_plan_v6", "select public.approve_campaign_plan_v6($1, null)", [CLIENT]],
+      ["approve_slot", "select public.approve_slot($1, null)", [CLIENT]],
+    ];
+    for (const [name, sql, params] of content) {
+      const allowed = await callReady(production, sql, params);
+      expect(allowed ?? "", name).not.toMatch(/Bot accounts cannot perform this action/);
+      const denied = await callReady(marketing, sql, params);
+      expect(denied, name).toMatch(/Bot accounts cannot perform this action/);
+    }
+    const humanAsset = await callReady(HUMAN, content[0]![1], content[0]![2]);
+    expect(humanAsset ?? "").not.toMatch(/Bot accounts cannot perform this action/);
+
+    const publish = await callReady(
+      production,
+      "select public.set_publishing_enabled($1, false)",
+      [CLIENT],
+    );
+    expect(publish).toMatch(/Bot accounts cannot perform this action/);
+
+    const salesMagnet = await callReady(
+      sales,
+      "select public.decide_lead_magnet_approval_v6($1, false, 'no')",
+      [CLIENT],
+    );
+    expect(salesMagnet ?? "").not.toMatch(/Bot accounts cannot perform this action/);
+    const productionMagnet = await callReady(
+      production,
+      "select public.decide_lead_magnet_approval_v6($1, false, 'no')",
+      [CLIENT],
+    );
+    expect(productionMagnet).toMatch(/Bot accounts cannot perform this action/);
+    const marketingMagnet = await callReady(
+      marketing,
+      "select public.decide_lead_magnet_approval_v6($1, false, 'no')",
+      [CLIENT],
+    );
+    expect(marketingMagnet).toMatch(/Bot accounts cannot perform this action/);
+
+    const salesAsset = await callReady(sales, content[0]![1], content[0]![2]);
+    expect(salesAsset).toMatch(/Bot accounts cannot perform this action/);
+
+    const queued = await callReady(production, "select public.enqueue_agent_job('brief', $1)", [CLIENT]);
+    expect(queued ?? "").not.toMatch(/Bot accounts cannot perform this action/);
+    const publisher = await callReady(production, "select public.enqueue_agent_job('publisher', $1)", [CLIENT]);
+    expect(publisher).toMatch(/Bot accounts cannot perform this action/);
+    const upload = await callReady(
+      production,
+      "insert into storage.objects (id, bucket_id, name) values (gen_random_uuid(), 'client-media', $1 || '/bot.bin')",
+      [CLIENT],
+    );
+    expect(upload).toMatch(/row-level security/i);
+    const humanUpload = await callReady(
+      HUMAN,
+      "insert into storage.objects (id, bucket_id, name) values (gen_random_uuid(), 'client-media', $1 || '/human.bin')",
+      [CLIENT],
+    );
+    expect(humanUpload).toBeNull();
+
+    await db.exec("reset role");
+    await asUser(HUMAN);
+    const truncated = await call("truncate table public.profiles");
+    expect(truncated ?? "").toMatch(/permission denied/i);
+
+    await db.exec("reset role");
+    await db.query(
+      `insert into public.approval_requests_v6 (id, source_kind)
+       values ('12121212-1212-4121-8121-121212121212', 'production_release')
+       on conflict (id) do update set source_kind = excluded.source_kind`,
+    );
+    const releaseDecision = await callReady(
+      production,
+      "select public.record_approval_decision_v6($1,'rejected','hash','ref','no')",
+      ["12121212-1212-4121-8121-121212121212"],
+    );
+    expect(releaseDecision ?? "").not.toMatch(/Bot accounts cannot perform this action/);
+    const marketingRelease = await callReady(
+      marketing,
+      "select public.record_approval_decision_v6($1,'rejected','hash','ref','no')",
+      ["12121212-1212-4121-8121-121212121212"],
+    );
+    expect(marketingRelease).toMatch(/Bot accounts cannot perform this action/);
   });
 
   it("fires the AAL2 decision triggers against a bot before they trust assurance", async () => {
