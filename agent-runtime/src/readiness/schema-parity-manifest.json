@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "175c1581c451f2b5a6b2d321a9c13ef54a0dc517df48e1978536ddc1904964ac",
-  "generatedTypesSha256": "4e57bbac07094e5c27a5a40e6596c53b0c87e6fb78c84a248e058388037e6369",
-  "generatedSchemaBodySha256": "21bbfe9740ec613e4bfb079c405419d18f12e2a5eb3aa480ee6cfa647d827255",
+  "migrationSourceDigest": "bcc4aa49749861b48a6d0061450297a6ce5cc6268cd6a4d111e9554318d98fb4",
+  "generatedTypesSha256": "f2efe52485032a2e34d9d647709bf58bd527074c937d4b4ef7ff4912e683975e",
+  "generatedSchemaBodySha256": "9c50c34ee4d7f27afe47be6452531fd84fe884d9ad2dd2e587272ce3c3dc8c82",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3718,8 +3718,8 @@
       "version": "20261121235900",
       "name": "514_campaign_sweep_qa_and_sibling_progress",
       "filename": "20261121235900_514_campaign_sweep_qa_and_sibling_progress.sql",
-      "sha256": "c700e64c690b8684046695d5b86d8f1333e380e5beb56f32c11f5351f3cfc62e",
-      "trimmedMd5": "c618027c3f51483710fd76bd423fa747"
+      "sha256": "f909aac30bdf99196802b3e108010291c633e9fad2ec2348766a2ae8e60dc436",
+      "trimmedMd5": "325354cbc329ba5fe29c8d9d5dc34dac"
     },
     {
       "version": "20261122000000",
@@ -3732,8 +3732,8 @@
       "version": "20261122010000",
       "name": "516_campaign_sweep_work_items",
       "filename": "20261122010000_516_campaign_sweep_work_items.sql",
-      "sha256": "9d7c15585e27d7e8016f68910008c052016fef01114e3c69d91a05839455ee84",
-      "trimmedMd5": "c91ebe50956ff3d01b8d0cb40ad77307"
+      "sha256": "64df6260a9f5ebc2e2d71f18faf03f71aeb40936b2b7ea3d24a99a667f4b5e9b",
+      "trimmedMd5": "19e1c9e7322670ec376fe464ebcb59d7"
     },
     {
       "version": "20261122020000",
@@ -3753,8 +3753,8 @@
       "version": "20261122040000",
       "name": "519_campaign_conversion_qa",
       "filename": "20261122040000_519_campaign_conversion_qa.sql",
-      "sha256": "1365be69e45250310e9e1a36e5f34fe8dc7a97c3fd14d3d721ed7431ff7e5be6",
-      "trimmedMd5": "5ce5f2a6d151929d0bf8998c4de2d99b"
+      "sha256": "7e4a32101bbe11fab4cf57b5c384aee13ce8cda3583629de90fdad0ee0ede0dc",
+      "trimmedMd5": "96053c2024f4186809a64305d5b212bf"
     },
     {
       "version": "20261122050000",
@@ -3762,6 +3762,13 @@
       "filename": "20261122050000_520_campaign_conversion_retry.sql",
       "sha256": "0974e0d72183ffc1ef78bdc121982cb6b68b5e07a848e0cc20ebe35117d6ab98",
       "trimmedMd5": "6453e9334662ce882cf19a0de59deecf"
+    },
+    {
+      "version": "20261122060000",
+      "name": "521_campaign_package_readiness",
+      "filename": "20261122060000_521_campaign_package_readiness.sql",
+      "sha256": "35b829e13784b80f01ce92d9e63a3b145b120b61c5b29033ded64c736c8623ab",
+      "trimmedMd5": "b0f1c53f6cf0220497b99de8b7e5ba5b"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

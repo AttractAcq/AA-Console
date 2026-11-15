@@ -35108,6 +35108,10 @@ export type Database = {
         Args: { p_client_id: string; p_execution_id: string }
         Returns: Json
       }
+      campaign_package_readiness_v7: {
+        Args: { p_campaign_id: string }
+        Returns: Json
+      }
       campaign_page_readback_target_v6: {
         Args: { p_client_id: string; p_execution_id: string }
         Returns: Json
