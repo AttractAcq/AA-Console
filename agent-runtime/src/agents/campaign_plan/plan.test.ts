@@ -88,9 +88,11 @@ describe("planner crash recovery", () => {
       id: "campaign-1", client_id: "client-1", acquisition_mode: "organic",
       offer_version_id: "offer-1", built_at: "2026-10-16T10:00:00Z",
       content_ideas_generated_at: "2026-10-16T10:01:00Z",
-      ideate_on_plan: true, job_id: "job-1", content_spec_id: "spec-1",
+      ideate_on_plan: true, job_id: "job-1", content_spec_id: "spec-1", content_count: 1,
     };
     const rpc = vi.fn(async (name: string) => {
+      if (name === "bind_campaign_planned_ideas_v7")
+        return { data: ["idea-1"], error: null };
       if (name === "capture_campaign_intelligence_snapshot_v6")
         return { data: { id: "snapshot-1" }, error: null };
       if (name === "capture_campaign_offer_v6")
@@ -114,7 +116,7 @@ describe("planner crash recovery", () => {
     );
     expect(result).toMatchObject({ ok: true });
     expect(rpc.mock.calls.map(([name]) => name)).toEqual([
-      "capture_campaign_intelligence_snapshot_v6", "capture_campaign_offer_v6",
+      "bind_campaign_planned_ideas_v7", "capture_campaign_intelligence_snapshot_v6", "capture_campaign_offer_v6",
       "create_campaign_manifest_v6", "attach_campaign_manifest_intelligence_v6",
       "attach_campaign_offer_v6",
     ]);

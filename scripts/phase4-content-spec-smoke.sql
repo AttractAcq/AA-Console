@@ -45,5 +45,24 @@ begin
   if next_id=first_id or (select plan_approved_at from public.client_campaigns where id=cid) is not null
     or first_hash=next_hash
     then raise exception 'Changing the content shape retained the old approval'; end if;
+  insert into public.client_ideas(client_id,campaign_id,campaign_position,title,media_type,
+    content_format,target_platform,source,status)
+  values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',cid,1,'Story idea','image',
+      'story','instagram','auto','draft'),
+    ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',cid,2,'Carousel idea','image',
+      'carousel','facebook','auto','draft');
+  update public.client_campaigns set content_ideas_generated_at=now() where id=cid;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+  if cardinality(public.bind_campaign_planned_ideas_v7(cid))<>2
+    or (select acquisition_route from public.client_ideas where campaign_id=cid and campaign_position=1)<>'organic'
+    or (select acquisition_route from public.client_ideas where campaign_id=cid and campaign_position=2)<>'paid'
+    then raise exception 'Saved ideas were not bound to their reviewed routes'; end if;
+  update public.client_ideas set target_platform='instagram'
+    where campaign_id=cid and campaign_position=2;
+  begin
+    perform public.bind_campaign_planned_ideas_v7(cid);
+    raise exception 'A changed idea destination was accepted';
+  exception when check_violation then null; end;
 end $checks$;
 rollback;

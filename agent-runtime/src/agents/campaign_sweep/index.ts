@@ -76,7 +76,7 @@ export async function runCampaignSweepJob(
 
   const { data: campaign, error: campaignError } = await sb
     .from("client_campaigns")
-    .select("id, client_id, name, acquisition_mode, channels, content_count, organic_content_count, paid_content_count, content_spec_id, content_spec_hash")
+    .select("id, client_id, name, acquisition_mode, channels, content_count, organic_content_count, paid_content_count, content_spec_id, content_spec_hash, content_ideas_generated_at")
     .eq("id", job.input_id)
     .maybeSingle();
   if (campaignError) throw new Error(`Campaign lookup failed: ${campaignError.message}`);
@@ -88,6 +88,7 @@ export async function runCampaignSweepJob(
     channels: string[] | null; content_count: number;
     organic_content_count: number; paid_content_count: number;
     content_spec_id: string | null; content_spec_hash: string | null;
+    content_ideas_generated_at: string | null;
   };
   if (c.client_id !== job.client_id) {
     return { ok: false, retryable: false, failureMessage: "That campaign belongs to another client." };
@@ -96,6 +97,7 @@ export async function runCampaignSweepJob(
   // Pre-v7 approved route plans have no spec. Their original image sweep
   // remains readable and runnable; every newly approved route plan has a spec.
   let pieces: SweepPiece[] | undefined;
+  let plannedIdeaIds: string[] | undefined;
   if (c.acquisition_mode !== "legacy" && c.content_spec_id) {
     if (!c.content_spec_hash) {
       return { ok: false, retryable: false, failureMessage: "The campaign's content requirements have no hash." };
@@ -112,6 +114,19 @@ export async function runCampaignSweepJob(
       return { ok: false, retryable: false, failureMessage: "Google search copy has no campaign sweep producer yet. Use the approved manual build sheet." };
     }
     pieces = spec.pieces as SweepPiece[];
+    if (c.content_ideas_generated_at) {
+      const { data: ids, error: bindError } = await sb.rpc("bind_campaign_planned_ideas_v7", {
+        p_campaign_id: c.id,
+      });
+      if (bindError) {
+        return { ok: false, retryable: false,
+          failureMessage: `The saved campaign ideas do not match the reviewed plan: ${bindError.message}` };
+      }
+      if (!Array.isArray(ids) || ids.length !== c.content_count) {
+        return { ok: false, retryable: false, failureMessage: "The reviewed campaign idea batch is incomplete." };
+      }
+      plannedIdeaIds = ids as string[];
+    }
   }
 
   const platform = platformFor(c.channels);
@@ -135,6 +150,7 @@ export async function runCampaignSweepJob(
     platform: platform ?? pieces?.[0]?.platform ?? "instagram",
     campaignId: c.id,
     pieces,
+    plannedIdeaIds,
   });
   if (steps.length === 0) {
     return {
@@ -165,6 +181,7 @@ export async function runCampaignSweepJob(
       target_platform: platform,
       content_spec_id: c.content_spec_id,
       content_spec_hash: c.content_spec_hash,
+      planned_idea_ids: plannedIdeaIds ?? null,
     },
     p_deadline_at: new Date(Date.now() + DEADLINE_HOURS * 3_600_000).toISOString(),
     p_campaign_id: c.id,
@@ -184,7 +201,7 @@ export async function runCampaignSweepJob(
       p_dependencies: step.dependencies,
       p_agent_key: step.agentKey,
       p_input_table: step.inputTable,
-      p_input_id: step.usesClientAsInput ? c.client_id : null,
+      p_input_id: step.inputId ?? (step.usesClientAsInput ? c.client_id : null),
       p_input_params: step.inputParams,
       p_input_from_step_key: step.inputFromStepKey,
     });

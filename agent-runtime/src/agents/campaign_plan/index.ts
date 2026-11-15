@@ -240,6 +240,14 @@ export async function runCampaignPlanJob(
   // package creation and links after a crash between the SQL save and return.
   if (savedPlanNeedsFinalization(campaign, job.id) && (!isV6 || campaign.content_spec_id || campaign.content_count === 0)) {
     if (isV6) {
+      if (campaign.content_spec_id && campaign.content_ideas_generated_at) {
+        const { data: ids, error: bindError } = await sb.rpc("bind_campaign_planned_ideas_v7", {
+          p_campaign_id: campaign.id,
+        });
+        if (bindError || !Array.isArray(ids) || ids.length !== campaign.content_count) {
+          throw new Error(`Failed to recover planned idea routes: ${bindError?.message ?? "incomplete idea batch"}`);
+        }
+      }
       const { data: snapshot, error } = await sb.rpc("capture_campaign_intelligence_snapshot_v6", {
         p_campaign_id: campaign.id, p_job_id: job.id,
       });
@@ -571,6 +579,14 @@ Call ${submitTool.name} once when you are done.`;
       p_pieces: contentSpec,
     });
     if (error) throw new Error(`Failed to record the campaign content requirements: ${error.message}`);
+    if (includeIdeas) {
+      const { data: boundIds, error: bindError } = await sb.rpc("bind_campaign_planned_ideas_v7", {
+        p_campaign_id: campaign.id,
+      });
+      if (bindError || !Array.isArray(boundIds) || boundIds.length !== contentSpec.length) {
+        throw new Error(`Failed to bind planned ideas to reviewed routes: ${bindError?.message ?? "incomplete idea batch"}`);
+      }
+    }
   }
 
   if (isV6) {

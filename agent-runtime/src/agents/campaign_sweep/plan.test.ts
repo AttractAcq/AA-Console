@@ -115,6 +115,22 @@ describe("the chain a plan implies", () => {
       ]);
   });
 
+  it("starts at exact saved planner ideas when they exist", () => {
+    const steps = sweepSteps({ ...base, organicCount: 1, paidCount: 1,
+      plannedIdeaIds: ["idea-1", "idea-2"] });
+    expect(steps.map((step) => step.stepKey)).toEqual([
+      "piece1_brief", "piece1_create", "piece2_brief", "piece2_create",
+    ]);
+    expect(steps[0]).toMatchObject({ inputTable: "client_ideas", inputId: "idea-1",
+      inputFromStepKey: null, dependencies: [] });
+    expect(steps[2]).toMatchObject({ inputTable: "client_ideas", inputId: "idea-2",
+      inputFromStepKey: null, dependencies: [] });
+    expect(steps[1]).toMatchObject({ inputFromStepKey: "piece1_brief",
+      dependencies: ["piece1_brief"] });
+    expect(() => sweepSteps({ ...base, organicCount: 2, paidCount: 0,
+      plannedIdeaIds: ["idea-1"] })).toThrow(/disagree/);
+  });
+
   it("composes nothing from a plan with no pieces", () => {
     expect(sweepSteps({ ...base, organicCount: 0, paidCount: 0 })).toEqual([]);
   });

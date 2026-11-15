@@ -34465,6 +34465,10 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: undefined
       }
+      bind_campaign_planned_ideas_v7: {
+        Args: { p_campaign_id: string }
+        Returns: string[]
+      }
       bind_delivery_approval_dependency_v6: {
         Args: { p_approval_request_id: string; p_entity_version_id: string }
         Returns: undefined
