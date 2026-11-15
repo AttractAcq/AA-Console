@@ -89,6 +89,9 @@ export function requestedOffer(
   if (source !== "strategy" && source !== "micro_niche") {
     return { error: "This job does not say what to compile the offer from." };
   }
+  if ((kind === "main") !== (source === "strategy")) {
+    return { error: "A main offer uses strategy; a secondary offer needs one approved opportunity." };
+  }
   return { kind, source };
 }
 
@@ -177,7 +180,6 @@ export async function runOfferCompileJob(
     return { ok: false, retryable: false, failureMessage: asked.error };
   }
   const { kind, source } = asked;
-
   let sourceBlock = "";
   if (source === "micro_niche") {
     if (job.input_table !== "market_opportunities" || !job.input_id) {
@@ -302,10 +304,24 @@ ${existingLines.length > 0 ? `\nWHAT THIS BUSINESS ALREADY SELLS\n${existingLine
   // The RPC writes the offer and its version atomically. Pass every argument:
   // PostgREST resolves functions by the complete named-argument signature.
   // Price, cost and claims remain unset because the source does not prove them.
-  const { error: versionError } = await sb.rpc(
-    "create_compiled_service_offer_v6",
-    compiledOfferArgs(job.client_id, kind, job.id, checked),
-  );
+  const sourceHash = job.params?.opportunity_hash;
+  if (kind === "secondary" && (typeof sourceHash !== "string" || !/^[0-9a-f]{64}$/.test(sourceHash))) {
+    return { ok: false, retryable: false, failureMessage: "The compile job has no approved opportunity evidence hash.", usage };
+  }
+  const { error: versionError } = kind === "secondary"
+    ? await sb.rpc("create_compiled_secondary_offer_v7", {
+      p_client_id: job.client_id,
+      p_opportunity_id: job.input_id,
+      p_opportunity_hash: sourceHash,
+      p_job_id: job.id,
+      p_service_name: checked.serviceName,
+      p_audience: checked.audience,
+      p_promise: checked.promise,
+      p_inclusions: checked.inclusions,
+      p_exclusions: checked.exclusions,
+      p_idempotency_key: `${job.id}:1`,
+    })
+    : await sb.rpc("create_compiled_service_offer_v6", compiledOfferArgs(job.client_id, kind, job.id, checked));
   if (versionError) return {
     ok: false,
     retryable: false,

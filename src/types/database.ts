@@ -24112,6 +24112,107 @@ export type Database = {
           },
         ]
       }
+      secondary_offer_sources_v7: {
+        Row: {
+          client_id: string
+          compile_job_id: string | null
+          created_at: string
+          offer_id: string
+          opportunity_hash: string
+          opportunity_id: string
+          opportunity_snapshot: Json
+        }
+        Insert: {
+          client_id: string
+          compile_job_id?: string | null
+          created_at?: string
+          offer_id: string
+          opportunity_hash: string
+          opportunity_id: string
+          opportunity_snapshot: Json
+        }
+        Update: {
+          client_id?: string
+          compile_job_id?: string | null
+          created_at?: string
+          offer_id?: string
+          opportunity_hash?: string
+          opportunity_id?: string
+          opportunity_snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "secondary_offer_sources_v7_compile_job_id_fkey"
+            columns: ["compile_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "secondary_offer_sources_v7_compile_job_id_fkey"
+            columns: ["compile_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "secondary_offer_sources_v7_compile_job_id_fkey"
+            columns: ["compile_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "secondary_offer_sources_v7_offer_id_client_id_fkey"
+            columns: ["offer_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "service_offers"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "secondary_offer_sources_v7_opportunity_id_client_id_fkey"
+            columns: ["opportunity_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "secondary_offer_sources_v7_opportunity_id_client_id_fkey"
+            columns: ["opportunity_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "secondary_offer_sources_v7_opportunity_id_client_id_fkey"
+            columns: ["opportunity_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id", "client_id"]
+          },
+          {
+            foreignKeyName: "secondary_offer_sources_v7_opportunity_id_client_id_fkey"
+            columns: ["opportunity_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id", "client_id"]
+          },
+          {
+            foreignKeyName: "secondary_offer_sources_v7_opportunity_id_client_id_fkey"
+            columns: ["opportunity_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id", "client_id"]
+          },
+          {
+            foreignKeyName: "secondary_offer_sources_v7_opportunity_id_client_id_fkey"
+            columns: ["opportunity_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_template_readiness"
+            referencedColumns: ["opportunity_id", "client_id"]
+          },
+        ]
+      }
       service_offer_signoffs: {
         Row: {
           approved_at: string
@@ -34644,6 +34745,43 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_compiled_secondary_offer_v7: {
+        Args: {
+          p_audience: string
+          p_client_id: string
+          p_exclusions: string[]
+          p_idempotency_key: string
+          p_inclusions: string[]
+          p_job_id: string
+          p_opportunity_hash: string
+          p_opportunity_id: string
+          p_promise: string
+          p_service_name: string
+        }
+        Returns: {
+          audience: string
+          claims: Json
+          client_id: string
+          content_hash: string
+          created_at: string
+          currency: string | null
+          delivery_cost_estimate: number | null
+          exclusions: string[]
+          id: string
+          idempotency_key: string
+          inclusions: string[]
+          offer_id: string
+          price_amount: number | null
+          promise: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_offer_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_compiled_service_offer_v6: {
         Args: {
           p_audience: string
@@ -34981,6 +35119,22 @@ export type Database = {
           p_target_countries: string[]
         }
         Returns: string
+      }
+      create_secondary_offer_v7: {
+        Args: { p_opportunity_id: string }
+        Returns: {
+          client_id: string
+          created_at: string
+          id: string
+          kind: string
+          service_name: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_offers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       create_service_offer_version_v6: {
         Args: {
@@ -39325,6 +39479,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      secondary_offer_source_current_v7: {
+        Args: { p_offer_id: string }
+        Returns: boolean
       }
       seed_motion_scenes_v6: { Args: { p_project_id: string }; Returns: number }
       select_idea_for_slot: {

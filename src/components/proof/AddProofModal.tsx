@@ -1,5 +1,5 @@
 import { CONTENT_FORMATS, formatAllows } from "../../lib/contentFormat";
-import { CAPTURE_METHODS, PROOF_CATEGORIES, categoryLabel } from "../../lib/proofFactory";
+import { PROOF_CATEGORIES, categoryLabel } from "../../lib/proofFactory";
 import { FormModal } from "../forms/FormModal";
 import type { FieldDef } from "../forms/fields";
 import { MEDIA_TYPE_OPTIONS, uploadThen } from "../../lib/options";
@@ -38,10 +38,14 @@ const FIELDS: FieldDef[] = [
   { name: "title", label: "Title", kind: "text" },
   {
     name: "source",
-    label: "Who / where from",
+    label: "Original person or source URL",
     kind: "text",
-    placeholder: "Client name, platform, or where it came from",
+    required: true,
+    placeholder: "Name of the person, original review URL, or source record",
   },
+  { name: "captured_on", label: "When was this captured?", kind: "date" },
+  { name: "permission_basis", label: "Consent or rights evidence (if known)", kind: "textarea", rows: 3,
+    hint: "A reviewer must still clear the rights before this proof can be used." },
 ];
 
 export function AddProofModal({
@@ -66,17 +70,18 @@ export function AddProofModal({
       intro="Write the proof, attach a file, or do both. Files upload to your private proof store."
       fields={classify ? [...FIELDS,
         { name: "source_format", label: "Source format", kind: "select", required: true, options: CONTENT_FORMATS.map((f) => ({value: f.value, label: f.label})) },
-        { name: "capture_method", label: "Capture method", kind: "select", required: true, options: CAPTURE_METHODS.map((m) => ({ value: m.id, label: m.label })) },
         { name: "source_category", label: "Proof category", kind: "select", required: true, options: Object.keys(PROOF_CATEGORIES).map((value) => ({ value, label: categoryLabel(value) })) },
         ...Object.entries(PROOF_CATEGORIES).map(([category, types]): FieldDef => ({ name: `kind_${category}`, label: "Proof type", kind: "select", required: true, showIf: { field: "source_category", equals: [category] }, options: types.map((value) => ({ value, label: value })) })),
       ] : FIELDS}
-      initialValues={classify ? { capture_method: "manual_import", source_format: "single" } : undefined}
+      initialValues={classify ? { source_format: "single" } : undefined}
       submitLabel="Add proof"
       onSubmit={async (v) => {
         if (!clientId) throw new Error("No client selected.");
         const mediaType = v.media_type as ProofAsset["media_type"];
         const title = (v.title as string)?.trim() || null;
         const source = (v.source as string)?.trim() || null;
+        const capturedOn = (v.captured_on as string)?.trim() || null;
+        const permissionBasis = (v.permission_basis as string)?.trim() || null;
         const body = (v.body as string)?.trim() || null;
         const file = v.file instanceof File ? v.file : null;
 
@@ -85,6 +90,7 @@ export function AddProofModal({
         if (mediaType === "text" && !body) {
           throw new Error("Written proof needs some text.");
         }
+        if (!source) throw new Error("Name the original person or source record.");
         if (mediaType !== "text" && !file) {
           throw new Error(`${mediaType === "video" ? "Video" : "Image"} proof needs a file.`);
         }
@@ -94,7 +100,7 @@ export function AddProofModal({
         if (classify && !(PROOF_CATEGORIES[category] as readonly string[] | undefined)?.includes(kind)) throw new Error("Choose a proof type in the selected category.");
         const sourceFormat = v.source_format as "single" | "carousel" | "story" | "reel";
         if (classify && !formatAllows(sourceFormat, mediaType)) throw new Error("Choose a format compatible with the media type.");
-        const classification = classify ? { source_format: sourceFormat, capture_method: v.capture_method as string, source_category: category, source_kind: kind } : {};
+        const classification = classify ? { source_format: sourceFormat, source_category: category, source_kind: kind } : {};
         const proofId = crypto.randomUUID();
 
         if (!file) {
@@ -105,6 +111,9 @@ export function AddProofModal({
             media_type: mediaType,
             title,
             source,
+            capture_method: "manual_import",
+            captured_on: capturedOn,
+            permission_basis: permissionBasis,
             body,
           });
           if (error) throw error;
@@ -120,6 +129,9 @@ export function AddProofModal({
             media_type: mediaType,
             title: title ?? file.name,
             source,
+            capture_method: "manual_import",
+            captured_on: capturedOn,
+            permission_basis: permissionBasis,
             body,
             storage_path: storagePath,
           });

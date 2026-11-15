@@ -43,6 +43,7 @@ const drift = (over: Record<string, unknown> = {}) => ({
 
 function database(data: {
   offers?: unknown[]; versions?: unknown[]; signoffs?: unknown[]; drift?: unknown[]; jobs?: unknown[];
+  opportunities?: unknown[]; approvals?: unknown[]; sources?: unknown[];
 }) {
   const byTable: Record<string, unknown[]> = {
     service_offers: data.offers ?? [],
@@ -50,6 +51,9 @@ function database(data: {
     service_offer_signoffs: data.signoffs ?? [],
     offer_version_drift: data.drift ?? [],
     agent_jobs: data.jobs ?? [],
+    market_opportunities: data.opportunities ?? [],
+    opportunity_approval_state_v6: data.approvals ?? [],
+    secondary_offer_sources_v7: data.sources ?? [],
   };
   // The panel chains select -> eq -> order for some tables and select -> eq for
   // others, so the chain is a thenable rather than having one terminal method:
@@ -96,10 +100,20 @@ describe("the two buttons the notes ask for", () => {
   });
 
   it("creates a secondary offer as secondary", async () => {
-    database({ offers: [] });
+    database({ offers: [], opportunities: [{ id: "opp-1", name: "Winter garage gym", micro_market: "Unused garages" }],
+      approvals: [{ opportunity_id: "opp-1", approval_current: true }] });
     show();
     await userEvent.click(await screen.findByRole("button", { name: "New secondary offer" }));
-    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ kind: "secondary" }));
+    expect(rpc).toHaveBeenCalledWith("create_secondary_offer_v7", { p_opportunity_id: "opp-1" });
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("holds secondary actions until an opportunity has current approval", async () => {
+    database({ offers: [], opportunities: [{ id: "opp-1", name: "Winter garage gym", micro_market: "Unused garages" }],
+      approvals: [{ opportunity_id: "opp-1", approval_current: false }] });
+    show();
+    expect(await screen.findByRole("button", { name: "New secondary offer" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Compile a secondary offer" })).toBeDisabled();
   });
 
   it("says what to do when there is nothing yet, naming both kinds", async () => {
@@ -215,7 +229,9 @@ describe("compiling an offer instead of writing one", () => {
   });
 
   it("shows a terminal compile failure instead of leaving Queued on screen", async () => {
-    database({ offers: [], jobs: [{ id: "job-2", status: "failed", terminal: true, error: "Version writer refused the draft." }] });
+    database({ offers: [], jobs: [{ id: "job-2", status: "failed", terminal: true, error: "Version writer refused the draft." }],
+      opportunities: [{ id: "opp-1", name: "Winter garage gym", micro_market: "Unused garages" }],
+      approvals: [{ opportunity_id: "opp-1", approval_current: true }] });
     rpc.mockResolvedValueOnce({ data: "job-2", error: null });
     show();
     await userEvent.click(await screen.findByRole("button", { name: "Compile a secondary offer" }));
@@ -223,19 +239,17 @@ describe("compiling an offer instead of writing one", () => {
   });
 
   it("asks the compiler for a main or a secondary offer", async () => {
-    // The notes: "agent compiles from Offer Strategy or from the micro-niche".
-    // Only the strategy source is offered here; the micro-niche one needs an
-    // opportunity, and that choice belongs on the opportunity.
-    database({ offers: [] });
+    database({ offers: [], opportunities: [{ id: "opp-1", name: "Winter garage gym", micro_market: "Unused garages" }],
+      approvals: [{ opportunity_id: "opp-1", approval_current: true }] });
     show();
     await userEvent.click(await screen.findByRole("button", { name: "Compile a main offer" }));
     expect(rpc).toHaveBeenCalledWith("request_offer_compile_v6", {
-      p_client_id: "client-1", p_kind: "main", p_source: "strategy",
+      p_client_id: "client-1", p_kind: "main", p_source: "strategy", p_opportunity_id: undefined,
     });
 
     await userEvent.click(screen.getByRole("button", { name: "Compile a secondary offer" }));
     expect(rpc).toHaveBeenCalledWith("request_offer_compile_v6", {
-      p_client_id: "client-1", p_kind: "secondary", p_source: "strategy",
+      p_client_id: "client-1", p_kind: "secondary", p_source: "micro_niche", p_opportunity_id: "opp-1",
     });
   });
 
@@ -262,10 +276,11 @@ describe("compiling an offer instead of writing one", () => {
   });
 
   it("confirms what was queued when it works", async () => {
-    database({ offers: [] });
+    database({ offers: [], opportunities: [{ id: "opp-1", name: "Winter garage gym", micro_market: "Unused garages" }],
+      approvals: [{ opportunity_id: "opp-1", approval_current: true }] });
     show();
     await userEvent.click(await screen.findByRole("button", { name: "Compile a secondary offer" }));
     expect(await screen.findByRole("status"))
-      .toHaveTextContent(/drafting a secondary offer from the offer strategy/);
+      .toHaveTextContent(/drafting a secondary offer from the selected approved opportunity/);
   });
 });

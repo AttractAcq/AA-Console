@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "f8faaf16aff8fcbcca88492250112160f6f7e1b4d48a26f672f69ffd5d483b0f",
-  "generatedTypesSha256": "d01bad424d05b6a448537e1e70dc716d4204b3684b53f25e9d7b5aecb084e0f1",
-  "generatedSchemaBodySha256": "075b5143e74162b095cdf9177acc7686b9d587ffd7ff15caa08de3613829f87a",
+  "migrationSourceDigest": "75efe80f202d0aa1ddf3fffd9dad017a30eb4b459fc1dce87f837fa98cc06f73",
+  "generatedTypesSha256": "c0b357a8e75505d0f3369ea98a0f2551b98cb3bae3629d0a8250fe6d934f83e7",
+  "generatedSchemaBodySha256": "81f95ea83f221e5a0cf7e390ee95f2b6c1a3460839916b9aa12fc67553e14b1b",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3650,6 +3650,13 @@
       "filename": "20261121200000_504_lead_magnet_external_outcome_alerts.sql",
       "sha256": "db8d1e0b50b9997f19cff4d945a512e42e6b44fe3f958277a93123d4a17681ae",
       "trimmedMd5": "895f517dbb5679e33f185dc5680b1b12"
+    },
+    {
+      "version": "20261121210000",
+      "name": "505_secondary_offer_opportunity_source",
+      "filename": "20261121210000_505_secondary_offer_opportunity_source.sql",
+      "sha256": "2fbed3737b75487c7b83fefb0d1a754a8fcf22d60c54de7c02a785446ad48f8f",
+      "trimmedMd5": "06477c28fa19c7c0d5d3478db774bf40"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

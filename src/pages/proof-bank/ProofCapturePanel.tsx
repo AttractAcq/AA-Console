@@ -75,6 +75,16 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
         Back to capture
       </button>
       <h2 className="text-xl font-semibold">{method.label}</h2>
+      {placeholder && (
+        <div role="status" className="rounded-lg border border-border bg-card p-4 text-sm">
+          <p className="font-medium">Automatic capture is held</p>
+          <p className="mt-1 text-muted-foreground">{method.description}</p>
+          <p className="mt-2 text-muted-foreground">Use Manual Upload & Import for a sourced record while this route is being built. Manual uploads enter Raw and still require rights review.</p>
+          <button type="button" className={`${button} mt-3`} onClick={() => choose("manual_import")}>
+            Open Manual Upload & Import
+          </button>
+        </div>
+      )}
       {!placeholder && (
         <>
           <p className="text-sm text-muted-foreground">{method.description}</p>

@@ -69,6 +69,13 @@ describe("reading what the job asked for", () => {
     expect(requestedOffer({ kind: "main" }))
       .toEqual({ error: "This job does not say what to compile the offer from." });
   });
+
+  it("refuses a source that does not match the offer kind", () => {
+    expect(requestedOffer({ kind: "secondary", source: "strategy" }))
+      .toEqual({ error: "A main offer uses strategy; a secondary offer needs one approved opportunity." });
+    expect(requestedOffer({ kind: "main", source: "micro_niche" }))
+      .toEqual({ error: "A main offer uses strategy; a secondary offer needs one approved opportunity." });
+  });
 });
 
 describe("a usable offer", () => {

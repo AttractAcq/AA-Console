@@ -14,7 +14,7 @@ export const CAPTURE_METHODS = [
     label: "Guided Interview Capture",
     description: "Prepare interview questions and an evidence capture script.",
   },
-  { id: "integration", label: "Integration Capture", description: "" },
+  { id: "integration", label: "Integration Capture", description: "Provider import is held until a verified source connection and rights mapping are available." },
   {
     id: "manual_import",
     label: "Manual Upload & Import",
@@ -24,7 +24,7 @@ export const CAPTURE_METHODS = [
   {
     id: "outcome_followup",
     label: "Outcome Follow-up Engine",
-    description: "",
+    description: "Outcome-triggered follow-ups need a verified completion event, recipient consent and an approved request route.",
   },
 ] as const;
 export const PROOF_CATEGORIES = {
