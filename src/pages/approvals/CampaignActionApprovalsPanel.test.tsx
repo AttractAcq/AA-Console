@@ -45,6 +45,8 @@ function database(
     snapshots?: unknown[];
     attempts?: unknown[];
     revocations?: unknown[];
+    readbacks?: unknown[];
+    budgetJobs?: unknown[];
     runtime?: unknown;
   } = {},
 ) {
@@ -74,6 +76,16 @@ function database(
     if (table === "campaign_action_attempts_v6") {
       const query = { in: () => query,
         order: async () => ({ data: options.attempts ?? [], error: null }) };
+      return { select: () => query };
+    }
+    if (table === "campaign_budget_readback_overview_v6") {
+      const query = { in: () => query,
+        order: async () => ({ data: options.readbacks ?? [], error: null }) };
+      return { select: () => query };
+    }
+    if (table === "agent_jobs") {
+      const query = { eq: () => query, in: () => query,
+        order: async () => ({ data: options.budgetJobs ?? [], error: null }) };
       return { select: () => query };
     }
     if (table === "campaign_action_revocations_v6") {
@@ -240,6 +252,23 @@ it("shows an uncertain external effect and blocks another attempt", async () => 
   expect(await screen.findByText(/Provider effect may have happened; inspect the destination/))
     .toBeInTheDocument();
   expect(screen.getByRole("alert")).toHaveTextContent("1 failed, stopped or uncertain action");
+});
+
+it("requests a read-only Meta budget check and labels a value match as observation", async () => {
+  const user = userEvent.setup();
+  database({ due: [{ ...done, action_key: "budget_change", execution_status: "uncertain",
+    external_id: "23848", external_url: null,
+    blocker: "Provider effect may have happened; inspect the ad set." }],
+    readbacks: [{ execution_id: "execution-1", result: "matches_proposed",
+      observed_currency: "USD", observed_daily_budget_minor: 7500,
+      checked_at: "2026-11-15T12:00:00Z", account_id: "act_123" }] });
+  render(<CampaignActionApprovalsPanel />);
+  expect(await screen.findByText(/Latest observation: matches proposed/)).toBeInTheDocument();
+  expect(screen.getByText(/does not prove this action changed it/)).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Check current Meta budget" }));
+  await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_campaign_budget_readback_v6", {
+    p_execution_id: "execution-1",
+  }));
 });
 
 it("requires a reason and records a revocation through the owning RPC", async () => {

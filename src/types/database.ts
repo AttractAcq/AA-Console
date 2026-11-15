@@ -2319,6 +2319,85 @@ export type Database = {
           },
         ]
       }
+      campaign_budget_readbacks_v6: {
+        Row: {
+          account_id: string
+          ad_set_external_id: string
+          checked_at: string
+          client_id: string
+          execution_id: string
+          id: string
+          observed_currency: string
+          observed_daily_budget_minor: number
+          result: string
+        }
+        Insert: {
+          account_id: string
+          ad_set_external_id: string
+          checked_at?: string
+          client_id: string
+          execution_id: string
+          id?: string
+          observed_currency: string
+          observed_daily_budget_minor: number
+          result: string
+        }
+        Update: {
+          account_id?: string
+          ad_set_external_id?: string
+          checked_at?: string
+          client_id?: string
+          execution_id?: string
+          id?: string
+          observed_currency?: string
+          observed_daily_budget_minor?: number
+          result?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_content_pillars: {
         Row: {
           campaign_id: string
@@ -26495,6 +26574,85 @@ export type Database = {
           },
         ]
       }
+      campaign_budget_readback_overview_v6: {
+        Row: {
+          account_id: string | null
+          ad_set_external_id: string | null
+          checked_at: string | null
+          client_id: string | null
+          execution_id: string | null
+          id: string | null
+          observed_currency: string | null
+          observed_daily_budget_minor: number | null
+          result: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          ad_set_external_id?: string | null
+          checked_at?: string | null
+          client_id?: string | null
+          execution_id?: string | null
+          id?: string | null
+          observed_currency?: string | null
+          observed_daily_budget_minor?: number | null
+          result?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          ad_set_external_id?: string | null
+          checked_at?: string | null
+          client_id?: string | null
+          execution_id?: string | null
+          id?: string | null
+          observed_currency?: string | null
+          observed_daily_budget_minor?: number | null
+          result?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_launch_due: {
         Row: {
           acquisition_mode: string | null
@@ -32151,6 +32309,10 @@ export type Database = {
         Args: { p_change_id: string }
         Returns: Json
       }
+      campaign_budget_readback_target_v6: {
+        Args: { p_client_id: string; p_execution_id: string }
+        Returns: Json
+      }
       campaign_plan_fingerprint: {
         Args: {
           p_campaign: Database["public"]["Tables"]["client_campaigns"]["Row"]
@@ -35978,6 +36140,17 @@ export type Database = {
         }
         Returns: undefined
       }
+      record_campaign_budget_readback_v6: {
+        Args: {
+          p_account_id: string
+          p_ad_set_external_id: string
+          p_client_id: string
+          p_execution_id: string
+          p_observed_currency: string
+          p_observed_daily_budget_minor: number
+        }
+        Returns: string
+      }
       record_campaign_page_probe_v6: {
         Args: {
           p_detail: string
@@ -36693,6 +36866,10 @@ export type Database = {
           p_proposed_daily_budget: number
           p_reason: string
         }
+        Returns: string
+      }
+      request_campaign_budget_readback_v6: {
+        Args: { p_execution_id: string }
         Returns: string
       }
       request_campaign_google_build_v6: {

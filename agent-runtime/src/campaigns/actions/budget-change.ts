@@ -36,7 +36,7 @@ interface BudgetChange {
 }
 
 /** The ad account and its token, read the same way the builder reads them. */
-async function accountFor(
+export async function accountFor(
   sb: SupabaseClient,
   clientId: string,
 ): Promise<{ accessToken: string; accountId: string }> {

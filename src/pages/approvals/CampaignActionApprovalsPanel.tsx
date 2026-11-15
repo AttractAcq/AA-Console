@@ -17,6 +17,9 @@ type ActionAttempt = {
   external_url: string | null; error: string | null; legacy_inferred: boolean;
 };
 type ActionRevocation = { approval_id: string; reason: string; revoked_at: string };
+type BudgetReadback = { execution_id: string; result: string; observed_currency: string;
+  observed_daily_budget_minor: number; checked_at: string; account_id: string };
+type BudgetJob = { input_id: string; status: string };
 
 export function CampaignActionApprovalsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -25,6 +28,8 @@ export function CampaignActionApprovalsPanel() {
   const [decided, setDecided] = useState<CampaignActionDue[]>([]);
   const [attemptsByExecution, setAttemptsByExecution] = useState<Record<string, ActionAttempt[]> | null>({});
   const [revocations, setRevocations] = useState<Record<string, ActionRevocation>>({});
+  const [budgetReadbacks, setBudgetReadbacks] = useState<Record<string, BudgetReadback>>({});
+  const [budgetJobs, setBudgetJobs] = useState<Record<string, BudgetJob>>({});
   const [actionsOn, setActionsOn] = useState(false);
   const [runtimeHold, setRuntimeHold] = useState<string | null>("Runtime state has not been verified.");
   const [loading, setLoading] = useState(true);
@@ -45,6 +50,8 @@ export function CampaignActionApprovalsPanel() {
       setDecided([]);
       setAttemptsByExecution({});
       setRevocations({});
+      setBudgetReadbacks({});
+      setBudgetJobs({});
       setLoading(false);
       return;
     }
@@ -81,21 +88,43 @@ export function CampaignActionApprovalsPanel() {
       const executionIds = due.map((action) => action.execution_id).filter((id): id is string => Boolean(id));
       if (executionIds.length === 0) {
         setAttemptsByExecution({});
+        setBudgetReadbacks({});
+        setBudgetJobs({});
       } else {
-        const { data: attemptRows, error: attemptError } = await supabase
-          .from("campaign_action_attempts_v6" as never)
-          .select("execution_id,attempt_number,status,started_at,finished_at,external_id,external_url,error,legacy_inferred")
-          .in("execution_id", executionIds)
-          .order("attempt_number", { ascending: true });
+        const [{ data: attemptRows, error: attemptError }, readbacks, jobs] = await Promise.all([
+          supabase.from("campaign_action_attempts_v6" as never)
+            .select("execution_id,attempt_number,status,started_at,finished_at,external_id,external_url,error,legacy_inferred")
+            .in("execution_id", executionIds).order("attempt_number", { ascending: true }),
+          supabase.from("campaign_budget_readback_overview_v6")
+            .select("execution_id,result,observed_currency,observed_daily_budget_minor,checked_at,account_id")
+            .in("execution_id", executionIds).order("checked_at", { ascending: false }),
+          supabase.from("agent_jobs").select("input_id,status")
+            .eq("agent_key", "campaign_budget_reconciler").in("input_id", executionIds)
+            .order("created_at", { ascending: false }),
+        ]);
         if (attemptError) throw new Error(`Attempt receipts could not be read: ${attemptError.message}`);
+        if (readbacks.error) throw new Error(`Budget readbacks could not be read: ${readbacks.error.message}`);
+        if (jobs.error) throw new Error(`Budget readback jobs could not be read: ${jobs.error.message}`);
         const grouped: Record<string, ActionAttempt[]> = {};
         for (const row of (attemptRows ?? []) as ActionAttempt[]) {
           (grouped[row.execution_id] ??= []).push(row);
         }
         setAttemptsByExecution(grouped);
+        const latest: Record<string, BudgetReadback> = {};
+        for (const row of (readbacks.data ?? []) as BudgetReadback[]) {
+          latest[row.execution_id] ??= row;
+        }
+        setBudgetReadbacks(latest);
+        const latestJobs: Record<string, BudgetJob> = {};
+        for (const row of (jobs.data ?? []) as BudgetJob[]) {
+          if (row.input_id) latestJobs[row.input_id] ??= row;
+        }
+        setBudgetJobs(latestJobs);
       }
     } catch (cause) {
       setAttemptsByExecution(null);
+      setBudgetReadbacks({});
+      setBudgetJobs({});
       setRuntimeHold("Runtime state has not been verified.");
       setError(cause instanceof Error ? cause.message : "Could not read what happened to approved actions.");
     }
@@ -171,6 +200,17 @@ export function CampaignActionApprovalsPanel() {
     setError(null);
     const { error: rpcError } = await supabase.rpc("revoke_campaign_action_approval_v6", {
       p_approval_id: approvalId, p_reason: reason,
+    });
+    setBusyId(null);
+    if (rpcError) { setError(rpcError.message); return; }
+    await refresh();
+  }
+
+  async function requestBudgetReadback(executionId: string) {
+    setBusyId(executionId);
+    setError(null);
+    const { error: rpcError } = await supabase.rpc("request_campaign_budget_readback_v6", {
+      p_execution_id: executionId,
     });
     setBusyId(null);
     if (rpcError) { setError(rpcError.message); return; }
@@ -350,6 +390,23 @@ export function CampaignActionApprovalsPanel() {
                     </div>
                   )}
                 </dl>
+                {action.action_key === "budget_change" && action.execution_status === "uncertain" && action.execution_id && (
+                  <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-xs">
+                    <p className="font-medium">Read-only Meta budget check</p>
+                    <p className="mt-1">The check reads the ad set once and records its current amount. A matching amount does not prove this action changed it; no budget write is retried.</p>
+                    {budgetReadbacks[action.execution_id] && <p className="mt-2">
+                      Latest observation: {budgetReadbacks[action.execution_id].result.replaceAll("_", " ")}
+                      {` · ${budgetReadbacks[action.execution_id].observed_daily_budget_minor / 100} ${budgetReadbacks[action.execution_id].observed_currency}`}
+                      {` · ${new Date(budgetReadbacks[action.execution_id].checked_at).toLocaleString()}`}
+                    </p>}
+                    {budgetJobs[action.execution_id] && <p className="mt-1">Latest readback job: {budgetJobs[action.execution_id].status}</p>}
+                    <button type="button" className="mt-2 rounded-lg border border-border px-3 py-2 font-medium disabled:opacity-50"
+                      disabled={busyId === action.execution_id || ["queued", "claimed", "running", "paused"].includes(budgetJobs[action.execution_id]?.status ?? "")}
+                      onClick={() => void requestBudgetReadback(action.execution_id!)}>
+                      Check current Meta budget
+                    </button>
+                  </div>
+                )}
                 {!revocations[action.approval_id] && <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-xs">
                   <input aria-label={`Reason to revoke ${action.action_key}`} value={revokeReasonById[action.approval_id] ?? ""}
                     onChange={(event) => setRevokeReasonById((prior) => ({ ...prior, [action.approval_id]: event.target.value }))}

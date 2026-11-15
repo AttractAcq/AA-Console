@@ -37,6 +37,7 @@ import { runTokenHealthJob } from "../agents/token_health/index.js";
 import { runQaJob } from "../agents/qa/index.js";
 import { runPublisherJob } from "../agents/publisher/index.js";
 import { runCampaignActionJob } from "../campaigns/actions/executor.js";
+import { runCampaignBudgetReconciliationJob } from "../campaigns/actions/budget-reconciliation-job.js";
 import { runProofPlacerJob } from "../proof-distribution/placer.js";
 import { runLeadMagnetCourierJob } from "../lead-magnets/courier.js";
 import { runOutboundCourierJob } from "../outbound/courier.js";
@@ -186,6 +187,7 @@ const RUNNERS: Record<string, JobRunner> = {
   google_profile_field_reconciler: runGoogleProfileReconciliationJob,
   meta_profile_field_writer: runMetaProfileFieldJob,
   meta_profile_field_reconciler: runMetaProfileReconciliationJob,
+  campaign_budget_reconciler: runCampaignBudgetReconciliationJob,
   google_reply_sender: runGoogleReplySenderJob,
   google_reply_reconciler: runGoogleReplyReconciliationJob,
   brief_dispatch: runBriefDispatchJob,
