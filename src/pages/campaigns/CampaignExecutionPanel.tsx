@@ -722,7 +722,7 @@ export function CampaignExecutionPanel() {
               {packageState.approvals.length > 0 && <p className="mt-3 text-xs text-muted-foreground">Current-package approvals: {packageState.approvals.map((approval) => `${approval.action_key.replaceAll("_", " ")} · ${approval.status}`).join("; ")}</p>}
             </section>
             {clientId && c.acquisition_mode !== "legacy" &&
-              <CampaignPackageReadiness campaignId={c.id} />}
+              <CampaignPackageReadiness campaignId={c.id} clientId={clientId} />}
             {clientId && c.acquisition_mode !== "legacy" &&
               <CampaignSweepWork clientId={clientId} campaignId={c.id} />}
             {clientId && c.acquisition_mode !== "legacy"

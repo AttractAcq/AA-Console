@@ -149,6 +149,24 @@ const readyOffer = {
   owning_path: `/clients/client-1/delivery/offer-studio?tab=versions&offer=${offerId}`,
 };
 
+const packageId = "99999999-9999-4999-8999-999999999999";
+const packageHash = "9".repeat(64);
+const readyPreparation = {
+  ...request, id: "preparation-inbox-1", source_system: "aa_console",
+  source_kind: "campaign_preparation_package", source_id: packageId,
+  source_version: packageHash, artifact_hash: packageHash,
+  title: "Campaign preparation package v1", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z",
+  destination: "campaign_factory:prepared_package", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", campaign_id: "campaign-1", run_id: "run-1",
+    routes: [{ route: "organic", version: 1 }],
+    outputs: [{ item_key: "content_piece1", output_fingerprint: "a".repeat(64) }] },
+  scope: { client_id: "client-1", campaign_id: "campaign-1", run_id: "run-1",
+    package_id: packageId, snapshot_hash: packageHash, version: 1 },
+  owning_path: "/clients/client-1/delivery/campaign-factory?campaign=campaign-1",
+};
+
 const publicAgentId = "55555555-5555-4555-8555-555555555555";
 const publicAgentToken = "66666666-6666-4666-8666-666666666666";
 const publicAgentHash = "1".repeat(64);
@@ -1039,6 +1057,17 @@ describe("unified approval inbox", () => {
     await user.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_service_offer_version_v6", {
       p_version_id: offerVersionId,
+    }));
+  });
+
+  it("reviews the frozen campaign preparation package through its own decision RPC", async () => {
+    requests = [readyPreparation];
+    show();
+    const card = await screen.findByRole("article", { name: readyPreparation.title });
+    expect(within(card).getByText("Campaign preparation package decision")).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_campaign_preparation_package_v7", {
+      p_package_id: packageId, p_request_id: readyPreparation.id, p_approved: true,
     }));
   });
 

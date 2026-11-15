@@ -266,6 +266,26 @@ function isServiceOfferApprovalReady(request: UnifiedApprovalRequest, clientId: 
     && request.status === "pending" && request.source_state === "pending" && !isExpired(request);
 }
 
+function isCampaignPreparationReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console"
+    || request.source_kind !== "campaign_preparation_package"
+    || request.client_id !== clientId || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || request.source_version !== request.artifact_hash
+    || !request.artifact_hash || !/^[0-9a-f]{64}$/.test(request.artifact_hash)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  return scope.package_id === request.source_id
+    && scope.client_id === clientId && scope.campaign_id === preview.campaign_id
+    && scope.run_id === preview.run_id && scope.snapshot_hash === request.artifact_hash
+    && preview.client_id === clientId && Array.isArray(preview.routes)
+    && Array.isArray(preview.outputs) && preview.outputs.length > 0
+    && request.destination === "campaign_factory:prepared_package"
+    && request.owner_role === "admin_or_active_client_manager";
+}
+
 function isLeadMagnetApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   if (request.source_system !== "aa_console" || request.source_kind !== "lead_magnet"
     || request.client_id !== clientId || request.status !== "pending"
@@ -1007,7 +1027,8 @@ function isEngineSlotReady(request: UnifiedApprovalRequest, clientId: string): b
 }
 
 function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
-  return isCampaignRejectionReady(request, clientId)
+  return isCampaignPreparationReady(request, clientId)
+    || isCampaignRejectionReady(request, clientId)
     || isGoogleReplyRejectionReady(request, clientId)
     || isSalesEntitlementRejectionReady(request, clientId)
     || isServiceOfferRejectionReady(request, clientId)
@@ -1039,7 +1060,8 @@ function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): bo
 }
 
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
-  return isCampaignApprovalReady(request, clientId)
+  return isCampaignPreparationReady(request, clientId)
+    || isCampaignApprovalReady(request, clientId)
     || isGoogleReplyApprovalReady(request, clientId)
     || isRecruitmentBriefApprovalReady(request, clientId)
     || isSalesEntitlementApprovalReady(request, clientId)
@@ -1169,7 +1191,8 @@ function RequestCard({ request, history, gatewayOutcome, executionEvidence, clie
   const decisionLabel = request.source_kind === "google_review_reply"
     ? "Google review reply" : request.source_kind === "recruitment_brief"
       ? "Recruitment brief" : request.source_kind === "client_sales_entitlement"
-        ? "Sales access" : request.source_kind === "service_offer"
+        ? "Sales access" : request.source_kind === "campaign_preparation_package"
+          ? "Campaign preparation package" : request.source_kind === "service_offer"
           ? "Service offer" : request.source_kind === "lead_magnet"
             ? "Lead magnet" : request.source_kind === "sales_agent_public_use"
               ? "Sales agent public use" : request.source_kind === "opportunity_approve"
@@ -1597,6 +1620,12 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             p_scope_hash: request.source_version,
             p_approve: decision === "approved",
             p_note: decision === "rejected" ? reason!.trim() : "Approved from unified Approval Inbox",
+          })
+        : request.source_kind === "campaign_preparation_package"
+          ? await supabase.rpc("decide_campaign_preparation_package_v7", {
+            p_package_id: request.source_id, p_request_id: request.id,
+            p_approved: decision === "approved",
+            ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
           })
         : request.source_kind === "service_offer"
           ? decision === "approved"

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "6a396890f2c2dd145181c6cbeb50bd088dc776942dc28d6124c3b3f6ca535237",
-  "generatedTypesSha256": "f2cca7a81f5fdb5f71ef69da9a943803710424bb5187aab2507562e8914f57be",
-  "generatedSchemaBodySha256": "53a90af8d4911e15e1e460c5d50e28bdeb5aaf75b6f17901fc6ee16dfc5efb16",
+  "migrationSourceDigest": "78690219adc1c921742f7d1783b92c0c651e28dd378944c1862c0d6969fcab8f",
+  "generatedTypesSha256": "0ba480533b8dde571fc996cd333bf6c8f5fd3eb5acaaeee16b4a89d4252d68cb",
+  "generatedSchemaBodySha256": "8ccba023a62889d94f3cfffbe7d7ad11b477024cf85ba77c4f11a8c985a629ba",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3776,6 +3776,20 @@
       "filename": "20261122070000_522_campaign_preparation_snapshot.sql",
       "sha256": "d4c9a18b884d0f517728fe238fbf67e8671532bdbc8e8b627c3779ed63f03b0b",
       "trimmedMd5": "0ab22c95fe18773779759643fb7a4092"
+    },
+    {
+      "version": "20261122080000",
+      "name": "523_campaign_package_review",
+      "filename": "20261122080000_523_campaign_package_review.sql",
+      "sha256": "cce9861958245113216faca5290a90e6eb4663c2052e53c4dac60d736eb48797",
+      "trimmedMd5": "10b5179fd0b786ccd0ac504b18733dae"
+    },
+    {
+      "version": "20261122090000",
+      "name": "524_campaign_package_inbox_view",
+      "filename": "20261122090000_524_campaign_package_inbox_view.sql",
+      "sha256": "7e1b15923d152d273516e60867db45ddd63cce9d8908d9b5eca7e39de6b4cda0",
+      "trimmedMd5": "dde836f67a62d75172f3c49437e9d8ae"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

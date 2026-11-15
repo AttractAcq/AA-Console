@@ -17,10 +17,13 @@ type Package = {
     output_fingerprint: string; output_refs: unknown[] }> };
 };
 
-export function CampaignPackageReadiness({ campaignId }: { campaignId: string }) {
+export function CampaignPackageReadiness({ campaignId, clientId }: {
+  campaignId: string; clientId: string;
+}) {
   const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [prepared, setPrepared] = useState<Package | null>(null);
   const [current, setCurrent] = useState(false);
+  const [approved, setApproved] = useState(false);
   const [assembling, setAssembling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const refresh = useCallback(async () => {
@@ -41,7 +44,13 @@ export function CampaignPackageReadiness({ campaignId }: { campaignId: string })
         { p_package_id: row.id });
       if (check.error) { setError(check.error.message); return; }
       setCurrent(check.data === true);
-    } else setCurrent(false);
+      if (check.data === true) {
+        const decision = await supabase.rpc("campaign_preparation_approved_v7",
+          { p_package_id: row.id });
+        if (decision.error) { setError(decision.error.message); return; }
+        setApproved(decision.data === true);
+      } else setApproved(false);
+    } else { setCurrent(false); setApproved(false); }
     setError(null);
   }, [campaignId]);
 
@@ -86,7 +95,11 @@ export function CampaignPackageReadiness({ campaignId }: { campaignId: string })
       {prepared && <div className="mt-3 rounded-md border border-border p-3 text-xs">
         <p className="font-medium">Frozen package v{prepared.version} · {current ? "Current" : "Superseded"}</p>
         <p className="mt-1 text-muted-foreground">Assembled {new Date(prepared.assembled_at).toLocaleString()} · SHA-256 {prepared.snapshot_hash}</p>
-        {current && <p className="mt-1">Exact outputs: {(prepared.snapshot.outputs ?? []).length}. Human package review is still required.</p>}
+        {current && <p className="mt-1">Exact outputs: {(prepared.snapshot.outputs ?? []).length}.
+          {approved ? " Human preparation review approved." : " Human preparation review is pending."}</p>}
+        {current && !approved && <a className="mt-2 inline-block underline"
+          href={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>
+          Review in Approval Inbox</a>}
         {current && <ul className="mt-2 list-disc space-y-1 pl-5">{(prepared.snapshot.outputs ?? []).map((output) =>
           <li key={output.item_key}>{output.item_key.replaceAll("_", " ")} · {output.route_key} · {output.output_fingerprint.slice(0, 12)}…</li>)}</ul>}
       </div>}

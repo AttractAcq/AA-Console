@@ -29,6 +29,7 @@ declare cid uuid:='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
   asset_id uuid; asset_fingerprint text; plan_hash text; spec_hash text;
   frozen public.campaign_preparation_packages_v7%rowtype;
   again public.campaign_preparation_packages_v7%rowtype;
+  request_id uuid; refused boolean := false;
 begin
   select public.campaign_plan_fingerprint(c),c.content_spec_hash into plan_hash,spec_hash
     from public.client_campaigns c where id=cid;
@@ -76,9 +77,29 @@ begin
     or not public.campaign_preparation_package_current_v7(frozen.id)
     or jsonb_array_length(frozen.snapshot->'outputs')<>1 then
     raise exception 'Package freeze was not exact and idempotent'; end if;
+  select id into request_id from public.approval_requests_v6
+    where source_kind='campaign_preparation_package' and source_id=frozen.id::text;
+  if request_id is null or (select status from public.approval_inbox_v6
+    where id=request_id)<>'pending' then
+    raise exception 'Exact package review did not enter the unified inbox'; end if;
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal1"}',true);
+  begin
+    perform public.decide_campaign_preparation_package_v7(frozen.id,request_id,true);
+  exception when insufficient_privilege then refused:=true;
+  end;
+  if not refused then raise exception 'AAL1 approved a preparation package'; end if;
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  perform public.decide_campaign_preparation_package_v7(frozen.id,request_id,true);
+  if not public.campaign_preparation_approved_v7(frozen.id)
+    or (select status from public.approval_inbox_v6 where id=request_id)<>'approved' then
+    raise exception 'AAL2 review did not approve the exact package'; end if;
   update public.client_media_assets set storage_path='campaign-fixture/changed.png'
     where id=asset_id;
-  if public.campaign_preparation_package_current_v7(frozen.id) then
-    raise exception 'Changed output kept the frozen package current'; end if;
+  if public.campaign_preparation_package_current_v7(frozen.id)
+    or public.campaign_preparation_approved_v7(frozen.id)
+    or (select status from public.approval_inbox_v6 where id=request_id)<>'superseded' then
+    raise exception 'Changed output kept its package approval usable'; end if;
 end $checks$;
 rollback;

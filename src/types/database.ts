@@ -35254,9 +35254,17 @@ export type Database = {
         Args: { p_campaign_id: string }
         Returns: boolean
       }
+      campaign_preparation_approved_v7: {
+        Args: { p_package_id: string }
+        Returns: boolean
+      }
       campaign_preparation_package_current_v7: {
         Args: { p_package_id: string }
         Returns: boolean
+      }
+      campaign_preparation_review_source_state_v7: {
+        Args: { p_request_id: string }
+        Returns: string
       }
       campaign_preparation_snapshot_v7: {
         Args: { p_campaign_id: string }
@@ -36636,6 +36644,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      decide_campaign_preparation_package_v7: {
+        Args: {
+          p_approved: boolean
+          p_package_id: string
+          p_reason?: string
+          p_request_id: string
+        }
+        Returns: string
       }
       decide_client_authority_assignment_v6: {
         Args: {
