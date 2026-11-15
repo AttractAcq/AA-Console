@@ -4,6 +4,7 @@ import { RequireRole } from "./components/RequireRole";
 import { Page } from "./pages/Page";
 import { ClientsPage } from "./pages/ClientsPage";
 import { LoginPage } from "./pages/LoginPage";
+import { InvitationAcceptPage } from "./pages/InvitationAcceptPage";
 import { LandingPage } from "./pages/marketing/LandingPage";
 import { ClientLoginPage } from "./pages/client/ClientLoginPage";
 import { ClientConsolePage } from "./pages/client/ClientConsolePage";
@@ -42,6 +43,15 @@ export default function App() {
 
             <Route path="/login" element={<LoginPage />} />
             <Route path="/security/mfa" element={<MfaSecurityPage />} />
+
+            {/*
+              Invitation acceptance. The email link lands here with
+              ?request= and an Auth session hash, before a profile row
+              exists. It stays outside RequireRole and the admin layout:
+              that layout's splat would send this path to / or /login and
+              drop the query and hash that the page and Supabase need.
+            */}
+            <Route path="/invite/accept" element={<InvitationAcceptPage />} />
 
             <Route path="/client/login" element={<ClientLoginPage />} />
             <Route
