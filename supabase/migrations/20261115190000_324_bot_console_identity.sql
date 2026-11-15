@@ -3458,12 +3458,33 @@ begin
   return v_placement;
 end $$;
 
+-- Frozen at decision time. Reading profiles.is_bot later is wrong: decided_by
+-- is ON DELETE SET NULL, and clearing is_bot would make a bot approval
+-- look human. Approved rows with a null decider stay undeliverable.
+alter table public.lead_magnet_approvals
+  add column if not exists decided_by_bot boolean not null default false;
+
+comment on column public.lead_magnet_approvals.decided_by_bot is
+  'True when the caller who decided this row was a bot. Set only by decide_lead_magnet_approval_v6. Not recomputed from the profile. Authenticated has no write policy on this table, and UPDATE of this column is revoked from public, anon, authenticated, and service_role.';
+
+update public.lead_magnet_approvals a
+   set decided_by_bot = true
+  from public.profiles p
+ where p.id = a.decided_by
+   and p.is_bot;
+
+revoke update (decided_by_bot) on table public.lead_magnet_approvals
+  from public, anon, authenticated, service_role;
+
 -- decide_lead_magnet_approval_v6 (was 20261024100000_236_lead_magnets.sql)
 create or replace function public.decide_lead_magnet_approval_v6(
   p_approval_id uuid, p_approved boolean, p_reason text default null)
 returns public.lead_magnet_approvals language plpgsql security definer
 set search_path = pg_catalog, public as $$
-declare v_approval public.lead_magnet_approvals%rowtype; v_current text;
+declare
+  v_approval public.lead_magnet_approvals%rowtype;
+  v_current text;
+  v_caller_is_bot boolean;
 begin
 
   -- Bot console users are admins so agency reads keep working, and AAL2 does
@@ -3502,19 +3523,26 @@ begin
       using errcode = 'P0001';
   end if;
 
+  select coalesce(bool_or(p.is_bot), false)
+    into v_caller_is_bot
+    from public.profiles p
+   where p.id = auth.uid();
+
   if not coalesce(p_approved, false) then
     if nullif(btrim(coalesce(p_reason, '')), '') is null then
       raise exception 'Say why it was rejected.' using errcode = 'P0001';
     end if;
     update public.lead_magnet_approvals
        set status = 'rejected', decided_at = now(), decided_by = auth.uid(),
+           decided_by_bot = v_caller_is_bot,
            rejection_reason = btrim(p_reason)
      where id = p_approval_id returning * into v_approval;
     return v_approval;
   end if;
 
   update public.lead_magnet_approvals
-     set status = 'approved', decided_at = now(), decided_by = auth.uid()
+     set status = 'approved', decided_at = now(), decided_by = auth.uid(),
+         decided_by_bot = v_caller_is_bot
    where id = p_approval_id returning * into v_approval;
   return v_approval;
 end $$;
@@ -4546,10 +4574,54 @@ revoke all on function public.schedule_asset(uuid, date, public.post_channel, pu
 grant execute on function public.schedule_asset(uuid, date, public.post_channel, public.post_platform, time)
   to authenticated;
 
+-- revoke_lead_magnet_approval_v6 (was 20261024100000_236_lead_magnets.sql)
+-- Cancels queued and failed deliveries. Bots must not do that, including a
+-- bot that is the assigned manager.
+create or replace function public.revoke_lead_magnet_approval_v6(p_approval_id uuid, p_reason text)
+returns void language plpgsql security definer
+set search_path = pg_catalog, public as $$
+declare v_approval public.lead_magnet_approvals%rowtype;
+begin
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+
+  select * into v_approval from public.lead_magnet_approvals where id = p_approval_id for update;
+  if not found then raise exception 'No such approval.' using errcode = 'P0001'; end if;
+  if not (coalesce(public.is_human_admin(), false)
+          or coalesce(auth.uid() = public.active_video_approval_manager(v_approval.client_id), false)) then
+    raise exception 'Only an admin or the assigned client manager can revoke this.'
+      using errcode = 'P0001';
+  end if;
+  if v_approval.status <> 'approved' then
+    raise exception 'Only an approved magnet can be revoked.' using errcode = 'P0001';
+  end if;
+  if nullif(btrim(coalesce(p_reason, '')), '') is null then
+    raise exception 'Say why it is being revoked.' using errcode = 'P0001';
+  end if;
+  update public.lead_magnet_approvals
+     set status = 'revoked', revoked_at = now(), revoked_reason = btrim(p_reason)
+   where id = p_approval_id;
+  update public.lead_magnet_deliveries
+     set status = 'cancelled', last_error = 'The magnet approval was revoked: ' || btrim(p_reason)
+   where magnet_version_id = v_approval.magnet_version_id
+     and status in ('queued', 'failed');
+end $$;
+
+revoke all on function public.revoke_lead_magnet_approval_v6(uuid, text) from public, anon;
+grant execute on function public.revoke_lead_magnet_approval_v6(uuid, text) to authenticated;
+
 -- A bot-sales approval is internal. The courier reads lead_magnet_due, and
 -- claim_lead_magnet_deliveries only takes rows whose blocker is null.
--- decided_by is_bot stays blocked until a human approval of that version
--- is the live approved row. The per-client delivery switch is unchanged.
+-- decided_by_bot is the frozen decision. A null decided_by on an approved
+-- row is also blocked. The per-client delivery switch is unchanged.
 create or replace view public.lead_magnet_due with (security_invoker = true) as
 select
   d.id as delivery_id,
@@ -4571,10 +4643,7 @@ select
       then 'The approval was revoked: ' || coalesce(a.revoked_reason, 'no reason recorded') || '.'
     when a.status <> 'approved'
       then 'The approval is ' || a.status || '.'
-    when exists (
-      select 1 from public.profiles decider
-       where decider.id = a.decided_by and decider.is_bot
-    )
+    when a.decided_by_bot or a.decided_by is null
       then 'A bot approved this magnet. A person still has to approve this version before it can be sent.'
     when a.payload_hash <> public.lead_magnet_payload_hash_v6(d.magnet_version_id)
       then 'The file or the message changed after approval. Ask again.'
@@ -4616,10 +4685,9 @@ begin
        and not exists (
          select 1
            from public.lead_magnet_approvals bot_approval
-           join public.profiles bot_decider on bot_decider.id = bot_approval.decided_by
           where bot_approval.magnet_version_id = d.magnet_version_id
             and bot_approval.status = 'approved'
-            and bot_decider.is_bot
+            and (bot_approval.decided_by_bot or bot_approval.decided_by is null)
        )
      order by d.created_at
      limit greatest(coalesce(p_limit, 5), 1)

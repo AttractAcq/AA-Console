@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "fb7d3de0ccb60e2a0cc5116bfbd550c78847a3d77e21bfc31acab1379d0c4dc5",
-  "generatedTypesSha256": "d865e1a23af8455ef448f30b3f2a129ddd14032e5c2ccb9deee7526efd0d1c3d",
-  "generatedSchemaBodySha256": "00c05fa039360f2eb2ff644eeb99fa6ec1ccf53a504dfbc51230d3c4e91277d1",
+  "migrationSourceDigest": "4cf371171e70bf247c29fc0031f1282085b720c6ddb2044295312c7e428dad56",
+  "generatedTypesSha256": "33d54dea282e0c1e636d71e42bb42d0b5a2c518971968b2c8a81750c0e9bcb6d",
+  "generatedSchemaBodySha256": "6844633d687d866fe275cba97b924087f3acf26638d8d467223ad8c69aa3c633",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2388,8 +2388,8 @@
       "version": "20261115190000",
       "name": "324_bot_console_identity",
       "filename": "20261115190000_324_bot_console_identity.sql",
-      "sha256": "c2080ab00e0f856f6d01d3da7fea3f4088fe6f37e7ecc7bd3260c34ea7d582c1",
-      "trimmedMd5": "148584a38fd6515eddfc441223eae434"
+      "sha256": "9fb7133671e9ad92c7b7ed5fd07646c63ab6572baab817d547f21db7256f9d5a",
+      "trimmedMd5": "b5d2dc49f15f02fa1dda848069d3ae27"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

@@ -4,7 +4,7 @@
 -- The agent-runtime pglite suite covers the same checks in CI.
 
 begin;
-select plan(40);
+select plan(51);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -348,6 +348,19 @@ select results_eq(
   $$values ('approved'::text, '77777777-7777-4777-8777-777777777772'::uuid)$$,
   'the lead-magnet decision is recorded as bot-sales'
 );
+select results_eq(
+  $$select decided_by_bot from public.lead_magnet_approvals
+     where id = 'c1111111-1111-4111-8111-111111111111'$$,
+  $$values (true)$$,
+  'the bot decision is frozen on the approval'
+);
+select throws_ok(
+  $$select public.revoke_lead_magnet_approval_v6(
+      'c1111111-1111-4111-8111-111111111111', 'stop')$$,
+  '42501',
+  'Bot accounts cannot perform this action',
+  'a bot cannot revoke a magnet or cancel its deliveries'
+);
 
 select set_config('request.jwt.claim.sub', '77777777-7777-4777-8777-777777777773', true);
 select throws_ok(
@@ -466,6 +479,114 @@ select results_eq(
      where id = 'b4444444-4444-4444-8444-444444444442'$$,
   $$values (true)$$,
   'a rejection clears human_approved_at'
+);
+
+select ok(
+  not has_column_privilege('authenticated', 'public.lead_magnet_approvals', 'decided_by_bot', 'UPDATE')
+  and not has_column_privilege('anon', 'public.lead_magnet_approvals', 'decided_by_bot', 'UPDATE')
+  and not has_column_privilege('service_role', 'public.lead_magnet_approvals', 'decided_by_bot', 'UPDATE'),
+  'no session can update decided_by_bot directly'
+);
+select ok(
+  not exists (
+    select 1 from pg_policies
+     where schemaname = 'public' and tablename = 'lead_magnet_approvals'
+       and cmd in ('INSERT', 'UPDATE', 'DELETE', 'ALL')
+  ),
+  'lead_magnet_approvals has no direct write policy'
+);
+
+insert into public.lead_capture_endpoints (
+  id, client_id, purpose, token_hash, consent_wording, expires_at)
+values (
+  'e1000000-0000-4000-8000-000000000010',
+  '44444444-4444-4444-8444-444444444401',
+  'magnet_optin', repeat('c', 64), 'Send me the guide.', now() + interval '1 day');
+insert into public.lead_submissions (
+  id, client_id, endpoint_id, email, consent_wording, consent_given_at, idempotency_key)
+values (
+  'e1000000-0000-4000-8000-000000000011',
+  '44444444-4444-4444-8444-444444444401',
+  'e1000000-0000-4000-8000-000000000010',
+  'lead@example.com', 'Send me the guide.', now(), 'magnet-once');
+insert into public.lead_magnet_deliveries (
+  id, client_id, submission_id, magnet_version_id, channel, recipient)
+values (
+  'e1000000-0000-4000-8000-000000000012',
+  '44444444-4444-4444-8444-444444444401',
+  'e1000000-0000-4000-8000-000000000011',
+  'c0000000-0000-4000-8000-000000000011',
+  'email', 'lead@example.com');
+update public.client_engine_settings
+   set lead_magnet_delivery_enabled = true
+ where client_id = '44444444-4444-4444-8444-444444444401';
+
+select set_config('request.jwt.claim.role', 'service_role', true);
+select is_empty(
+  $$select delivery_id from public.claim_lead_magnet_deliveries(5)$$,
+  'the claim skips a bot-decided magnet'
+);
+select results_eq(
+  $$select blocker is not null from public.lead_magnet_due
+     where delivery_id = 'e1000000-0000-4000-8000-000000000012'$$,
+  $$values (true)$$,
+  'a bot-decided magnet is not due'
+);
+
+update public.lead_magnet_approvals
+   set decided_by = null
+ where id = 'c1111111-1111-4111-8111-111111111111';
+select results_eq(
+  $$select decided_by_bot, blocker is not null
+      from public.lead_magnet_approvals a
+      join public.lead_magnet_due d on d.magnet_version_id = a.magnet_version_id
+     where a.id = 'c1111111-1111-4111-8111-111111111111'$$,
+  $$values (true, true)$$,
+  'deleting the bot leaves the approval undeliverable'
+);
+
+update public.lead_magnet_approvals
+   set decided_by = '77777777-7777-4777-8777-777777777772', decided_by_bot = true
+ where id = 'c1111111-1111-4111-8111-111111111111';
+update public.profiles
+   set is_bot = false, bot_key = null
+ where id = '77777777-7777-4777-8777-777777777772';
+select results_eq(
+  $$select a.decided_by_bot, d.blocker is not null
+      from public.lead_magnet_approvals a
+      join public.lead_magnet_due d on d.magnet_version_id = a.magnet_version_id
+     where a.id = 'c1111111-1111-4111-8111-111111111111'$$,
+  $$values (true, true)$$,
+  'clearing is_bot leaves the approval undeliverable'
+);
+update public.profiles
+   set is_bot = true, bot_key = 'bot-sales'
+ where id = '77777777-7777-4777-8777-777777777772';
+
+update public.lead_magnet_approvals
+   set status = 'pending', decided_at = null, decided_by = null,
+       decided_by_bot = false, rejection_reason = null
+ where id = 'c1111111-1111-4111-8111-111111111111';
+select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
+select lives_ok(
+  $$select public.decide_lead_magnet_approval_v6(
+      'c1111111-1111-4111-8111-111111111111', true, null)$$,
+  'a human can re-approve the version'
+);
+select results_eq(
+  $$select decided_by_bot, blocker is null
+      from public.lead_magnet_approvals a
+      join public.lead_magnet_due d on d.magnet_version_id = a.magnet_version_id
+     where a.id = 'c1111111-1111-4111-8111-111111111111'$$,
+  $$values (false, true)$$,
+  'a human re-approval makes the magnet due'
+);
+select set_config('request.jwt.claim.role', 'service_role', true);
+select results_eq(
+  $$select magnet_version_id from public.claim_lead_magnet_deliveries(5)$$,
+  $$values ('c0000000-0000-4000-8000-000000000011'::uuid)$$,
+  'the claim takes the human-approved magnet'
 );
 
 select * from finish();

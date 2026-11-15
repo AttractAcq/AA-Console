@@ -228,6 +228,7 @@ beforeAll(async () => {
       status text,
       decided_at timestamptz,
       decided_by uuid,
+      decided_by_bot boolean not null default false,
       rejection_reason text,
       revoked_reason text
     );
@@ -295,6 +296,7 @@ beforeAll(async () => {
       attempts integer default 0,
       provider_ref text,
       last_error text,
+      claimed_at timestamptz,
       lease_until timestamptz,
       created_at timestamptz default now()
     );
@@ -995,6 +997,11 @@ describe("bot console identity", () => {
     );
     await db.exec("reset role");
     expect(salesDecision.rows[0]).toEqual({ status: "approved", decided_by: sales });
+    const frozen = await db.query<{ decided_by_bot: boolean }>(
+      "select decided_by_bot from public.lead_magnet_approvals where id = $1",
+      [salesApproval],
+    );
+    expect(frozen.rows[0]?.decided_by_bot).toBe(true);
 
     await asUser(HUMAN);
     const humanDecision = await db.query<{ status: string; decided_by: string }>(
@@ -1051,6 +1058,103 @@ describe("bot console identity", () => {
     const byVersion = new Map(due.rows.map((row) => [row.magnet_version_id, row.blocker]));
     expect(byVersion.get(salesApproval)).toMatch(/A bot approved this magnet/);
     expect(byVersion.get(humanApproval)).toBeNull();
+
+    await asUser(sales);
+    expect(await call(
+      "select public.revoke_lead_magnet_approval_v6($1, 'stop')",
+      [salesApproval],
+    )).toMatch(/Bot accounts cannot perform this action/);
+    await db.exec("reset role");
+    const stillQueued = await db.query<{ status: string }>(
+      "select status from public.lead_magnet_deliveries where id = 'e1000000-0000-4000-8000-000000000001'",
+    );
+    expect(stillQueued.rows[0]?.status).toBe("queued");
+
+    await asService();
+    const claimed = await db.query<{ magnet_version_id: string }>(
+      "select magnet_version_id::text from public.claim_lead_magnet_deliveries(5)",
+    );
+    await db.exec("reset role");
+    expect(claimed.rows.map((row) => row.magnet_version_id)).toEqual([humanApproval]);
+
+    await db.query(
+      "update public.lead_magnet_approvals set decided_by = null where id = $1",
+      [salesApproval],
+    );
+    const deletedBot = await db.query<{ decided_by_bot: boolean; blocker: string | null }>(
+      `select a.decided_by_bot, d.blocker
+         from public.lead_magnet_approvals a
+         join public.lead_magnet_due d on d.magnet_version_id = a.magnet_version_id
+        where a.id = $1`,
+      [salesApproval],
+    );
+    expect(deletedBot.rows[0]?.decided_by_bot).toBe(true);
+    expect(deletedBot.rows[0]?.blocker).toMatch(/A bot approved this magnet/);
+    await db.query(
+      "update public.lead_magnet_approvals set decided_by_bot = false where id = $1",
+      [salesApproval],
+    );
+    const nullDecider = await db.query<{ blocker: string | null }>(
+      `select blocker from public.lead_magnet_due where magnet_version_id = $1`,
+      [salesApproval],
+    );
+    expect(nullDecider.rows[0]?.blocker).toMatch(/A bot approved this magnet/);
+
+    await db.query(
+      `update public.lead_magnet_approvals
+          set decided_by = $2, decided_by_bot = true
+        where id = $1`,
+      [salesApproval, sales],
+    );
+    await asService();
+    await db.query(
+      "update public.profiles set is_bot = false, bot_key = null where id = $1",
+      [sales],
+    );
+    await db.exec("reset role");
+    const demoted = await db.query<{ decided_by_bot: boolean; blocker: string | null }>(
+      `select a.decided_by_bot, d.blocker
+         from public.lead_magnet_approvals a
+         join public.lead_magnet_due d on d.magnet_version_id = a.magnet_version_id
+        where a.id = $1`,
+      [salesApproval],
+    );
+    expect(demoted.rows[0]).toMatchObject({
+      decided_by_bot: true,
+      blocker: expect.stringMatching(/A bot approved this magnet/),
+    });
+    await asService();
+    await db.query(
+      "update public.profiles set is_bot = true, bot_key = 'bot-sales' where id = $1",
+      [sales],
+    );
+    await db.exec("reset role");
+
+    await db.query(
+      `update public.lead_magnet_approvals
+          set status = 'pending', decided_at = null, decided_by = null, decided_by_bot = false
+        where id = $1`,
+      [salesApproval],
+    );
+    await asUser(HUMAN);
+    const reapproved = await db.query<{ decided_by_bot: boolean; decided_by: string }>(
+      `select decided_by_bot, decided_by::text
+         from public.decide_lead_magnet_approval_v6($1::uuid, true, null)`,
+      [salesApproval],
+    );
+    await db.exec("reset role");
+    expect(reapproved.rows[0]).toEqual({ decided_by_bot: false, decided_by: HUMAN });
+    const deliverable = await db.query<{ blocker: string | null }>(
+      "select blocker from public.lead_magnet_due where magnet_version_id = $1",
+      [salesApproval],
+    );
+    expect(deliverable.rows[0]?.blocker).toBeNull();
+    await asService();
+    const claimedAfter = await db.query<{ magnet_version_id: string }>(
+      "select magnet_version_id::text from public.claim_lead_magnet_deliveries(5)",
+    );
+    await db.exec("reset role");
+    expect(claimedAfter.rows.map((row) => row.magnet_version_id)).toEqual([salesApproval]);
   });
 
   it("purges a bot's sessions and refuses a human", async () => {

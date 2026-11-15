@@ -12664,6 +12664,7 @@ export type Database = {
           client_id: string
           decided_at: string | null
           decided_by: string | null
+          decided_by_bot: boolean
           id: string
           magnet_version_id: string
           payload_hash: string
@@ -12679,6 +12680,7 @@ export type Database = {
           client_id: string
           decided_at?: string | null
           decided_by?: string | null
+          decided_by_bot?: boolean
           id?: string
           magnet_version_id: string
           payload_hash: string
@@ -12694,6 +12696,7 @@ export type Database = {
           client_id?: string
           decided_at?: string | null
           decided_by?: string | null
+          decided_by_bot?: boolean
           id?: string
           magnet_version_id?: string
           payload_hash?: string

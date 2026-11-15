@@ -136,10 +136,12 @@ to a human admin, the creative director, or the active SMM, and that
 schedule calls `review_media_asset` so the seat gates run and a
 `client_asset_reviews` row records the human. `organic_publication_source_snapshot_v6`
 still requires `human_approved_at`. `approve_slot` stays human-only.
-`bot-sales` may decide a pending lead magnet, and that approval is not
-deliverable: `lead_magnet_due` stays blocked until a human approves the
-same version. Turning delivery on, and the `lead_magnet_courier` worker,
-stay refused for every bot.
+`bot-sales` may decide a pending lead magnet. `decided_by_bot` is stored
+on that row at decision time. Deleting the bot or clearing `is_bot` does
+not make the approval deliverable, and an approved row with a null
+decider stays blocked. A human decision clears the flag. Turning delivery
+on, and the `lead_magnet_courier` worker, stay refused for every bot.
+Bots cannot revoke a magnet approval or cancel its queued deliveries.
 
 ```bash
 BOT_RESET_CONFIRM=reset-bot-password \
