@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "e92a24a3d75ae2f51727005bfbd58fbf04f431fcbe3a0217019670c27b1d0a07",
-  "generatedTypesSha256": "8ee1241acc170dac54a7f6195a328d908a3067ac1ed09b133f796bc2b7e5d6d9",
-  "generatedSchemaBodySha256": "61a5f90a037db84df66c22f909348f22aa4607ded78f791b5537c2884aa7a40f",
+  "migrationSourceDigest": "ad29db5d77d783e791428634af6c442d53393d726b84ff8a5045463436845b91",
+  "generatedTypesSha256": "6cb26f17b2473c79b208210fff935275e8064cebd5efc5ea22105fc28d8f3888",
+  "generatedSchemaBodySha256": "4e7fa9ff2c7ce0f372ba78923d0a5b6d873204d9ac9908d8046754255f48a8c9",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3587,6 +3587,13 @@
       "filename": "20261121110000_495_campaign_proof_release_observations.sql",
       "sha256": "2df570414302d30d14045a3edfc9d5eb681e8e24c254948811e3d22553af1b96",
       "trimmedMd5": "3966f985a27b344ed02446dda392dc79"
+    },
+    {
+      "version": "20261121120000",
+      "name": "496_campaign_lead_enrolment_source_audit",
+      "filename": "20261121120000_496_campaign_lead_enrolment_source_audit.sql",
+      "sha256": "f352628aae445f1a237dbfba275c5a1072b039281394700edf658dc151dcd2c4",
+      "trimmedMd5": "5327ebed9b0bced2b9f816d68706d3b7"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

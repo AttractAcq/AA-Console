@@ -50,6 +50,7 @@ function database(
     pageReadbacks?: unknown[];
     pageJobs?: unknown[];
     proofRows?: unknown[];
+    leadRows?: unknown[];
     runtime?: unknown;
   } = {},
 ) {
@@ -93,6 +94,9 @@ function database(
     }
     if (table === "campaign_proof_release_observations_v6") {
       return { select: () => ({ in: async () => ({ data: options.proofRows ?? [], error: null }) }) };
+    }
+    if (table === "campaign_lead_enrolment_source_v6") {
+      return { select: () => ({ in: async () => ({ data: options.leadRows ?? [], error: null }) }) };
     }
     if (table === "agent_jobs") {
       let key = "";
@@ -314,6 +318,30 @@ it("shows proof release and destination receipts as separate facts", async () =>
   expect(await screen.findByText("Proof release source check")).toBeInTheDocument();
   expect(screen.getByText(/approval approved · placement queued/)).toBeInTheDocument();
   expect(screen.getByText(/still needs its destination placement receipt/)).toBeInTheDocument();
+});
+
+it("shows a committed lead enrolment sweep without calling it a message send", async () => {
+  database({ due: [{ ...done, action_key: "lead_message", destination: "nurture sequence",
+    external_id: null, external_url: null }], leadRows: [{
+      execution_id: "execution-1", sequence_name: "Guide follow-up",
+      started_at: "2026-11-15T08:00:00Z", finished_at: "2026-11-15T08:00:01Z",
+      observed_count: 2, skipped_count: 1, current_observation_rows: 2,
+    }] });
+  render(<CampaignActionApprovalsPanel />);
+  expect(await screen.findByText("Lead enrolment source check")).toBeInTheDocument();
+  expect(screen.getByText(/2 enrolment rows observed, 1 lead skipped/)).toBeInTheDocument();
+  expect(screen.getByText(/Enrolment does not itself send a message/)).toBeInTheDocument();
+});
+
+it("does not treat a missing lead source run as a safe retry", async () => {
+  database({ due: [{ ...done, action_key: "lead_message", execution_status: "uncertain",
+    destination: "nurture sequence", external_id: null, external_url: null }],
+    leadRows: [{ execution_id: "execution-1", sequence_name: "Guide follow-up",
+      started_at: null, finished_at: null, observed_count: null,
+      skipped_count: null, current_observation_rows: 0 }] });
+  render(<CampaignActionApprovalsPanel />);
+  expect(await screen.findByText(/No committed enrolment run is recorded/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Retry/ })).not.toBeInTheDocument();
 });
 
 it("requires a reason and records a revocation through the owning RPC", async () => {

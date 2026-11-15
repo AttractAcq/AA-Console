@@ -1322,6 +1322,13 @@ export type Database = {
             foreignKeyName: "campaign_action_attempts_v6_execution_id_fkey"
             columns: ["execution_id"]
             isOneToOne: false
+            referencedRelation: "campaign_lead_enrolment_source_v6"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
             referencedRelation: "campaign_proof_release_observations_v6"
             referencedColumns: ["execution_id"]
           },
@@ -1400,6 +1407,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "campaign_action_executions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_events_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_lead_enrolment_source_v6"
+            referencedColumns: ["execution_id"]
           },
           {
             foreignKeyName: "campaign_action_events_execution_id_fkey"
@@ -2414,6 +2428,13 @@ export type Database = {
             foreignKeyName: "campaign_budget_readbacks_v6_execution_id_fkey"
             columns: ["execution_id"]
             isOneToOne: false
+            referencedRelation: "campaign_lead_enrolment_source_v6"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
             referencedRelation: "campaign_proof_release_observations_v6"
             referencedColumns: ["execution_id"]
           },
@@ -2589,6 +2610,249 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "meta_build_due"
             referencedColumns: ["campaign_id", "client_id"]
+          },
+        ]
+      }
+      campaign_lead_enrolment_items_v6: {
+        Row: {
+          client_id: string
+          enrollment_id: string | null
+          execution_id: string
+          lead_id: string
+          observed_at: string
+          reason: string | null
+          result: string
+        }
+        Insert: {
+          client_id: string
+          enrollment_id?: string | null
+          execution_id: string
+          lead_id: string
+          observed_at?: string
+          reason?: string | null
+          result: string
+        }
+        Update: {
+          client_id?: string
+          enrollment_id?: string | null
+          execution_id?: string
+          lead_id?: string
+          observed_at?: string
+          reason?: string | null
+          result?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_lead_enrolment_items_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_items_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_items_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_items_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_items_v6_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "lead_sequence_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_items_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_lead_enrolment_runs_v6"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_items_v6_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_items_v6_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
+          },
+        ]
+      }
+      campaign_lead_enrolment_runs_v6: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          execution_id: string
+          finished_at: string | null
+          observed_count: number
+          sequence_hash: string
+          sequence_id: string
+          skipped_count: number
+          started_at: string
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          execution_id: string
+          finished_at?: string | null
+          observed_count?: number
+          sequence_hash: string
+          sequence_id: string
+          skipped_count?: number
+          started_at?: string
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          execution_id?: string
+          finished_at?: string | null
+          observed_count?: number
+          sequence_hash?: string
+          sequence_id?: string
+          skipped_count?: number
+          started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_lead_enrolment_source_v6"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_proof_release_observations_v6"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "nurture_sequence_due"
+            referencedColumns: ["sequence_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "nurture_sequences"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3197,6 +3461,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "campaign_action_executions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_lead_enrolment_source_v6"
+            referencedColumns: ["execution_id"]
           },
           {
             foreignKeyName: "campaign_page_readbacks_v6_execution_id_fkey"
@@ -26772,6 +27043,13 @@ export type Database = {
             foreignKeyName: "campaign_budget_readbacks_v6_execution_id_fkey"
             columns: ["execution_id"]
             isOneToOne: false
+            referencedRelation: "campaign_lead_enrolment_source_v6"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
             referencedRelation: "campaign_proof_release_observations_v6"
             referencedColumns: ["execution_id"]
           },
@@ -26903,6 +27181,85 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "meta_build_due"
             referencedColumns: ["campaign_id", "client_id"]
+          },
+        ]
+      }
+      campaign_lead_enrolment_source_v6: {
+        Row: {
+          approval_id: string | null
+          approved_sequence_hash: string | null
+          client_id: string | null
+          current_observation_rows: number | null
+          execution_id: string | null
+          finished_at: string | null
+          observed_count: number | null
+          sequence_name: string | null
+          skipped_count: number | null
+          started_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_page_publish_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -27203,6 +27560,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "campaign_action_executions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_lead_enrolment_source_v6"
+            referencedColumns: ["execution_id"]
           },
           {
             foreignKeyName: "campaign_page_readbacks_v6_execution_id_fkey"

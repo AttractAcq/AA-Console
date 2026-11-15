@@ -28,6 +28,9 @@ type ProofReleaseObservation = { execution_id: string; placement_ref: string | n
   placement_status: string | null; payload_matches: boolean | null;
   destination_key: string | null; external_id: string | null; external_url: string | null;
   retracted_at: string | null };
+type LeadEnrollmentSource = { execution_id: string; sequence_name: string | null;
+  started_at: string | null; finished_at: string | null; observed_count: number | null;
+  skipped_count: number | null; current_observation_rows: number };
 
 export function CampaignActionApprovalsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -41,6 +44,7 @@ export function CampaignActionApprovalsPanel() {
   const [pageReadbacks, setPageReadbacks] = useState<Record<string, PageReadback>>({});
   const [pageJobs, setPageJobs] = useState<Record<string, BudgetJob>>({});
   const [proofObservations, setProofObservations] = useState<Record<string, ProofReleaseObservation[]>>({});
+  const [leadSources, setLeadSources] = useState<Record<string, LeadEnrollmentSource>>({});
   const [actionsOn, setActionsOn] = useState(false);
   const [runtimeHold, setRuntimeHold] = useState<string | null>("Runtime state has not been verified.");
   const [loading, setLoading] = useState(true);
@@ -66,6 +70,7 @@ export function CampaignActionApprovalsPanel() {
       setPageReadbacks({});
       setPageJobs({});
       setProofObservations({});
+      setLeadSources({});
       setLoading(false);
       return;
     }
@@ -107,8 +112,9 @@ export function CampaignActionApprovalsPanel() {
         setPageReadbacks({});
         setPageJobs({});
         setProofObservations({});
+        setLeadSources({});
       } else {
-        const [{ data: attemptRows, error: attemptError }, readbacks, jobs, pageChecks, pageJobRows, proofRows] = await Promise.all([
+        const [{ data: attemptRows, error: attemptError }, readbacks, jobs, pageChecks, pageJobRows, proofRows, leadRows] = await Promise.all([
           supabase.from("campaign_action_attempts_v6" as never)
             .select("execution_id,attempt_number,status,started_at,finished_at,external_id,external_url,error,legacy_inferred")
             .in("execution_id", executionIds).order("attempt_number", { ascending: true }),
@@ -127,6 +133,9 @@ export function CampaignActionApprovalsPanel() {
           supabase.from("campaign_proof_release_observations_v6" as never)
             .select("execution_id,placement_ref,expected_payload_hash,placement_approval_status,placement_status,payload_matches,destination_key,external_id,external_url,retracted_at")
             .in("execution_id", executionIds),
+          supabase.from("campaign_lead_enrolment_source_v6" as never)
+            .select("execution_id,sequence_name,started_at,finished_at,observed_count,skipped_count,current_observation_rows")
+            .in("execution_id", executionIds),
         ]);
         if (attemptError) throw new Error(`Attempt receipts could not be read: ${attemptError.message}`);
         if (readbacks.error) throw new Error(`Budget readbacks could not be read: ${readbacks.error.message}`);
@@ -134,6 +143,7 @@ export function CampaignActionApprovalsPanel() {
         if (pageChecks.error) throw new Error(`Page readbacks could not be read: ${pageChecks.error.message}`);
         if (pageJobRows.error) throw new Error(`Page readback jobs could not be read: ${pageJobRows.error.message}`);
         if (proofRows.error) throw new Error(`Proof release observations could not be read: ${proofRows.error.message}`);
+        if (leadRows.error) throw new Error(`Lead enrolment source could not be read: ${leadRows.error.message}`);
         const grouped: Record<string, ActionAttempt[]> = {};
         for (const row of (attemptRows ?? []) as ActionAttempt[]) {
           (grouped[row.execution_id] ??= []).push(row);
@@ -164,6 +174,8 @@ export function CampaignActionApprovalsPanel() {
           (groupedProof[row.execution_id] ??= []).push(row);
         }
         setProofObservations(groupedProof);
+        setLeadSources(Object.fromEntries(((leadRows.data ?? []) as LeadEnrollmentSource[])
+          .map((row) => [row.execution_id,row])));
       }
     } catch (cause) {
       setAttemptsByExecution(null);
@@ -172,6 +184,7 @@ export function CampaignActionApprovalsPanel() {
       setPageReadbacks({});
       setPageJobs({});
       setProofObservations({});
+      setLeadSources({});
       setRuntimeHold("Runtime state has not been verified.");
       setError(cause instanceof Error ? cause.message : "Could not read what happened to approved actions.");
     }
@@ -501,6 +514,22 @@ export function CampaignActionApprovalsPanel() {
                           {!item.external_url && item.external_id && <span className="block break-all font-mono">External ID: {item.external_id}</span>}
                         </li>
                       ))}</ul>}
+                  </div>
+                )}
+                {action.action_key === "lead_message" && action.execution_id && (
+                  <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3 text-xs">
+                    <p className="font-medium">Lead enrolment source check</p>
+                    <p className="mt-1 text-muted-foreground">This records the committed database sweep. Enrolment does not itself send a message; the courier makes separate send decisions.</p>
+                    {!leadSources[action.execution_id]
+                      ? <p className="mt-2 text-destructive">Source check unavailable for this execution.</p>
+                      : !leadSources[action.execution_id].finished_at
+                        ? <p className="mt-2 text-destructive">No committed enrolment run is recorded. Inspect before any new request.</p>
+                        : <p className="mt-2">
+                          {`${leadSources[action.execution_id].sequence_name ?? "Sequence"}: `}
+                          {`${leadSources[action.execution_id].observed_count ?? 0} enrolment rows observed, `}
+                          {`${leadSources[action.execution_id].skipped_count ?? 0} lead${leadSources[action.execution_id].skipped_count === 1 ? "" : "s"} skipped`}
+                          {` · ${new Date(leadSources[action.execution_id].finished_at!).toLocaleString()}`}
+                        </p>}
                   </div>
                 )}
                 {!revocations[action.approval_id] && <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-xs">
