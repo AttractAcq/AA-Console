@@ -1,4 +1,6 @@
-export type TeamCategory = "avatars" | "editors" | "smm" | "creative_director";
+export const TEAM_CATEGORIES = ["avatars", "editors", "smm", "creative_director"] as const;
+
+export type TeamCategory = (typeof TEAM_CATEGORIES)[number];
 
 export type EngagementType = "Employee" | "Contractor";
 
@@ -48,7 +50,7 @@ export function getMemberSections(category: TeamCategory): MemberSection[] {
 }
 
 export function isTeamCategory(value: string | undefined): value is TeamCategory {
-  return value === "avatars" || value === "editors" || value === "smm";
+  return (TEAM_CATEGORIES as readonly string[]).includes(value ?? "");
 }
 
 export function findTeamMember(
