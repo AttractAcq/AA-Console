@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "78690219adc1c921742f7d1783b92c0c651e28dd378944c1862c0d6969fcab8f",
-  "generatedTypesSha256": "0ba480533b8dde571fc996cd333bf6c8f5fd3eb5acaaeee16b4a89d4252d68cb",
-  "generatedSchemaBodySha256": "8ccba023a62889d94f3cfffbe7d7ad11b477024cf85ba77c4f11a8c985a629ba",
+  "migrationSourceDigest": "0706bcf54862c4519346144a37733bea2c6e15db401185b65634bcea1f5ac6e6",
+  "generatedTypesSha256": "d4dcfc7fa790681effb0fd664adc96e3603be76b1e6bf024adc205ffd964ebf9",
+  "generatedSchemaBodySha256": "e6ccc6ebb9113c751c1475a2d7c8a84dcb6a5815c04e98a8954c882f4aa3ddc4",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3790,6 +3790,20 @@
       "filename": "20261122090000_524_campaign_package_inbox_view.sql",
       "sha256": "7e1b15923d152d273516e60867db45ddd63cce9d8908d9b5eca7e39de6b4cda0",
       "trimmedMd5": "dde836f67a62d75172f3c49437e9d8ae"
+    },
+    {
+      "version": "20261122100000",
+      "name": "525_campaign_magnet_plan_requirement",
+      "filename": "20261122100000_525_campaign_magnet_plan_requirement.sql",
+      "sha256": "2dcc36eed681b9d08457f3eb9d111601034bd225fc1255e2d8af71cf5868a55c",
+      "trimmedMd5": "9fa0a690ae4819af207409e3f903f6d8"
+    },
+    {
+      "version": "20261122110000",
+      "name": "526_campaign_magnet_readiness_hold",
+      "filename": "20261122110000_526_campaign_magnet_readiness_hold.sql",
+      "sha256": "df0db6b9a151157d93a5dc83916647fe094fa7aed8630c2d4db55dadcda957ba",
+      "trimmedMd5": "c40ee52b0956199abda9f2e07e89194e"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

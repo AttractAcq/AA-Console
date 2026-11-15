@@ -22,6 +22,7 @@ export interface CampaignPlan {
   content_count: number;
   needs_landing_page: boolean;
   needs_sales_agent: boolean;
+  needs_lead_magnet?: boolean;
 }
 
 /** The most content one campaign may ask for in a single plan. */
@@ -198,7 +199,8 @@ export function planProblem(plan: CampaignPlan): string | null {
   if (plan.ends_on && plan.starts_on && plan.ends_on < plan.starts_on) {
     return "The plan came back ending before it starts.";
   }
-  if (plan.content_count === 0 && !plan.needs_landing_page && !plan.needs_sales_agent) {
+  if (plan.content_count === 0 && !plan.needs_landing_page && !plan.needs_sales_agent
+    && !plan.needs_lead_magnet) {
     return "The plan asks for nothing to be built, so there is no campaign to execute.";
   }
   return null;
@@ -210,6 +212,7 @@ export function planSummary(plan: CampaignPlan): string {
     plan.content_count > 0 ? `${plan.content_count} pieces of content` : null,
     plan.needs_landing_page ? "a landing page" : null,
     plan.needs_sales_agent ? "a sales agent" : null,
+    plan.needs_lead_magnet ? "a lead magnet" : null,
   ].filter(Boolean);
   return [
     `**Objective:** ${plan.objective}`,

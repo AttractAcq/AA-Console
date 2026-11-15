@@ -29,8 +29,15 @@ export function CampaignPackageReadiness({ campaignId, clientId }: {
   const refresh = useCallback(async () => {
     const { data, error: readError } = await supabase.rpc("campaign_package_readiness_v7",
       { p_campaign_id: campaignId });
-    if (readError) { setError(readError.message); return; }
-    setReadiness(data as Readiness);
+    if (readError) { setReadiness(null); setError(readError.message); return; }
+    const result = data as Partial<Readiness> | null;
+    if (!result || !Array.isArray(result.blockers)
+      || !["unsupported", "preparing", "ready_for_review"].includes(result.status ?? "")) {
+      setReadiness(null);
+      setError("Package readiness returned incomplete evidence. Refresh and try again.");
+      return;
+    }
+    setReadiness(result as Readiness);
     const { data: packageData, error: packageError } = await supabase
       .from("campaign_preparation_packages_v7")
       .select("id, version, snapshot_hash, snapshot, assembled_at")

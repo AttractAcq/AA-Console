@@ -147,11 +147,12 @@ export function submitToolFor(pillars: readonly { id: string; name: string }[] =
       },
       needs_landing_page: { type: "boolean", description: "Whether this campaign needs its own landing page built." },
       needs_sales_agent: { type: "boolean", description: "Whether it needs a client-facing sales agent on that page." },
+      needs_lead_magnet: { type: "boolean", description: "Whether this campaign requires a downloadable lead magnet tied to its approved offer. Choose only when the offer and intake path call for it." },
       reasoning: { type: "string", description: "Why this shape, and what you deliberately left out." },
     },
     required: [
       "objective", "audience", "offer_summary", "core_message", "channels",
-      "kpi_metric", "content_count", ...(includeSpec ? ["content_spec"] : []), ...(includeIdeas ? ["ideas"] : []), "needs_landing_page", "needs_sales_agent", "reasoning",
+      "kpi_metric", "content_count", ...(includeSpec ? ["content_spec"] : []), ...(includeIdeas ? ["ideas"] : []), "needs_landing_page", "needs_sales_agent", "needs_lead_magnet", "reasoning",
     ],
     additionalProperties: false,
   },
@@ -179,11 +180,12 @@ export function savedPlanNeedsFinalization(campaign: {
 async function finalizeV6CampaignPackage(
   sb: SupabaseClient, campaignId: string, jobId: string,
   intelligenceSnapshotId: string, offerVersionId: string | null,
+  needsLeadMagnet: boolean,
 ): Promise<void> {
   const { data: manifest, error } = await sb.rpc("create_campaign_manifest_v6", {
     p_campaign_id: campaignId,
     p_idempotency_key: `campaign-plan:${jobId}`,
-    p_needs_lead_magnet: false,
+    p_needs_lead_magnet: needsLeadMagnet,
   });
   if (error) throw new Error(`Failed to version v6 campaign package: ${error.message}`);
   if (!manifest?.id) throw new Error("The v6 campaign package has no manifest ID.");
@@ -261,7 +263,8 @@ export async function runCampaignPlanJob(
         }
       }
       await finalizeV6CampaignPackage(
-        sb, campaign.id, job.id, snapshot.id, campaign.offer_version_id ?? null);
+        sb, campaign.id, job.id, snapshot.id, campaign.offer_version_id ?? null,
+        campaign.needs_lead_magnet === true);
     }
     return { ok: true, retryable: false };
   }
@@ -493,6 +496,7 @@ Call ${submitTool.name} once when you are done.`;
       needs_landing_page: result.submitted.needs_landing_page,
       needs_sales_agent: result.submitted.needs_sales_agent,
     }),
+    needs_lead_magnet: result.submitted.needs_lead_magnet === true,
   };
   if (approvedOffer && !campaign.built_at) {
     // The model may paraphrase its summary; persist the exact signed promise.
@@ -505,6 +509,7 @@ Call ${submitTool.name} once when you are done.`;
     starts_on: campaign.starts_on, ends_on: campaign.ends_on, kpi_metric: campaign.kpi_metric,
     kpi_target: campaign.kpi_target, content_count: campaign.content_count,
     needs_landing_page: campaign.needs_landing_page, needs_sales_agent: campaign.needs_sales_agent,
+    needs_lead_magnet: campaign.needs_lead_magnet === true,
   } : submittedPlan;
   const problem = planProblem(plan);
   if (problem) {
@@ -542,6 +547,14 @@ Call ${submitTool.name} once when you are done.`;
     } catch (error) {
       return { ok: false, retryable: true, failureMessage: (error as Error).message, usage };
     }
+  }
+  if (isV6) {
+    // Persist this before the plan save. If a worker dies after saving the plan,
+    // retry finalization must recover the same magnet requirement from the row.
+    const { error } = await sb.rpc("set_campaign_magnet_requirement_v7", {
+      p_campaign_id: campaign.id, p_required: plan.needs_lead_magnet === true,
+    });
+    if (error) throw new Error(`Failed to record campaign magnet requirement: ${error.message}`);
   }
   if (includeIdeas) {
     // One transaction commits the plan and its exact idea batch, or neither.
@@ -594,7 +607,8 @@ Call ${submitTool.name} once when you are done.`;
       throw new Error("The v6 campaign package has no intelligence snapshot link.");
     }
     await finalizeV6CampaignPackage(
-      sb, campaign.id, job.id, intelligenceSnapshotId, approvedOffer?.id ?? null);
+      sb, campaign.id, job.id, intelligenceSnapshotId, approvedOffer?.id ?? null,
+      plan.needs_lead_magnet === true);
   }
 
   await appendEvent(sb, job.id, `Planned "${campaign.name}".\n\n${planSummary(plan)}`, "info", {

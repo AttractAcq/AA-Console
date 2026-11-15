@@ -72,7 +72,7 @@ export async function runCampaignSweepJob(
 
   const { data: campaign, error: campaignError } = await sb
     .from("client_campaigns")
-    .select("id, client_id, name, acquisition_mode, channels, content_count, organic_content_count, paid_content_count, content_spec_id, content_spec_hash, content_ideas_generated_at, plan_approved_fingerprint, needs_landing_page, needs_sales_agent")
+    .select("id, client_id, name, acquisition_mode, channels, content_count, organic_content_count, paid_content_count, content_spec_id, content_spec_hash, content_ideas_generated_at, plan_approved_fingerprint, needs_landing_page, needs_sales_agent, needs_lead_magnet")
     .eq("id", job.input_id)
     .maybeSingle();
   if (campaignError) throw new Error(`Campaign lookup failed: ${campaignError.message}`);
@@ -86,7 +86,7 @@ export async function runCampaignSweepJob(
     content_spec_id: string | null; content_spec_hash: string | null;
     content_ideas_generated_at: string | null;
     plan_approved_fingerprint: string | null;
-    needs_landing_page: boolean; needs_sales_agent: boolean;
+    needs_landing_page: boolean; needs_sales_agent: boolean; needs_lead_magnet: boolean;
   };
   if (c.client_id !== job.client_id) {
     return { ok: false, retryable: false, failureMessage: "That campaign belongs to another client." };
@@ -197,6 +197,7 @@ export async function runCampaignSweepJob(
       plan_fingerprint: c.plan_approved_fingerprint,
       needs_landing_page: c.needs_landing_page,
       needs_sales_agent: c.needs_sales_agent,
+      ...(c.needs_lead_magnet ? { needs_lead_magnet: true } : {}),
     },
     p_deadline_at: priorRun?.deadline_at ?? new Date(Date.now() + DEADLINE_HOURS * 3_600_000).toISOString(),
     p_campaign_id: c.id,

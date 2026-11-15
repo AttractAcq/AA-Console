@@ -58,6 +58,7 @@ type Campaign = {
   plan_review_note: string | null;
   needs_landing_page: boolean;
   needs_sales_agent: boolean;
+  needs_lead_magnet: boolean;
   built_at: string | null;
   content_ideas_generated_at: string | null;
   ideate_on_plan: boolean;
@@ -256,7 +257,7 @@ export function CampaignExecutionPanel() {
       const query = supabase
         .from("client_campaigns")
         .select(
-          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, content_spec_id, plan_approved_at, plan_approved_fingerprint, plan_review_note, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, ideate_on_plan, launched_at, created_at, template, mirrors_template, daily_budget, target_countries, conversion_event, meta_campaign_id, meta_ad_set_id, meta_built_at, acquisition_mode, paid_platform, cloned_from_campaign_id, offer_version_id",
+          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, content_spec_id, plan_approved_at, plan_approved_fingerprint, plan_review_note, needs_landing_page, needs_sales_agent, needs_lead_magnet, built_at, content_ideas_generated_at, ideate_on_plan, launched_at, created_at, template, mirrors_template, daily_budget, target_countries, conversion_event, meta_campaign_id, meta_ad_set_id, meta_built_at, acquisition_mode, paid_platform, cloned_from_campaign_id, offer_version_id",
         )
         .eq("client_id", clientId)
         // A campaign somebody archived is over. It reads from the archive.
@@ -738,7 +739,24 @@ export function CampaignExecutionPanel() {
             </div>
             {v2Tab === "plan" && <section className="space-y-4 py-4" aria-label="Campaign plan">
               <div className="flex flex-wrap justify-between gap-2"><div><h3 className="font-semibold">Campaign plan</h3><p className="text-xs text-muted-foreground">{c.built_at ? `Generated ${new Date(c.built_at).toLocaleString()}` : "Awaiting planner"}</p></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => setEditingPlan(c)}>Edit plan</button><button type="button" className={buttonClass} disabled={busy || planning.has(c.id)} onClick={() => setConfirmAction({ campaign: c, kind: "plan" })}>{c.built_at ? "Regenerate plan" : "Run planner"}</button></div></div>
-              <dl className="grid gap-4 rounded-lg border border-border bg-card p-4 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">Objective</dt><dd>{c.objective ?? "—"}</dd></div><div><dt className="text-muted-foreground">Audience</dt><dd>{c.audience ?? "—"}</dd></div><div><dt className="text-muted-foreground">Offer</dt><dd>{c.offer_summary ?? "—"}</dd></div><div><dt className="text-muted-foreground">Core message</dt><dd>{c.core_message ?? "—"}</dd></div><div><dt className="text-muted-foreground">Channels</dt><dd>{c.channels?.join(", ") || "—"}</dd></div><div><dt className="text-muted-foreground">Budget</dt><dd>{c.budget == null ? "—" : c.budget.toLocaleString()}</dd></div><div><dt className="text-muted-foreground">Dates</dt><dd>{c.starts_on ?? "—"} to {c.ends_on ?? "—"}</dd></div><div><dt className="text-muted-foreground">KPI</dt><dd>{c.kpi_metric ?? "—"}{c.kpi_target != null ? ` · target ${c.kpi_target}` : ""}</dd></div><div><dt className="text-muted-foreground">Content pieces</dt><dd>{c.content_count}</dd></div><div><dt className="text-muted-foreground">Required builds</dt><dd>{[c.needs_landing_page && "Landing page", c.needs_sales_agent && "Sales agent"].filter(Boolean).join(", ") || "None"}</dd></div></dl>
+              <dl className="grid gap-4 rounded-lg border border-border bg-card p-4 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">Objective</dt><dd>{c.objective ?? "—"}</dd></div><div><dt className="text-muted-foreground">Audience</dt><dd>{c.audience ?? "—"}</dd></div><div><dt className="text-muted-foreground">Offer</dt><dd>{c.offer_summary ?? "—"}</dd></div><div><dt className="text-muted-foreground">Core message</dt><dd>{c.core_message ?? "—"}</dd></div><div><dt className="text-muted-foreground">Channels</dt><dd>{c.channels?.join(", ") || "—"}</dd></div><div><dt className="text-muted-foreground">Budget</dt><dd>{c.budget == null ? "—" : c.budget.toLocaleString()}</dd></div><div><dt className="text-muted-foreground">Dates</dt><dd>{c.starts_on ?? "—"} to {c.ends_on ?? "—"}</dd></div><div><dt className="text-muted-foreground">KPI</dt><dd>{c.kpi_metric ?? "—"}{c.kpi_target != null ? ` · target ${c.kpi_target}` : ""}</dd></div><div><dt className="text-muted-foreground">Content pieces</dt><dd>{c.content_count}</dd></div><div><dt className="text-muted-foreground">Required builds</dt><dd>{[c.needs_landing_page && "Landing page", c.needs_sales_agent && "Sales agent", c.needs_lead_magnet && "Lead magnet"].filter(Boolean).join(", ") || "None"}</dd></div></dl>
+              {c.built_at && c.acquisition_mode !== "legacy" && <div className="flex flex-wrap items-center gap-3 text-xs">
+                <span>Lead magnet required: {c.needs_lead_magnet ? "Yes" : "No"}</span>
+                <button type="button" className={buttonClass}
+                  disabled={busy || c.plan_approved_at !== null}
+                  onClick={async () => {
+                    setBusy(true); setProblem(null);
+                    const { error } = await supabase.rpc("set_campaign_magnet_requirement_v7", {
+                      p_campaign_id: c.id, p_required: !c.needs_lead_magnet,
+                    });
+                    setBusy(false);
+                    if (error) setProblem(error.message);
+                    else { setNotice("Magnet requirement changed. Review and approve the plan."); void refresh(); }
+                  }}>
+                  {c.needs_lead_magnet ? "Remove magnet requirement" : "Require a lead magnet"}
+                </button>
+                {c.plan_approved_at !== null && <span className="text-muted-foreground">Regenerate the plan to change this requirement.</span>}
+              </div>}
               {c.acquisition_mode !== "legacy" && c.content_count > 0 && (
                 <div className="rounded-lg border border-border bg-card p-4 text-sm">
                   <h4 className="font-medium">Content requirements to review</h4>
@@ -792,7 +810,7 @@ export function CampaignExecutionPanel() {
                         ? "Approve the plan first. A sweep is the moment a plan becomes work, so it refuses an unreviewed one."
                         : sweeping.has(c.id)
                           ? "A sweep of this campaign is queued. One at a time, so two sweeps cannot compose the same steps twice."
-                          : `Prepares ${c.content_count} ${c.content_count === 1 ? "piece" : "pieces"} of planned content${c.needs_landing_page ? ", a page" : ""}${c.needs_sales_agent ? ", and a sales agent" : ""}. Each output stops for review before public use.`}
+                          : `Prepares ${c.content_count} ${c.content_count === 1 ? "piece" : "pieces"} of planned content${c.needs_landing_page ? ", a page" : ""}${c.needs_sales_agent ? ", and a sales agent" : ""}. Each output stops for review before public use.${c.needs_lead_magnet ? " The required lead magnet remains a package blocker until its producer is connected." : ""}`}
                     </p>
                   </div>
                   <button

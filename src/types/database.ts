@@ -5927,6 +5927,7 @@ export type Database = {
             | null
           name: string
           needs_landing_page: boolean
+          needs_lead_magnet: boolean
           needs_sales_agent: boolean
           objective: string | null
           offer_summary: string | null
@@ -5986,6 +5987,7 @@ export type Database = {
             | null
           name: string
           needs_landing_page?: boolean
+          needs_lead_magnet?: boolean
           needs_sales_agent?: boolean
           objective?: string | null
           offer_summary?: string | null
@@ -6045,6 +6047,7 @@ export type Database = {
             | null
           name?: string
           needs_landing_page?: boolean
+          needs_lead_magnet?: boolean
           needs_sales_agent?: boolean
           objective?: string | null
           offer_summary?: string | null
@@ -35993,6 +35996,7 @@ export type Database = {
             | null
           name: string
           needs_landing_page: boolean
+          needs_lead_magnet: boolean
           needs_sales_agent: boolean
           objective: string | null
           offer_summary: string | null
@@ -41162,6 +41166,10 @@ export type Database = {
       set_campaign_content_spec_v7: {
         Args: { p_campaign_id: string; p_pieces: Json }
         Returns: string
+      }
+      set_campaign_magnet_requirement_v7: {
+        Args: { p_campaign_id: string; p_required: boolean }
+        Returns: undefined
       }
       set_campaign_route_volumes_v6: {
         Args: { p_campaign_id: string; p_organic: number; p_paid: number }
