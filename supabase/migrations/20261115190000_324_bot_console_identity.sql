@@ -3485,7 +3485,8 @@ begin
   if not found then raise exception 'No such approval.' using errcode = 'P0001'; end if;
   if auth.role() is distinct from 'authenticated'
      or not (coalesce(public.is_human_admin(), false)
-             or coalesce(auth.uid() = public.active_video_approval_manager(v_approval.client_id), false)) then
+             or coalesce(auth.uid() = public.active_video_approval_manager(v_approval.client_id), false)
+             or coalesce(public.bot_may('approve_lead_magnet'), false)) then
     raise exception 'A signed-in admin or the assigned client manager must decide this.'
       using errcode = 'P0001';
   end if;
@@ -4032,7 +4033,16 @@ begin
 end;
 $$;
 
--- review_media_asset (was 20261025120000_247_creative_decisions_have_a_seat.sql; preamble only)
+-- A bot review is not a human sign-off. Migration 105 kept human_approved_at
+-- null for a bot; review_media_asset had started writing it, and schedule_asset
+-- treated that stamp as permission to enter the organic calendar.
+alter table public.client_media_assets
+  add column if not exists bot_reviewed_at timestamptz;
+
+comment on column public.client_media_assets.bot_reviewed_at is
+  'When a bot approved this asset. Null when a bot rejected it. A bot never writes human_approved_at. A human schedule of a bot-reviewed asset is what stamps human_approved_at, which is what claim_posts_for_publishing still requires.';
+
+-- review_media_asset (was 20261025120000_247_creative_decisions_have_a_seat.sql)
 -- ---------------------------------------------------------------------------
 -- The decision, now recording its seat
 -- ---------------------------------------------------------------------------
@@ -4051,6 +4061,7 @@ declare
   v_seat text;
   v_required boolean;
   v_director uuid;
+  v_caller_is_bot boolean;
 begin
 
   -- Bot console users are admins so agency reads keep working, and AAL2 does
@@ -4122,13 +4133,34 @@ begin
 
   v_seat := creative_seat_of(a.client_id, auth.uid());
 
-  update client_media_assets set review_status = p_decision,
-    human_approved_at = case when p_decision = 'approved' then now() else null end
+  -- Aggregate so a missing profile is false, not an unassigned variable.
+  -- A bot sets review_status and bot_reviewed_at and does not write
+  -- human_approved_at. A human writes human_approved_at exactly as before.
+  select coalesce(bool_or(p.is_bot), false)
+    into v_caller_is_bot
+    from public.profiles p
+   where p.id = auth.uid();
+
+  update client_media_assets set
+    review_status = p_decision,
+    human_approved_at = case
+      when v_caller_is_bot then human_approved_at
+      when p_decision = 'approved' then now()
+      else null
+    end,
+    bot_reviewed_at = case
+      when not v_caller_is_bot then bot_reviewed_at
+      when p_decision = 'approved' then now()
+      else null
+    end
     where id = p_asset_id;
   insert into client_asset_reviews (asset_id, decision, reason, reviewed_by, decided_in_seat)
     values (p_asset_id, p_decision, p_reason, auth.uid(), v_seat);
 end;
 $function$;
+
+comment on function public.review_media_asset(uuid, review_status, text) is
+  'Records a creative decision and the seat it was made from. A human approval stamps human_approved_at. A bot approval stamps bot_reviewed_at and leaves human_approved_at untouched.';
 
 -- approve_idea_and_generate_brief (was 20260903104816_05_content_chain_proof_ideas_briefs_media.sql; preamble only)
 -- Approve an idea and enqueue its brief in one call. This is the
@@ -4384,11 +4416,134 @@ begin
   );
 end;
 $$;
+
+-- schedule_asset (was 20261101040000_290_organic_schedule_route.sql)
+-- Human-only. A bot review may set bot_reviewed_at; it must not be enough
+-- to insert a scheduled post. The human who schedules stamps
+-- human_approved_at, which claim_posts_for_publishing still requires.
+-- client_media_assets has no human_approved_by column. Who scheduled is
+-- scheduled_posts.created_by.
+create or replace function public.schedule_asset(
+  p_asset_id uuid,
+  p_date date,
+  p_channel public.post_channel default 'organic'::public.post_channel,
+  p_platform public.post_platform default null::public.post_platform,
+  p_time time default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_asset public.client_media_assets%rowtype;
+  v_brief public.client_briefs%rowtype;
+  v_idea public.client_ideas%rowtype;
+  v_campaign public.client_campaigns%rowtype;
+  v_id uuid;
+begin
+  if auth.role() is distinct from 'service_role'
+     and not coalesce(public.is_human_admin(), false)
+     and exists (
+       select 1
+         from public.profiles as bot_identity
+        where bot_identity.id = auth.uid()
+          and bot_identity.is_bot
+     ) then
+    raise exception 'Bot accounts cannot perform this action' using errcode = '42501';
+  end if;
+  if coalesce(auth.role(), '') <> 'authenticated' or auth.uid() is null then
+    raise exception 'A signed-in console user must schedule this asset.' using errcode = '42501';
+  end if;
+  if p_date is null then
+    raise exception 'Choose a date before scheduling.' using errcode = 'P0001';
+  end if;
+  if p_channel is distinct from 'organic'::public.post_channel then
+    raise exception 'Paid scheduling uses the Ads Studio route, not organic distribution.' using errcode = 'P0001';
+  end if;
+
+  select * into v_asset from public.client_media_assets
+   where id = p_asset_id for share;
+  if not found then
+    raise exception 'Asset not found.' using errcode = 'P0001';
+  end if;
+  if public.can_access_client(v_asset.client_id) is not true then
+    raise exception 'Not permitted for this client.' using errcode = '42501';
+  end if;
+  if v_asset.review_status is distinct from 'approved'::public.review_status then
+    raise exception 'Asset must be approved before it can be scheduled.' using errcode = 'P0001';
+  end if;
+  if v_asset.human_approved_at is null and v_asset.bot_reviewed_at is null then
+    raise exception 'That asset has not been approved by a person yet. Approve it in Approvals before scheduling it.' using errcode = 'P0001';
+  end if;
+  if v_asset.brief_id is null then
+    raise exception 'Scheduling blocked: this asset has no verified organic campaign brief.' using errcode = 'P0001';
+  end if;
+
+  select * into v_brief from public.client_briefs
+   where id = v_asset.brief_id for share;
+  if not found or v_brief.client_id is distinct from v_asset.client_id
+     or v_brief.source_idea_id is null then
+    raise exception 'Scheduling blocked: the asset brief has no same-client campaign idea.' using errcode = 'P0001';
+  end if;
+
+  select * into v_idea from public.client_ideas
+   where id = v_brief.source_idea_id for share;
+  if not found or v_idea.client_id is distinct from v_asset.client_id
+     or v_idea.campaign_id is null then
+    raise exception 'Scheduling blocked: the brief idea has no same-client campaign.' using errcode = 'P0001';
+  end if;
+
+  select * into v_campaign from public.client_campaigns
+   where id = v_idea.campaign_id for share;
+  if not found or v_campaign.client_id is distinct from v_asset.client_id then
+    raise exception 'Scheduling blocked: the campaign belongs to another client or is missing.' using errcode = 'P0001';
+  end if;
+  if v_campaign.acquisition_mode = 'paid' then
+    raise exception 'Scheduling blocked: this asset belongs to a paid campaign. Use Ads Studio.' using errcode = 'P0001';
+  end if;
+  if v_campaign.acquisition_mode is distinct from 'organic' or v_campaign.paid_platform is not null then
+    raise exception 'Scheduling blocked: this campaign has no explicit organic route.' using errcode = 'P0001';
+  end if;
+
+  -- The publisher still requires human_approved_at. Writing it here is the
+  -- human act. An asset a person already approved keeps that earlier stamp.
+  if v_asset.human_approved_at is null then
+    update public.client_media_assets
+       set human_approved_at = now()
+     where id = v_asset.id
+       and human_approved_at is null
+       and bot_reviewed_at is not null;
+  end if;
+
+  insert into public.scheduled_posts
+    (asset_id, scheduled_for, scheduled_at, channel, platform, created_by)
+  values (
+    p_asset_id, p_date,
+    case when p_time is null then null
+         else (p_date + p_time) at time zone public.client_timezone(v_asset.client_id) end,
+    p_channel, p_platform, auth.uid()
+  ) returning id into v_id;
+  return v_id;
+end
+$function$;
+
+comment on function public.schedule_asset(uuid, date, public.post_channel, public.post_platform, time) is
+  'Human scheduling. Accepts an asset a person approved or a bot reviewed, and a human schedule of a bot-reviewed asset stamps human_approved_at. Bots are refused. Publication still requires that stamp plus a matching approved Engine slot.';
+
+revoke all on function public.schedule_asset(uuid, date, public.post_channel, public.post_platform, time)
+  from public, anon, service_role;
+grant execute on function public.schedule_asset(uuid, date, public.post_channel, public.post_platform, time)
+  to authenticated;
 -- <<end security-review-preambles>>
 
 select public.lock_down_definer_functions();
 grant execute on function public.is_human_admin() to authenticated, service_role;
 grant execute on function public.revoke_bot_sessions(uuid) to service_role;
+revoke all on function public.schedule_asset(uuid, date, public.post_channel, public.post_platform, time)
+  from public, anon, service_role;
+grant execute on function public.schedule_asset(uuid, date, public.post_channel, public.post_platform, time)
+  to authenticated;
 revoke all on function public.revoke_bot_sessions(uuid) from public, anon, authenticated;
 revoke execute on function public.guard_profile_bot_identity() from public, anon, authenticated;
 revoke execute on function public.sync_profile_bot_app_metadata() from public, anon, authenticated;

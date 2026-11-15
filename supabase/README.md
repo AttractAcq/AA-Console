@@ -128,6 +128,14 @@ script deletes that bot's rows in auth.sessions and auth.refresh_tokens
 through public.revoke_bot_sessions. That function refuses every non-bot
 and is executable only by service_role.
 
+`bot-production` may review an asset, approve an idea, and approve a
+campaign plan. A bot review sets `bot_reviewed_at` and does not set
+`human_approved_at`. `schedule_asset` is human-only. A human may schedule
+a bot-reviewed asset, and that schedule stamps `human_approved_at`, which
+publishing still requires. `approve_slot` stays human-only. `bot-sales`
+may decide a pending lead magnet. Turning delivery on, and the
+`lead_magnet_courier` worker, stay refused for every bot.
+
 ```bash
 BOT_RESET_CONFIRM=reset-bot-password \
 node --experimental-strip-types scripts/provision-bot-user.ts reset-password \

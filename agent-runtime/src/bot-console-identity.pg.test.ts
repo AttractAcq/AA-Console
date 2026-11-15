@@ -219,12 +219,45 @@ beforeAll(async () => {
   // only needs the auth gate, which is the first statement in each function.
   await db.exec("set check_function_bodies = off");
   await applyCreatingMissingTypes(section(sql, "hard-hold-rpcs"));
+  await db.exec(`
+    create table if not exists public.lead_magnet_approvals (
+      id uuid primary key,
+      client_id uuid,
+      magnet_version_id uuid,
+      payload_hash text,
+      status text,
+      decided_at timestamptz,
+      decided_by uuid,
+      rejection_reason text
+    );
+  `);
   await applyCreatingMissingTypes(section(sql, "approval-decisions"));
   await db.exec(`
     do $$ begin
       create type public.review_status as enum ('pending', 'approved', 'rejected');
     exception when duplicate_object then null;
     end $$;
+    do $$ begin
+      create type public.post_channel as enum ('organic', 'paid');
+    exception when duplicate_object then null;
+    end $$;
+    do $$ begin
+      create type public.post_platform as enum ('facebook', 'instagram', 'tiktok', 'linkedin', 'youtube');
+    exception when duplicate_object then null;
+    end $$;
+    create table if not exists public.client_media_assets (
+      id uuid primary key,
+      client_id uuid,
+      brief_id uuid,
+      media_type text,
+      review_status public.review_status,
+      human_approved_at timestamptz,
+      bot_reviewed_at timestamptz,
+      edit_stage text,
+      content_format text,
+      render_path text,
+      storage_path text
+    );
   `);
   await applyCreatingMissingTypes(section(sql, "security-review-preambles"));
   await db.exec("set check_function_bodies = on");
@@ -548,25 +581,6 @@ describe("bot console identity", () => {
     );
     expect(publish).toMatch(/Bot accounts cannot perform this action/);
 
-    const salesMagnet = await callReady(
-      sales,
-      "select public.decide_lead_magnet_approval_v6($1, false, 'no')",
-      [CLIENT],
-    );
-    expect(salesMagnet ?? "").not.toMatch(/Bot accounts cannot perform this action/);
-    const productionMagnet = await callReady(
-      production,
-      "select public.decide_lead_magnet_approval_v6($1, false, 'no')",
-      [CLIENT],
-    );
-    expect(productionMagnet).toMatch(/Bot accounts cannot perform this action/);
-    const marketingMagnet = await callReady(
-      marketing,
-      "select public.decide_lead_magnet_approval_v6($1, false, 'no')",
-      [CLIENT],
-    );
-    expect(marketingMagnet).toMatch(/Bot accounts cannot perform this action/);
-
     const salesAsset = await callReady(sales, content[0]![1], content[0]![2]);
     expect(salesAsset).toMatch(/Bot accounts cannot perform this action/);
 
@@ -610,6 +624,245 @@ describe("bot console identity", () => {
       ["12121212-1212-4121-8121-121212121212"],
     );
     expect(marketingRelease).toMatch(/Bot accounts cannot perform this action/);
+  });
+
+  it("keeps a bot review off the publisher until a human schedules it", async () => {
+    const production = "77777777-7777-4777-8777-777777777771";
+    const campaign = "b1111111-1111-4111-8111-111111111111";
+    const idea = "b2222222-2222-4222-8222-222222222222";
+    const brief = "b3333333-3333-4333-8333-333333333333";
+    const botAsset = "b4444444-4444-4444-8444-444444444441";
+    const humanAsset = "b4444444-4444-4444-8444-444444444442";
+    const bareAsset = "b4444444-4444-4444-8444-444444444443";
+    await db.exec("reset role");
+    await asService();
+    await db.query(
+      `insert into auth.users (id, email) values ($1, 'production@attractacq.com')
+       on conflict (id) do nothing`,
+      [production],
+    );
+    await db.query(
+      `insert into public.profiles (id, role, full_name, email, is_bot, bot_key)
+       values ($1, 'admin', 'bot-production', 'production@attractacq.com', true, 'bot-production')
+       on conflict (id) do nothing`,
+      [production],
+    );
+    await db.exec("reset role");
+    await db.exec(`
+      alter table public.client_briefs add column if not exists client_id uuid;
+      alter table public.client_briefs add column if not exists source_idea_id uuid;
+      alter table public.client_ideas add column if not exists client_id uuid;
+      alter table public.client_ideas add column if not exists campaign_id uuid;
+      alter table public.client_campaigns add column if not exists client_id uuid;
+      alter table public.client_campaigns add column if not exists acquisition_mode text;
+      alter table public.client_campaigns add column if not exists paid_platform text;
+      create table if not exists public.client_engine_settings (
+        id uuid primary key default gen_random_uuid()
+      );
+      alter table public.client_engine_settings
+        add column if not exists client_id uuid;
+      alter table public.client_engine_settings
+        add column if not exists creative_director_required boolean;
+      create table if not exists public.client_asset_reviews (
+        id uuid primary key default gen_random_uuid(),
+        asset_id uuid,
+        decision text,
+        reason text,
+        reviewed_by uuid,
+        decided_in_seat text
+      );
+      create table if not exists public.scheduled_posts (
+        id uuid primary key default gen_random_uuid(),
+        asset_id uuid,
+        client_id uuid,
+        scheduled_for date,
+        scheduled_at timestamptz,
+        channel public.post_channel,
+        platform public.post_platform,
+        created_by uuid
+      );
+      create or replace function public.creative_seat_of(p_client_id uuid, p_user_id uuid)
+        returns text language sql stable as $$ select 'admin'::text $$;
+      create or replace function public.client_timezone(p_client_id uuid)
+        returns text language sql stable as $$ select 'UTC'::text $$;
+    `);
+    await db.query(
+      `insert into public.client_campaigns (id, client_id, acquisition_mode, paid_platform)
+       values ($1, $2, 'organic', null)`,
+      [campaign, CLIENT],
+    );
+    await db.query(
+      `insert into public.client_ideas (id, client_id, campaign_id) values ($1, $2, $3)`,
+      [idea, CLIENT, campaign],
+    );
+    await db.query(
+      `insert into public.client_briefs (id, client_id, source_idea_id) values ($1, $2, $3)`,
+      [brief, CLIENT, idea],
+    );
+    await db.query(
+      `insert into public.client_media_assets
+         (id, client_id, brief_id, media_type, review_status, edit_stage, content_format, storage_path)
+       values
+         ($1, $4, $5, 'image', 'pending', 'review_ready', 'single', 'bot.jpg'),
+         ($2, $4, $5, 'image', 'pending', 'review_ready', 'single', 'human.jpg'),
+         ($3, $4, $5, 'image', 'approved', 'review_ready', 'single', 'bare.jpg')`,
+      [botAsset, humanAsset, bareAsset, CLIENT, brief],
+    );
+
+    await asUser(production);
+    expect(await call("select public.review_media_asset($1, 'approved', null)", [botAsset])).toBeNull();
+    await db.exec("reset role");
+    const botReview = await db.query<{ human_approved_at: string | null; bot_reviewed_at: string | null }>(
+      "select human_approved_at::text, bot_reviewed_at::text from public.client_media_assets where id = $1",
+      [botAsset],
+    );
+    expect(botReview.rows[0]?.human_approved_at).toBeNull();
+    expect(botReview.rows[0]?.bot_reviewed_at).not.toBeNull();
+
+    await asUser(production);
+    const botSchedule = await call(
+      "select public.schedule_asset($1, current_date, 'organic', null, '09:00')",
+      [botAsset],
+    );
+    expect(botSchedule).toMatch(/Bot accounts cannot perform this action/);
+    await db.exec("reset role");
+    const beforeHuman = await db.query<{ posts: string; stamped: string | null }>(
+      `select (select count(*) from public.scheduled_posts where asset_id = $1)::text as posts,
+              human_approved_at::text as stamped
+         from public.client_media_assets where id = $1`,
+      [botAsset],
+    );
+    expect(beforeHuman.rows[0]).toEqual({ posts: "0", stamped: null });
+
+    await asUser(HUMAN);
+    expect(await call(
+      "select public.schedule_asset($1, current_date, 'organic', null, '09:00')",
+      [botAsset],
+    )).toBeNull();
+    await db.exec("reset role");
+    const published = await db.query<{ stamped: string | null; created_by: string }>(
+      `select a.human_approved_at::text as stamped, sp.created_by::text as created_by
+         from public.client_media_assets a
+         join public.scheduled_posts sp on sp.asset_id = a.id
+        where a.id = $1`,
+      [botAsset],
+    );
+    expect(published.rows[0]?.stamped).not.toBeNull();
+    expect(published.rows[0]?.created_by).toBe(HUMAN);
+
+    await asUser(HUMAN);
+    expect(await call("select public.review_media_asset($1, 'approved', null)", [humanAsset])).toBeNull();
+    await db.exec("reset role");
+    const humanReview = await db.query<{ human_approved_at: string; bot_reviewed_at: string | null }>(
+      "select human_approved_at::text, bot_reviewed_at::text from public.client_media_assets where id = $1",
+      [humanAsset],
+    );
+    expect(humanReview.rows[0]?.human_approved_at).not.toBeNull();
+    expect(humanReview.rows[0]?.bot_reviewed_at).toBeNull();
+    const stamp = humanReview.rows[0]!.human_approved_at;
+    await asUser(HUMAN);
+    expect(await call(
+      "select public.schedule_asset($1, current_date, 'organic', null, '09:00')",
+      [humanAsset],
+    )).toBeNull();
+    await db.exec("reset role");
+    const still = await db.query<{ human_approved_at: string }>(
+      "select human_approved_at::text from public.client_media_assets where id = $1",
+      [humanAsset],
+    );
+    expect(still.rows[0]?.human_approved_at).toBe(stamp);
+
+    await asUser(HUMAN);
+    const bare = await call(
+      "select public.schedule_asset($1, current_date, 'organic', null, '09:00')",
+      [bareAsset],
+    );
+    expect(bare).toMatch(/not been approved by a person/);
+    await db.exec("reset role");
+  });
+
+  it("lets bot-sales decide a pending lead magnet and refuses every other bot", async () => {
+    const production = "77777777-7777-4777-8777-777777777771";
+    const sales = "77777777-7777-4777-8777-777777777772";
+    const marketing = "77777777-7777-4777-8777-777777777773";
+    const salesApproval = "c1111111-1111-4111-8111-111111111111";
+    const humanApproval = "c2222222-2222-4222-8222-222222222222";
+    const hash = "a".repeat(64);
+    await db.exec("reset role");
+    await asService();
+    for (const [id, key, email] of [
+      [production, "bot-production", "production@attractacq.com"],
+      [sales, "bot-sales", "sales@attractacq.com"],
+      [marketing, "bot-marketing", "marketing@attractacq.com"],
+    ] as const) {
+      await db.query(
+        "insert into auth.users (id, email) values ($1, $2) on conflict (id) do nothing",
+        [id, email],
+      );
+      await db.query(
+        `insert into public.profiles (id, role, full_name, email, is_bot, bot_key)
+         values ($1, 'admin', $2, $3, true, $2)
+         on conflict (id) do nothing`,
+        [id, key, email],
+      );
+    }
+    await db.exec("reset role");
+    await db.exec(`
+      create or replace function public.lead_magnet_payload_hash_v6(p_version_id uuid)
+      returns text language sql stable as $$
+        select '${hash}'::text
+      $$;
+    `);
+    await db.query(
+      `insert into public.lead_magnet_approvals
+         (id, client_id, magnet_version_id, payload_hash, status)
+       values
+         ($1, $3, $1, $4, 'pending'),
+         ($2, $3, $2, $4, 'pending')`,
+      [salesApproval, humanApproval, CLIENT, hash],
+    );
+
+    await asUser(production);
+    expect(await call(
+      "select public.decide_lead_magnet_approval_v6($1, true, null)",
+      [salesApproval],
+    )).toMatch(/Bot accounts cannot perform this action/);
+    await asUser(marketing);
+    expect(await call(
+      "select public.decide_lead_magnet_approval_v6($1, true, null)",
+      [humanApproval],
+    )).toMatch(/Bot accounts cannot perform this action/);
+
+    await asUser(sales);
+    const salesDecision = await db.query<{ status: string; decided_by: string }>(
+      `select status, decided_by::text as decided_by
+         from public.decide_lead_magnet_approval_v6($1::uuid, true, null)`,
+      [salesApproval],
+    );
+    await db.exec("reset role");
+    expect(salesDecision.rows[0]).toEqual({ status: "approved", decided_by: sales });
+
+    await asUser(HUMAN);
+    const humanDecision = await db.query<{ status: string; decided_by: string }>(
+      `select status, decided_by::text as decided_by
+         from public.decide_lead_magnet_approval_v6($1::uuid, true, null)`,
+      [humanApproval],
+    );
+    await db.exec("reset role");
+    expect(humanDecision.rows[0]).toEqual({ status: "approved", decided_by: HUMAN });
+
+    const delivery = await callReady(
+      sales,
+      "select public.set_lead_magnet_delivery_enabled($1, true)",
+      [CLIENT],
+    );
+    expect(delivery).toMatch(/Bot accounts cannot perform this action/);
+    const courier = await callReady(
+      sales,
+      "select public.enqueue_agent_job('lead_magnet_courier', $1)",
+      [CLIENT],
+    );
+    expect(courier).toMatch(/Bot accounts cannot perform this action/);
   });
 
   it("purges a bot's sessions and refuses a human", async () => {

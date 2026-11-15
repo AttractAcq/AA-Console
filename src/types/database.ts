@@ -6480,6 +6480,7 @@ export type Database = {
           ad_link_url: string | null
           ad_primary_text: string | null
           archived_at: string | null
+          bot_reviewed_at: string | null
           brief_id: string | null
           client_id: string
           content_format: Database["public"]["Enums"]["content_format"]
@@ -6517,6 +6518,7 @@ export type Database = {
           ad_link_url?: string | null
           ad_primary_text?: string | null
           archived_at?: string | null
+          bot_reviewed_at?: string | null
           brief_id?: string | null
           client_id: string
           content_format?: Database["public"]["Enums"]["content_format"]
@@ -6554,6 +6556,7 @@ export type Database = {
           ad_link_url?: string | null
           ad_primary_text?: string | null
           archived_at?: string | null
+          bot_reviewed_at?: string | null
           brief_id?: string | null
           client_id?: string
           content_format?: Database["public"]["Enums"]["content_format"]
