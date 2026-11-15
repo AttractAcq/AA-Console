@@ -3767,6 +3767,59 @@ export type Database = {
           },
         ]
       }
+      campaign_sweep_work_bindings_v7: {
+        Row: {
+          created_at: string
+          final_step_key: string
+          piece_key: string
+          run_id: string
+          work_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          final_step_key: string
+          piece_key: string
+          run_id: string
+          work_item_id: string
+        }
+        Update: {
+          created_at?: string
+          final_step_key?: string
+          piece_key?: string
+          run_id?: string
+          work_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_sweep_work_bindings_v7_run_id_final_step_key_fkey"
+            columns: ["run_id", "final_step_key"]
+            isOneToOne: true
+            referencedRelation: "workflow_steps"
+            referencedColumns: ["run_id", "step_key"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_work_bindings_v7_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_work_bindings_v7_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: true
+            referencedRelation: "delivery_work_effective_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_work_bindings_v7_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: true
+            referencedRelation: "delivery_work_items_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_template_matrix: {
         Row: {
           code: Database["public"]["Enums"]["campaign_template"]
@@ -34479,6 +34532,27 @@ export type Database = {
         Args: { p_campaign_id: string }
         Returns: string[]
       }
+      bind_campaign_sweep_work_v7: {
+        Args: {
+          p_final_step_key: string
+          p_piece_key: string
+          p_run_id: string
+          p_work_item_id: string
+        }
+        Returns: {
+          created_at: string
+          final_step_key: string
+          piece_key: string
+          run_id: string
+          work_item_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_sweep_work_bindings_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       bind_delivery_approval_dependency_v6: {
         Args: { p_approval_request_id: string; p_entity_version_id: string }
         Returns: undefined
@@ -36769,6 +36843,25 @@ export type Database = {
           to: "lead_sequence_enrollments"
           isOneToOne: true
           isSetofReturn: false
+        }
+      }
+      ensure_campaign_route_packages_v7: {
+        Args: { p_campaign_id: string; p_run_id: string }
+        Returns: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          id: string
+          paid_platform: string | null
+          plan_fingerprint: string
+          route: string
+          version: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "campaign_route_packages_v6"
+          isOneToOne: false
+          isSetofReturn: true
         }
       }
       exit_lead_from_sequence_v6: {
@@ -41040,6 +41133,10 @@ export type Database = {
         Returns: string
       }
       sweep_expired_proof_placements: { Args: never; Returns: number }
+      sync_campaign_sweep_work_v7: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
       system_readiness_catalog: { Args: never; Returns: Json }
       title_overlap: {
         Args: { p_candidate: string; p_other: string }

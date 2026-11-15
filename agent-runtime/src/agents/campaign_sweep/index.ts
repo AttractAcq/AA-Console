@@ -135,7 +135,7 @@ export async function runCampaignSweepJob(
   }
 
   const platform = platformFor(c.channels);
-  if (platform === null && c.acquisition_mode === "legacy") {
+  if (platform === null && !pieces) {
     // Composing a chain whose pieces have nowhere to go would fail at the end,
     // after paying for every idea and brief in it.
     return {
@@ -211,6 +211,61 @@ export async function runCampaignSweepJob(
       p_input_from_step_key: step.inputFromStepKey,
     });
     if (error) throw new Error(`Could not add step ${step.stepKey}: ${error.message}`);
+  }
+
+  // Every route-aware piece gets a durable work record before the graph is
+  // sealed. A retried composer sees the same package/version and the work-item
+  // RPC rejects any changed input under the same identity.
+  if (c.acquisition_mode !== "legacy") {
+    const { data: packageRows, error: packageError } = await sb.rpc(
+      "ensure_campaign_route_packages_v7", { p_campaign_id: c.id, p_run_id: runId },
+    );
+    if (packageError) throw new Error(`Could not version campaign routes: ${packageError.message}`);
+    const packages = new Map((packageRows as Array<{ id: string; route: string; version: number }> | null ?? [])
+      .map((row) => [row.route, row]));
+    const plannedPieces: SweepPiece[] = pieces ?? [
+      ...Array.from({ length: organicCount }, () => ({ route: "organic" as const,
+        platform: platform ?? "instagram", media_type: "image" as const, content_format: "single" as const })),
+      ...Array.from({ length: paidCount }, () => ({ route: "paid" as const,
+        platform: platform ?? "instagram", media_type: "image" as const, content_format: "single" as const })),
+    ];
+    for (const [index, piece] of plannedPieces.entries()) {
+      const routePackage = packages.get(piece.route);
+      if (!routePackage) throw new Error(`No ${piece.route} route package was prepared.`);
+      const pieceKey = `piece${index + 1}`;
+      const finalStepKey = piece.media_type === "video" ? `${pieceKey}_edit` : `${pieceKey}_create`;
+      const { data: work, error: workError } = await sb.rpc("create_delivery_work_item_v6", {
+        p_campaign_id: c.id,
+        p_route_package_id: routePackage.id,
+        p_manifest_id: null,
+        p_manifest_item_key: null,
+        p_item_key: `content_${pieceKey}`,
+        p_work_version: routePackage.version,
+        p_owner_module: "content_production_factory",
+        p_required: true,
+        p_input_snapshot: {
+          campaign_id: c.id,
+          route_package_id: routePackage.id,
+          content_spec_id: c.content_spec_id,
+          content_spec_hash: c.content_spec_hash,
+          piece_index: index + 1,
+          piece,
+          planned_idea_id: plannedIdeaIds?.[index] ?? null,
+          workflow_run_id: runId,
+        },
+        p_expected_output: { artifact_kind: "asset", final_step_key: finalStepKey,
+          route: piece.route, platform: piece.platform, media_type: piece.media_type,
+          content_format: piece.content_format },
+      });
+      if (workError) throw new Error(`Could not record ${pieceKey}: ${workError.message}`);
+      const workId = (work as { id?: string } | null)?.id;
+      if (!workId) throw new Error(`${pieceKey} has no work item id.`);
+      const { error: bindError } = await sb.rpc("bind_campaign_sweep_work_v7", {
+        p_work_item_id: workId, p_run_id: runId,
+        p_piece_key: pieceKey, p_final_step_key: finalStepKey,
+      });
+      if (bindError) throw new Error(`Could not bind ${pieceKey} to its final step: ${bindError.message}`);
+    }
   }
   const { error: sealError } = await sb.rpc("seal_workflow_run", { p_run_id: runId });
   if (sealError) throw new Error(`Could not seal the campaign sweep: ${sealError.message}`);

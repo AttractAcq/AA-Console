@@ -49,6 +49,13 @@ export function startWorkflowReconciler(sb: SupabaseClient, config: RuntimeConfi
         if (campaignQa && (campaignQa.steps_accepted || campaignQa.steps_blocked)) {
           logger.info("campaign_sweep_internal_qa", campaignQa);
         }
+        const { data: workSynced, error: workError } = await sb.rpc(
+          "sync_campaign_sweep_work_v7", { p_limit: 100 },
+        );
+        if (workError) throw new Error(workError.message);
+        if (typeof workSynced === "number" && workSynced > 0) {
+          logger.info("campaign_sweep_work_synced", { count: workSynced });
+        }
         const { data: siblings, error: siblingError } = await sb.rpc(
           "settle_completed_blocked_daily_siblings", { p_limit: 5 },
         );
