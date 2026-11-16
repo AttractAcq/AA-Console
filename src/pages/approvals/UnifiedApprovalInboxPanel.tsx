@@ -258,6 +258,7 @@ function statusTone(status: string): string {
     case "pending": return "border-amber-300 bg-amber-50 text-amber-900";
     case "approved": return "border-green-300 bg-green-50 text-green-900";
     case "rejected": return "border-red-300 bg-red-50 text-red-900";
+    case "stale": return "border-red-300 bg-red-50 text-red-900";
     default: return "border-border bg-muted text-foreground";
   }
 }
@@ -663,6 +664,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
             <option value="pending">Pending</option><option value="approved">Approved</option>
             <option value="rejected">Rejected</option><option value="expired">Expired</option>
+            <option value="stale">Stale source</option>
             <option value="revoked">Revoked</option><option value="superseded">Superseded</option>
             <option value="cancelled">Cancelled</option><option value="source_held">Source held</option>
             <option value="source_decided">Source decided without a mirrored event</option>
