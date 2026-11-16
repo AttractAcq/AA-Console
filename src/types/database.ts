@@ -21805,6 +21805,163 @@ export type Database = {
           },
         ]
       }
+      paid_operator_bundles_v7: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          created_by: string
+          id: string
+          package_id: string
+          platform: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          package_id: string
+          platform: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          package_id?: string
+          platform?: string
+          snapshot?: Json
+          snapshot_hash?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_preparation_packages_v7"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paid_operator_events_v7: {
+        Row: {
+          bundle_id: string
+          client_id: string
+          detail: string | null
+          event: string
+          external_ad_id: string | null
+          external_campaign_id: string | null
+          id: string
+          recorded_at: string
+          recorded_by: string
+          reference: string
+        }
+        Insert: {
+          bundle_id: string
+          client_id: string
+          detail?: string | null
+          event: string
+          external_ad_id?: string | null
+          external_campaign_id?: string | null
+          id?: string
+          recorded_at?: string
+          recorded_by: string
+          reference: string
+        }
+        Update: {
+          bundle_id?: string
+          client_id?: string
+          detail?: string | null
+          event?: string
+          external_ad_id?: string | null
+          external_campaign_id?: string | null
+          id?: string
+          recorded_at?: string
+          recorded_by?: string
+          reference?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paid_operator_events_v7_bundle_id_fkey"
+            columns: ["bundle_id"]
+            isOneToOne: false
+            referencedRelation: "paid_operator_bundles_v7"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paid_operator_events_v7_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_format_publishing: {
         Row: {
           content_format: Database["public"]["Enums"]["content_format"]
@@ -37242,6 +37399,32 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_paid_operator_bundle_v7: {
+        Args: {
+          p_budget_instruction: string
+          p_owner: string
+          p_package_id: string
+          p_tracking_instruction: string
+        }
+        Returns: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          created_by: string
+          id: string
+          package_id: string
+          platform: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "paid_operator_bundles_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_proof_artifact_v6: {
         Args: {
           p_artifact_kind: string
@@ -39773,6 +39956,11 @@ export type Database = {
         Args: { p_message_id: string }
         Returns: boolean
       }
+      paid_operator_bundle_current_v7: {
+        Args: { p_bundle_id: string }
+        Returns: boolean
+      }
+      paid_operator_source_v7: { Args: { p_package_id: string }; Returns: Json }
       pause_agent_job: {
         Args: { p_job_id: string; p_reason: string }
         Returns: {
@@ -40364,6 +40552,34 @@ export type Database = {
           p_summary?: string
         }
         Returns: number
+      }
+      record_paid_operator_event_v7: {
+        Args: {
+          p_bundle_id: string
+          p_detail?: string
+          p_event: string
+          p_external_ad_id?: string
+          p_external_campaign_id?: string
+          p_reference: string
+        }
+        Returns: {
+          bundle_id: string
+          client_id: string
+          detail: string | null
+          event: string
+          external_ad_id: string | null
+          external_campaign_id: string | null
+          id: string
+          recorded_at: string
+          recorded_by: string
+          reference: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "paid_operator_events_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       record_post_publish_failure: {
         Args: {

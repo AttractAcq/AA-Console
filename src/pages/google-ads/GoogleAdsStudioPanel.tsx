@@ -6,6 +6,7 @@ import { DataTable } from "../../components/DataTable";
 import { EmptyState } from "../../components/EmptyState";
 import { dayOrDash } from "../../lib/contentRecords";
 import { enqueueAgentJob, supabase } from "../../lib/supabase";
+import { PaidOperatorBundles } from "../distribution/PaidOperatorBundles";
 import type { Database } from "../../types/database";
 
 type SheetDue = Database["public"]["Views"]["google_ads_sheet_due"]["Row"];
@@ -114,6 +115,7 @@ export function GoogleAdsStudioPanel({ tab }: { tab: Tab }) {
 
       {tab === "sheet" && (
         <div className="space-y-4">
+          <PaidOperatorBundles clientId={clientId} platform="google" />
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="font-semibold">The build a person does by hand</h3>
             <p className="mt-1 text-sm text-muted-foreground">

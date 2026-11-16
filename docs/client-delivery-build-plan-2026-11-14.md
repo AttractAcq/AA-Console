@@ -385,6 +385,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Proof destination setup checkpoint, 16 November 2026:** Each destination card now separates route implementation, the client switch, and recorded provider credential, status, expiry and account reference where required. A complete metadata setup remains explicitly unverified until a live provider preflight and read-back. This is an operator-visible checklist, not a new execution gate; unsupported adapters and unproven live access remain Phase 7 work.
 
+**Paid operator bundle checkpoint, 16 November 2026:** Meta Paid Distribution and the Google Ads manual sheet now expose a versioned human-operator bundle based on a current, AAL2-approved preparation package and signed-off offer. The first supported creative route accepts exact approved single-file image or text assets, freezing their file hashes, ad copy, targeting, offer/page context, budget and tracking instructions, and named operator. The browser verifies downloaded creative bytes before recording its download report; handoff then requires an external ticket or message reference. External campaign/ad IDs can be reported afterward and remain explicitly unverified until provider account reconciliation and metrics ingest. A changed budget or source makes the bundle stale. Video and carousel creative approvals, observed external handoff, real-account reconciliation, and a live Meta/Google operator journey remain open.
+
 ## Phase 8 — Attribution, Master AI feedback and Archive
 
 ### Attribution OS

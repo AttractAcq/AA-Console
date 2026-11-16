@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "7e87cd545cbe022bf050086233b36e71b7b32b3ed9b254dca753e8172142f5f5",
-  "generatedTypesSha256": "533b082bb104df428373c9baf70733a4e0de1110a6998c845345cad775703c1e",
-  "generatedSchemaBodySha256": "23fa83968dd9ec8b21ceba7cba89485a0b667a69c97afd4ed86758795a2234b8",
+  "migrationSourceDigest": "bd8a1625fbb336f83b09b8b91212a384c1d134905e5aaa030d92543fe23610b6",
+  "generatedTypesSha256": "f83d4c1977e1b93a0d65ddc144a927cc7713a1d3485264d1cf8d136fe18c2c70",
+  "generatedSchemaBodySha256": "6b562a798d24021ae22a45d8f92d4e3a9e920771b004bacbe0b90e3dc8d594f1",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3881,6 +3881,13 @@
       "filename": "20261122220000_537_organic_publication_events.sql",
       "sha256": "daa811880ec0979913c79d6ae7eabcf2262319dbce7e77957c23bd659db2b07b",
       "trimmedMd5": "07f93d398a56215acd9babce1863f9bc"
+    },
+    {
+      "version": "20261122230000",
+      "name": "538_paid_operator_bundle",
+      "filename": "20261122230000_538_paid_operator_bundle.sql",
+      "sha256": "02e7204709edc8d756a61d59d69fece4fb26b4247715a2c7b9134594e662f5aa",
+      "trimmedMd5": "a0f7d7aee5db19ed9fb35f5a10529235"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
