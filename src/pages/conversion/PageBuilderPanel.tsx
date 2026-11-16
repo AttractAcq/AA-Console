@@ -541,7 +541,6 @@ export function PageBuilderPanel({
           { name: "route_package_id", label: "Campaign route package", kind: "select", required: true,
             hint: "Choose the exact route version this form measures. A new campaign plan needs a new form revision.",
             options: [
-              { value: "", label: "Select a route package" },
               ...routePackages.filter((route) => {
                 const campaignId = pageLinks.find((link) => link.page_id === formPageId)?.campaign_id;
                 return route.campaign_id === campaignId

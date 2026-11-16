@@ -55,6 +55,7 @@ export function FieldControl({
   onChange: (next: string | boolean | File | null) => void;
 }) {
   const id = `field-${field.name}`;
+  const hintId = field.hint ? `${id}-hint` : undefined;
   const text = typeof value === "string" ? value : "";
 
   function handle(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
@@ -84,6 +85,8 @@ export function FieldControl({
       {field.kind === "textarea" ? (
         <textarea
           id={id}
+          aria-describedby={hintId}
+          aria-required={field.required || undefined}
           rows={field.rows ?? 3}
           value={text}
           onChange={handle}
@@ -91,7 +94,8 @@ export function FieldControl({
           className={inputClass}
         />
       ) : field.kind === "select" ? (
-        <select id={id} value={text} onChange={handle} className={inputClass}>
+        <select id={id} aria-describedby={hintId} aria-required={field.required || undefined}
+          value={text} onChange={handle} className={inputClass}>
           <option value="">Select…</option>
           {(field.options ?? []).map((o) => (
             <option key={o.value} value={o.value}>
@@ -103,6 +107,8 @@ export function FieldControl({
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <input
             id={id}
+            aria-describedby={hintId}
+            aria-required={field.required || undefined}
             type="checkbox"
             checked={value === true}
             onChange={(e) => onChange(e.target.checked)}
@@ -113,6 +119,8 @@ export function FieldControl({
       ) : field.kind === "file" ? (
         <input
           id={id}
+          aria-describedby={hintId}
+          aria-required={field.required || undefined}
           type="file"
           accept={field.accept}
           onChange={(e) => onChange(e.target.files?.[0] ?? null)}
@@ -121,6 +129,8 @@ export function FieldControl({
       ) : (
         <input
           id={id}
+          aria-describedby={hintId}
+          aria-required={field.required || undefined}
           type={
             field.kind === "number"
               ? "number"
@@ -144,7 +154,7 @@ export function FieldControl({
         />
       )}
 
-      {field.hint && <p className="text-xs text-muted-foreground">{field.hint}</p>}
+      {field.hint && <p id={hintId} className="text-xs text-muted-foreground">{field.hint}</p>}
     </div>
   );
 }
