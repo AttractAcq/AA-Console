@@ -53,6 +53,37 @@ export interface ClientDestination {
   account_ref: string | null;
 }
 
+export interface DestinationIntegration {
+  provider: string;
+  status: string;
+  credential_secret_id: string | null;
+  token_expires_at: string | null;
+}
+
+/** Metadata preflight only. A live provider read-back is still required. */
+export function destinationPreflight(
+  destination: Destination,
+  client: ClientDestination | undefined,
+  integrations: readonly DestinationIntegration[],
+): string[] {
+  const blockers: string[] = [];
+  if (!destination.supported) blockers.push("Route is not implemented.");
+  if (!client?.enabled) blockers.push("Destination is off for this client.");
+  if (destination.requires_integration) {
+    const matches = integrations.filter((row) => row.provider === destination.provider);
+    if (matches.length !== 1) blockers.push(matches.length ? "Provider connection is ambiguous." : "No provider connection is recorded.");
+    else {
+      const row = matches[0];
+      if (!row.credential_secret_id) blockers.push("Provider credential is missing.");
+      if (!["connected", "active"].includes(row.status)) blockers.push(`Provider status is ${row.status}.`);
+      if (row.token_expires_at && (!Number.isFinite(Date.parse(row.token_expires_at))
+        || Date.parse(row.token_expires_at) <= Date.now())) blockers.push("Recorded provider token has expired.");
+    }
+    if (!client?.account_ref) blockers.push("Destination account reference is missing.");
+  }
+  return blockers;
+}
+
 export interface Placement {
   id: string;
   client_id: string;

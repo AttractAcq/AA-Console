@@ -383,6 +383,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Organic distribution log checkpoint, 16 November 2026:** New scheduled posts now record append-only schedule, reschedule, attempt, retry, failure, recorded publication and calendar-removal events. Existing posts receive one clearly labeled legacy snapshot; earlier transitions are not invented. Organic Content Distribution shows the current attempt count, failure reason and external ID/URL, plus a paged event log. Removal from the calendar is explicitly labeled as separate from provider removal. A recorded publication with no provider ID or URL is shown as incomplete evidence; provider read-back and a live approved post remain open Phase 7 exit checks.
 
+**Proof destination setup checkpoint, 16 November 2026:** Each destination card now separates route implementation, the client switch, and recorded provider credential, status, expiry and account reference where required. A complete metadata setup remains explicitly unverified until a live provider preflight and read-back. This is an operator-visible checklist, not a new execution gate; unsupported adapters and unproven live access remain Phase 7 work.
+
 ## Phase 8 — Attribution, Master AI feedback and Archive
 
 ### Attribution OS

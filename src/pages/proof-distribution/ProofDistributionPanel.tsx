@@ -15,7 +15,9 @@ import {
   markPlacedByHand, recordRetracted, auditLegacyRetraction,
   requestApproval, setDestinationEnabled, setProofPublishingEnabled,
   fetchProofSurfaceCoverage,
+  destinationPreflight,
   type ClientDestination, type Destination, type Placement, type PlacementDue,
+  type DestinationIntegration,
   type RetractionReceipt, type PlacementEvent,
   type ProofSurfaceCoverage,
 } from "../../lib/proofDistribution";
@@ -78,6 +80,7 @@ export function ProofDistributionPanel({ tab }: { tab: Tab }) {
   const { clientId } = useParams<{ clientId: string }>();
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [clientDestinations, setClientDestinations] = useState<ReadonlyMap<string, ClientDestination>>(new Map());
+  const [integrations, setIntegrations] = useState<DestinationIntegration[]>([]);
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [retractionReceipts, setRetractionReceipts] = useState<ReadonlyMap<string, RetractionReceipt>>(new Map());
   const [due, setDue] = useState<ReadonlyMap<string, PlacementDue>>(new Map());
@@ -94,7 +97,7 @@ export function ProofDistributionPanel({ tab }: { tab: Tab }) {
       return;
     }
     try {
-      const [all, mine, rows, receipts, blockers, proofRows, settings] = await Promise.all([
+      const [all, mine, rows, receipts, blockers, proofRows, settings, connected] = await Promise.all([
         fetchDestinations(),
         fetchClientDestinations(clientId),
         fetchPlacements(clientId),
@@ -103,9 +106,13 @@ export function ProofDistributionPanel({ tab }: { tab: Tab }) {
         fetchProofAssets(clientId),
         supabase.from("client_engine_settings")
           .select("proof_publishing_enabled").eq("client_id", clientId).maybeSingle(),
+        supabase.from("client_integrations")
+          .select("provider, status, credential_secret_id, token_expires_at").eq("client_id", clientId),
       ]);
+      if (connected.error) throw connected.error;
       setDestinations(all);
       setClientDestinations(mine);
+      setIntegrations((connected.data ?? []) as DestinationIntegration[]);
       setPlacements(rows);
       setRetractionReceipts(receipts);
       setDue(blockers);
@@ -160,6 +167,7 @@ export function ProofDistributionPanel({ tab }: { tab: Tab }) {
           clientId={clientId}
           destinations={destinations}
           mine={clientDestinations}
+          integrations={integrations}
           publishingOn={publishingOn}
           placements={placements}
           busy={busy}
@@ -197,11 +205,12 @@ export function ProofDistributionPanel({ tab }: { tab: Tab }) {
 }
 
 function DestinationsTab({
-  clientId, destinations, mine, publishingOn, placements, busy, loading, onAct,
+  clientId, destinations, mine, integrations, publishingOn, placements, busy, loading, onAct,
 }: {
   clientId: string | undefined;
   destinations: Destination[];
   mine: ReadonlyMap<string, ClientDestination>;
+  integrations: DestinationIntegration[];
   publishingOn: boolean;
   placements: Placement[];
   busy: string | null;
@@ -260,6 +269,7 @@ function DestinationsTab({
           {destinations.map((destination) => {
             const row = mine.get(destination.destination_key);
             const on = row?.enabled ?? false;
+            const preflight = destinationPreflight(destination, row, integrations);
             return (
               <article key={destination.destination_key} className="rounded-xl border border-border bg-card p-5">
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -276,10 +286,14 @@ function DestinationsTab({
                         : "bg-secondary text-secondary-foreground"
                     }`}
                   >
-                    {destination.supported ? "Adapter ready" : "No adapter yet"}
+                    {destination.supported ? "Route implemented" : "No adapter yet"}
                   </span>
                 </div>
                 <p className="mt-3 text-sm text-muted-foreground">{destination.note}</p>
+                <div className="mt-2 text-xs" aria-label={`${destination.label} preflight`}>
+                  {preflight.length ? preflight.map((reason) => <p key={reason} className="text-destructive">{reason}</p>)
+                    : <p className="text-amber-700">Recorded setup is present. Account rights and provider action remain unverified until live preflight and read-back.</p>}
+                </div>
                 <p className="mt-2 text-xs text-muted-foreground">
                   {counts.get(destination.destination_key) ?? 0} placement
                   {(counts.get(destination.destination_key) ?? 0) === 1 ? "" : "s"}

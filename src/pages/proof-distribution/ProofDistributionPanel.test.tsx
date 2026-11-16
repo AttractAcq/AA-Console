@@ -38,6 +38,7 @@ const state = {
   clientDestinations: [] as Record<string, unknown>[],
   coverage: [] as Record<string, unknown>[],
   events: [] as Record<string, unknown>[],
+  integrations: [] as Record<string, unknown>[],
   publishing: false,
 };
 
@@ -45,6 +46,7 @@ function result(table: string) {
   switch (table) {
     case "proof_destinations": return { data: DESTINATIONS, error: null };
     case "client_proof_destinations": return { data: state.clientDestinations, error: null };
+    case "client_integrations": return { data: state.integrations, error: null };
     case "proof_placements": return { data: state.placements, error: null };
     case "proof_placement_retraction_receipts_v6": return { data: state.retractionReceipts, error: null };
     case "proof_placement_due": return { data: state.due, error: null };
@@ -106,6 +108,7 @@ beforeEach(() => {
   state.due = [];
   state.clientDestinations = [];
   state.events = [];
+  state.integrations = [];
   state.publishing = false;
 });
 
@@ -117,6 +120,17 @@ describe("destinations", () => {
     expect(await screen.findByText("Third Party Directories")).toBeInTheDocument();
     expect(screen.getByText("No adapter yet")).toBeInTheDocument();
     expect(screen.getByText(/Account: yell.com\/aa/)).toBeInTheDocument();
+    expect(screen.getByText("No provider connection is recorded.")).toBeInTheDocument();
+  });
+
+  it("distinguishes recorded provider setup from verified provider rights", async () => {
+    state.clientDestinations = [{ destination_key: "google_business_profile", enabled: true,
+      account_ref: "accounts/1/locations/2" }];
+    state.integrations = [{ provider: "google_business", status: "connected",
+      credential_secret_id: "vault-ref", token_expires_at: null }];
+    render(<ProofDistributionPanel tab="destinations" />);
+    expect(await screen.findByLabelText("Google Business Profile preflight")).toHaveTextContent("Route is not implemented.");
+    expect(screen.queryByText(/Recorded setup is present/)).not.toBeInTheDocument();
   });
 
   it("leads with the switch, and says plainly that nothing goes out while it is off", async () => {
