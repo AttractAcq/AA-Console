@@ -37,6 +37,7 @@ const state = {
   due: [] as Record<string, unknown>[],
   clientDestinations: [] as Record<string, unknown>[],
   coverage: [] as Record<string, unknown>[],
+  events: [] as Record<string, unknown>[],
   publishing: false,
 };
 
@@ -47,6 +48,7 @@ function result(table: string) {
     case "proof_placements": return { data: state.placements, error: null };
     case "proof_placement_retraction_receipts_v6": return { data: state.retractionReceipts, error: null };
     case "proof_placement_due": return { data: state.due, error: null };
+    case "proof_placement_events": return { data: state.events, error: null };
     case "proof_surface_coverage": return { data: state.coverage, error: null };
     case "client_engine_settings":
       return { data: { proof_publishing_enabled: state.publishing }, error: null };
@@ -58,7 +60,8 @@ const from = vi.fn((table: string) => {
   const payload = () => Promise.resolve(result(table));
   const chain: Record<string, unknown> = {
     maybeSingle: payload,
-    order: payload,
+    order: () => table === "proof_placement_events" || table === "proof_placements" ? chain : payload(),
+    range: payload,
     upsert: payload,
     then: (...a: Parameters<Promise<unknown>["then"]>) => payload().then(...a),
   };
@@ -87,6 +90,7 @@ const placement = (over: Record<string, unknown> = {}) => ({
   id: "pl1", client_id: "c1", destination_key: "third_party_directory",
   status: "awaiting_manual_placement", source_proof_id: "p1",
   artifact_version_id: "a1", proof_id: null, asset_id: null, approval_id: null,
+  payload_hash: "a".repeat(64), verified_at: null, bound_revision_id: null,
   campaign_id: null, external_id: null, external_url: null, attempts: 0, placed_at: null,
   retracted_at: null,
   created_at: "2026-10-18T00:00:00Z", last_error: null, ...over,
@@ -101,6 +105,7 @@ beforeEach(() => {
   state.retractionReceipts = [];
   state.due = [];
   state.clientDestinations = [];
+  state.events = [];
   state.publishing = false;
 });
 
@@ -127,6 +132,20 @@ describe("destinations", () => {
 });
 
 describe("placements", () => {
+  it("shows exact payload, rights, provider result and the append-only event trail", async () => {
+    state.placements = [placement({ status: "verified", external_id: "provider-42",
+      external_url: "https://directory.example/proof/42", verified_at: "2026-11-16T12:00:00Z" })];
+    state.events = [{ id: "event-1", placement_id: "pl1", client_id: "c1", event: "verified",
+      actor: "human", detail: "Provider page checked", external_ref: "ticket-42",
+      occurred_at: "2026-11-16T12:00:00Z" }];
+    render(<ProofDistributionPanel tab="placements" />);
+    expect(await screen.findByText("Rights: unknown")).toBeInTheDocument();
+    expect(screen.getByText("provider-42", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("aaaaaaaaaaaaaaaa")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "View history" }));
+    expect(await screen.findByText("Provider page checked")).toBeInTheDocument();
+    expect(screen.getByText("ticket-42")).toBeInTheDocument();
+  });
   it("shows the blocker the database gave, not one of its own", async () => {
     state.placements = [placement({ status: "approved" })];
     state.due = [{

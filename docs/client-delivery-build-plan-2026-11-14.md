@@ -379,6 +379,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Exit gate:** one approved organic post and one supported proof placement have provider receipts and read-back; failures are visible and retryable. One Meta and one Google paid package can be handed to a human and reconciled to actual external IDs and metrics. Unsupported destinations say so plainly.
 
+**Proof distribution log checkpoint, 16 November 2026:** The existing Placements view now shows the exact approved payload hash, artifact or page revision reference, current source-proof rights and expiry, attempt count, external URL/ID, placed and verified dates, and removal confirmation. Each placement has a paged, append-only event trail with actor, detail and external reference. This exposes recorded history; an external ID or a human-entered URL alone is not provider read-back. Destination-specific preflight, missing adapters, and a verified provider placement remain Phase 7 exit work.
+
 ## Phase 8 — Attribution, Master AI feedback and Archive
 
 ### Attribution OS

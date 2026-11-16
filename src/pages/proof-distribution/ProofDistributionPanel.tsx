@@ -11,12 +11,12 @@ import { supabase } from "../../lib/supabase";
 import {
   LIVE_STATUSES, MODE_HINT,
   createPlacement, fetchClientDestinations, fetchDestinations,
-  fetchPlacementDue, fetchPlacements, fetchRetractionReceipts,
+  fetchPlacementDue, fetchPlacements, fetchPlacementEvents, fetchRetractionReceipts,
   markPlacedByHand, recordRetracted, auditLegacyRetraction,
   requestApproval, setDestinationEnabled, setProofPublishingEnabled,
   fetchProofSurfaceCoverage,
   type ClientDestination, type Destination, type Placement, type PlacementDue,
-  type RetractionReceipt,
+  type RetractionReceipt, type PlacementEvent,
   type ProofSurfaceCoverage,
 } from "../../lib/proofDistribution";
 
@@ -173,6 +173,7 @@ export function ProofDistributionPanel({ tab }: { tab: Tab }) {
           retractionReceipts={retractionReceipts}
           due={due}
           destinations={destinations}
+          proof={proof}
           titleOf={titleOf}
           busy={busy}
           loading={loading}
@@ -317,20 +318,42 @@ function DestinationsTab({
 }
 
 function PlacementsTab({
-  placements, retractionReceipts, due, destinations, titleOf, busy, loading, onAct,
+  placements, retractionReceipts, due, destinations, proof, titleOf, busy, loading, onAct,
 }: {
   placements: Placement[];
   retractionReceipts: ReadonlyMap<string, RetractionReceipt>;
   due: ReadonlyMap<string, PlacementDue>;
   destinations: Destination[];
+  proof: ProofAsset[];
   titleOf: (id: string) => string;
   busy: string | null;
   loading: boolean;
   onAct: (key: string, work: () => Promise<void>, said: string) => Promise<void>;
 }) {
   const navigate = useNavigate();
+  const [historyId, setHistoryId] = useState<string | null>(null);
+  const [history, setHistory] = useState<PlacementEvent[]>([]);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [hasOlder, setHasOlder] = useState(false);
   const modeOf = (key: string) => destinations.find((d) => d.destination_key === key)?.mode;
   const labelOf = (key: string) => destinations.find((d) => d.destination_key === key)?.label ?? key;
+  const proofOf = (id: string) => proof.find((item) => item.id === id);
+
+  const loadHistory = async (placement: Placement, older = false) => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    if (!older) { setHistoryId(placement.id); setHistory([]); }
+    try {
+      const next = await fetchPlacementEvents(placement.client_id, placement.id, older ? history.length : 0);
+      setHistory((current) => older ? [...current, ...next] : next);
+      setHasOlder(next.length === 50);
+    } catch (cause) {
+      setHistoryError(cause instanceof Error ? cause.message : "Could not load placement history.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   if (!loading && placements.length === 0) {
     return (
@@ -339,19 +362,36 @@ function PlacementsTab({
   }
 
   return (
+    <div className="space-y-4">
     <DataTable
-      columns={["Proof", "Destination", "Status", "What is stopping it", "Placed", "Removal record", "Actions"]}
+      columns={["Proof and rights", "Destination", "Exact payload", "Status", "What is stopping it", "External record", "Removal record", "Trail", "Actions"]}
       emptyLabel={loading ? "Loading placements…" : "No placements yet"}
       rows={placements.map((placement) => {
         const blocker = due.get(placement.id)?.blocker ?? null;
         const mode = modeOf(placement.destination_key);
         return [
-          <span key="p">{titleOf(placement.source_proof_id)}</span>,
+          <span key="p">
+            {titleOf(placement.source_proof_id)}
+            <span className="block text-xs text-muted-foreground">
+              Rights: {proofOf(placement.source_proof_id)?.usage_rights ?? "unknown"}
+              {proofOf(placement.source_proof_id)?.expires_on
+                ? ` · expires ${dayOrDash(proofOf(placement.source_proof_id)?.expires_on ?? null)}` : ""}
+            </span>
+          </span>,
           <span key="d">
             {labelOf(placement.destination_key)}
             <span className="block text-xs capitalize text-muted-foreground">{mode}</span>
           </span>,
-          <span key="s">{placement.status.replace(/_/g, " ")}</span>,
+          <span key="v" className="font-mono text-xs">
+            {placement.payload_hash ? placement.payload_hash.slice(0, 16) : "not recorded"}
+            <span className="block text-muted-foreground">
+              {placement.artifact_version_id ? `artifact ${placement.artifact_version_id.slice(0, 8)}`
+                : placement.bound_revision_id ? `page revision ${placement.bound_revision_id.slice(0, 8)}` : "source proof"}
+            </span>
+          </span>,
+          <span key="s">{placement.status.replace(/_/g, " ")}
+            <span className="block text-xs text-muted-foreground">{placement.attempts} attempt{placement.attempts === 1 ? "" : "s"}</span>
+          </span>,
           <span key="b" className={blocker || placement.last_error ? "text-destructive" : "text-brand-strong"}>
             {/* A failed or rejected placement is outside the due view, so its
                 blocker is null while the thing a person needs to read sits in
@@ -364,14 +404,16 @@ function PlacementsTab({
                   ? "Live"
                   : "Nothing")}
           </span>,
-          <span key="w">
+          <span key="w" className="text-xs">
             {placement.external_url ? (
               <a href={placement.external_url} target="_blank" rel="noreferrer" className="hover:underline">
-                {dayOrDash(placement.placed_at)}
+                {placement.external_url}
               </a>
             ) : (
-              dayOrDash(placement.placed_at)
+              "No external URL"
             )}
+            {placement.external_id && <span className="block break-all">ID: {placement.external_id}</span>}
+            <span className="block text-muted-foreground">Placed {dayOrDash(placement.placed_at)} · verified {dayOrDash(placement.verified_at)}</span>
           </span>,
           <span key="r" className="text-xs">
             {placement.status === "retracted"
@@ -389,6 +431,8 @@ function PlacementsTab({
                 : <span className="text-destructive">Historical removal unverified</span>
               : "—"}
           </span>,
+          <button key="h" type="button" onClick={() => void loadHistory(placement)}
+            className="text-xs text-brand-strong underline">View history</button>,
           <ActionMenu
             key="a"
             name={`${titleOf(placement.source_proof_id)} at ${labelOf(placement.destination_key)}`}
@@ -463,6 +507,26 @@ function PlacementsTab({
         ];
       })}
     />
+    {historyId && (
+      <section className="space-y-2 rounded-lg border border-border p-4">
+        <h3 className="font-semibold">Placement history · {titleOf(placements.find((p) => p.id === historyId)?.source_proof_id ?? "")}</h3>
+        {historyError && <p role="alert" className="text-sm text-destructive">{historyError}</p>}
+        <DataTable columns={["When", "Event", "Actor", "Result / evidence"]}
+          emptyLabel={historyLoading ? "Loading events…" : "No events recorded"}
+          rows={history.map((event) => [
+            <span key="w">{dayOrDash(event.occurred_at)}</span>,
+            <span key="e">{event.event.replace(/_/g, " ")}</span>,
+            <span key="a">{event.actor}</span>,
+            <span key="d" className="text-xs">{event.detail ?? "—"}
+              {event.external_ref && <span className="block break-all">{event.external_ref}</span>}
+            </span>,
+          ])} />
+        {hasOlder && <button type="button" disabled={historyLoading}
+          onClick={() => { const placement = placements.find((p) => p.id === historyId); if (placement) void loadHistory(placement, true); }}
+          className="text-xs text-brand-strong underline">Load older events</button>}
+      </section>
+    )}
+    </div>
   );
 }
 

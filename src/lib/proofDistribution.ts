@@ -62,6 +62,7 @@ export interface Placement {
   artifact_version_id: string | null;
   proof_id: string | null;
   asset_id: string | null;
+  payload_hash: string;
   approval_id: string | null;
   /** The campaign this placement belongs to, where it belongs to one. */
   campaign_id: string | null;
@@ -69,10 +70,14 @@ export interface Placement {
   external_url: string | null;
   attempts: number;
   placed_at: string | null;
+  verified_at: string | null;
+  bound_revision_id: string | null;
   retracted_at: string | null;
   created_at: string;
   last_error: string | null;
 }
+
+export type PlacementEvent = Database["public"]["Tables"]["proof_placement_events"]["Row"];
 
 export interface RetractionReceipt {
   placement_id: string;
@@ -121,13 +126,27 @@ export async function fetchClientDestinations(clientId: string): Promise<Map<str
 }
 
 export async function fetchPlacements(clientId: string): Promise<Placement[]> {
-  const { data, error } = await supabase
-    .from("proof_placements")
-    .select("id, client_id, destination_key, status, source_proof_id, artifact_version_id, proof_id, asset_id, approval_id, campaign_id, external_id, external_url, attempts, placed_at, retracted_at, created_at, last_error")
-    .eq("client_id", clientId)
-    .order("created_at", { ascending: false });
+  const all: Placement[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const { data, error } = await supabase
+      .from("proof_placements")
+      .select("id, client_id, destination_key, status, source_proof_id, artifact_version_id, proof_id, asset_id, payload_hash, approval_id, campaign_id, external_id, external_url, attempts, placed_at, verified_at, bound_revision_id, retracted_at, created_at, last_error")
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: false }).order("id", { ascending: false })
+      .range(offset, offset + 499);
+    if (error) throw new Error(error.message);
+    all.push(...((data ?? []) as Placement[]));
+    if ((data ?? []).length < 500) return all;
+  }
+}
+
+export async function fetchPlacementEvents(clientId: string, placementId: string, offset = 0): Promise<PlacementEvent[]> {
+  const { data, error } = await supabase.from("proof_placement_events")
+    .select("id, placement_id, client_id, event, actor, detail, external_ref, occurred_at")
+    .eq("client_id", clientId).eq("placement_id", placementId)
+    .order("occurred_at", { ascending: false }).range(offset, offset + 49);
   if (error) throw new Error(error.message);
-  return (data ?? []) as Placement[];
+  return data ?? [];
 }
 
 export async function fetchRetractionReceipts(clientId: string): Promise<Map<string, RetractionReceipt>> {
