@@ -137,7 +137,11 @@ schedule calls `review_media_asset` so the seat gates run and a
 `client_asset_reviews` row records the human. `organic_publication_source_snapshot_v6`
 still requires `human_approved_at`. `approve_slot` stays human-only.
 `bot-sales` may decide a pending lead magnet. `decided_by_bot` is stored
-on that row at decision time. Deleting the bot or clearing `is_bot` does
+on that row at decision time. Do not delete that bot. `decided_by`
+references `profiles` with `ON DELETE SET NULL`, and
+`lead_magnet_approvals_check` from migration 236 requires `decided_by` on
+an approved or rejected row, so the delete is rejected with `23514`.
+Disable the bot with the command below instead. Clearing `is_bot` does
 not make the approval deliverable, and an approved row with a null
 decider stays blocked. A human decision clears the flag. Turning delivery
 on, and the `lead_magnet_courier` worker, stay refused for every bot.
@@ -158,11 +162,38 @@ node --experimental-strip-types scripts/provision-bot-user.ts unenroll-mfa \
 `auth.admin.updateUserById`. `unenroll-mfa` lists factors with
 `auth.admin.mfa.listFactors` and deletes each with
 `auth.admin.mfa.deleteFactor`. Each command has its own confirm string.
-`BOT_PROVISION_CONFIRM` does not authorize a reset or an unenroll.
+`BOT_PROVISION_CONFIRM` does not authorize a reset, an unenroll, or a
+disable.
+
+Disable a bot with `disable`. Do not delete the Auth user or the profile:
+migration 236's approval check refuses that delete, as above. Without
+`BOT_DISABLE_CONFIRM=disable-bot-user` the command dry-runs and writes
+nothing. `--dry-run` forces that preview even when the confirm is set.
+A real run is idempotent. It bans the Auth user for `876000h` through
+`auth.admin.updateUserById` (`ban_duration`), calls
+`public.revoke_bot_sessions` as the service role, and sets
+`profiles.role` to `employee`. `is_bot` and `bot_key` stay, so the
+profile remains the decider and a later run still recognizes the account.
+Running it again extends the ban, revokes any sessions that remain, and
+sets `employee` again. It does not read or print a password, and it does
+not print the service-role key. It refuses a profile that is not
+`is_bot=true` with that `bot_key`.
+
+```bash
+BOT_DISABLE_CONFIRM=disable-bot-user \
+SUPABASE_URL=https://<project>.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
+node --experimental-strip-types scripts/provision-bot-user.ts disable \
+  --bot-key bot-sales
+```
 
 There is no database test job in CI. The same checks run in the agent-runtime
 test suite. A local pgTAP file is `supabase/tests/bot_console_identity.sql`,
 run with `supabase test db` after the migrations are applied locally.
+`supabase/tests/link_delivery_current_source_v6_execute.sql` asserts that
+migration 325 revoked `EXECUTE` on
+`public.link_delivery_current_source_v6(public.delivery_entity_versions_v6, text, text, text)`
+from `public`, `anon`, and `authenticated`.
 
 ## Local state
 
