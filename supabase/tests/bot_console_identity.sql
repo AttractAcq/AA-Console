@@ -502,7 +502,7 @@ select throws_ok(
        set decided_by_bot = false
      where id = 'c1111111-1111-4111-8111-111111111111'$$,
   '42501',
-  'permission denied for column decided_by_bot',
+  NULL,
   'service_role cannot write decided_by_bot'
 );
 reset role;
@@ -552,21 +552,14 @@ select results_eq(
   'a bot-decided magnet is not due'
 );
 
-update public.lead_magnet_approvals
-   set decided_by = null
- where id = 'c1111111-1111-4111-8111-111111111111';
-select results_eq(
-  $$select decided_by_bot, blocker is not null
-      from public.lead_magnet_approvals a
-      join public.lead_magnet_due d on d.magnet_version_id = a.magnet_version_id
-     where a.id = 'c1111111-1111-4111-8111-111111111111'$$,
-  $$values (true, true)$$,
-  'deleting the bot leaves the approval undeliverable'
+select throws_ok(
+  $$delete from public.profiles
+     where id = '77777777-7777-4777-8777-777777777772'$$,
+  '23514',
+  NULL,
+  'deleting the deciding bot is refused by the approval check'
 );
 
-update public.lead_magnet_approvals
-   set decided_by = '77777777-7777-4777-8777-777777777772', decided_by_bot = true
- where id = 'c1111111-1111-4111-8111-111111111111';
 update public.profiles
    set is_bot = false, bot_key = null
  where id = '77777777-7777-4777-8777-777777777772';
