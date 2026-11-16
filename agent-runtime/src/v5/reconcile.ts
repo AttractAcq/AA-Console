@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import type { RuntimeConfig } from "../config.js";
 import { logger } from "../logging/logger.js";
 import { dispatchOneRecoveryAlert } from "./recovery-alerts.js";
+import { attestCampaignCreativeWorkflowOutputs } from "../creative/attest-campaign-workflow.js";
+import { attestCampaignMagnetWorkflowOutputs } from "../lead-magnets/attest-campaign-workflow.js";
 
 const INTERVAL_MS = 15_000;
 
@@ -38,6 +40,60 @@ export function startWorkflowReconciler(sb: SupabaseClient, config: RuntimeConfi
         } | null;
         if (qa && (qa.steps_accepted || qa.steps_blocked)) {
           logger.info("v5_daily_internal_qa", qa);
+        }
+        const attested = await attestCampaignCreativeWorkflowOutputs(sb);
+        if (attested > 0) logger.info("campaign_creative_bytes_attested", { count: attested });
+        const magnetAttested = await attestCampaignMagnetWorkflowOutputs(sb);
+        if (magnetAttested > 0) logger.info("campaign_magnet_bytes_attested", { count: magnetAttested });
+        const { data: campaignQaData, error: campaignQaError } = await sb.rpc(
+          "accept_ready_campaign_workflow_steps_v7", { p_limit: 20 },
+        );
+        if (campaignQaError) throw new Error(campaignQaError.message);
+        const campaignQa = (Array.isArray(campaignQaData) ? campaignQaData[0] : campaignQaData) as {
+          steps_accepted?: number; steps_blocked?: number;
+        } | null;
+        if (campaignQa && (campaignQa.steps_accepted || campaignQa.steps_blocked)) {
+          logger.info("campaign_sweep_internal_qa", campaignQa);
+        }
+        const { data: conversionQaData, error: conversionQaError } = await sb.rpc(
+          "accept_ready_campaign_conversion_steps_v7", { p_limit: 20 },
+        );
+        if (conversionQaError) throw new Error(conversionQaError.message);
+        const conversionQa = (Array.isArray(conversionQaData) ? conversionQaData[0]
+          : conversionQaData) as { steps_accepted?: number; steps_blocked?: number } | null;
+        if (conversionQa && (conversionQa.steps_accepted || conversionQa.steps_blocked)) {
+          logger.info("campaign_conversion_internal_qa", conversionQa);
+        }
+        const { data: magnetQa, error: magnetQaError } = await sb.rpc(
+          "accept_ready_campaign_magnet_steps_v7", { p_limit: 20 },
+        );
+        if (magnetQaError) throw new Error(magnetQaError.message);
+        const magnetCounts = (Array.isArray(magnetQa) ? magnetQa[0] : magnetQa) as {
+          steps_accepted?: number; steps_blocked?: number;
+        } | null;
+        if (magnetCounts && (magnetCounts.steps_accepted || magnetCounts.steps_blocked)) {
+          logger.info("campaign_magnet_internal_qa", magnetCounts);
+        }
+        const { data: workSynced, error: workError } = await sb.rpc(
+          "sync_campaign_sweep_work_v7", { p_limit: 100 },
+        );
+        if (workError) throw new Error(workError.message);
+        if (typeof workSynced === "number" && workSynced > 0) {
+          logger.info("campaign_sweep_work_synced", { count: workSynced });
+        }
+        const { data: conversionSynced, error: conversionWorkError } = await sb.rpc(
+          "sync_campaign_conversion_work_v7", { p_limit: 100 },
+        );
+        if (conversionWorkError) throw new Error(conversionWorkError.message);
+        if (typeof conversionSynced === "number" && conversionSynced > 0) {
+          logger.info("campaign_conversion_work_synced", { count: conversionSynced });
+        }
+        const { data: magnetSynced, error: magnetWorkError } = await sb.rpc(
+          "sync_campaign_magnet_work_v7", { p_limit: 100 },
+        );
+        if (magnetWorkError) throw new Error(magnetWorkError.message);
+        if (typeof magnetSynced === "number" && magnetSynced > 0) {
+          logger.info("campaign_magnet_work_synced", { count: magnetSynced });
         }
         const { data: siblings, error: siblingError } = await sb.rpc(
           "settle_completed_blocked_daily_siblings", { p_limit: 5 },

@@ -389,6 +389,13 @@ export type Database = {
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "approval_decision_events_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
         ]
       }
       approval_request_evidence_v6: {
@@ -448,6 +455,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_request_evidence_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
         ]
       }
@@ -555,6 +569,75 @@ export type Database = {
           },
         ]
       }
+      archive_decisions_v8: {
+        Row: {
+          acted_at: string
+          acted_by: string
+          action: string
+          archive_stamp: string | null
+          client_id: string
+          id: string
+          record_id: string
+          table_name: string
+        }
+        Insert: {
+          acted_at?: string
+          acted_by: string
+          action: string
+          archive_stamp?: string | null
+          client_id: string
+          id?: string
+          record_id: string
+          table_name: string
+        }
+        Update: {
+          acted_at?: string
+          acted_by?: string
+          action?: string
+          archive_stamp?: string | null
+          client_id?: string
+          id?: string
+          record_id?: string
+          table_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "archive_decisions_v8_acted_by_fkey"
+            columns: ["acted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "archive_decisions_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "archive_decisions_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "archive_decisions_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "archive_decisions_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       archived_leads: {
         Row: {
           archived_at: string
@@ -631,6 +714,150 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "lead_identities"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      assignment_deliveries_v7: {
+        Row: {
+          asset_id: string
+          assignment_id: string
+          client_id: string
+          delivered_at: string
+          id: string
+        }
+        Insert: {
+          asset_id: string
+          assignment_id: string
+          client_id: string
+          delivered_at?: string
+          id?: string
+        }
+        Update: {
+          asset_id?: string
+          assignment_id?: string
+          client_id?: string
+          delivered_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignment_deliveries_v7_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "assignment_deliveries_v7_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "assignment_deliveries_v7_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_deliveries_v7_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_deliveries_v7_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "assignment_deliveries_v7_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_presence"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "assignment_deliveries_v7_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "assignment_deliveries_v7_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "assignment_deliveries_v7_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_deliveries_v7_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_deliveries_v7_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_deliveries_v7_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignment_board"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "assignment_deliveries_v7_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "job_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_deliveries_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "assignment_deliveries_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "assignment_deliveries_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_deliveries_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -1075,8 +1302,22 @@ export type Database = {
             foreignKeyName: "brief_dispatches_source_asset_id_fkey"
             columns: ["source_asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "brief_dispatches_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "brief_dispatches_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "brief_dispatches_source_asset_id_fkey"
@@ -1177,6 +1418,149 @@ export type Database = {
           },
         ]
       }
+      campaign_action_attempts_v6: {
+        Row: {
+          action_key: string
+          approval_id: string
+          artifact_version_hash: string
+          attempt_number: number
+          client_id: string
+          error: string | null
+          execution_id: string
+          external_id: string | null
+          external_url: string | null
+          finished_at: string | null
+          legacy_inferred: boolean
+          result: Json | null
+          started_at: string
+          status: string
+        }
+        Insert: {
+          action_key: string
+          approval_id: string
+          artifact_version_hash: string
+          attempt_number: number
+          client_id: string
+          error?: string | null
+          execution_id: string
+          external_id?: string | null
+          external_url?: string | null
+          finished_at?: string | null
+          legacy_inferred?: boolean
+          result?: Json | null
+          started_at: string
+          status: string
+        }
+        Update: {
+          action_key?: string
+          approval_id?: string
+          artifact_version_hash?: string
+          attempt_number?: number
+          client_id?: string
+          error?: string | null
+          execution_id?: string
+          external_id?: string | null
+          external_url?: string | null
+          finished_at?: string | null
+          legacy_inferred?: boolean
+          result?: Json | null
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_action_attempts_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_page_publish_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_lead_enrolment_source_v6"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_proof_release_observations_v6"
+            referencedColumns: ["execution_id"]
+          },
+        ]
+      }
       campaign_action_events: {
         Row: {
           actor: string
@@ -1250,6 +1634,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "campaign_action_executions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_events_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_lead_enrolment_source_v6"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_events_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_proof_release_observations_v6"
+            referencedColumns: ["execution_id"]
           },
         ]
       }
@@ -1487,6 +1885,111 @@ export type Database = {
         }
         Relationships: []
       }
+      campaign_action_revocations_v6: {
+        Row: {
+          approval_id: string
+          client_id: string
+          inbox_decision_id: string
+          reason: string
+          revoked_at: string
+          revoked_by: string
+        }
+        Insert: {
+          approval_id: string
+          client_id: string
+          inbox_decision_id: string
+          reason: string
+          revoked_at?: string
+          revoked_by: string
+        }
+        Update: {
+          approval_id?: string
+          client_id?: string
+          inbox_decision_id?: string
+          reason?: string
+          revoked_at?: string
+          revoked_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_action_revocations_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_page_publish_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_inbox_decision_id_fkey"
+            columns: ["inbox_decision_id"]
+            isOneToOne: true
+            referencedRelation: "approval_decision_events_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_revoked_by_fkey"
+            columns: ["revoked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_artifact_offer_inputs: {
         Row: {
           artifact_id: string
@@ -1667,8 +2170,22 @@ export type Database = {
             foreignKeyName: "campaign_artifacts_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "campaign_artifacts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "campaign_artifacts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "campaign_artifacts_asset_id_fkey"
@@ -1887,6 +2404,7 @@ export type Database = {
           lease_until: string | null
           proposed_daily_budget: number
           reason: string
+          review_epoch_v6: number
           status: string
           updated_at: string
         }
@@ -1908,6 +2426,7 @@ export type Database = {
           lease_until?: string | null
           proposed_daily_budget: number
           reason: string
+          review_epoch_v6?: number
           status?: string
           updated_at?: string
         }
@@ -1929,6 +2448,7 @@ export type Database = {
           lease_until?: string | null
           proposed_daily_budget?: number
           reason?: string
+          review_epoch_v6?: number
           status?: string
           updated_at?: string
         }
@@ -2054,6 +2574,99 @@ export type Database = {
           },
         ]
       }
+      campaign_budget_readbacks_v6: {
+        Row: {
+          account_id: string
+          ad_set_external_id: string
+          checked_at: string
+          client_id: string
+          execution_id: string
+          id: string
+          observed_currency: string
+          observed_daily_budget_minor: number
+          result: string
+        }
+        Insert: {
+          account_id: string
+          ad_set_external_id: string
+          checked_at?: string
+          client_id: string
+          execution_id: string
+          id?: string
+          observed_currency: string
+          observed_daily_budget_minor: number
+          result: string
+        }
+        Update: {
+          account_id?: string
+          ad_set_external_id?: string
+          checked_at?: string
+          client_id?: string
+          execution_id?: string
+          id?: string
+          observed_currency?: string
+          observed_daily_budget_minor?: number
+          result?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_lead_enrolment_source_v6"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_proof_release_observations_v6"
+            referencedColumns: ["execution_id"]
+          },
+        ]
+      }
       campaign_content_pillars: {
         Row: {
           campaign_id: string
@@ -2125,6 +2738,323 @@ export type Database = {
             columns: ["pillar_id"]
             isOneToOne: false
             referencedRelation: "client_content_pillars"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_content_spec_versions_v7: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          content_hash: string
+          created_at: string
+          created_by: string | null
+          id: string
+          pieces: Json
+          version: number
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          content_hash: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          pieces: Json
+          version: number
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          content_hash?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          pieces?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_content_spec_versions_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_content_spec_versions_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_content_spec_versions_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_content_spec_versions_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_content_spec_versions_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_content_spec_versions_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_content_spec_versions_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_content_spec_versions_v7_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_conversion_drafts_v7: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          page_id: string | null
+          page_work_item_id: string | null
+          plan_fingerprint: string
+          run_id: string
+          sales_agent_id: string | null
+          sales_work_item_id: string | null
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          created_at?: string
+          page_id?: string | null
+          page_work_item_id?: string | null
+          plan_fingerprint: string
+          run_id: string
+          sales_agent_id?: string | null
+          sales_work_item_id?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          created_at?: string
+          page_id?: string | null
+          page_work_item_id?: string | null
+          plan_fingerprint?: string
+          run_id?: string
+          sales_agent_id?: string | null
+          sales_work_item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "client_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_page_work_item_id_fkey"
+            columns: ["page_work_item_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_work_effective_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_page_work_item_id_fkey"
+            columns: ["page_work_item_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_work_items_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: true
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_sales_agent_id_fkey"
+            columns: ["sales_agent_id"]
+            isOneToOne: false
+            referencedRelation: "client_sales_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_sales_agent_id_fkey"
+            columns: ["sales_agent_id"]
+            isOneToOne: false
+            referencedRelation: "sales_agents_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_sales_work_item_id_fkey"
+            columns: ["sales_work_item_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_work_effective_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_drafts_v7_sales_work_item_id_fkey"
+            columns: ["sales_work_item_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_work_items_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_conversion_work_bindings_v7: {
+        Row: {
+          created_at: string
+          run_id: string
+          step_key: string
+          work_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          run_id: string
+          step_key: string
+          work_item_id: string
+        }
+        Update: {
+          created_at?: string
+          run_id?: string
+          step_key?: string
+          work_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_conversion_work_bindings_v7_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_work_bindings_v7_run_id_step_key_fkey"
+            columns: ["run_id", "step_key"]
+            isOneToOne: true
+            referencedRelation: "workflow_steps"
+            referencedColumns: ["run_id", "step_key"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_work_bindings_v7_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: true
+            referencedRelation: "delivery_work_effective_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_conversion_work_bindings_v7_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: true
+            referencedRelation: "delivery_work_items_v6"
             referencedColumns: ["id"]
           },
         ]
@@ -2224,6 +3154,476 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "meta_build_due"
             referencedColumns: ["campaign_id", "client_id"]
+          },
+        ]
+      }
+      campaign_lead_enrolment_items_v6: {
+        Row: {
+          client_id: string
+          enrollment_id: string | null
+          execution_id: string
+          lead_id: string
+          observed_at: string
+          reason: string | null
+          result: string
+        }
+        Insert: {
+          client_id: string
+          enrollment_id?: string | null
+          execution_id: string
+          lead_id: string
+          observed_at?: string
+          reason?: string | null
+          result: string
+        }
+        Update: {
+          client_id?: string
+          enrollment_id?: string | null
+          execution_id?: string
+          lead_id?: string
+          observed_at?: string
+          reason?: string | null
+          result?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_lead_enrolment_items_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_items_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_items_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_items_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_items_v6_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "lead_sequence_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_items_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_lead_enrolment_runs_v6"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_items_v6_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_items_v6_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
+          },
+        ]
+      }
+      campaign_lead_enrolment_runs_v6: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          execution_id: string
+          finished_at: string | null
+          observed_count: number
+          sequence_hash: string
+          sequence_id: string
+          skipped_count: number
+          started_at: string
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          execution_id: string
+          finished_at?: string | null
+          observed_count?: number
+          sequence_hash: string
+          sequence_id: string
+          skipped_count?: number
+          started_at?: string
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          execution_id?: string
+          finished_at?: string | null
+          observed_count?: number
+          sequence_hash?: string
+          sequence_id?: string
+          skipped_count?: number
+          started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_lead_enrolment_source_v6"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_proof_release_observations_v6"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "nurture_sequence_due"
+            referencedColumns: ["sequence_id"]
+          },
+          {
+            foreignKeyName: "campaign_lead_enrolment_runs_v6_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "nurture_sequences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_magnet_byte_checks_v7: {
+        Row: {
+          checked_at: string
+          client_id: string
+          content_sha256: string
+          file_bytes: number
+          job_id: string
+          version_id: string
+        }
+        Insert: {
+          checked_at?: string
+          client_id: string
+          content_sha256: string
+          file_bytes: number
+          job_id: string
+          version_id: string
+        }
+        Update: {
+          checked_at?: string
+          client_id?: string
+          content_sha256?: string
+          file_bytes?: number
+          job_id?: string
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_magnet_byte_checks_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_byte_checks_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_byte_checks_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_byte_checks_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_byte_checks_v7_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_byte_checks_v7_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_byte_checks_v7_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_byte_checks_v7_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_magnet_drafts_v7: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          magnet_id: string
+          plan_fingerprint: string
+          run_id: string
+          work_item_id: string
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          created_at?: string
+          magnet_id: string
+          plan_fingerprint: string
+          run_id: string
+          work_item_id: string
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          created_at?: string
+          magnet_id?: string
+          plan_fingerprint?: string
+          run_id?: string
+          work_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_magnet_id_fkey"
+            columns: ["magnet_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_magnet_id_fkey"
+            columns: ["magnet_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: true
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: true
+            referencedRelation: "delivery_work_effective_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_magnet_drafts_v7_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: true
+            referencedRelation: "delivery_work_items_v6"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2611,6 +4011,7 @@ export type Database = {
           id: string
           page_id: string
           probe_detail: string | null
+          probe_kind: string
           probe_lead_id: string | null
           probe_status: string | null
           probed_at: string | null
@@ -2627,6 +4028,7 @@ export type Database = {
           id?: string
           page_id: string
           probe_detail?: string | null
+          probe_kind?: string
           probe_lead_id?: string | null
           probe_status?: string | null
           probed_at?: string | null
@@ -2643,6 +4045,7 @@ export type Database = {
           id?: string
           page_id?: string
           probe_detail?: string | null
+          probe_kind?: string
           probe_lead_id?: string | null
           probe_status?: string | null
           probed_at?: string | null
@@ -2753,6 +4156,304 @@ export type Database = {
           },
         ]
       }
+      campaign_page_readbacks_v6: {
+        Row: {
+          checked_at: string
+          checked_ref: string
+          client_id: string
+          execution_id: string
+          id: string
+          observed_sha256: string | null
+          repository_name: string
+          repository_owner: string
+          result: string
+          site_path: string
+        }
+        Insert: {
+          checked_at?: string
+          checked_ref: string
+          client_id: string
+          execution_id: string
+          id?: string
+          observed_sha256?: string | null
+          repository_name: string
+          repository_owner: string
+          result: string
+          site_path: string
+        }
+        Update: {
+          checked_at?: string
+          checked_ref?: string
+          client_id?: string
+          execution_id?: string
+          id?: string
+          observed_sha256?: string | null
+          repository_name?: string
+          repository_owner?: string
+          result?: string
+          site_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_lead_enrolment_source_v6"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_proof_release_observations_v6"
+            referencedColumns: ["execution_id"]
+          },
+        ]
+      }
+      campaign_preparation_packages_v7: {
+        Row: {
+          assembled_at: string
+          assembled_by: string | null
+          campaign_id: string
+          client_id: string
+          id: string
+          run_id: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        Insert: {
+          assembled_at?: string
+          assembled_by?: string | null
+          campaign_id: string
+          client_id: string
+          id?: string
+          run_id: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        Update: {
+          assembled_at?: string
+          assembled_by?: string | null
+          campaign_id?: string
+          client_id?: string
+          id?: string
+          run_id?: string
+          snapshot?: Json
+          snapshot_hash?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_preparation_packages_v7_assembled_by_fkey"
+            columns: ["assembled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_preparation_packages_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_preparation_packages_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_preparation_packages_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_preparation_packages_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_preparation_packages_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_preparation_packages_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_preparation_packages_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_preparation_packages_v7_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: true
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_proof_retraction_demands_v6: {
+        Row: {
+          approval_id: string
+          client_id: string
+          placement_id: string
+          reason: string
+          requested_at: string
+        }
+        Insert: {
+          approval_id: string
+          client_id: string
+          placement_id: string
+          reason: string
+          requested_at?: string
+        }
+        Update: {
+          approval_id?: string
+          client_id?: string
+          placement_id?: string
+          reason?: string
+          requested_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_page_publish_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_placement_id_fkey"
+            columns: ["placement_id"]
+            isOneToOne: false
+            referencedRelation: "proof_placement_due"
+            referencedColumns: ["placement_id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_placement_id_fkey"
+            columns: ["placement_id"]
+            isOneToOne: false
+            referencedRelation: "proof_placements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_route_packages_v6: {
         Row: {
           campaign_id: string
@@ -2833,6 +4534,215 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "meta_build_due"
             referencedColumns: ["campaign_id", "client_id"]
+          },
+        ]
+      }
+      campaign_sweep_step_retries_v7: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          id: string
+          prior_blocker: string
+          prior_job_id: string | null
+          requested_at: string
+          requested_by: string
+          run_id: string
+          step_id: string
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          id?: string
+          prior_blocker: string
+          prior_job_id?: string | null
+          requested_at?: string
+          requested_by: string
+          run_id: string
+          step_id: string
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          id?: string
+          prior_blocker?: string
+          prior_job_id?: string | null
+          requested_at?: string
+          requested_by?: string
+          run_id?: string
+          step_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_prior_job_id_fkey"
+            columns: ["prior_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_prior_job_id_fkey"
+            columns: ["prior_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_prior_job_id_fkey"
+            columns: ["prior_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_step_retries_v7_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_sweep_work_bindings_v7: {
+        Row: {
+          created_at: string
+          final_step_key: string
+          piece_key: string
+          run_id: string
+          work_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          final_step_key: string
+          piece_key: string
+          run_id: string
+          work_item_id: string
+        }
+        Update: {
+          created_at?: string
+          final_step_key?: string
+          piece_key?: string
+          run_id?: string
+          work_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_sweep_work_bindings_v7_run_id_final_step_key_fkey"
+            columns: ["run_id", "final_step_key"]
+            isOneToOne: true
+            referencedRelation: "workflow_steps"
+            referencedColumns: ["run_id", "step_key"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_work_bindings_v7_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_work_bindings_v7_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: true
+            referencedRelation: "delivery_work_effective_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sweep_work_bindings_v7_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: true
+            referencedRelation: "delivery_work_items_v6"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3474,8 +5384,22 @@ export type Database = {
             foreignKeyName: "client_asset_reviews_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_asset_reviews_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_asset_reviews_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_asset_reviews_asset_id_fkey"
@@ -3635,6 +5559,121 @@ export type Database = {
           },
           {
             foreignKeyName: "client_audit_notes_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_authority_assignment_reviews_v6: {
+        Row: {
+          action: string
+          applied_assignment_id: string | null
+          applied_at: string | null
+          applied_by: string | null
+          canonical_request_id: string | null
+          client_id: string
+          compensation: number | null
+          created_at: string
+          due_date: string | null
+          id: string
+          member_id: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+        }
+        Insert: {
+          action: string
+          applied_assignment_id?: string | null
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id: string
+          compensation?: number | null
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          member_id: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Update: {
+          action?: string
+          applied_assignment_id?: string | null
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id?: string
+          compensation?: number | null
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          member_id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_authority_assignment_reviews__applied_assignment_id_fkey"
+            columns: ["applied_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "client_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_authority_assignment_reviews_v_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_authority_assignment_reviews_v_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_authority_assignment_reviews_v_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "client_authority_assignment_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_authority_assignment_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_authority_assignment_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_authority_assignment_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_authority_assignment_reviews_v6_member_id_fkey"
             columns: ["member_id"]
             isOneToOne: false
             referencedRelation: "team_members"
@@ -4113,8 +6152,22 @@ export type Database = {
             foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
             columns: ["derived_from_asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
+            columns: ["derived_from_asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
+            columns: ["derived_from_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
@@ -4286,12 +6339,15 @@ export type Database = {
           audience: string | null
           brief: string
           budget: number | null
+          budget_context_epoch_v6: number
           built_at: string | null
           channels: string[]
           client_id: string
           cloned_from_campaign_id: string | null
           content_count: number
           content_ideas_generated_at: string | null
+          content_spec_hash: string | null
+          content_spec_id: string | null
           conversion_event: string | null
           core_message: string | null
           created_at: string
@@ -4314,6 +6370,7 @@ export type Database = {
             | null
           name: string
           needs_landing_page: boolean
+          needs_lead_magnet: boolean
           needs_sales_agent: boolean
           objective: string | null
           offer_summary: string | null
@@ -4326,6 +6383,7 @@ export type Database = {
           plan_approved_by: string | null
           plan_approved_fingerprint: string | null
           plan_review_note: string | null
+          planned_idea_epoch: number
           runs_organic: boolean
           runs_paid: boolean
           starts_on: string | null
@@ -4341,12 +6399,15 @@ export type Database = {
           audience?: string | null
           brief: string
           budget?: number | null
+          budget_context_epoch_v6?: number
           built_at?: string | null
           channels?: string[]
           client_id: string
           cloned_from_campaign_id?: string | null
           content_count?: number
           content_ideas_generated_at?: string | null
+          content_spec_hash?: string | null
+          content_spec_id?: string | null
           conversion_event?: string | null
           core_message?: string | null
           created_at?: string
@@ -4369,6 +6430,7 @@ export type Database = {
             | null
           name: string
           needs_landing_page?: boolean
+          needs_lead_magnet?: boolean
           needs_sales_agent?: boolean
           objective?: string | null
           offer_summary?: string | null
@@ -4381,6 +6443,7 @@ export type Database = {
           plan_approved_by?: string | null
           plan_approved_fingerprint?: string | null
           plan_review_note?: string | null
+          planned_idea_epoch?: number
           runs_organic?: boolean
           runs_paid?: boolean
           starts_on?: string | null
@@ -4396,12 +6459,15 @@ export type Database = {
           audience?: string | null
           brief?: string
           budget?: number | null
+          budget_context_epoch_v6?: number
           built_at?: string | null
           channels?: string[]
           client_id?: string
           cloned_from_campaign_id?: string | null
           content_count?: number
           content_ideas_generated_at?: string | null
+          content_spec_hash?: string | null
+          content_spec_id?: string | null
           conversion_event?: string | null
           core_message?: string | null
           created_at?: string
@@ -4424,6 +6490,7 @@ export type Database = {
             | null
           name?: string
           needs_landing_page?: boolean
+          needs_lead_magnet?: boolean
           needs_sales_agent?: boolean
           objective?: string | null
           offer_summary?: string | null
@@ -4436,6 +6503,7 @@ export type Database = {
           plan_approved_by?: string | null
           plan_approved_fingerprint?: string | null
           plan_review_note?: string | null
+          planned_idea_epoch?: number
           runs_organic?: boolean
           runs_paid?: boolean
           starts_on?: string | null
@@ -4528,6 +6596,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "meta_build_due"
             referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_content_spec_id_fkey"
+            columns: ["content_spec_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_content_spec_versions_v7"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_campaigns_feeds_from_campaign_id_fkey"
@@ -5284,6 +7359,7 @@ export type Database = {
       client_google_locations: {
         Row: {
           address: string | null
+          approval_epoch_v6: number
           client_id: string
           created_at: string
           created_by: string | null
@@ -5293,6 +7369,7 @@ export type Database = {
           location_ref: string
           missing_fields: string[]
           primary_phone: string | null
+          profile_review_epoch_v6: number
           profile_snapshot: Json
           title: string
           updated_at: string
@@ -5301,6 +7378,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          approval_epoch_v6?: number
           client_id: string
           created_at?: string
           created_by?: string | null
@@ -5310,6 +7388,7 @@ export type Database = {
           location_ref: string
           missing_fields?: string[]
           primary_phone?: string | null
+          profile_review_epoch_v6?: number
           profile_snapshot?: Json
           title: string
           updated_at?: string
@@ -5318,6 +7397,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          approval_epoch_v6?: number
           client_id?: string
           created_at?: string
           created_by?: string | null
@@ -5327,6 +7407,7 @@ export type Database = {
           location_ref?: string
           missing_fields?: string[]
           primary_phone?: string | null
+          profile_review_epoch_v6?: number
           profile_snapshot?: Json
           title?: string
           updated_at?: string
@@ -5374,6 +7455,8 @@ export type Database = {
       client_ideas: {
         Row: {
           acquisition_route: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           archived_at: string | null
           body: string | null
           campaign_id: string | null
@@ -5399,6 +7482,8 @@ export type Database = {
         }
         Insert: {
           acquisition_route?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           archived_at?: string | null
           body?: string | null
           campaign_id?: string | null
@@ -5424,6 +7509,8 @@ export type Database = {
         }
         Update: {
           acquisition_route?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           archived_at?: string | null
           body?: string | null
           campaign_id?: string | null
@@ -5448,6 +7535,27 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_ideas_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_ideas_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_ideas_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
           {
             foreignKeyName: "client_ideas_campaign_client_fkey"
             columns: ["campaign_id", "client_id"]
@@ -5619,6 +7727,7 @@ export type Database = {
           last_checked_at: string | null
           meta_page_id: string | null
           meta_pixel_id: string | null
+          profile_scope_epoch_v6: number
           provider: string
           status: string
           token_expires_at: string | null
@@ -5638,6 +7747,7 @@ export type Database = {
           last_checked_at?: string | null
           meta_page_id?: string | null
           meta_pixel_id?: string | null
+          profile_scope_epoch_v6?: number
           provider: string
           status?: string
           token_expires_at?: string | null
@@ -5657,6 +7767,7 @@ export type Database = {
           last_checked_at?: string | null
           meta_page_id?: string | null
           meta_pixel_id?: string | null
+          profile_scope_epoch_v6?: number
           provider?: string
           status?: string
           token_expires_at?: string | null
@@ -5759,8 +7870,22 @@ export type Database = {
             foreignKeyName: "client_launch_asset_checks_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_launch_asset_checks_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_launch_asset_checks_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_launch_asset_checks_asset_id_fkey"
@@ -6142,8 +8267,22 @@ export type Database = {
             foreignKeyName: "client_leads_source_asset_id_fkey"
             columns: ["source_asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_leads_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_leads_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_leads_source_asset_id_fkey"
@@ -6690,8 +8829,22 @@ export type Database = {
             foreignKeyName: "client_media_assets_source_asset_id_fkey"
             columns: ["source_asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_media_assets_source_asset_id_fkey"
@@ -6815,8 +8968,22 @@ export type Database = {
             foreignKeyName: "client_media_frames_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_frames_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_frames_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_media_frames_asset_id_fkey"
@@ -7345,8 +9512,22 @@ export type Database = {
             foreignKeyName: "client_pages_reference_asset_id_fkey"
             columns: ["reference_asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_pages_reference_asset_id_fkey"
+            columns: ["reference_asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_pages_reference_asset_id_fkey"
+            columns: ["reference_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_pages_reference_asset_id_fkey"
@@ -7373,6 +9554,8 @@ export type Database = {
       }
       client_proof_assets: {
         Row: {
+          approved_rights_content_hash: string | null
+          approved_rights_request_id: string | null
           avatar_relevance: string | null
           body: string | null
           capture_file_mime: string | null
@@ -7383,6 +9566,7 @@ export type Database = {
           created_at: string
           evidence: string | null
           expires_on: string | null
+          google_source_changed_at: string | null
           id: string
           media_type: Database["public"]["Enums"]["media_type"]
           permission_basis: string | null
@@ -7401,6 +9585,8 @@ export type Database = {
           usage_rights: string
         }
         Insert: {
+          approved_rights_content_hash?: string | null
+          approved_rights_request_id?: string | null
           avatar_relevance?: string | null
           body?: string | null
           capture_file_mime?: string | null
@@ -7411,6 +9597,7 @@ export type Database = {
           created_at?: string
           evidence?: string | null
           expires_on?: string | null
+          google_source_changed_at?: string | null
           id?: string
           media_type: Database["public"]["Enums"]["media_type"]
           permission_basis?: string | null
@@ -7429,6 +9616,8 @@ export type Database = {
           usage_rights?: string
         }
         Update: {
+          approved_rights_content_hash?: string | null
+          approved_rights_request_id?: string | null
           avatar_relevance?: string | null
           body?: string | null
           capture_file_mime?: string | null
@@ -7439,6 +9628,7 @@ export type Database = {
           created_at?: string
           evidence?: string | null
           expires_on?: string | null
+          google_source_changed_at?: string | null
           id?: string
           media_type?: Database["public"]["Enums"]["media_type"]
           permission_basis?: string | null
@@ -7457,6 +9647,27 @@ export type Database = {
           usage_rights?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_proof_assets_approved_rights_request_id_fkey"
+            columns: ["approved_rights_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_proof_assets_approved_rights_request_id_fkey"
+            columns: ["approved_rights_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_proof_assets_approved_rights_request_id_fkey"
+            columns: ["approved_rights_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
           {
             foreignKeyName: "client_proof_assets_client_id_fkey"
             columns: ["client_id"]
@@ -7686,6 +9897,8 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           archived_at: string | null
           booking_rule: string | null
           built_at: string | null
@@ -7699,6 +9912,7 @@ export type Database = {
           name: string
           objections: Json
           page_id: string | null
+          public_use_request_token: string | null
           purpose: string
           qualification: Json
           role: string | null
@@ -7709,6 +9923,8 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           archived_at?: string | null
           booking_rule?: string | null
           built_at?: string | null
@@ -7722,6 +9938,7 @@ export type Database = {
           name: string
           objections?: Json
           page_id?: string | null
+          public_use_request_token?: string | null
           purpose: string
           qualification?: Json
           role?: string | null
@@ -7732,6 +9949,8 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           archived_at?: string | null
           booking_rule?: string | null
           built_at?: string | null
@@ -7745,6 +9964,7 @@ export type Database = {
           name?: string
           objections?: Json
           page_id?: string | null
+          public_use_request_token?: string | null
           purpose?: string
           qualification?: Json
           role?: string | null
@@ -7759,6 +9979,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_sales_agents_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_sales_agents_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_sales_agents_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "client_sales_agents_client_id_fkey"
@@ -8158,6 +10399,98 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "github_app_installations"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_switch_activation_reviews_v6: {
+        Row: {
+          applied_at: string | null
+          applied_by: string | null
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+          switch_key: string
+          target_id: string | null
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+          switch_key: string
+          target_id?: string | null
+        }
+        Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+          switch_key?: string
+          target_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_switch_activation_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_switch_activation_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_switch_activation_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "client_switch_activation_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_switch_activation_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_switch_activation_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_switch_activation_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -8634,8 +10967,22 @@ export type Database = {
             foreignKeyName: "content_slots_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "content_slots_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "content_slots_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "content_slots_asset_id_fkey"
@@ -8916,8 +11263,22 @@ export type Database = {
             foreignKeyName: "creative_generations_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "creative_generations_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "creative_generations_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "creative_generations_asset_id_fkey"
@@ -9107,8 +11468,22 @@ export type Database = {
             foreignKeyName: "creative_renders_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "creative_renders_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "creative_renders_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "creative_renders_asset_id_fkey"
@@ -9179,6 +11554,95 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "metrics_pulls"
             referencedColumns: ["job_id"]
+          },
+        ]
+      }
+      creative_requirement_reviews_v6: {
+        Row: {
+          applied_at: string | null
+          applied_by: string | null
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          request_epoch: number
+          request_token: string
+          required: boolean
+          source_hash: string
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          required: boolean
+          source_hash?: string
+        }
+        Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          required?: boolean
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_requirement_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_requirement_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_requirement_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "creative_requirement_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "creative_requirement_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "creative_requirement_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_requirement_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -9272,8 +11736,22 @@ export type Database = {
             foreignKeyName: "daily_package_items_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "daily_package_items_asset_id_fkey"
@@ -9479,8 +11957,22 @@ export type Database = {
             foreignKeyName: "daily_package_recoveries_reserve_asset_id_fkey"
             columns: ["reserve_asset_id"]
             isOneToOne: true
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "daily_package_recoveries_reserve_asset_id_fkey"
+            columns: ["reserve_asset_id"]
+            isOneToOne: true
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "daily_package_recoveries_reserve_asset_id_fkey"
+            columns: ["reserve_asset_id"]
+            isOneToOne: true
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "daily_package_recoveries_reserve_asset_id_fkey"
@@ -9655,6 +12147,13 @@ export type Database = {
             referencedColumns: ["id", "client_id"]
           },
           {
+            foreignKeyName: "delivery_approval_dependencie_approval_request_id_client_i_fkey"
+            columns: ["approval_request_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id", "client_id"]
+          },
+          {
             foreignKeyName: "delivery_approval_dependencies_entity_version_id_client_id_fkey"
             columns: ["entity_version_id", "client_id"]
             isOneToOne: false
@@ -9733,6 +12232,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_approval_invalidations_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "delivery_approval_invalidations_v6_client_id_fkey"
@@ -10026,6 +12532,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "delivery_remediation_tasks_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "delivery_remediation_tasks_v6_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -10314,6 +12827,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "delivery_work_items_v6_campaign_id_client_id_fkey"
@@ -11074,6 +13594,179 @@ export type Database = {
         }
         Relationships: []
       }
+      gateway_tool_execution_receipts_v6: {
+        Row: {
+          approval_id: string
+          canonical_request_id: string
+          claimed_at: string
+          execution_key: string
+          finished_at: string | null
+          result_hash: string | null
+          sites_invocation_id: string | null
+          sites_invoked_at: string | null
+          status: string
+        }
+        Insert: {
+          approval_id: string
+          canonical_request_id: string
+          claimed_at?: string
+          execution_key: string
+          finished_at?: string | null
+          result_hash?: string | null
+          sites_invocation_id?: string | null
+          sites_invoked_at?: string | null
+          status: string
+        }
+        Update: {
+          approval_id?: string
+          canonical_request_id?: string
+          claimed_at?: string
+          execution_key?: string
+          finished_at?: string | null
+          result_hash?: string | null
+          sites_invocation_id?: string | null
+          sites_invoked_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gateway_tool_execution_receipts_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "gateway_tool_execution_overview_v6"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_execution_receipts_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "gateway_tool_reviews_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_execution_receipts_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_execution_receipts_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_execution_receipts_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+        ]
+      }
+      gateway_tool_reviews_v6: {
+        Row: {
+          bot_id: string
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          payload: Json
+          payload_hash: string
+          request_token: string
+          risk: string
+          source_hash: string
+          summary: string
+          token_id: string
+          tool: string
+        }
+        Insert: {
+          bot_id: string
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          expires_at: string
+          id: string
+          payload: Json
+          payload_hash: string
+          request_token?: string
+          risk: string
+          source_hash?: string
+          summary: string
+          token_id: string
+          tool: string
+        }
+        Update: {
+          bot_id?: string
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          payload?: Json
+          payload_hash?: string
+          request_token?: string
+          risk?: string
+          source_hash?: string
+          summary?: string
+          token_id?: string
+          tool?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       github_app_installations: {
         Row: {
           account_login: string
@@ -11139,6 +13832,195 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      global_engine_activation_reviews_v6: {
+        Row: {
+          applied_at: string | null
+          applied_by: string | null
+          canonical_request_id: string | null
+          created_at: string
+          id: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "global_engine_activation_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "global_engine_activation_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "global_engine_activation_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+        ]
+      }
+      global_video_owner_reviews_v6: {
+        Row: {
+          applied_at: string | null
+          applied_by: string | null
+          canonical_request_id: string | null
+          created_at: string
+          id: string
+          proposed_owner: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          created_at?: string
+          id?: string
+          proposed_owner: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          created_at?: string
+          id?: string
+          proposed_owner?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "global_video_owner_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "global_video_owner_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "global_video_owner_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "global_video_owner_reviews_v6_proposed_owner_fkey"
+            columns: ["proposed_owner"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_ads_ad_reads_v7: {
+        Row: {
+          ad_type: string
+          clicks: number
+          client_id: string
+          conversions: number
+          cost_micros: number
+          descriptions: Json
+          external_ad_group_id: string
+          external_ad_id: string
+          external_campaign_id: string
+          final_urls: Json
+          headlines: Json
+          impressions: number
+          resource_name: string
+          run_id: string
+          status: string
+        }
+        Insert: {
+          ad_type: string
+          clicks: number
+          client_id: string
+          conversions: number
+          cost_micros: number
+          descriptions: Json
+          external_ad_group_id: string
+          external_ad_id: string
+          external_campaign_id: string
+          final_urls: Json
+          headlines: Json
+          impressions: number
+          resource_name: string
+          run_id: string
+          status: string
+        }
+        Update: {
+          ad_type?: string
+          clicks?: number
+          client_id?: string
+          conversions?: number
+          cost_micros?: number
+          descriptions?: Json
+          external_ad_group_id?: string
+          external_ad_id?: string
+          external_campaign_id?: string
+          final_urls?: Json
+          headlines?: Json
+          impressions?: number
+          resource_name?: string
+          run_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_ads_ad_reads_v7_run_id_client_id_fkey"
+            columns: ["run_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_read_runs_v7"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_ads_ad_reads_v7_run_id_external_campaign_id_fkey"
+            columns: ["run_id", "external_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_campaign_reads_v7"
+            referencedColumns: ["run_id", "external_campaign_id"]
           },
         ]
       }
@@ -11473,6 +14355,53 @@ export type Database = {
           },
         ]
       }
+      google_ads_campaign_reads_v7: {
+        Row: {
+          channel: string
+          clicks: number
+          client_id: string
+          conversions: number
+          cost_micros: number
+          external_campaign_id: string
+          impressions: number
+          name: string
+          run_id: string
+          status: string
+        }
+        Insert: {
+          channel: string
+          clicks: number
+          client_id: string
+          conversions: number
+          cost_micros: number
+          external_campaign_id: string
+          impressions: number
+          name: string
+          run_id: string
+          status: string
+        }
+        Update: {
+          channel?: string
+          clicks?: number
+          client_id?: string
+          conversions?: number
+          cost_micros?: number
+          external_campaign_id?: string
+          impressions?: number
+          name?: string
+          run_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_ads_campaign_reads_v7_run_id_client_id_fkey"
+            columns: ["run_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_read_runs_v7"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
       google_ads_copy: {
         Row: {
           campaign_id: string
@@ -11597,11 +14526,280 @@ export type Database = {
           },
         ]
       }
+      google_ads_read_runs_v7: {
+        Row: {
+          client_id: string
+          credential_secret_id: string
+          currency: string
+          customer_id: string
+          fetched_at: string
+          from_date: string
+          id: string
+          integration_id: string
+          job_id: string
+          provider_request_id: string
+          through_date: string
+        }
+        Insert: {
+          client_id: string
+          credential_secret_id: string
+          currency: string
+          customer_id: string
+          fetched_at?: string
+          from_date: string
+          id?: string
+          integration_id: string
+          job_id: string
+          provider_request_id: string
+          through_date: string
+        }
+        Update: {
+          client_id?: string
+          credential_secret_id?: string
+          currency?: string
+          customer_id?: string
+          fetched_at?: string
+          from_date?: string
+          id?: string
+          integration_id?: string
+          job_id?: string
+          provider_request_id?: string
+          through_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_ads_read_runs_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_ads_read_runs_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_ads_read_runs_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_ads_read_runs_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_ads_read_runs_v7_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "client_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_ads_read_runs_v7_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integration_health"
+            referencedColumns: ["integration_id"]
+          },
+          {
+            foreignKeyName: "google_ads_read_runs_v7_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_ads_read_runs_v7_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "google_ads_read_runs_v7_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+        ]
+      }
+      google_operator_bundles_v7: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          created_by: string
+          id: string
+          sheet_id: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          sheet_id: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          sheet_id?: string
+          snapshot?: Json
+          snapshot_hash?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_sheet_id_campaign_id_client_id_fkey"
+            columns: ["sheet_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_sheets"
+            referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+        ]
+      }
+      google_operator_events_v7: {
+        Row: {
+          bundle_id: string
+          client_id: string
+          detail: string | null
+          event: string
+          external_ad_id: string | null
+          external_campaign_id: string | null
+          id: string
+          recorded_at: string
+          recorded_by: string
+          reference: string
+        }
+        Insert: {
+          bundle_id: string
+          client_id: string
+          detail?: string | null
+          event: string
+          external_ad_id?: string | null
+          external_campaign_id?: string | null
+          id?: string
+          recorded_at?: string
+          recorded_by: string
+          reference: string
+        }
+        Update: {
+          bundle_id?: string
+          client_id?: string
+          detail?: string | null
+          event?: string
+          external_ad_id?: string | null
+          external_campaign_id?: string | null
+          id?: string
+          recorded_at?: string
+          recorded_by?: string
+          reference?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_operator_events_v7_bundle_id_fkey"
+            columns: ["bundle_id"]
+            isOneToOne: false
+            referencedRelation: "google_operator_bundles_v7"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_operator_events_v7_bundle_id_fkey"
+            columns: ["bundle_id"]
+            isOneToOne: false
+            referencedRelation: "google_operator_google_match_v7"
+            referencedColumns: ["bundle_id"]
+          },
+          {
+            foreignKeyName: "google_operator_events_v7_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_profile_changes: {
         Row: {
           applied_at: string | null
           approved_at: string | null
           approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           attempts: number
           claimed_at: string | null
           client_id: string
@@ -11617,6 +14815,7 @@ export type Database = {
           proposed_value: string
           reason: string | null
           rejection_reason: string | null
+          review_epoch_v6: number
           status: string
           updated_at: string
         }
@@ -11624,6 +14823,8 @@ export type Database = {
           applied_at?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           attempts?: number
           claimed_at?: string | null
           client_id: string
@@ -11639,6 +14840,7 @@ export type Database = {
           proposed_value: string
           reason?: string | null
           rejection_reason?: string | null
+          review_epoch_v6?: number
           status?: string
           updated_at?: string
         }
@@ -11646,6 +14848,8 @@ export type Database = {
           applied_at?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           attempts?: number
           claimed_at?: string | null
           client_id?: string
@@ -11661,6 +14865,7 @@ export type Database = {
           proposed_value?: string
           reason?: string | null
           rejection_reason?: string | null
+          review_epoch_v6?: number
           status?: string
           updated_at?: string
         }
@@ -11671,6 +14876,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_changes_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_changes_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_changes_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "google_profile_changes_client_id_fkey"
@@ -11720,6 +14946,532 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "google_profile_due"
             referencedColumns: ["location_id"]
+          },
+        ]
+      }
+      google_profile_execution_attempts_v6: {
+        Row: {
+          approval_request_id: string
+          before_value: string | null
+          change_id: string
+          claim_key: string
+          client_id: string
+          field: string
+          finished_at: string | null
+          id: string
+          location_ref: string
+          observed_value: string | null
+          outcome_note: string | null
+          proposed_value: string
+          provider_ref: string | null
+          reserved_at: string
+          source_hash: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          approval_request_id: string
+          before_value?: string | null
+          change_id: string
+          claim_key?: string
+          client_id: string
+          field: string
+          finished_at?: string | null
+          id?: string
+          location_ref: string
+          observed_value?: string | null
+          outcome_note?: string | null
+          proposed_value: string
+          provider_ref?: string | null
+          reserved_at?: string
+          source_hash: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          approval_request_id?: string
+          before_value?: string | null
+          change_id?: string
+          claim_key?: string
+          client_id?: string
+          field?: string
+          finished_at?: string | null
+          id?: string
+          location_ref?: string
+          observed_value?: string | null
+          outcome_note?: string | null
+          proposed_value?: string
+          provider_ref?: string | null
+          reserved_at?: string
+          source_hash?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_change_id_fkey"
+            columns: ["change_id"]
+            isOneToOne: true
+            referencedRelation: "google_profile_changes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      google_profile_reconciliation_checks_v6: {
+        Row: {
+          attempt_id: string
+          checked_at: string
+          client_id: string
+          id: string
+          observed_value: string | null
+          provider_ref: string
+          result: string
+        }
+        Insert: {
+          attempt_id: string
+          checked_at?: string
+          client_id: string
+          id?: string
+          observed_value?: string | null
+          provider_ref: string
+          result: string
+        }
+        Update: {
+          attempt_id?: string
+          checked_at?: string
+          client_id?: string
+          id?: string
+          observed_value?: string | null
+          provider_ref?: string
+          result?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_profile_reconciliation_checks_v6_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "google_profile_execution_attempts_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_reconciliation_checks_v6_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "google_profile_execution_overview_v6"
+            referencedColumns: ["attempt_id"]
+          },
+          {
+            foreignKeyName: "google_profile_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      google_profile_review_requests_v6: {
+        Row: {
+          canonical_request_id: string | null
+          change_id: string
+          client_id: string
+          created_at: string
+          id: string
+          request_token: string
+          review_epoch: number
+          source_hash: string
+        }
+        Insert: {
+          canonical_request_id?: string | null
+          change_id: string
+          client_id: string
+          created_at?: string
+          id?: string
+          request_token?: string
+          review_epoch?: never
+          source_hash?: string
+        }
+        Update: {
+          canonical_request_id?: string | null
+          change_id?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          request_token?: string
+          review_epoch?: never
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_profile_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "google_profile_review_requests_v6_change_id_fkey"
+            columns: ["change_id"]
+            isOneToOne: false
+            referencedRelation: "google_profile_changes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      google_reply_context_bindings_v6: {
+        Row: {
+          approval_request_id: string
+          bound_at: string
+          location_epoch: number
+          reply_id: string
+          review_epoch: number
+        }
+        Insert: {
+          approval_request_id: string
+          bound_at?: string
+          location_epoch: number
+          reply_id: string
+          review_epoch: number
+        }
+        Update: {
+          approval_request_id?: string
+          bound_at?: string
+          location_epoch?: number
+          reply_id?: string
+          review_epoch?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_reply_context_bindings_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_context_bindings_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_context_bindings_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "google_reply_context_bindings_v6_reply_id_fkey"
+            columns: ["reply_id"]
+            isOneToOne: true
+            referencedRelation: "google_review_replies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_reply_execution_attempts_v6: {
+        Row: {
+          approval_request_id: string
+          body_hash: string
+          claim_key: string
+          client_id: string
+          finished_at: string | null
+          id: string
+          location_ref: string
+          observed_body_hash: string | null
+          outcome_note: string | null
+          provider_state: string | null
+          provider_update_time: string | null
+          reply_id: string
+          reserved_at: string
+          review_ref: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          approval_request_id: string
+          body_hash: string
+          claim_key?: string
+          client_id: string
+          finished_at?: string | null
+          id?: string
+          location_ref: string
+          observed_body_hash?: string | null
+          outcome_note?: string | null
+          provider_state?: string | null
+          provider_update_time?: string | null
+          reply_id: string
+          reserved_at?: string
+          review_ref: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          approval_request_id?: string
+          body_hash?: string
+          claim_key?: string
+          client_id?: string
+          finished_at?: string | null
+          id?: string
+          location_ref?: string
+          observed_body_hash?: string | null
+          outcome_note?: string | null
+          provider_state?: string | null
+          provider_update_time?: string | null
+          reply_id?: string
+          reserved_at?: string
+          review_ref?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_reply_id_fkey"
+            columns: ["reply_id"]
+            isOneToOne: true
+            referencedRelation: "google_review_replies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_reply_reconciliation_checks_v6: {
+        Row: {
+          attempt_id: string
+          checked_at: string
+          client_id: string
+          id: string
+          observed_body_hash: string | null
+          provider_state: string | null
+          provider_update_time: string | null
+          result: string
+          review_ref: string
+        }
+        Insert: {
+          attempt_id: string
+          checked_at?: string
+          client_id: string
+          id?: string
+          observed_body_hash?: string | null
+          provider_state?: string | null
+          provider_update_time?: string | null
+          result: string
+          review_ref: string
+        }
+        Update: {
+          attempt_id?: string
+          checked_at?: string
+          client_id?: string
+          id?: string
+          observed_body_hash?: string | null
+          provider_state?: string | null
+          provider_update_time?: string | null
+          result?: string
+          review_ref?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_reply_reconciliation_checks_v6_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "google_reply_execution_attempts_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_reconciliation_checks_v6_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "google_reply_execution_overview_v6"
+            referencedColumns: ["attempt_id"]
+          },
+          {
+            foreignKeyName: "google_reply_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_reply_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_reply_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -11859,6 +15611,7 @@ export type Database = {
       }
       google_reviews: {
         Row: {
+          approval_epoch_v6: number
           author_name: string | null
           captured_proof_id: string | null
           client_id: string
@@ -11874,6 +15627,7 @@ export type Database = {
           star_rating: number | null
         }
         Insert: {
+          approval_epoch_v6?: number
           author_name?: string | null
           captured_proof_id?: string | null
           client_id: string
@@ -11889,6 +15643,7 @@ export type Database = {
           star_rating?: number | null
         }
         Update: {
+          approval_epoch_v6?: number
           author_name?: string | null
           captured_proof_id?: string | null
           client_id?: string
@@ -11962,6 +15717,103 @@ export type Database = {
           },
         ]
       }
+      human_idea_review_requests_v6: {
+        Row: {
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          idea_id: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+        }
+        Insert: {
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          idea_id: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Update: {
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          idea_id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "human_idea_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "human_idea_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "human_idea_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "human_idea_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "human_idea_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "human_idea_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "human_idea_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "human_idea_review_requests_v6_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "client_ideas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "human_idea_review_requests_v6_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["idea_id"]
+          },
+        ]
+      }
       ideation_learning_snapshots: {
         Row: {
           captured_at: string
@@ -12030,6 +15882,112 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "metrics_pulls"
             referencedColumns: ["job_id"]
+          },
+        ]
+      }
+      integration_grant_reviews_v6: {
+        Row: {
+          applied_at: string | null
+          applied_by: string | null
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          enable_ingest: boolean
+          id: string
+          integration_id: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          enable_ingest?: boolean
+          id?: string
+          integration_id: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          enable_ingest?: boolean
+          id?: string
+          integration_id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_grant_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_grant_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_grant_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "integration_grant_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "integration_grant_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "integration_grant_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_grant_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "integration_grant_reviews_v6_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "client_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_grant_reviews_v6_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integration_health"
+            referencedColumns: ["integration_id"]
           },
         ]
       }
@@ -12114,6 +16072,20 @@ export type Database = {
             foreignKeyName: "job_assignments_asset_client_fk"
             columns: ["asset_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id", "client_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_client_fk"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_client_fk"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id", "client_id"]
           },
@@ -12170,8 +16142,22 @@ export type Database = {
             foreignKeyName: "job_assignments_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "job_assignments_asset_id_fkey"
@@ -12289,8 +16275,22 @@ export type Database = {
             foreignKeyName: "job_assignments_source_asset_id_fkey"
             columns: ["source_asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "job_assignments_source_asset_id_fkey"
@@ -12666,6 +16666,7 @@ export type Database = {
           decided_by: string | null
           decided_by_bot: boolean
           id: string
+          inbox_enforced_v6: boolean
           magnet_version_id: string
           payload_hash: string
           rejection_reason: string | null
@@ -12682,6 +16683,7 @@ export type Database = {
           decided_by?: string | null
           decided_by_bot?: boolean
           id?: string
+          inbox_enforced_v6?: boolean
           magnet_version_id: string
           payload_hash: string
           rejection_reason?: string | null
@@ -12698,6 +16700,7 @@ export type Database = {
           decided_by?: string | null
           decided_by_bot?: boolean
           id?: string
+          inbox_enforced_v6?: boolean
           magnet_version_id?: string
           payload_hash?: string
           rejection_reason?: string | null
@@ -12762,6 +16765,7 @@ export type Database = {
       }
       lead_magnet_deliveries: {
         Row: {
+          attempt_request_id: string | null
           attempts: number
           channel: string
           claimed_at: string | null
@@ -12780,6 +16784,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          attempt_request_id?: string | null
           attempts?: number
           channel: string
           claimed_at?: string | null
@@ -12798,6 +16803,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          attempt_request_id?: string | null
           attempts?: number
           channel?: string
           claimed_at?: string | null
@@ -12816,6 +16822,27 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_magnet_deliveries_attempt_request_id_fkey"
+            columns: ["attempt_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_deliveries_attempt_request_id_fkey"
+            columns: ["attempt_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_deliveries_attempt_request_id_fkey"
+            columns: ["attempt_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
           {
             foreignKeyName: "lead_magnet_deliveries_client_id_fkey"
             columns: ["client_id"]
@@ -12871,6 +16898,198 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "lead_submissions"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_magnet_delivery_attempts_v6: {
+        Row: {
+          attempt_no: number
+          client_id: string
+          delivery_id: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          outcome: string
+          provider_ref: string | null
+          request_id: string
+          started_at: string
+        }
+        Insert: {
+          attempt_no: number
+          client_id: string
+          delivery_id: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          outcome: string
+          provider_ref?: string | null
+          request_id: string
+          started_at?: string
+        }
+        Update: {
+          attempt_no?: number
+          client_id?: string
+          delivery_id?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          outcome?: string
+          provider_ref?: string | null
+          request_id?: string
+          started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_magnet_delivery_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_delivery_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_delivery_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_delivery_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_delivery_attempts_v6_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_delivery_attempts_v6_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_due"
+            referencedColumns: ["delivery_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_delivery_attempts_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_delivery_attempts_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_delivery_attempts_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+        ]
+      }
+      lead_magnet_operator_events_v7: {
+        Row: {
+          actor_id: string
+          approval_id: string | null
+          client_id: string
+          content_sha256: string
+          event_kind: string
+          id: string
+          magnet_version_id: string
+          occurred_at: string
+          recipient: string | null
+          reference: string | null
+        }
+        Insert: {
+          actor_id: string
+          approval_id?: string | null
+          client_id: string
+          content_sha256: string
+          event_kind: string
+          id?: string
+          magnet_version_id: string
+          occurred_at?: string
+          recipient?: string | null
+          reference?: string | null
+        }
+        Update: {
+          actor_id?: string
+          approval_id?: string | null
+          client_id?: string
+          content_sha256?: string
+          event_kind?: string
+          id?: string
+          magnet_version_id?: string
+          occurred_at?: string
+          recipient?: string | null
+          reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_magnet_operator_events_v7_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_operator_events_v7_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_operator_events_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_operator_events_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_operator_events_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_operator_events_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_operator_events_v7_magnet_version_id_client_id_fkey"
+            columns: ["magnet_version_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_versions"
+            referencedColumns: ["id", "client_id"]
           },
         ]
       }
@@ -13435,8 +17654,69 @@ export type Database = {
           },
         ]
       }
+      main_offer_sources_v7: {
+        Row: {
+          client_id: string
+          compile_job_id: string | null
+          created_at: string
+          offer_id: string
+          strategy_hash: string
+          strategy_snapshot: Json
+        }
+        Insert: {
+          client_id: string
+          compile_job_id?: string | null
+          created_at?: string
+          offer_id: string
+          strategy_hash: string
+          strategy_snapshot: Json
+        }
+        Update: {
+          client_id?: string
+          compile_job_id?: string | null
+          created_at?: string
+          offer_id?: string
+          strategy_hash?: string
+          strategy_snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "main_offer_sources_v7_compile_job_id_fkey"
+            columns: ["compile_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "main_offer_sources_v7_compile_job_id_fkey"
+            columns: ["compile_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "main_offer_sources_v7_compile_job_id_fkey"
+            columns: ["compile_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "main_offer_sources_v7_offer_id_client_id_fkey"
+            columns: ["offer_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "service_offers"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
       market_opportunities: {
         Row: {
+          activated_content_hash: string | null
+          activated_request_id: string | null
+          approval_request_token: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           archived_at: string | null
           buying_situation: string
           client_id: string
@@ -13460,6 +17740,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          activated_content_hash?: string | null
+          activated_request_id?: string | null
+          approval_request_token?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           archived_at?: string | null
           buying_situation: string
           client_id: string
@@ -13483,6 +17768,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          activated_content_hash?: string | null
+          activated_request_id?: string | null
+          approval_request_token?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           archived_at?: string | null
           buying_situation?: string
           client_id?: string
@@ -13506,6 +17796,48 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "market_opportunities_activated_request_id_fkey"
+            columns: ["activated_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_activated_request_id_fkey"
+            columns: ["activated_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_activated_request_id_fkey"
+            columns: ["activated_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
           {
             foreignKeyName: "market_opportunities_client_id_fkey"
             columns: ["client_id"]
@@ -13839,6 +18171,8 @@ export type Database = {
         Row: {
           approved_at: string
           approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           channel_key: string
           client_id: string
           consent_basis: string
@@ -13853,6 +18187,8 @@ export type Database = {
         Insert: {
           approved_at?: string
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           channel_key: string
           client_id: string
           consent_basis: string
@@ -13867,6 +18203,8 @@ export type Database = {
         Update: {
           approved_at?: string
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           channel_key?: string
           client_id?: string
           consent_basis?: string
@@ -13885,6 +18223,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_template_approvals_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_template_approvals_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_template_approvals_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "message_template_approvals_channel_key_fkey"
@@ -13930,6 +18289,99 @@ export type Database = {
           },
           {
             foreignKeyName: "message_template_approvals_template_version_id_fkey"
+            columns: ["template_version_id"]
+            isOneToOne: false
+            referencedRelation: "message_template_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_template_review_requests_v6: {
+        Row: {
+          canonical_request_id: string | null
+          client_id: string
+          consent_basis: string
+          created_at: string
+          id: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+          template_version_id: string
+        }
+        Insert: {
+          canonical_request_id?: string | null
+          client_id: string
+          consent_basis: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+          template_version_id: string
+        }
+        Update: {
+          canonical_request_id?: string | null
+          client_id?: string
+          consent_basis?: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+          template_version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_template_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_template_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_template_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "message_template_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "message_template_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "message_template_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_template_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "message_template_review_requests_v6_template_version_id_fkey"
             columns: ["template_version_id"]
             isOneToOne: false
             referencedRelation: "message_template_versions"
@@ -14199,11 +18651,229 @@ export type Database = {
           },
         ]
       }
+      meta_ads_ad_reads_v7: {
+        Row: {
+          actions: Json
+          clicks: number
+          client_id: string
+          creative_id: string | null
+          creative_name: string | null
+          effective_status: string
+          external_ad_id: string
+          external_adset_id: string
+          external_campaign_id: string
+          impressions: number
+          name: string
+          run_id: string
+          spend: number
+          status: string
+        }
+        Insert: {
+          actions: Json
+          clicks: number
+          client_id: string
+          creative_id?: string | null
+          creative_name?: string | null
+          effective_status: string
+          external_ad_id: string
+          external_adset_id: string
+          external_campaign_id: string
+          impressions: number
+          name: string
+          run_id: string
+          spend: number
+          status: string
+        }
+        Update: {
+          actions?: Json
+          clicks?: number
+          client_id?: string
+          creative_id?: string | null
+          creative_name?: string | null
+          effective_status?: string
+          external_ad_id?: string
+          external_adset_id?: string
+          external_campaign_id?: string
+          impressions?: number
+          name?: string
+          run_id?: string
+          spend?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_ads_ad_reads_v7_run_id_client_id_fkey"
+            columns: ["run_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_ads_read_runs_v7"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "meta_ads_ad_reads_v7_run_id_external_campaign_id_fkey"
+            columns: ["run_id", "external_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_ads_campaign_reads_v7"
+            referencedColumns: ["run_id", "external_campaign_id"]
+          },
+        ]
+      }
+      meta_ads_campaign_reads_v7: {
+        Row: {
+          actions: Json
+          clicks: number
+          client_id: string
+          effective_status: string
+          external_campaign_id: string
+          impressions: number
+          name: string
+          run_id: string
+          spend: number
+          status: string
+        }
+        Insert: {
+          actions: Json
+          clicks: number
+          client_id: string
+          effective_status: string
+          external_campaign_id: string
+          impressions: number
+          name: string
+          run_id: string
+          spend: number
+          status: string
+        }
+        Update: {
+          actions?: Json
+          clicks?: number
+          client_id?: string
+          effective_status?: string
+          external_campaign_id?: string
+          impressions?: number
+          name?: string
+          run_id?: string
+          spend?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_ads_campaign_reads_v7_run_id_client_id_fkey"
+            columns: ["run_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_ads_read_runs_v7"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
+      meta_ads_read_runs_v7: {
+        Row: {
+          account_id: string
+          client_id: string
+          credential_secret_id: string
+          currency: string
+          fetched_at: string
+          from_date: string
+          id: string
+          integration_id: string
+          job_id: string
+          through_date: string
+        }
+        Insert: {
+          account_id: string
+          client_id: string
+          credential_secret_id: string
+          currency: string
+          fetched_at?: string
+          from_date: string
+          id?: string
+          integration_id: string
+          job_id: string
+          through_date: string
+        }
+        Update: {
+          account_id?: string
+          client_id?: string
+          credential_secret_id?: string
+          currency?: string
+          fetched_at?: string
+          from_date?: string
+          id?: string
+          integration_id?: string
+          job_id?: string
+          through_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_ads_read_runs_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_ads_read_runs_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_ads_read_runs_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_ads_read_runs_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_ads_read_runs_v7_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "client_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_ads_read_runs_v7_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integration_health"
+            referencedColumns: ["integration_id"]
+          },
+          {
+            foreignKeyName: "meta_ads_read_runs_v7_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_ads_read_runs_v7_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "meta_ads_read_runs_v7_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+        ]
+      }
       meta_profile_changes: {
         Row: {
           applied_at: string | null
           approved_at: string | null
           approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           attempts: number
           claimed_at: string | null
           client_id: string
@@ -14220,6 +18890,7 @@ export type Database = {
           proposed_value: string
           reason: string | null
           rejection_reason: string | null
+          review_epoch_v6: number
           status: string
           updated_at: string
         }
@@ -14227,6 +18898,8 @@ export type Database = {
           applied_at?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           attempts?: number
           claimed_at?: string | null
           client_id: string
@@ -14243,6 +18916,7 @@ export type Database = {
           proposed_value: string
           reason?: string | null
           rejection_reason?: string | null
+          review_epoch_v6?: number
           status?: string
           updated_at?: string
         }
@@ -14250,6 +18924,8 @@ export type Database = {
           applied_at?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           attempts?: number
           claimed_at?: string | null
           client_id?: string
@@ -14266,6 +18942,7 @@ export type Database = {
           proposed_value?: string
           reason?: string | null
           rejection_reason?: string | null
+          review_epoch_v6?: number
           status?: string
           updated_at?: string
         }
@@ -14276,6 +18953,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_changes_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_changes_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_changes_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "meta_profile_changes_client_id_fkey"
@@ -14325,6 +19023,384 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "service_offer_versions"
             referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
+      meta_profile_execution_attempts_v6: {
+        Row: {
+          approval_request_id: string
+          before_value: string | null
+          change_id: string
+          claim_key: string
+          client_id: string
+          field: string
+          finished_at: string | null
+          id: string
+          observed_value: string | null
+          outcome_note: string | null
+          page_id: string
+          proposed_value: string
+          provider_ref: string | null
+          reserved_at: string
+          source_hash: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          approval_request_id: string
+          before_value?: string | null
+          change_id: string
+          claim_key?: string
+          client_id: string
+          field: string
+          finished_at?: string | null
+          id?: string
+          observed_value?: string | null
+          outcome_note?: string | null
+          page_id: string
+          proposed_value: string
+          provider_ref?: string | null
+          reserved_at?: string
+          source_hash: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          approval_request_id?: string
+          before_value?: string | null
+          change_id?: string
+          claim_key?: string
+          client_id?: string
+          field?: string
+          finished_at?: string | null
+          id?: string
+          observed_value?: string | null
+          outcome_note?: string | null
+          page_id?: string
+          proposed_value?: string
+          provider_ref?: string | null
+          reserved_at?: string
+          source_hash?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_change_id_fkey"
+            columns: ["change_id"]
+            isOneToOne: true
+            referencedRelation: "meta_profile_changes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      meta_profile_reconciliation_checks_v6: {
+        Row: {
+          attempt_id: string
+          checked_at: string
+          client_id: string
+          id: string
+          observed_value: string | null
+          provider_ref: string
+          result: string
+        }
+        Insert: {
+          attempt_id: string
+          checked_at?: string
+          client_id: string
+          id?: string
+          observed_value?: string | null
+          provider_ref: string
+          result: string
+        }
+        Update: {
+          attempt_id?: string
+          checked_at?: string
+          client_id?: string
+          id?: string
+          observed_value?: string | null
+          provider_ref?: string
+          result?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_profile_reconciliation_checks_v6_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_execution_attempts_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_reconciliation_checks_v6_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_execution_overview_v6"
+            referencedColumns: ["attempt_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_reconciliation_checks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      meta_profile_review_requests_v6: {
+        Row: {
+          canonical_request_id: string | null
+          change_id: string
+          client_id: string
+          created_at: string
+          id: string
+          request_token: string
+          review_epoch: number
+          source_hash: string
+        }
+        Insert: {
+          canonical_request_id?: string | null
+          change_id: string
+          client_id: string
+          created_at?: string
+          id?: string
+          request_token?: string
+          review_epoch?: never
+          source_hash?: string
+        }
+        Update: {
+          canonical_request_id?: string | null
+          change_id?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          request_token?: string
+          review_epoch?: never
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_profile_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_review_requests_v6_change_id_fkey"
+            columns: ["change_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_changes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      metrics_backfill_reviews_v6: {
+        Row: {
+          accounts_snapshot: Json
+          applied_at: string | null
+          applied_by: string | null
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          jobs_created: number
+          request_token: string
+          since_day: string
+          source_hash: string
+          surface: string
+          until_day: string
+        }
+        Insert: {
+          accounts_snapshot: Json
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          jobs_created?: number
+          request_token?: string
+          since_day: string
+          source_hash: string
+          surface: string
+          until_day: string
+        }
+        Update: {
+          accounts_snapshot?: Json
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          jobs_created?: number
+          request_token?: string
+          since_day?: string
+          source_hash?: string
+          surface?: string
+          until_day?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metrics_backfill_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metrics_backfill_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metrics_backfill_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "metrics_backfill_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "metrics_backfill_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "metrics_backfill_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metrics_backfill_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -14462,6 +19538,80 @@ export type Database = {
           },
         ]
       }
+      model_section_reviews_v7: {
+        Row: {
+          client_id: string
+          confidence: string
+          id: string
+          observed_on: string
+          record_hash: string
+          record_id: string
+          record_snapshot: Json
+          review_note: string
+          review_order: number
+          reviewed_at: string
+          reviewed_by: string
+          source_ref: string
+        }
+        Insert: {
+          client_id: string
+          confidence: string
+          id?: string
+          observed_on: string
+          record_hash: string
+          record_id: string
+          record_snapshot: Json
+          review_note?: string
+          review_order?: never
+          reviewed_at?: string
+          reviewed_by: string
+          source_ref: string
+        }
+        Update: {
+          client_id?: string
+          confidence?: string
+          id?: string
+          observed_on?: string
+          record_hash?: string
+          record_id?: string
+          record_snapshot?: Json
+          review_note?: string
+          review_order?: never
+          reviewed_at?: string
+          reviewed_by?: string
+          source_ref?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_section_reviews_v7_record_id_client_id_fkey"
+            columns: ["record_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "agent_models_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "model_section_reviews_v7_record_id_client_id_fkey"
+            columns: ["record_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_agent_records"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "model_section_reviews_v7_record_id_client_id_fkey"
+            columns: ["record_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "model_section_review_state_v7"
+            referencedColumns: ["record_id", "client_id"]
+          },
+          {
+            foreignKeyName: "model_section_reviews_v7_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       motion_design_attachments: {
         Row: {
           asset_id: string
@@ -14537,8 +19687,22 @@ export type Database = {
             foreignKeyName: "motion_design_attachments_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: true
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "motion_design_attachments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "motion_design_attachments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "motion_design_attachments_asset_id_fkey"
@@ -14705,6 +19869,8 @@ export type Database = {
         Row: {
           accepted_at: string | null
           accepted_by: string | null
+          accepted_content_hash: string | null
+          accepted_request_id: string | null
           attempt: number
           benchmark_note: string | null
           brand_qa: string | null
@@ -14718,12 +19884,20 @@ export type Database = {
           job_id: string | null
           poster_path: string | null
           project_id: string
+          proof_source_lost: boolean
           rejected_reason: string | null
+          render_bytes_sha256: string | null
+          render_file_bytes: number | null
+          render_object_id: string | null
+          render_object_updated_at: string | null
+          render_object_version: string | null
           render_path: string | null
         }
         Insert: {
           accepted_at?: string | null
           accepted_by?: string | null
+          accepted_content_hash?: string | null
+          accepted_request_id?: string | null
           attempt: number
           benchmark_note?: string | null
           brand_qa?: string | null
@@ -14737,12 +19911,20 @@ export type Database = {
           job_id?: string | null
           poster_path?: string | null
           project_id: string
+          proof_source_lost?: boolean
           rejected_reason?: string | null
+          render_bytes_sha256?: string | null
+          render_file_bytes?: number | null
+          render_object_id?: string | null
+          render_object_updated_at?: string | null
+          render_object_version?: string | null
           render_path?: string | null
         }
         Update: {
           accepted_at?: string | null
           accepted_by?: string | null
+          accepted_content_hash?: string | null
+          accepted_request_id?: string | null
           attempt?: number
           benchmark_note?: string | null
           brand_qa?: string | null
@@ -14756,7 +19938,13 @@ export type Database = {
           job_id?: string | null
           poster_path?: string | null
           project_id?: string
+          proof_source_lost?: boolean
           rejected_reason?: string | null
+          render_bytes_sha256?: string | null
+          render_file_bytes?: number | null
+          render_object_id?: string | null
+          render_object_updated_at?: string | null
+          render_object_version?: string | null
           render_path?: string | null
         }
         Relationships: [
@@ -14766,6 +19954,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_render_candidates_accepted_request_id_fkey"
+            columns: ["accepted_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_render_candidates_accepted_request_id_fkey"
+            columns: ["accepted_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_render_candidates_accepted_request_id_fkey"
+            columns: ["accepted_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "motion_render_candidates_client_id_fkey"
@@ -14822,6 +20031,103 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "motion_design_projects"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      motion_render_review_requests_v6: {
+        Row: {
+          candidate_id: string
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+        }
+        Insert: {
+          candidate_id: string
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Update: {
+          candidate_id?: string
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "motion_render_review_requests_v6_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "motion_candidate_due"
+            referencedColumns: ["candidate_id"]
+          },
+          {
+            foreignKeyName: "motion_render_review_requests_v6_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "motion_render_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_render_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_render_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_render_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "motion_render_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "motion_render_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "motion_render_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_render_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -14920,6 +20226,103 @@ export type Database = {
           },
         ]
       }
+      nurture_sequence_review_requests_v6: {
+        Row: {
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          request_epoch: number
+          request_token: string
+          sequence_id: string
+          source_hash: string
+        }
+        Insert: {
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          sequence_id: string
+          source_hash?: string
+        }
+        Update: {
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          sequence_id?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nurture_sequence_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_review_requests_v6_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "nurture_sequence_due"
+            referencedColumns: ["sequence_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_review_requests_v6_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "nurture_sequences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nurture_sequence_steps: {
         Row: {
           client_id: string
@@ -15004,6 +20407,8 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           archived_at: string | null
           campaign_id: string | null
           client_id: string
@@ -15021,6 +20426,8 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           archived_at?: string | null
           campaign_id?: string | null
           client_id: string
@@ -15038,6 +20445,8 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           archived_at?: string | null
           campaign_id?: string | null
           client_id?: string
@@ -15059,6 +20468,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "nurture_sequences_campaign_id_fkey"
@@ -15146,6 +20576,141 @@ export type Database = {
           },
         ]
       }
+      opportunity_activation_requests_v6: {
+        Row: {
+          activation_note: string | null
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          opportunity_id: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+        }
+        Insert: {
+          activation_note?: string | null
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          opportunity_id: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Update: {
+          activation_note?: string | null
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          opportunity_id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_origins"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_template_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+        ]
+      }
       opportunity_attributes: {
         Row: {
           body: string
@@ -15223,6 +20788,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_attributes_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_attributes_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_attributes_opportunity_id_fkey"
@@ -15343,6 +20922,20 @@ export type Database = {
             foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "opportunity_readiness"
             referencedColumns: ["opportunity_id"]
           },
@@ -15453,6 +21046,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_events_opportunity_id_fkey"
@@ -15611,6 +21218,20 @@ export type Database = {
             foreignKeyName: "opportunity_links_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "opportunity_readiness"
             referencedColumns: ["opportunity_id"]
           },
@@ -15634,6 +21255,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_agent_records"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "model_section_review_state_v7"
+            referencedColumns: ["record_id"]
           },
         ]
       }
@@ -15714,6 +21342,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_proof_requirements_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_proof_requirements_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_proof_requirements_opportunity_id_fkey"
@@ -15840,6 +21482,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_proposals_opportunity_id_fkey"
@@ -15994,6 +21650,20 @@ export type Database = {
             foreignKeyName: "opportunity_scores_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_scores_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_scores_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "opportunity_readiness"
             referencedColumns: ["opportunity_id"]
           },
@@ -16030,6 +21700,422 @@ export type Database = {
           to_status?: Database["public"]["Enums"]["opportunity_status"]
         }
         Relationships: []
+      }
+      ordinary_media_review_requests_v6: {
+        Row: {
+          asset_id: string
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          request_token: string
+          source_hash: string | null
+        }
+        Insert: {
+          asset_id: string
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          request_token?: string
+          source_hash?: string | null
+        }
+        Update: {
+          asset_id?: string
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          request_token?: string
+          source_hash?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id", "client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id", "client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_presence"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      ordinary_media_signoffs_v6: {
+        Row: {
+          approved_at: string
+          approved_by: string
+          approved_hash: string
+          approved_request_id: string
+          asset_id: string
+          client_id: string
+        }
+        Insert: {
+          approved_at?: string
+          approved_by: string
+          approved_hash: string
+          approved_request_id: string
+          asset_id: string
+          client_id: string
+        }
+        Update: {
+          approved_at?: string
+          approved_by?: string
+          approved_hash?: string
+          approved_request_id?: string
+          asset_id?: string
+          client_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id", "client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id", "client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "meta_profile_presence"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
       }
       organic_publication_packages_v6: {
         Row: {
@@ -16393,6 +22479,177 @@ export type Database = {
           },
         ]
       }
+      paid_operator_bundles_v7: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          created_by: string
+          id: string
+          package_id: string
+          platform: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          package_id: string
+          platform: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          package_id?: string
+          platform?: string
+          snapshot?: Json
+          snapshot_hash?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_preparation_packages_v7"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paid_operator_events_v7: {
+        Row: {
+          bundle_id: string
+          client_id: string
+          detail: string | null
+          event: string
+          external_ad_id: string | null
+          external_campaign_id: string | null
+          id: string
+          recorded_at: string
+          recorded_by: string
+          reference: string
+        }
+        Insert: {
+          bundle_id: string
+          client_id: string
+          detail?: string | null
+          event: string
+          external_ad_id?: string | null
+          external_campaign_id?: string | null
+          id?: string
+          recorded_at?: string
+          recorded_by: string
+          reference: string
+        }
+        Update: {
+          bundle_id?: string
+          client_id?: string
+          detail?: string | null
+          event?: string
+          external_ad_id?: string | null
+          external_campaign_id?: string | null
+          id?: string
+          recorded_at?: string
+          recorded_by?: string
+          reference?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paid_operator_events_v7_bundle_id_fkey"
+            columns: ["bundle_id"]
+            isOneToOne: false
+            referencedRelation: "meta_operator_account_match_v7"
+            referencedColumns: ["bundle_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_events_v7_bundle_id_fkey"
+            columns: ["bundle_id"]
+            isOneToOne: false
+            referencedRelation: "paid_operator_bundles_v7"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paid_operator_events_v7_bundle_id_fkey"
+            columns: ["bundle_id"]
+            isOneToOne: false
+            referencedRelation: "paid_operator_metric_match_v7"
+            referencedColumns: ["bundle_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_events_v7_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_format_publishing: {
         Row: {
           content_format: Database["public"]["Enums"]["content_format"]
@@ -16543,8 +22800,22 @@ export type Database = {
             foreignKeyName: "post_copy_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "post_copy_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "post_copy_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "post_copy_asset_id_fkey"
@@ -16716,6 +22987,66 @@ export type Database = {
           },
         ]
       }
+      post_publication_events_v6: {
+        Row: {
+          actor_role: string | null
+          asset_id: string | null
+          attempt_number: number
+          channel: string
+          client_id: string | null
+          detail: string | null
+          event: string
+          external_id: string | null
+          external_url: string | null
+          id: string
+          media_type: string
+          occurred_at: string
+          platform: string | null
+          post_id: string
+          publication_status: string
+          ref_number: string | null
+          scheduled_at: string
+        }
+        Insert: {
+          actor_role?: string | null
+          asset_id?: string | null
+          attempt_number: number
+          channel: string
+          client_id?: string | null
+          detail?: string | null
+          event: string
+          external_id?: string | null
+          external_url?: string | null
+          id?: string
+          media_type: string
+          occurred_at?: string
+          platform?: string | null
+          post_id: string
+          publication_status: string
+          ref_number?: string | null
+          scheduled_at: string
+        }
+        Update: {
+          actor_role?: string | null
+          asset_id?: string | null
+          attempt_number?: number
+          channel?: string
+          client_id?: string | null
+          detail?: string | null
+          event?: string
+          external_id?: string | null
+          external_url?: string | null
+          id?: string
+          media_type?: string
+          occurred_at?: string
+          platform?: string | null
+          post_id?: string
+          publication_status?: string
+          ref_number?: string | null
+          scheduled_at?: string
+        }
+        Relationships: []
+      }
       production_release_approval_bindings_v6: {
         Row: {
           attestation_id: string
@@ -16770,6 +23101,13 @@ export type Database = {
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "production_release_approval_bindings_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
         ]
       }
       production_release_attestations_v6: {
@@ -16814,6 +23152,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_release_attestations_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
         ]
       }
@@ -16965,6 +23310,13 @@ export type Database = {
             referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "production_release_merge_leases_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
         ]
       }
       profile_field_support: {
@@ -17031,22 +23383,115 @@ export type Database = {
         }
         Relationships: []
       }
+      proof_artifact_review_requests_v6: {
+        Row: {
+          artifact_hash: string | null
+          artifact_version_id: string
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          request_token: string
+        }
+        Insert: {
+          artifact_hash?: string | null
+          artifact_version_id: string
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          request_token?: string
+        }
+        Update: {
+          artifact_hash?: string | null
+          artifact_version_id?: string
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          request_token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_artifact_review_requests_v6_artifact_version_id_fkey"
+            columns: ["artifact_version_id"]
+            isOneToOne: false
+            referencedRelation: "proof_artifact_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       proof_artifact_signoffs: {
         Row: {
           approved_at: string
           approved_by: string
+          approved_content_hash: string | null
+          approved_request_id: string | null
           artifact_version_id: string
           client_id: string
         }
         Insert: {
           approved_at?: string
           approved_by: string
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           artifact_version_id: string
           client_id: string
         }
         Update: {
           approved_at?: string
           approved_by?: string
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           artifact_version_id?: string
           client_id?: string
         }
@@ -17057,6 +23502,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_signoffs_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_signoffs_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_signoffs_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "proof_artifact_signoffs_artifact_version_id_client_id_fkey"
@@ -17432,6 +23898,103 @@ export type Database = {
           },
         ]
       }
+      proof_delivery_reviews_v6: {
+        Row: {
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          delivery_id: string
+          id: string
+          request_token: string
+          review_epoch: number
+          source_hash: string
+        }
+        Insert: {
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          delivery_id: string
+          id?: string
+          request_token?: string
+          review_epoch?: never
+          source_hash?: string
+        }
+        Update: {
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          delivery_id?: string
+          id?: string
+          request_token?: string
+          review_epoch?: never
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_delivery_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_delivery_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_delivery_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "proof_delivery_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_delivery_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_delivery_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_delivery_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_delivery_reviews_v6_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "proof_outcome_followup_submissions_v7"
+            referencedColumns: ["delivery_id"]
+          },
+          {
+            foreignKeyName: "proof_delivery_reviews_v6_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "proof_request_deliveries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proof_destinations: {
         Row: {
           destination_key: string
@@ -17465,9 +24028,108 @@ export type Database = {
         }
         Relationships: []
       }
+      proof_outcome_followup_consents_v7: {
+        Row: {
+          channel: string
+          client_id: string
+          consent_text: string
+          consented_at: string
+          evidence_note: string
+          evidence_url: string | null
+          id: string
+          lead_id: string
+          recipient: string
+          recorded_at: string
+          recorded_by: string
+          withdrawal_reason: string | null
+          withdrawn_at: string | null
+        }
+        Insert: {
+          channel: string
+          client_id: string
+          consent_text: string
+          consented_at: string
+          evidence_note: string
+          evidence_url?: string | null
+          id?: string
+          lead_id: string
+          recipient: string
+          recorded_at?: string
+          recorded_by: string
+          withdrawal_reason?: string | null
+          withdrawn_at?: string | null
+        }
+        Update: {
+          channel?: string
+          client_id?: string
+          consent_text?: string
+          consented_at?: string
+          evidence_note?: string
+          evidence_url?: string | null
+          id?: string
+          lead_id?: string
+          recipient?: string
+          recorded_at?: string
+          recorded_by?: string
+          withdrawal_reason?: string | null
+          withdrawn_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_outcome_followup_consents_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_outcome_followup_consents_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_outcome_followup_consents_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_outcome_followup_consents_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_outcome_followup_consents_v7_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_outcome_followup_consents_v7_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
+          },
+          {
+            foreignKeyName: "proof_outcome_followup_consents_v7_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proof_placement_approvals: {
         Row: {
           campaign_action_approval_id: string | null
+          canonical_request_id: string | null
           client_id: string
           decided_at: string | null
           decided_by: string | null
@@ -17476,6 +24138,7 @@ export type Database = {
           payload_hash: string
           placement_id: string
           rejection_reason: string | null
+          request_token: string | null
           requested_at: string
           requested_by: string | null
           scope: Json
@@ -17483,6 +24146,7 @@ export type Database = {
         }
         Insert: {
           campaign_action_approval_id?: string | null
+          canonical_request_id?: string | null
           client_id: string
           decided_at?: string | null
           decided_by?: string | null
@@ -17491,6 +24155,7 @@ export type Database = {
           payload_hash: string
           placement_id: string
           rejection_reason?: string | null
+          request_token?: string | null
           requested_at?: string
           requested_by?: string | null
           scope: Json
@@ -17498,6 +24163,7 @@ export type Database = {
         }
         Update: {
           campaign_action_approval_id?: string | null
+          canonical_request_id?: string | null
           client_id?: string
           decided_at?: string | null
           decided_by?: string | null
@@ -17506,6 +24172,7 @@ export type Database = {
           payload_hash?: string
           placement_id?: string
           rejection_reason?: string | null
+          request_token?: string | null
           requested_at?: string
           requested_by?: string | null
           scope?: Json
@@ -17546,6 +24213,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "meta_build_due"
             referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_approvals_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placement_approvals_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placement_approvals_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "proof_placement_approvals_client_id_fkey"
@@ -17688,6 +24376,92 @@ export type Database = {
           },
         ]
       }
+      proof_placement_retraction_receipts_v6: {
+        Row: {
+          client_id: string
+          evidence_ref: string | null
+          id: string
+          legacy_audit: boolean
+          method: string
+          placement_id: string
+          reason: string
+          recorded_at: string
+          recorded_by: string | null
+        }
+        Insert: {
+          client_id: string
+          evidence_ref?: string | null
+          id?: string
+          legacy_audit?: boolean
+          method: string
+          placement_id: string
+          reason: string
+          recorded_at?: string
+          recorded_by?: string | null
+        }
+        Update: {
+          client_id?: string
+          evidence_ref?: string | null
+          id?: string
+          legacy_audit?: boolean
+          method?: string
+          placement_id?: string
+          reason?: string
+          recorded_at?: string
+          recorded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_placement_retraction_receipts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_retraction_receipts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_retraction_receipts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placement_retraction_receipts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_retraction_receipts_v6_placement_id_fkey"
+            columns: ["placement_id"]
+            isOneToOne: true
+            referencedRelation: "proof_placement_due"
+            referencedColumns: ["placement_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_retraction_receipts_v6_placement_id_fkey"
+            columns: ["placement_id"]
+            isOneToOne: true
+            referencedRelation: "proof_placements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placement_retraction_receipts_v6_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proof_placement_transitions: {
         Row: {
           from_status: string
@@ -17802,6 +24576,13 @@ export type Database = {
             foreignKeyName: "proof_placement_approval_fk"
             columns: ["approval_id"]
             isOneToOne: false
+            referencedRelation: "campaign_proof_release_observations_v6"
+            referencedColumns: ["placement_approval_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_approval_fk"
+            columns: ["approval_id"]
+            isOneToOne: false
             referencedRelation: "proof_placement_approvals"
             referencedColumns: ["id"]
           },
@@ -17858,8 +24639,22 @@ export type Database = {
             foreignKeyName: "proof_placements_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_placements_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_placements_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "proof_placements_asset_id_fkey"
@@ -17979,6 +24774,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_production_request_id_fkey"
+            columns: ["production_request_id"]
+            isOneToOne: false
+            referencedRelation: "proof_production_counts_v7"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "proof_placements_production_request_id_fkey"
@@ -18203,8 +25005,22 @@ export type Database = {
             foreignKeyName: "proof_production_requests_source_asset_id_fkey"
             columns: ["source_asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "proof_production_requests_source_asset_id_fkey"
@@ -18240,6 +25056,9 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          attempt_finished_at: string | null
+          attempt_request_id: string | null
+          attempt_started_at: string | null
           attempts: number
           capture_url: string
           channel: string
@@ -18252,6 +25071,9 @@ export type Database = {
           lease_until: string | null
           link_id: string
           message: string
+          outcome_consent_id: string | null
+          outcome_event_id: string | null
+          outcome_lead_id: string | null
           provider_id: string | null
           recipient: string
           scheduled_at: string
@@ -18264,6 +25086,9 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          attempt_finished_at?: string | null
+          attempt_request_id?: string | null
+          attempt_started_at?: string | null
           attempts?: number
           capture_url: string
           channel: string
@@ -18276,6 +25101,9 @@ export type Database = {
           lease_until?: string | null
           link_id: string
           message: string
+          outcome_consent_id?: string | null
+          outcome_event_id?: string | null
+          outcome_lead_id?: string | null
           provider_id?: string | null
           recipient: string
           scheduled_at?: string
@@ -18288,6 +25116,9 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          attempt_finished_at?: string | null
+          attempt_request_id?: string | null
+          attempt_started_at?: string | null
           attempts?: number
           capture_url?: string
           channel?: string
@@ -18300,6 +25131,9 @@ export type Database = {
           lease_until?: string | null
           link_id?: string
           message?: string
+          outcome_consent_id?: string | null
+          outcome_event_id?: string | null
+          outcome_lead_id?: string | null
           provider_id?: string | null
           recipient?: string
           scheduled_at?: string
@@ -18316,6 +25150,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_attempt_request_id_fkey"
+            columns: ["attempt_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_attempt_request_id_fkey"
+            columns: ["attempt_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_attempt_request_id_fkey"
+            columns: ["attempt_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "proof_request_deliveries_client_id_fkey"
@@ -18358,6 +25213,34 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "proof_capture_links"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_outcome_consent_id_fkey"
+            columns: ["outcome_consent_id"]
+            isOneToOne: false
+            referencedRelation: "proof_outcome_followup_consents_v7"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_outcome_event_id_fkey"
+            columns: ["outcome_event_id"]
+            isOneToOne: false
+            referencedRelation: "proof_service_outcomes_v7"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_outcome_lead_id_fkey"
+            columns: ["outcome_lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_outcome_lead_id_fkey"
+            columns: ["outcome_lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
           },
         ]
       }
@@ -18450,6 +25333,407 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "proof_surface_coverage"
             referencedColumns: ["proof_asset_id"]
+          },
+        ]
+      }
+      proof_rights_requests_v6: {
+        Row: {
+          artifact_hash: string | null
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          proof_id: string
+          request_token: string
+          requested_basis: string
+          requested_expiry: string | null
+          verified_file_bytes: number | null
+          verified_storage_object_id: string | null
+          verified_storage_object_updated_at: string | null
+          verified_storage_object_version: string | null
+          verified_storage_path: string | null
+          verified_storage_sha256: string | null
+        }
+        Insert: {
+          artifact_hash?: string | null
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          proof_id: string
+          request_token?: string
+          requested_basis: string
+          requested_expiry?: string | null
+          verified_file_bytes?: number | null
+          verified_storage_object_id?: string | null
+          verified_storage_object_updated_at?: string | null
+          verified_storage_object_version?: string | null
+          verified_storage_path?: string | null
+          verified_storage_sha256?: string | null
+        }
+        Update: {
+          artifact_hash?: string | null
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          proof_id?: string
+          request_token?: string
+          requested_basis?: string
+          requested_expiry?: string | null
+          verified_file_bytes?: number | null
+          verified_storage_object_id?: string | null
+          verified_storage_object_updated_at?: string | null
+          verified_storage_object_version?: string | null
+          verified_storage_path?: string | null
+          verified_storage_sha256?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_rights_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_requests_v6_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_requests_v6_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
+          },
+        ]
+      }
+      proof_rights_revocations_v6: {
+        Row: {
+          actor_id: string | null
+          canonical_request_id: string
+          client_id: string
+          proof_id: string
+          reason: string
+          revoked_at: string
+        }
+        Insert: {
+          actor_id?: string | null
+          canonical_request_id: string
+          client_id: string
+          proof_id: string
+          reason: string
+          revoked_at?: string
+        }
+        Update: {
+          actor_id?: string | null
+          canonical_request_id?: string
+          client_id?: string
+          proof_id?: string
+          reason?: string
+          revoked_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_rights_revocations_v6_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_revocations_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_revocations_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_revocations_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_revocations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_revocations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_revocations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_revocations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_revocations_v6_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_revocations_v6_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
+          },
+        ]
+      }
+      proof_rights_storage_invalidations_v6: {
+        Row: {
+          client_id: string
+          invalidated_at: string
+          proof_id: string
+          reason: string
+          rights_request_id: string
+          storage_object_id: string | null
+        }
+        Insert: {
+          client_id: string
+          invalidated_at?: string
+          proof_id: string
+          reason: string
+          rights_request_id: string
+          storage_object_id?: string | null
+        }
+        Update: {
+          client_id?: string
+          invalidated_at?: string
+          proof_id?: string
+          reason?: string
+          rights_request_id?: string
+          storage_object_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_rights_storage_invalidations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_storage_invalidations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_storage_invalidations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_storage_invalidations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_storage_invalidations_v6_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_storage_invalidations_v6_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_storage_invalidations_v6_rights_request_id_fkey"
+            columns: ["rights_request_id"]
+            isOneToOne: true
+            referencedRelation: "proof_rights_requests_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proof_service_outcomes_v7: {
+        Row: {
+          client_id: string
+          evidence_note: string
+          evidence_source: string
+          evidence_url: string | null
+          id: string
+          lead_id: string
+          occurred_at: string
+          outcome_summary: string
+          recorded_at: string
+          recorded_by: string
+          verified_at: string | null
+          verified_by: string | null
+          withdrawal_reason: string | null
+          withdrawn_at: string | null
+        }
+        Insert: {
+          client_id: string
+          evidence_note: string
+          evidence_source: string
+          evidence_url?: string | null
+          id?: string
+          lead_id: string
+          occurred_at: string
+          outcome_summary: string
+          recorded_at?: string
+          recorded_by: string
+          verified_at?: string | null
+          verified_by?: string | null
+          withdrawal_reason?: string | null
+          withdrawn_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          evidence_note?: string
+          evidence_source?: string
+          evidence_url?: string | null
+          id?: string
+          lead_id?: string
+          occurred_at?: string
+          outcome_summary?: string
+          recorded_at?: string
+          recorded_by?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          withdrawal_reason?: string | null
+          withdrawn_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_service_outcomes_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_service_outcomes_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_service_outcomes_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_service_outcomes_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_service_outcomes_v7_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_service_outcomes_v7_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
+          },
+          {
+            foreignKeyName: "proof_service_outcomes_v7_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_service_outcomes_v7_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -18594,8 +25878,22 @@ export type Database = {
             foreignKeyName: "recruitment_meta_campaign_ads_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "recruitment_meta_campaign_ads_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "recruitment_meta_campaign_ads_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "recruitment_meta_campaign_ads_asset_id_fkey"
@@ -19162,8 +26460,22 @@ export type Database = {
             foreignKeyName: "scheduled_posts_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "scheduled_posts_asset_id_fkey"
@@ -19213,6 +26525,107 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      secondary_offer_sources_v7: {
+        Row: {
+          client_id: string
+          compile_job_id: string | null
+          created_at: string
+          offer_id: string
+          opportunity_hash: string
+          opportunity_id: string
+          opportunity_snapshot: Json
+        }
+        Insert: {
+          client_id: string
+          compile_job_id?: string | null
+          created_at?: string
+          offer_id: string
+          opportunity_hash: string
+          opportunity_id: string
+          opportunity_snapshot: Json
+        }
+        Update: {
+          client_id?: string
+          compile_job_id?: string | null
+          created_at?: string
+          offer_id?: string
+          opportunity_hash?: string
+          opportunity_id?: string
+          opportunity_snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "secondary_offer_sources_v7_compile_job_id_fkey"
+            columns: ["compile_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "secondary_offer_sources_v7_compile_job_id_fkey"
+            columns: ["compile_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "secondary_offer_sources_v7_compile_job_id_fkey"
+            columns: ["compile_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "secondary_offer_sources_v7_offer_id_client_id_fkey"
+            columns: ["offer_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "service_offers"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "secondary_offer_sources_v7_opportunity_id_client_id_fkey"
+            columns: ["opportunity_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "secondary_offer_sources_v7_opportunity_id_client_id_fkey"
+            columns: ["opportunity_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "secondary_offer_sources_v7_opportunity_id_client_id_fkey"
+            columns: ["opportunity_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id", "client_id"]
+          },
+          {
+            foreignKeyName: "secondary_offer_sources_v7_opportunity_id_client_id_fkey"
+            columns: ["opportunity_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id", "client_id"]
+          },
+          {
+            foreignKeyName: "secondary_offer_sources_v7_opportunity_id_client_id_fkey"
+            columns: ["opportunity_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id", "client_id"]
+          },
+          {
+            foreignKeyName: "secondary_offer_sources_v7_opportunity_id_client_id_fkey"
+            columns: ["opportunity_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_template_readiness"
+            referencedColumns: ["opportunity_id", "client_id"]
           },
         ]
       }
@@ -19740,6 +27153,8 @@ export type Database = {
       video_approval_signoffs: {
         Row: {
           approval_role: string
+          approved_content_hash: string | null
+          approved_request_id: string | null
           asset_id: string
           render_path: string
           signed_at: string
@@ -19747,6 +27162,8 @@ export type Database = {
         }
         Insert: {
           approval_role: string
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           asset_id: string
           render_path: string
           signed_at?: string
@@ -19754,12 +27171,35 @@ export type Database = {
         }
         Update: {
           approval_role?: string
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           asset_id?: string
           render_path?: string
           signed_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "video_approval_signoffs_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_approval_signoffs_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_approval_signoffs_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
           {
             foreignKeyName: "video_approval_signoffs_asset_id_fkey"
             columns: ["asset_id"]
@@ -19806,8 +27246,22 @@ export type Database = {
             foreignKeyName: "video_approval_signoffs_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_approval_signoffs_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_approval_signoffs_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_approval_signoffs_asset_id_fkey"
@@ -19916,8 +27370,22 @@ export type Database = {
             foreignKeyName: "video_client_approval_requests_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: true
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_client_approval_requests_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_client_approval_requests_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_client_approval_requests_asset_id_fkey"
@@ -20063,8 +27531,22 @@ export type Database = {
             foreignKeyName: "video_render_candidates_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_render_candidates_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_render_candidates_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_render_candidates_asset_id_fkey"
@@ -20304,8 +27786,22 @@ export type Database = {
             foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"
             columns: ["output_asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"
@@ -20367,8 +27863,22 @@ export type Database = {
             foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"
             columns: ["source_asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"
@@ -20494,8 +28004,22 @@ export type Database = {
             foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"
             columns: ["source_asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"
@@ -20652,8 +28176,22 @@ export type Database = {
             foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"
             columns: ["source_asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"
@@ -20668,6 +28206,218 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_seat_review_requests_v6: {
+        Row: {
+          approval_role: string
+          asset_id: string
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+        }
+        Insert: {
+          approval_role: string
+          asset_id: string
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Update: {
+          approval_role?: string
+          asset_id?: string
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_presence"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -20900,8 +28650,22 @@ export type Database = {
             foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"
             columns: ["output_asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"
@@ -20963,8 +28727,22 @@ export type Database = {
             foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"
             columns: ["source_asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"
@@ -21231,8 +29009,22 @@ export type Database = {
             foreignKeyName: "workflow_reel_source_rebuilds_source_asset_id_fkey"
             columns: ["source_asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "workflow_reel_source_rebuilds_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "workflow_reel_source_rebuilds_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "workflow_reel_source_rebuilds_source_asset_id_fkey"
@@ -21928,6 +29720,20 @@ export type Database = {
             foreignKeyName: "job_assignments_asset_client_fk"
             columns: ["asset_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id", "client_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_client_fk"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_client_fk"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id", "client_id"]
           },
@@ -21984,8 +29790,22 @@ export type Database = {
             foreignKeyName: "job_assignments_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "job_assignments_asset_id_fkey"
@@ -22138,6 +29958,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
@@ -22333,6 +30167,99 @@ export type Database = {
           },
         ]
       }
+      campaign_budget_readback_overview_v6: {
+        Row: {
+          account_id: string | null
+          ad_set_external_id: string | null
+          checked_at: string | null
+          client_id: string | null
+          execution_id: string | null
+          id: string | null
+          observed_currency: string | null
+          observed_daily_budget_minor: number | null
+          result: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          ad_set_external_id?: string | null
+          checked_at?: string | null
+          client_id?: string | null
+          execution_id?: string | null
+          id?: string | null
+          observed_currency?: string | null
+          observed_daily_budget_minor?: number | null
+          result?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          ad_set_external_id?: string | null
+          checked_at?: string | null
+          client_id?: string | null
+          execution_id?: string | null
+          id?: string | null
+          observed_currency?: string | null
+          observed_daily_budget_minor?: number | null
+          result?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_lead_enrolment_source_v6"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_proof_release_observations_v6"
+            referencedColumns: ["execution_id"]
+          },
+        ]
+      }
       campaign_launch_due: {
         Row: {
           acquisition_mode: string | null
@@ -22459,6 +30386,85 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "meta_build_due"
             referencedColumns: ["campaign_id", "client_id"]
+          },
+        ]
+      }
+      campaign_lead_enrolment_source_v6: {
+        Row: {
+          approval_id: string | null
+          approved_sequence_hash: string | null
+          client_id: string | null
+          current_observation_rows: number | null
+          execution_id: string | null
+          finished_at: string | null
+          observed_count: number | null
+          sequence_name: string | null
+          skipped_count: number | null
+          started_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_page_publish_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -22680,6 +30686,294 @@ export type Database = {
           },
         ]
       }
+      campaign_page_readback_overview_v6: {
+        Row: {
+          checked_at: string | null
+          checked_ref: string | null
+          client_id: string | null
+          execution_id: string | null
+          id: string | null
+          observed_sha256: string | null
+          repository_name: string | null
+          repository_owner: string | null
+          result: string | null
+          site_path: string | null
+        }
+        Insert: {
+          checked_at?: string | null
+          checked_ref?: string | null
+          client_id?: string | null
+          execution_id?: string | null
+          id?: string | null
+          observed_sha256?: string | null
+          repository_name?: string | null
+          repository_owner?: string | null
+          result?: string | null
+          site_path?: string | null
+        }
+        Update: {
+          checked_at?: string | null
+          checked_ref?: string | null
+          client_id?: string | null
+          execution_id?: string | null
+          id?: string | null
+          observed_sha256?: string | null
+          repository_name?: string | null
+          repository_owner?: string | null
+          result?: string | null
+          site_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_lead_enrolment_source_v6"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_readbacks_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_proof_release_observations_v6"
+            referencedColumns: ["execution_id"]
+          },
+        ]
+      }
+      campaign_proof_release_observations_v6: {
+        Row: {
+          approval_id: string | null
+          client_id: string | null
+          current_payload_hash: string | null
+          destination_key: string | null
+          execution_id: string | null
+          expected_payload_hash: string | null
+          external_id: string | null
+          external_url: string | null
+          payload_matches: boolean | null
+          placement_approval_id: string | null
+          placement_approval_status: string | null
+          placement_ref: string | null
+          placement_status: string | null
+          release_decided_at: string | null
+          retracted_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_page_publish_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placements_destination_key_fkey"
+            columns: ["destination_key"]
+            isOneToOne: false
+            referencedRelation: "proof_destinations"
+            referencedColumns: ["destination_key"]
+          },
+        ]
+      }
+      campaign_proof_retraction_status_v6: {
+        Row: {
+          approval_id: string | null
+          client_id: string | null
+          demand_status: string | null
+          destination_key: string | null
+          external_id: string | null
+          external_url: string | null
+          placement_id: string | null
+          placement_status: string | null
+          reason: string | null
+          requested_at: string | null
+          retracted_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_page_publish_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_placement_id_fkey"
+            columns: ["placement_id"]
+            isOneToOne: false
+            referencedRelation: "proof_placement_due"
+            referencedColumns: ["placement_id"]
+          },
+          {
+            foreignKeyName: "campaign_proof_retraction_demands_v6_placement_id_fkey"
+            columns: ["placement_id"]
+            isOneToOne: false
+            referencedRelation: "proof_placements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_destination_key_fkey"
+            columns: ["destination_key"]
+            isOneToOne: false
+            referencedRelation: "proof_destinations"
+            referencedColumns: ["destination_key"]
+          },
+        ]
+      }
       campaign_route_actions: {
         Row: {
           acquisition_mode: string | null
@@ -22883,6 +31177,18 @@ export type Database = {
         }
         Relationships: []
       }
+      client_external_outcomes_v6: {
+        Row: {
+          client_id: string | null
+          external_ref: string | null
+          occurred_at: string | null
+          outcome: string | null
+          outcome_id: string | null
+          owning_path: string | null
+          source_kind: string | null
+        }
+        Relationships: []
+      }
       content_archive: {
         Row: {
           approved_assets: number | null
@@ -23043,8 +31349,22 @@ export type Database = {
             foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
             columns: ["derived_from_asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
+            columns: ["derived_from_asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
+            columns: ["derived_from_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
@@ -23165,8 +31485,22 @@ export type Database = {
             foreignKeyName: "client_asset_reviews_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_asset_reviews_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_asset_reviews_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_asset_reviews_asset_id_fkey"
@@ -23375,6 +31709,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "delivery_work_items_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
             foreignKeyName: "delivery_work_items_v6_campaign_id_client_id_fkey"
             columns: ["campaign_id", "client_id"]
             isOneToOne: false
@@ -23525,8 +31866,22 @@ export type Database = {
             foreignKeyName: "scheduled_posts_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "scheduled_posts_asset_id_fkey"
@@ -23737,6 +32092,70 @@ export type Database = {
         }
         Relationships: []
       }
+      gateway_tool_execution_overview_v6: {
+        Row: {
+          approval_id: string | null
+          canonical_request_id: string | null
+          claimed_at: string | null
+          client_id: string | null
+          execution_status: string | null
+          finished_at: string | null
+          result_hash: string | null
+          sites_invocation_id: string | null
+          sites_invoked_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       google_ads_build_due: {
         Row: {
           action_supported: boolean | null
@@ -23835,6 +32254,80 @@ export type Database = {
           },
         ]
       }
+      google_operator_google_match_v7: {
+        Row: {
+          bundle_id: string | null
+          campaign_id: string | null
+          channel: string | null
+          clicks: number | null
+          client_id: string | null
+          configured_customer_id: string | null
+          conversions: number | null
+          cost_micros: number | null
+          currency: string | null
+          fetched_at: string | null
+          from_date: string | null
+          impressions: number | null
+          match_state: string | null
+          observed_name: string | null
+          observed_status: string | null
+          read_run_id: string | null
+          reported_at: string | null
+          reported_campaign_id: string | null
+          through_date: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+        ]
+      }
       google_profile_due: {
         Row: {
           blocker: string | null
@@ -23909,6 +32402,160 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      google_profile_execution_overview_v6: {
+        Row: {
+          approval_request_id: string | null
+          attempt_id: string | null
+          change_id: string | null
+          client_id: string | null
+          field: string | null
+          finished_at: string | null
+          location_ref: string | null
+          observed_value: string | null
+          outcome_note: string | null
+          provider_ref: string | null
+          reconciled_at: string | null
+          reconciliation_result: string | null
+          reserved_at: string | null
+          started_at: string | null
+          status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_change_id_fkey"
+            columns: ["change_id"]
+            isOneToOne: true
+            referencedRelation: "google_profile_changes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      google_reply_execution_overview_v6: {
+        Row: {
+          approval_request_id: string | null
+          attempt_id: string | null
+          client_id: string | null
+          finished_at: string | null
+          observed_body_hash: string | null
+          outcome_note: string | null
+          provider_state: string | null
+          provider_update_time: string | null
+          reconciled_at: string | null
+          reconciled_provider_state: string | null
+          reconciliation_result: string | null
+          reply_id: string | null
+          reserved_at: string | null
+          started_at: string | null
+          status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_reply_id_fkey"
+            columns: ["reply_id"]
+            isOneToOne: true
+            referencedRelation: "google_review_replies"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -24198,6 +32845,46 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pages_archive"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_magnet_approval_execution_evidence_v6: {
+        Row: {
+          client_id: string | null
+          detail: string | null
+          external_ref: string | null
+          request_id: string | null
+          source_kind: string | null
+          state: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "approval_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "approval_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -24628,6 +33315,153 @@ export type Database = {
           },
         ]
       }
+      meta_operator_account_match_v7: {
+        Row: {
+          bundle_id: string | null
+          campaign_id: string | null
+          client_id: string | null
+          configured_account_id: string | null
+          currency: string | null
+          fetched_at: string | null
+          match_state: string | null
+          observed_ad_name: string | null
+          observed_ad_status: string | null
+          observed_campaign_name: string | null
+          observed_campaign_status: string | null
+          read_run_id: string | null
+          reported_ad_id: string | null
+          reported_at: string | null
+          reported_campaign_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+        ]
+      }
+      meta_profile_execution_overview_v6: {
+        Row: {
+          approval_request_id: string | null
+          attempt_id: string | null
+          change_id: string | null
+          client_id: string | null
+          field: string | null
+          finished_at: string | null
+          observed_value: string | null
+          outcome_note: string | null
+          page_id: string | null
+          provider_ref: string | null
+          reconciled_at: string | null
+          reconciliation_result: string | null
+          reserved_at: string | null
+          started_at: string | null
+          status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_change_id_fkey"
+            columns: ["change_id"]
+            isOneToOne: true
+            referencedRelation: "meta_profile_changes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       meta_profile_presence: {
         Row: {
           asset_id: string | null
@@ -24796,6 +33630,86 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      model_section_review_state_v7: {
+        Row: {
+          body: string | null
+          client_id: string | null
+          confidence: string | null
+          domain: Database["public"]["Enums"]["record_domain"] | null
+          edited_at: string | null
+          item_key: string | null
+          model_job_id: string | null
+          observed_on: string | null
+          record_hash: string | null
+          record_id: string | null
+          review_id: string | null
+          review_note: string | null
+          review_state: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_ref: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_agent_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_agent_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_agent_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_agent_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_agent_records_job_id_fkey"
+            columns: ["model_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_agent_records_job_id_fkey"
+            columns: ["model_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "client_agent_records_job_id_fkey"
+            columns: ["model_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "model_section_reviews_v7_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -25109,6 +34023,106 @@ export type Database = {
           },
         ]
       }
+      opportunity_activation_state_v6: {
+        Row: {
+          activation_state: string | null
+          client_id: string | null
+          opportunity_id: string | null
+          status: Database["public"]["Enums"]["opportunity_status"] | null
+        }
+        Insert: {
+          activation_state?: never
+          client_id?: string | null
+          opportunity_id?: string | null
+          status?: Database["public"]["Enums"]["opportunity_status"] | null
+        }
+        Update: {
+          activation_state?: never
+          client_id?: string | null
+          opportunity_id?: string | null
+          status?: Database["public"]["Enums"]["opportunity_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      opportunity_approval_state_v6: {
+        Row: {
+          approval_current: boolean | null
+          approval_state: string | null
+          client_id: string | null
+          opportunity_id: string | null
+        }
+        Insert: {
+          approval_current?: never
+          approval_state?: never
+          client_id?: string | null
+          opportunity_id?: string | null
+        }
+        Update: {
+          approval_current?: never
+          approval_state?: never
+          client_id?: string | null
+          opportunity_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       opportunity_campaign_plan: {
         Row: {
           asset_direction: string | null
@@ -25178,6 +34192,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
@@ -25296,6 +34324,53 @@ export type Database = {
           },
           {
             foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      ordinary_media_current_status_v6: {
+        Row: {
+          asset_id: string | null
+          client_id: string | null
+          current_signoff: boolean | null
+        }
+        Insert: {
+          asset_id?: string | null
+          client_id?: string | null
+          current_signoff?: never
+        }
+        Update: {
+          asset_id?: string | null
+          client_id?: string | null
+          current_signoff?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "engine_readiness"
@@ -25543,6 +34618,81 @@ export type Database = {
           },
         ]
       }
+      paid_operator_metric_match_v7: {
+        Row: {
+          bundle_id: string | null
+          campaign_id: string | null
+          client_id: string | null
+          currencies_seen: number | null
+          currency: string | null
+          days_with_rows: number | null
+          external_ad_id: string | null
+          external_campaign_id: string | null
+          latest_fetched_at: string | null
+          latest_metric_date: string | null
+          match_state: string | null
+          platform: string | null
+          recorded_clicks: number | null
+          recorded_conversions: number | null
+          recorded_impressions: number | null
+          recorded_spend: number | null
+          reported_at: string | null
+          reported_event_id: string | null
+          reported_reference: string | null
+          version: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+        ]
+      }
       post_copy_effective: {
         Row: {
           alt_text: string | null
@@ -25605,8 +34755,22 @@ export type Database = {
             foreignKeyName: "scheduled_posts_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "scheduled_posts_asset_id_fkey"
@@ -25652,6 +34816,69 @@ export type Database = {
           },
         ]
       }
+      production_attempts_v7: {
+        Row: {
+          accepted_workflow_output: boolean | null
+          asset_id: string | null
+          attempt_id: string | null
+          attempt_kind: string | null
+          attempt_status: string | null
+          campaign_id: string | null
+          client_id: string | null
+          content_format: string | null
+          cost_usd: number | null
+          created_at: string | null
+          demand_id: string | null
+          demand_kind: string | null
+          destination: string | null
+          human_review_status: string | null
+          job_id: string | null
+          media_type: string | null
+          piece_key: string | null
+          revised: boolean | null
+          route_package_id: string | null
+          run_id: string | null
+        }
+        Relationships: []
+      }
+      production_demand_counts_v7: {
+        Row: {
+          accepted_asset_id: string | null
+          attempts: number | null
+          campaign_id: string | null
+          client_id: string | null
+          content_format: string | null
+          demand_id: string | null
+          demand_kind: string | null
+          destination: string | null
+          human_approved: number | null
+          media_type: string | null
+          piece_key: string | null
+          produced: number | null
+          rejected: number | null
+          revised: number | null
+          route_package_id: string | null
+          run_id: string | null
+          workflow_accepted: number | null
+        }
+        Relationships: []
+      }
+      production_demand_v7: {
+        Row: {
+          accepted_asset_id: string | null
+          campaign_id: string | null
+          client_id: string | null
+          content_format: string | null
+          demand_id: string | null
+          demand_kind: string | null
+          destination: string | null
+          media_type: string | null
+          piece_key: string | null
+          route_package_id: string | null
+          run_id: string | null
+        }
+        Relationships: []
+      }
       profile_change_due: {
         Row: {
           applied_at: string | null
@@ -25669,6 +34896,93 @@ export type Database = {
           writable: boolean | null
         }
         Relationships: []
+      }
+      proof_approval_execution_evidence_v6: {
+        Row: {
+          client_id: string | null
+          detail: string | null
+          external_ref: string | null
+          request_id: string | null
+          source_kind: string | null
+          state: string | null
+        }
+        Relationships: []
+      }
+      proof_outcome_followup_submissions_v7: {
+        Row: {
+          client_id: string | null
+          delivery_id: string | null
+          lead_id: string | null
+          outcome_event_id: string | null
+          proof_id: string | null
+          submission_id: string | null
+          submitted_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_capture_submissions_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_capture_submissions_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_outcome_event_id_fkey"
+            columns: ["outcome_event_id"]
+            isOneToOne: false
+            referencedRelation: "proof_service_outcomes_v7"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_outcome_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_outcome_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
+          },
+        ]
       }
       proof_placement_due: {
         Row: {
@@ -25730,6 +35044,241 @@ export type Database = {
           },
           {
             foreignKeyName: "proof_placements_source_proof_id_fkey"
+            columns: ["source_proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
+          },
+        ]
+      }
+      proof_production_attempts_v7: {
+        Row: {
+          asset_id: string | null
+          attempt_id: string | null
+          attempt_kind: string | null
+          attempt_status: string | null
+          client_id: string | null
+          cost_usd: number | null
+          created_at: string | null
+          finished_at: string | null
+          human_review_status: string | null
+          latency_seconds: number | null
+          request_id: string | null
+          revised: boolean | null
+          source_asset_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_presence"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proof_production_counts_v7: {
+        Row: {
+          attempts: number | null
+          awaiting_review: number | null
+          client_id: string | null
+          content_format: string | null
+          destination: string | null
+          human_approved: number | null
+          media_type: string | null
+          produced: number | null
+          rejected: number | null
+          render_cost_usd: number | null
+          request_id: string | null
+          revised: number | null
+          source_asset_id: string | null
+          source_proof_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_production_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_presence"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_proof_id_fkey"
+            columns: ["source_proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_proof_id_fkey"
             columns: ["source_proof_id"]
             isOneToOne: false
             referencedRelation: "proof_surface_coverage"
@@ -25842,6 +35391,86 @@ export type Database = {
           },
           {
             foreignKeyName: "scheduled_posts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      recruitment_media_ready_v6: {
+        Row: {
+          brief_id: string | null
+          client_id: string | null
+          content_format: Database["public"]["Enums"]["content_format"] | null
+          id: string | null
+          media_type: Database["public"]["Enums"]["media_type"] | null
+          storage_path: string | null
+          title: string | null
+        }
+        Insert: {
+          brief_id?: string | null
+          client_id?: string | null
+          content_format?: Database["public"]["Enums"]["content_format"] | null
+          id?: string | null
+          media_type?: Database["public"]["Enums"]["media_type"] | null
+          storage_path?: string | null
+          title?: string | null
+        }
+        Update: {
+          brief_id?: string | null
+          client_id?: string | null
+          content_format?: Database["public"]["Enums"]["content_format"] | null
+          id?: string | null
+          media_type?: Database["public"]["Enums"]["media_type"] | null
+          storage_path?: string | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_media_assets_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "client_briefs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive"
+            referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "engine_readiness"
@@ -26379,6 +36008,8 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           accepted_by: string | null
+          accepted_content_hash: string | null
+          accepted_request_id: string | null
           attempt: number
           benchmark_note: string | null
           brand_qa: string | null
@@ -26392,7 +36023,13 @@ export type Database = {
           job_id: string | null
           poster_path: string | null
           project_id: string
+          proof_source_lost: boolean
           rejected_reason: string | null
+          render_bytes_sha256: string | null
+          render_file_bytes: number | null
+          render_object_id: string | null
+          render_object_updated_at: string | null
+          render_object_version: string | null
           render_path: string | null
         }
         SetofOptions: {
@@ -26436,6 +36073,27 @@ export type Database = {
           p_token_hash: string
         }
         Returns: string
+      }
+      accept_ready_campaign_conversion_steps_v7: {
+        Args: { p_limit?: number }
+        Returns: {
+          steps_accepted: number
+          steps_blocked: number
+        }[]
+      }
+      accept_ready_campaign_magnet_steps_v7: {
+        Args: { p_limit?: number }
+        Returns: {
+          steps_accepted: number
+          steps_blocked: number
+        }[]
+      }
+      accept_ready_campaign_workflow_steps_v7: {
+        Args: { p_limit?: number }
+        Returns: {
+          steps_accepted: number
+          steps_blocked: number
+        }[]
       }
       accept_ready_daily_workflow_steps: {
         Args: { p_limit?: number }
@@ -26493,6 +36151,22 @@ export type Database = {
           p_source_version: string
         }
         Returns: string
+      }
+      acquisition_coverage_v8: {
+        Args: { p_client_id: string; p_days?: number }
+        Returns: {
+          consented_leads: number
+          latest_google_read_at: string
+          latest_meta_read_at: string
+          latest_paid_metric_date: string
+          latest_spend_date: string
+          lead_rows: number
+          paid_metric_days: number
+          sourced_leads: number
+          spend_currencies: number
+          spend_currency: string
+          spend_rows: number
+        }[]
       }
       acquisition_funnel: {
         Args: { p_client_id: string; p_days?: number }
@@ -26805,6 +36479,8 @@ export type Database = {
         Returns: {
           approved_at: string
           approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           channel_key: string
           client_id: string
           consent_basis: string
@@ -26828,6 +36504,8 @@ export type Database = {
         Returns: {
           approved_at: string | null
           approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           archived_at: string | null
           campaign_id: string | null
           client_id: string
@@ -26849,17 +36527,117 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      approve_proof_artifact_v6: {
-        Args: { p_artifact_version_id: string }
+      approve_opportunity_v6: {
+        Args: { p_opportunity_id: string; p_request_id: string }
+        Returns: {
+          activated_content_hash: string | null
+          activated_request_id: string | null
+          approval_request_token: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
+          archived_at: string | null
+          buying_situation: string
+          client_id: string
+          confidence: Database["public"]["Enums"]["opportunity_confidence"]
+          conversion_action: string | null
+          core_problem: string | null
+          created_at: string
+          created_by: string | null
+          desired_outcome: string | null
+          entry_awareness: string | null
+          id: string
+          idempotency_key: string
+          micro_market: string
+          name: string
+          positioning: string | null
+          proposed_by: string
+          proposed_by_job_id: string | null
+          purchase_trigger: string | null
+          status: Database["public"]["Enums"]["opportunity_status"]
+          status_note: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "market_opportunities"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      approve_ordinary_media_inbox_v6: {
+        Args: { p_request_id: string; p_review_id: string }
+        Returns: string
+      }
+      approve_proof_artifact_inbox_v6: {
+        Args: { p_request_id: string; p_review_id: string }
         Returns: {
           approved_at: string
           approved_by: string
+          approved_content_hash: string | null
+          approved_request_id: string | null
           artifact_version_id: string
           client_id: string
         }
         SetofOptions: {
           from: "*"
           to: "proof_artifact_signoffs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      approve_proof_artifact_v6: {
+        Args: { p_artifact_version_id: string }
+        Returns: {
+          approved_at: string
+          approved_by: string
+          approved_content_hash: string | null
+          approved_request_id: string | null
+          artifact_version_id: string
+          client_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "proof_artifact_signoffs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      approve_proof_rights_v6: {
+        Args: { p_canonical_id: string; p_rights_request_id: string }
+        Returns: {
+          approved_rights_content_hash: string | null
+          approved_rights_request_id: string | null
+          avatar_relevance: string | null
+          body: string | null
+          capture_file_mime: string | null
+          capture_method: string | null
+          captured_on: string | null
+          claim: string | null
+          client_id: string
+          created_at: string
+          evidence: string | null
+          expires_on: string | null
+          google_source_changed_at: string | null
+          id: string
+          media_type: Database["public"]["Enums"]["media_type"]
+          permission_basis: string | null
+          proof_type: string | null
+          ref_number: string | null
+          services: string | null
+          source: string | null
+          source_category: string | null
+          source_format: Database["public"]["Enums"]["content_format"]
+          source_kind: string | null
+          storage_path: string | null
+          strength: string
+          title: string | null
+          updated_at: string
+          uploaded_by: string | null
+          usage_rights: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_proof_assets"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -26876,6 +36654,41 @@ export type Database = {
           p_request_id: string
         }
         Returns: undefined
+      }
+      approve_sales_agent_public_use_v6: {
+        Args: { p_agent_id: string; p_request_id: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
+          archived_at: string | null
+          booking_rule: string | null
+          built_at: string | null
+          client_id: string
+          created_at: string
+          escalation_rule: string | null
+          greeting: string | null
+          guardrails: string | null
+          id: string
+          job_id: string | null
+          name: string
+          objections: Json
+          page_id: string | null
+          public_use_request_token: string | null
+          purpose: string
+          qualification: Json
+          role: string | null
+          status: string
+          system_prompt: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_sales_agents"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       approve_service_offer_version_v6: {
         Args: { p_version_id: string }
@@ -26926,6 +36739,26 @@ export type Database = {
         Args: { p_lead_id: string; p_reason?: string }
         Returns: undefined
       }
+      assemble_campaign_preparation_package_v7: {
+        Args: { p_campaign_id: string }
+        Returns: {
+          assembled_at: string
+          assembled_by: string | null
+          campaign_id: string
+          client_id: string
+          id: string
+          run_id: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_preparation_packages_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       assert_budget_change_allowed_v6: {
         Args: { p_execution_id: string }
         Returns: {
@@ -26946,6 +36779,7 @@ export type Database = {
           lease_until: string | null
           proposed_daily_budget: number
           reason: string
+          review_epoch_v6: number
           status: string
           updated_at: string
         }
@@ -26955,6 +36789,27 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      assert_campaign_action_prewrite_v6: {
+        Args: {
+          p_action_key: string
+          p_build_sha: string
+          p_execution_id: string
+          p_worker_id: string
+        }
+        Returns: undefined
+      }
+      assert_gateway_sites_prewrite_v6: {
+        Args: {
+          p_approval_id: string
+          p_bot_id: string
+          p_client_id: string
+          p_execution_key: string
+          p_provider_org: string
+          p_target: string
+          p_tool: string
+        }
+        Returns: undefined
       }
       assert_meta_build_allowed_v6: {
         Args: { p_campaign_id: string }
@@ -26999,6 +36854,42 @@ export type Database = {
         Args: { p_brief_id?: string; p_project_id: string }
         Returns: string
       }
+      attest_creative_storage_bytes_v6: {
+        Args: {
+          p_asset_id: string
+          p_file_bytes: number
+          p_object_id: string
+          p_object_updated_at: string
+          p_object_version: string
+          p_sha256: string
+          p_storage_path: string
+        }
+        Returns: string
+      }
+      attest_gateway_tool_review_v6: {
+        Args: {
+          p_approval_id: string
+          p_payload_hash: string
+          p_token_id: string
+        }
+        Returns: Json
+      }
+      attest_lead_magnet_bytes_v6: {
+        Args: { p_approval_id: string; p_file_bytes: number; p_sha256: string }
+        Returns: string
+      }
+      attest_motion_render_bytes_v6: {
+        Args: {
+          p_candidate_id: string
+          p_file_bytes: number
+          p_object_id: string
+          p_object_updated_at: string
+          p_object_version: string
+          p_sha256: string
+          p_storage_path: string
+        }
+        Returns: string
+      }
       attest_video_sound_asset: {
         Args: {
           p_client_id: string
@@ -27023,6 +36914,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      audit_legacy_proof_retraction_v6: {
+        Args: {
+          p_evidence_ref: string
+          p_placement_id: string
+          p_reason: string
+        }
+        Returns: string
+      }
       auto_rebuild_rejected_reel_sources: {
         Args: { p_limit?: number }
         Returns: number
@@ -27034,9 +36933,74 @@ export type Database = {
           starts_at: string
         }[]
       }
+      begin_gateway_sites_invocation_v6: {
+        Args: {
+          p_approval_id: string
+          p_bot_id: string
+          p_client_id: string
+          p_execution_key: string
+          p_invocation_id: string
+          p_provider_org: string
+          p_target: string
+          p_tool: string
+        }
+        Returns: boolean
+      }
+      begin_google_profile_write_v6: {
+        Args: { p_attempt_id: string; p_claim_key: string }
+        Returns: boolean
+      }
+      begin_google_reply_write_v6: {
+        Args: { p_attempt_id: string; p_claim_key: string }
+        Returns: boolean
+      }
+      begin_meta_profile_write_v6: {
+        Args: { p_attempt_id: string; p_claim_key: string }
+        Returns: boolean
+      }
       bind_campaign_action_sources_v6: {
         Args: { p_request_id: string }
         Returns: undefined
+      }
+      bind_campaign_conversion_work_v7: {
+        Args: { p_run_id: string; p_step_key: string; p_work_item_id: string }
+        Returns: {
+          created_at: string
+          run_id: string
+          step_key: string
+          work_item_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_conversion_work_bindings_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      bind_campaign_planned_ideas_v7: {
+        Args: { p_campaign_id: string }
+        Returns: string[]
+      }
+      bind_campaign_sweep_work_v7: {
+        Args: {
+          p_final_step_key: string
+          p_piece_key: string
+          p_run_id: string
+          p_work_item_id: string
+        }
+        Returns: {
+          created_at: string
+          final_step_key: string
+          piece_key: string
+          run_id: string
+          work_item_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_sweep_work_bindings_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       bind_delivery_approval_dependency_v6: {
         Args: { p_approval_request_id: string; p_entity_version_id: string }
@@ -27147,6 +37111,10 @@ export type Database = {
         Returns: boolean
       }
       bot_may: { Args: { p_action: string }; Returns: boolean }
+      brief_job_selection_current_v6: {
+        Args: { p_job_id: string }
+        Returns: boolean
+      }
       brief_video_repurpose_candidate: {
         Args: {
           p_candidate_index: number
@@ -27167,10 +37135,30 @@ export type Database = {
         Returns: string
       }
       caller_gate_markers: { Args: never; Returns: string }
+      campaign_action_exact_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       campaign_action_inbox_payload_v6: {
         Args: {
           p_action: Database["public"]["Tables"]["campaign_action_approvals"]["Row"]
         }
+        Returns: Json
+      }
+      campaign_budget_exact_snapshot_v6: {
+        Args: { p_change_id: string }
+        Returns: Json
+      }
+      campaign_budget_readback_target_v6: {
+        Args: { p_client_id: string; p_execution_id: string }
+        Returns: Json
+      }
+      campaign_package_readiness_v7: {
+        Args: { p_campaign_id: string }
+        Returns: Json
+      }
+      campaign_page_readback_target_v6: {
+        Args: { p_client_id: string; p_execution_id: string }
         Returns: Json
       }
       campaign_plan_fingerprint: {
@@ -27178,6 +37166,34 @@ export type Database = {
           p_campaign: Database["public"]["Tables"]["client_campaigns"]["Row"]
         }
         Returns: string
+      }
+      campaign_planned_idea_hash_v7: {
+        Args: { p_campaign_id: string }
+        Returns: string
+      }
+      campaign_planned_idea_selection_current_v7: {
+        Args: { p_idea_id: string }
+        Returns: boolean
+      }
+      campaign_planned_ideas_match_spec_v7: {
+        Args: { p_campaign_id: string }
+        Returns: boolean
+      }
+      campaign_preparation_approved_v7: {
+        Args: { p_package_id: string }
+        Returns: boolean
+      }
+      campaign_preparation_package_current_v7: {
+        Args: { p_package_id: string }
+        Returns: boolean
+      }
+      campaign_preparation_review_source_state_v7: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      campaign_preparation_snapshot_v7: {
+        Args: { p_campaign_id: string }
+        Returns: Json
       }
       campaign_readiness: {
         Args: { p_campaign_id: string }
@@ -27392,6 +37408,26 @@ export type Database = {
           scope: Json
         }[]
       }
+      claim_campaign_actions_owned_v6: {
+        Args: {
+          p_build_sha: string
+          p_handlers: Json
+          p_limit?: number
+          p_worker_id: string
+        }
+        Returns: {
+          action_key: string
+          approval_id: string
+          artifact_version_hash: string
+          attempt: number
+          campaign_id: string
+          client_id: string
+          destination: string
+          execution_id: string
+          manifest_id: string
+          scope: Json
+        }[]
+      }
       claim_console_invitation_send_v6: {
         Args: {
           p_actor_id: string
@@ -27439,6 +37475,23 @@ export type Database = {
           reason: string
         }[]
       }
+      claim_gateway_tool_execution_v6: {
+        Args: {
+          p_approval_id: string
+          p_execution_key: string
+          p_payload_hash: string
+          p_token_id: string
+        }
+        Returns: Json
+      }
+      claim_google_profile_execution_v6: {
+        Args: { p_change_id: string }
+        Returns: Json
+      }
+      claim_google_reply_execution_v6: {
+        Args: { p_reply_id: string }
+        Returns: Json
+      }
       claim_lead_magnet_deliveries: {
         Args: { p_limit?: number }
         Returns: {
@@ -27455,6 +37508,10 @@ export type Database = {
           recipient: string
           storage_path: string
         }[]
+      }
+      claim_meta_profile_execution_v6: {
+        Args: { p_change_id: string }
+        Returns: Json
       }
       claim_outbound_messages: {
         Args: { p_limit?: number }
@@ -27508,6 +37565,9 @@ export type Database = {
         Returns: {
           approved_at: string | null
           approved_by: string | null
+          attempt_finished_at: string | null
+          attempt_request_id: string | null
+          attempt_started_at: string | null
           attempts: number
           capture_url: string
           channel: string
@@ -27520,6 +37580,9 @@ export type Database = {
           lease_until: string | null
           link_id: string
           message: string
+          outcome_consent_id: string | null
+          outcome_event_id: string | null
+          outcome_lead_id: string | null
           provider_id: string | null
           recipient: string
           scheduled_at: string
@@ -27555,6 +37618,28 @@ export type Database = {
         Args: { p_issued_at: string; p_nonce_hash: string }
         Returns: boolean
       }
+      client_authority_assignment_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["client_authority_assignment_reviews_v6"]["Row"]
+        }
+        Returns: string
+      }
+      client_authority_assignment_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["client_authority_assignment_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      client_authority_assignment_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["client_authority_assignment_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      client_authority_assignment_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       client_budget_state: {
         Args: { p_client_id: string; p_month?: string }
         Returns: {
@@ -27563,6 +37648,10 @@ export type Database = {
           remaining_usd: number
           spent_usd: number
         }[]
+      }
+      client_control_activity_v6: {
+        Args: { p_client_id: string }
+        Returns: Json
       }
       client_economics: {
         Args: { p_client_id: string; p_since: string; p_until: string }
@@ -27626,6 +37715,36 @@ export type Database = {
       }
       client_for_meta_recipient_v6: {
         Args: { p_recipient_id: string }
+        Returns: string
+      }
+      client_runtime_controls_v6: {
+        Args: { p_client_id: string }
+        Returns: Json
+      }
+      client_switch_activation_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["client_switch_activation_reviews_v6"]["Row"]
+        }
+        Returns: string
+      }
+      client_switch_activation_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["client_switch_activation_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      client_switch_activation_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["client_switch_activation_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      client_switch_activation_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      client_switch_column_v6: {
+        Args: { p_switch_key: string }
         Returns: string
       }
       client_timezone: { Args: { p_client_id: string }; Returns: string }
@@ -27768,12 +37887,15 @@ export type Database = {
           audience: string | null
           brief: string
           budget: number | null
+          budget_context_epoch_v6: number
           built_at: string | null
           channels: string[]
           client_id: string
           cloned_from_campaign_id: string | null
           content_count: number
           content_ideas_generated_at: string | null
+          content_spec_hash: string | null
+          content_spec_id: string | null
           conversion_event: string | null
           core_message: string | null
           created_at: string
@@ -27796,6 +37918,7 @@ export type Database = {
             | null
           name: string
           needs_landing_page: boolean
+          needs_lead_magnet: boolean
           needs_sales_agent: boolean
           objective: string | null
           offer_summary: string | null
@@ -27808,6 +37931,7 @@ export type Database = {
           plan_approved_by: string | null
           plan_approved_fingerprint: string | null
           plan_review_note: string | null
+          planned_idea_epoch: number
           runs_organic: boolean
           runs_paid: boolean
           starts_on: string | null
@@ -27844,6 +37968,79 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "campaign_manifest_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_compiled_main_offer_v7: {
+        Args: {
+          p_audience: string
+          p_client_id: string
+          p_exclusions: string[]
+          p_idempotency_key: string
+          p_inclusions: string[]
+          p_job_id: string
+          p_promise: string
+          p_service_name: string
+          p_strategy_snapshot: Json
+        }
+        Returns: {
+          audience: string
+          claims: Json
+          client_id: string
+          content_hash: string
+          created_at: string
+          currency: string | null
+          delivery_cost_estimate: number | null
+          exclusions: string[]
+          id: string
+          idempotency_key: string
+          inclusions: string[]
+          offer_id: string
+          price_amount: number | null
+          promise: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_offer_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_compiled_secondary_offer_v7: {
+        Args: {
+          p_audience: string
+          p_client_id: string
+          p_exclusions: string[]
+          p_idempotency_key: string
+          p_inclusions: string[]
+          p_job_id: string
+          p_opportunity_hash: string
+          p_opportunity_id: string
+          p_promise: string
+          p_service_name: string
+        }
+        Returns: {
+          audience: string
+          claims: Json
+          client_id: string
+          content_hash: string
+          created_at: string
+          currency: string | null
+          delivery_cost_estimate: number | null
+          exclusions: string[]
+          id: string
+          idempotency_key: string
+          inclusions: string[]
+          offer_id: string
+          price_amount: number | null
+          promise: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_offer_versions"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -27983,6 +38180,34 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_google_operator_bundle_v7: {
+        Args: {
+          p_budget_instruction: string
+          p_descriptions: string[]
+          p_headlines: string[]
+          p_owner: string
+          p_research_task: string
+          p_sheet_id: string
+          p_tracking_instruction: string
+        }
+        Returns: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          created_by: string
+          id: string
+          sheet_id: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "google_operator_bundles_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_lead_capture_endpoint_v6: {
         Args: {
           p_campaign_id?: string
@@ -28017,6 +38242,22 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "lead_capture_endpoints"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_main_offer_v7: {
+        Args: { p_client_id: string }
+        Returns: {
+          client_id: string
+          created_at: string
+          id: string
+          kind: string
+          service_name: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_offers"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -28093,6 +38334,8 @@ export type Database = {
         Returns: {
           approved_at: string | null
           approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           archived_at: string | null
           campaign_id: string | null
           client_id: string
@@ -28110,6 +38353,32 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "nurture_sequences"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_paid_operator_bundle_v7: {
+        Args: {
+          p_budget_instruction: string
+          p_owner: string
+          p_package_id: string
+          p_tracking_instruction: string
+        }
+        Returns: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          created_by: string
+          id: string
+          package_id: string
+          platform: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "paid_operator_bundles_v7"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -28183,6 +38452,22 @@ export type Database = {
           p_target_countries: string[]
         }
         Returns: string
+      }
+      create_secondary_offer_v7: {
+        Args: { p_opportunity_id: string }
+        Returns: {
+          client_id: string
+          created_at: string
+          id: string
+          kind: string
+          service_name: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_offers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       create_service_offer_version_v6: {
         Args: {
@@ -28269,9 +38554,35 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      creative_requirement_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["creative_requirement_reviews_v6"]["Row"]
+        }
+        Returns: string
+      }
+      creative_requirement_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["creative_requirement_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      creative_requirement_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["creative_requirement_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      creative_requirement_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       creative_seat_of: {
         Args: { p_client_id: string; p_user_id: string }
         Returns: string
+      }
+      creative_storage_identity_v6: {
+        Args: { p_asset_id: string }
+        Returns: Json
       }
       current_member_id: { Args: never; Returns: string }
       current_role_of: {
@@ -28314,6 +38625,24 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      decide_campaign_preparation_package_v7: {
+        Args: {
+          p_approved: boolean
+          p_package_id: string
+          p_reason?: string
+          p_request_id: string
+        }
+        Returns: string
+      }
+      decide_client_authority_assignment_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
       decide_client_sales_entitlement: {
         Args: {
           p_approve: boolean
@@ -28322,6 +38651,15 @@ export type Database = {
           p_scope_hash: string
         }
         Returns: undefined
+      }
+      decide_client_switch_activation_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
       }
       decide_console_invitation_v6: {
         Args: {
@@ -28358,6 +38696,69 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      decide_creative_requirement_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
+      decide_engine_slot_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_slot_id: string
+        }
+        Returns: string
+      }
+      decide_gateway_tool_review_v6: {
+        Args: {
+          p_approval_id: string
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+        }
+        Returns: string
+      }
+      decide_global_engine_activation_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
+      decide_global_video_owner_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
+      decide_google_operator_bundle_v7: {
+        Args: {
+          p_approved: boolean
+          p_bundle_id: string
+          p_reason?: string
+          p_request_id: string
+        }
+        Returns: string
+      }
+      decide_google_profile_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
       }
       decide_google_review_reply_from_inbox_v6: {
         Args: {
@@ -28423,6 +38824,24 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      decide_human_idea_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
+      decide_integration_grant_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
       decide_lead_magnet_approval_v6: {
         Args: { p_approval_id: string; p_approved: boolean; p_reason?: string }
         Returns: {
@@ -28431,6 +38850,7 @@ export type Database = {
           decided_by: string | null
           decided_by_bot: boolean
           id: string
+          inbox_enforced_v6: boolean
           magnet_version_id: string
           payload_hash: string
           rejection_reason: string | null
@@ -28448,12 +38868,23 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      decide_message_template_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
       decide_meta_profile_change_v6: {
         Args: { p_approved: boolean; p_change_id: string; p_reason?: string }
         Returns: {
           applied_at: string | null
           approved_at: string | null
           approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           attempts: number
           claimed_at: string | null
           client_id: string
@@ -28470,6 +38901,7 @@ export type Database = {
           proposed_value: string
           reason: string | null
           rejection_reason: string | null
+          review_epoch_v6: number
           status: string
           updated_at: string
         }
@@ -28479,6 +38911,51 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      decide_meta_profile_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
+      decide_metrics_backfill_review_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string[]
+      }
+      decide_motion_render_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
+      decide_nurture_sequence_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
+      decide_opportunity_activation_inbox_v6: {
+        Args: {
+          p_activation_id: string
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+        }
+        Returns: string
       }
       decide_production_release_candidate_v6: {
         Args: {
@@ -28495,8 +38972,61 @@ export type Database = {
         Args: { p_approve: boolean; p_delivery_id: string }
         Returns: undefined
       }
+      decide_proof_delivery_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
       decide_proof_placement_approval_v6: {
         Args: { p_approval_id: string; p_approved: boolean; p_reason?: string }
+        Returns: {
+          approval_id: string | null
+          artifact_version_id: string | null
+          asset_id: string | null
+          attempts: number
+          bound_revision_id: string | null
+          bound_version_hash: string | null
+          campaign_id: string | null
+          claimed_at: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          destination_key: string
+          external_id: string | null
+          external_url: string | null
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          lease_until: string | null
+          payload_hash: string
+          placed_at: string | null
+          placed_by: string | null
+          production_request_id: string | null
+          proof_id: string | null
+          retracted_at: string | null
+          source_proof_id: string
+          status: string
+          updated_at: string
+          verified_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "proof_placements"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      decide_proof_placement_inbox_v6: {
+        Args: {
+          p_approval_id: string
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+        }
         Returns: {
           approval_id: string | null
           artifact_version_id: string | null
@@ -28563,6 +39093,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      decide_video_seat_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
       }
       decline_assignment: {
         Args: { p_assignment_id: string; p_reason: string }
@@ -28690,6 +39229,18 @@ export type Database = {
       }
       engine_is_enabled: { Args: { p_client_id: string }; Returns: boolean }
       engine_jobs_in_flight: { Args: { p_client_id: string }; Returns: number }
+      engine_slot_exact_hash_v6: {
+        Args: { p_slot_id: string }
+        Returns: string
+      }
+      engine_slot_exact_package_v6: {
+        Args: { p_slot_id: string }
+        Returns: Json
+      }
+      engine_slot_exact_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       engine_slot_inbox_payload_v6: {
         Args: { p_event: Database["public"]["Tables"]["slot_events"]["Row"] }
         Returns: Json
@@ -28805,6 +39356,14 @@ export type Database = {
         Args: { p_execution_id: string }
         Returns: Json
       }
+      enrol_campaign_leads_owned_v6: {
+        Args: {
+          p_build_sha: string
+          p_execution_id: string
+          p_worker_id: string
+        }
+        Returns: Json
+      }
       enroll_due_leads_v6: { Args: { p_limit?: number }; Returns: number }
       enroll_lead_in_sequence_v6: {
         Args: { p_lead_id: string; p_sequence_id: string }
@@ -28828,6 +39387,63 @@ export type Database = {
           to: "lead_sequence_enrollments"
           isOneToOne: true
           isSetofReturn: false
+        }
+      }
+      ensure_campaign_conversion_drafts_v7: {
+        Args: { p_campaign_id: string; p_run_id: string }
+        Returns: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          page_id: string | null
+          page_work_item_id: string | null
+          plan_fingerprint: string
+          run_id: string
+          sales_agent_id: string | null
+          sales_work_item_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_conversion_drafts_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      ensure_campaign_magnet_draft_v7: {
+        Args: { p_campaign_id: string; p_run_id: string }
+        Returns: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          magnet_id: string
+          plan_fingerprint: string
+          run_id: string
+          work_item_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_magnet_drafts_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      ensure_campaign_route_packages_v7: {
+        Args: { p_campaign_id: string; p_run_id: string }
+        Returns: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          id: string
+          paid_platform: string | null
+          plan_fingerprint: string
+          route: string
+          version: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "campaign_route_packages_v6"
+          isOneToOne: false
+          isSetofReturn: true
         }
       }
       exit_lead_from_sequence_v6: {
@@ -28873,6 +39489,49 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      finish_gateway_tool_execution_v6: {
+        Args: {
+          p_approval_id: string
+          p_execution_key: string
+          p_result_hash: string
+          p_status: string
+        }
+        Returns: Json
+      }
+      finish_google_profile_execution_v6: {
+        Args: {
+          p_attempt_id: string
+          p_claim_key: string
+          p_note?: string
+          p_observed_value?: string
+          p_outcome: string
+          p_provider_ref?: string
+        }
+        Returns: boolean
+      }
+      finish_google_reply_execution_v6: {
+        Args: {
+          p_attempt_id: string
+          p_claim_key: string
+          p_note?: string
+          p_observed_body_hash?: string
+          p_outcome: string
+          p_provider_state?: string
+          p_provider_update_time?: string
+        }
+        Returns: boolean
+      }
+      finish_meta_profile_execution_v6: {
+        Args: {
+          p_attempt_id: string
+          p_claim_key: string
+          p_note?: string
+          p_observed_value?: string
+          p_outcome: string
+          p_provider_ref?: string
+        }
+        Returns: boolean
+      }
       format_fits_media: {
         Args: {
           p_format: Database["public"]["Enums"]["content_format"]
@@ -28881,9 +39540,79 @@ export type Database = {
         Returns: boolean
       }
       frame_plan_is_usable: { Args: { p_plan: string[] }; Returns: boolean }
+      gateway_tool_execution_state_v6: {
+        Args: { p_approval_id: string }
+        Returns: Json
+      }
+      gateway_tool_review_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["gateway_tool_reviews_v6"]["Row"]
+        }
+        Returns: string
+      }
+      gateway_tool_review_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["gateway_tool_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      gateway_tool_review_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["gateway_tool_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      gateway_tool_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       generate_recruitment_ad: {
         Args: { p_brief_id: string; p_quality?: string; p_size?: string }
         Returns: Json
+      }
+      global_engine_activation_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["global_engine_activation_reviews_v6"]["Row"]
+        }
+        Returns: string
+      }
+      global_engine_activation_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["global_engine_activation_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      global_engine_activation_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["global_engine_activation_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      global_engine_activation_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      global_video_owner_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["global_video_owner_reviews_v6"]["Row"]
+        }
+        Returns: string
+      }
+      global_video_owner_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["global_video_owner_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      global_video_owner_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["global_video_owner_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      global_video_owner_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
       }
       google_ads_build_spec_v6: {
         Args: {
@@ -28892,15 +39621,103 @@ export type Database = {
         }
         Returns: Json
       }
+      google_operator_bundle_approved_v7: {
+        Args: { p_bundle_id: string }
+        Returns: boolean
+      }
+      google_operator_bundle_current_v7: {
+        Args: { p_bundle_id: string }
+        Returns: boolean
+      }
+      google_operator_bundle_export_v7: {
+        Args: { p_bundle_id: string }
+        Returns: string
+      }
+      google_operator_review_source_state_v7: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      google_operator_sheet_source_v7: {
+        Args: { p_sheet_id: string }
+        Returns: Json
+      }
+      google_profile_prewrite_current_v6: {
+        Args: { p_change_id: string }
+        Returns: boolean
+      }
+      google_profile_reconciliation_target_v6: {
+        Args: { p_attempt_id: string; p_client_id: string }
+        Returns: Json
+      }
+      google_profile_review_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["google_profile_review_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      google_profile_review_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["google_profile_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      google_profile_review_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["google_profile_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      google_profile_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      google_reply_credential_eligible_v6: {
+        Args: { p_client_id: string }
+        Returns: boolean
+      }
       google_reply_inbox_payload_v6: {
         Args: {
           p_reply: Database["public"]["Tables"]["google_review_replies"]["Row"]
         }
         Returns: Json
       }
+      google_reply_prewrite_current_v6: {
+        Args: { p_reply_id: string }
+        Returns: boolean
+      }
+      google_reply_reconciliation_target_v6: {
+        Args: { p_attempt_id: string; p_client_id: string }
+        Returns: Json
+      }
       has_client_sales_entitlement: {
         Args: { p_client_id: string }
         Returns: boolean
+      }
+      human_idea_approval_current_v6: {
+        Args: { p_idea_id: string }
+        Returns: boolean
+      }
+      human_idea_review_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["human_idea_review_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      human_idea_review_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["human_idea_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      human_idea_review_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["human_idea_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      human_idea_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
       }
       intake_video_for_edit: {
         Args: {
@@ -28915,6 +39732,28 @@ export type Database = {
           p_title: string
         }
         Returns: Json
+      }
+      integration_grant_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["integration_grant_reviews_v6"]["Row"]
+        }
+        Returns: string
+      }
+      integration_grant_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["integration_grant_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      integration_grant_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["integration_grant_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      integration_grant_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
       }
       integration_secret: {
         Args: { p_client_id: string; p_provider: string }
@@ -28943,8 +39782,50 @@ export type Database = {
         Args: { p_email: string; p_phone: string }
         Returns: string
       }
+      lead_journey_trace_v8: {
+        Args: { p_client_id: string; p_days?: number; p_limit?: number }
+        Returns: {
+          asset_id: string
+          asset_title: string
+          campaign_id: string
+          campaign_mode: string
+          campaign_name: string
+          cash_collected: number
+          lead_created_at: string
+          lead_id: string
+          lead_stage: string
+          offer_version_id: string
+          opportunity_ids: string[]
+          outcome_events: number
+          page_id: string
+          page_title: string
+          sale_value: number
+          sales_agent_id: string
+          source_channel: string
+        }[]
+      }
+      lead_magnet_inbox_preview_v6: {
+        Args: {
+          p_approval: Database["public"]["Tables"]["lead_magnet_approvals"]["Row"]
+        }
+        Returns: Json
+      }
+      lead_magnet_inbox_scope_v6: {
+        Args: {
+          p_approval: Database["public"]["Tables"]["lead_magnet_approvals"]["Row"]
+        }
+        Returns: Json
+      }
       lead_magnet_payload_hash_v6: {
         Args: { p_version_id: string }
+        Returns: string
+      }
+      lead_magnet_send_ready_v6: {
+        Args: { p_attempt: number; p_delivery_id: string }
+        Returns: boolean
+      }
+      lead_magnet_source_state_v6: {
+        Args: { p_request_id: string }
         Returns: string
       }
       lead_stage_rank: {
@@ -28980,6 +39861,10 @@ export type Database = {
         }[]
       }
       lock_down_definer_functions: { Args: never; Returns: number }
+      main_offer_source_current_v7: {
+        Args: { p_offer_id: string }
+        Returns: boolean
+      }
       mark_console_invitation_conflict_v6: {
         Args: { p_expected_hash: string; p_request_id: string }
         Returns: {
@@ -29009,6 +39894,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      mark_proof_placement_placed_inbox_v6: {
+        Args: { p_external_url: string; p_placement_id: string }
+        Returns: undefined
       }
       mark_proof_placement_placed_v6: {
         Args: { p_external_url: string; p_placement_id: string }
@@ -29805,12 +40694,148 @@ export type Database = {
         Args: { p_body: string; p_channel: string; p_subject: string }
         Returns: string
       }
+      message_template_approval_current_v6: {
+        Args: { p_approval_id: string }
+        Returns: boolean
+      }
+      message_template_review_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["message_template_review_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      message_template_review_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["message_template_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      message_template_review_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["message_template_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      message_template_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      meta_budget_credential_eligible_v6: {
+        Args: { p_client_id: string }
+        Returns: boolean
+      }
       meta_build_payload_hash_v6: {
         Args: { p_campaign_id: string }
         Returns: string
       }
+      meta_profile_prewrite_current_v6: {
+        Args: { p_change_id: string }
+        Returns: boolean
+      }
+      meta_profile_reconciliation_target_v6: {
+        Args: { p_attempt_id: string; p_client_id: string }
+        Returns: Json
+      }
+      meta_profile_review_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["meta_profile_review_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      meta_profile_review_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["meta_profile_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      meta_profile_review_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["meta_profile_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      meta_profile_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      meta_profile_target_snapshot_v6: {
+        Args: { p_client_id: string; p_platform: string }
+        Returns: Json
+      }
+      meta_profile_write_credential_eligible_v6: {
+        Args: { p_client_id: string }
+        Returns: boolean
+      }
+      metrics_backfill_accounts_v6: {
+        Args: { p_client_id: string; p_surface: string }
+        Returns: Json
+      }
+      metrics_backfill_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["metrics_backfill_reviews_v6"]["Row"]
+        }
+        Returns: string
+      }
+      metrics_backfill_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["metrics_backfill_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      metrics_backfill_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["metrics_backfill_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      metrics_backfill_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       metrics_period_summary: {
         Args: { p_client_id: string; p_since: string; p_until: string }
+        Returns: Json
+      }
+      model_section_hash_v7: {
+        Args: {
+          p_record: Database["public"]["Tables"]["client_agent_records"]["Row"]
+        }
+        Returns: string
+      }
+      model_section_snapshot_v7: {
+        Args: {
+          p_record: Database["public"]["Tables"]["client_agent_records"]["Row"]
+        }
+        Returns: Json
+      }
+      motion_render_acceptance_current_v6: {
+        Args: { p_candidate_id: string }
+        Returns: boolean
+      }
+      motion_render_review_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["motion_render_review_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      motion_render_review_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["motion_render_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      motion_render_review_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["motion_render_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      motion_render_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      motion_render_storage_identity_v6: {
+        Args: { p_candidate_id: string }
         Returns: Json
       }
       my_account_team: {
@@ -29821,9 +40846,103 @@ export type Database = {
         }[]
       }
       next_ref_number: { Args: { p_client_id: string }; Returns: string }
+      nurture_sequence_approval_current_v6: {
+        Args: { p_sequence_id: string }
+        Returns: boolean
+      }
+      nurture_sequence_review_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["nurture_sequence_review_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      nurture_sequence_review_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["nurture_sequence_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      nurture_sequence_review_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["nurture_sequence_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      nurture_sequence_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      nurture_sequence_steps_ready_v6: {
+        Args: { p_sequence_id: string }
+        Returns: boolean
+      }
+      opportunity_activation_current_v6: {
+        Args: { p_opportunity_id: string }
+        Returns: boolean
+      }
+      opportunity_activation_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["opportunity_activation_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      opportunity_activation_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["opportunity_activation_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      opportunity_activation_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["opportunity_activation_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      opportunity_activation_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      opportunity_approval_current_v6: {
+        Args: { p_id: string }
+        Returns: boolean
+      }
+      opportunity_approval_hash_v6: { Args: { p_id: string }; Returns: string }
+      opportunity_approval_preview_v6: { Args: { p_id: string }; Returns: Json }
+      opportunity_approval_scope_v6: { Args: { p_id: string }; Returns: Json }
+      opportunity_approval_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       opportunity_brief_v6: {
         Args: { p_opportunity_id: string }
         Returns: string
+      }
+      opportunity_proof_ready_v6: { Args: { p_id: string }; Returns: boolean }
+      ordinary_media_review_hash_v6: {
+        Args: {
+          p_review: Database["public"]["Tables"]["ordinary_media_review_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      ordinary_media_review_preview_v6: {
+        Args: {
+          p_review: Database["public"]["Tables"]["ordinary_media_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      ordinary_media_review_scope_v6: {
+        Args: {
+          p_review: Database["public"]["Tables"]["ordinary_media_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      ordinary_media_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      ordinary_media_signoff_current_v6: {
+        Args: { p_asset_id: string }
+        Returns: boolean
       }
       organic_publication_package_candidates_v6: {
         Args: { p_limit?: number }
@@ -29844,6 +40963,15 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: string
       }
+      outbound_message_send_ready_v6: {
+        Args: { p_message_id: string }
+        Returns: boolean
+      }
+      paid_operator_bundle_current_v7: {
+        Args: { p_bundle_id: string }
+        Returns: boolean
+      }
+      paid_operator_source_v7: { Args: { p_package_id: string }; Returns: Json }
       pause_agent_job: {
         Args: { p_job_id: string; p_reason: string }
         Returns: {
@@ -29917,6 +41045,69 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: string
       }
+      proof_artifact_review_hash_v6: {
+        Args: {
+          p_review: Database["public"]["Tables"]["proof_artifact_review_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      proof_artifact_review_preview_v6: {
+        Args: {
+          p_review: Database["public"]["Tables"]["proof_artifact_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      proof_artifact_review_scope_v6: {
+        Args: {
+          p_review: Database["public"]["Tables"]["proof_artifact_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      proof_artifact_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      proof_artifact_signoff_current_v6: {
+        Args: { p_artifact_version_id: string }
+        Returns: boolean
+      }
+      proof_delivery_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["proof_delivery_reviews_v6"]["Row"]
+        }
+        Returns: string
+      }
+      proof_delivery_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["proof_delivery_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      proof_delivery_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["proof_delivery_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      proof_delivery_send_ready_v6: {
+        Args: { p_delivery_id: string }
+        Returns: boolean
+      }
+      proof_delivery_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      proof_outcome_followup_ready_v7: {
+        Args: {
+          d: Database["public"]["Tables"]["proof_request_deliveries"]["Row"]
+        }
+        Returns: boolean
+      }
+      proof_placement_effect_allowed_v6: {
+        Args: { p_placement_id: string }
+        Returns: boolean
+      }
+      proof_placement_hash_v6: { Args: { p_id: string }; Returns: string }
       proof_placement_payload_hash_v6: {
         Args: {
           p_artifact_version_id: string
@@ -29926,11 +41117,44 @@ export type Database = {
         }
         Returns: string
       }
+      proof_placement_preview_v6: { Args: { p_id: string }; Returns: Json }
+      proof_placement_scope_v6: { Args: { p_id: string }; Returns: Json }
+      proof_placement_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      proof_rights_hash_v6: {
+        Args: {
+          p_request: Database["public"]["Tables"]["proof_rights_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      proof_rights_preview_v6: {
+        Args: {
+          p_request: Database["public"]["Tables"]["proof_rights_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      proof_rights_scope_v6: {
+        Args: {
+          p_request: Database["public"]["Tables"]["proof_rights_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      proof_rights_source_payload_v6: {
+        Args: { p: Database["public"]["Tables"]["client_proof_assets"]["Row"] }
+        Returns: Json
+      }
+      proof_rights_source_state_v6: {
+        Args: { p_canonical_id: string }
+        Returns: string
+      }
       proof_snapshot_hash_v6: { Args: { p: Json }; Returns: string }
       proof_source_snapshot_v6: {
         Args: { p: Database["public"]["Tables"]["client_proof_assets"]["Row"] }
         Returns: Json
       }
+      proof_storage_identity_v6: { Args: { p_proof_id: string }; Returns: Json }
       provision_campaign: {
         Args: { p_campaign_id: string }
         Returns: {
@@ -30101,6 +41325,27 @@ export type Database = {
         }
         Returns: undefined
       }
+      record_campaign_action_uncertain_v6: {
+        Args: {
+          p_execution_id: string
+          p_external_id?: string
+          p_external_url?: string
+          p_reason: string
+          p_result?: Json
+        }
+        Returns: undefined
+      }
+      record_campaign_budget_readback_v6: {
+        Args: {
+          p_account_id: string
+          p_ad_set_external_id: string
+          p_client_id: string
+          p_execution_id: string
+          p_observed_currency: string
+          p_observed_daily_budget_minor: number
+        }
+        Returns: string
+      }
       record_campaign_page_probe_v6: {
         Args: {
           p_detail: string
@@ -30117,6 +41362,18 @@ export type Database = {
           p_published_sha256?: string
           p_published_url: string
           p_rendered_sha256: string
+        }
+        Returns: string
+      }
+      record_campaign_page_readback_v6: {
+        Args: {
+          p_checked_ref: string
+          p_client_id: string
+          p_execution_id: string
+          p_observed_sha256: string
+          p_repository_name: string
+          p_repository_owner: string
+          p_site_path: string
         }
         Returns: string
       }
@@ -30179,6 +41436,37 @@ export type Database = {
         }
         Returns: undefined
       }
+      record_google_ads_full_read_v7: {
+        Args: {
+          p_ads: Json
+          p_campaigns: Json
+          p_client_id: string
+          p_credential_secret_id: string
+          p_currency: string
+          p_customer_id: string
+          p_from_date: string
+          p_integration_id: string
+          p_job_id: string
+          p_request_id: string
+          p_through_date: string
+        }
+        Returns: string
+      }
+      record_google_ads_read_v7: {
+        Args: {
+          p_campaigns: Json
+          p_client_id: string
+          p_credential_secret_id: string
+          p_currency: string
+          p_customer_id: string
+          p_from_date: string
+          p_integration_id: string
+          p_job_id: string
+          p_request_id: string
+          p_through_date: string
+        }
+        Returns: string
+      }
       record_google_ads_sheet_for_manifest_v6: {
         Args: {
           p_campaign_id: string
@@ -30206,6 +41494,54 @@ export type Database = {
         Args: { p_build_id: string; p_patch: Json }
         Returns: undefined
       }
+      record_google_operator_event_v7: {
+        Args: {
+          p_bundle_id: string
+          p_detail?: string
+          p_event: string
+          p_external_ad_id?: string
+          p_external_campaign_id?: string
+          p_reference: string
+        }
+        Returns: {
+          bundle_id: string
+          client_id: string
+          detail: string | null
+          event: string
+          external_ad_id: string | null
+          external_campaign_id: string | null
+          id: string
+          recorded_at: string
+          recorded_by: string
+          reference: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "google_operator_events_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      record_google_profile_reconciliation_v6: {
+        Args: {
+          p_attempt_id: string
+          p_client_id: string
+          p_observed_value: string
+          p_provider_ref: string
+        }
+        Returns: string
+      }
+      record_google_reply_reconciliation_v6: {
+        Args: {
+          p_attempt_id: string
+          p_client_id: string
+          p_observed_body_hash: string
+          p_provider_state: string
+          p_provider_update_time: string
+          p_review_ref: string
+        }
+        Returns: string
+      }
       record_inbound_dm_v6: {
         Args: {
           p_body: string
@@ -30226,9 +41562,59 @@ export type Database = {
         Args: { p_delivery_id: string; p_reason: string; p_retryable?: boolean }
         Returns: undefined
       }
+      record_lead_magnet_operator_event_v7: {
+        Args: {
+          p_kind: string
+          p_recipient?: string
+          p_reference?: string
+          p_version_id: string
+        }
+        Returns: {
+          actor_id: string
+          approval_id: string | null
+          client_id: string
+          content_sha256: string
+          event_kind: string
+          id: string
+          magnet_version_id: string
+          occurred_at: string
+          recipient: string | null
+          reference: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "lead_magnet_operator_events_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       record_lead_magnet_sent: {
         Args: { p_delivery_id: string; p_provider_ref: string }
         Returns: undefined
+      }
+      record_meta_ads_read_v7: {
+        Args: {
+          p_account_id: string
+          p_ads: Json
+          p_campaigns: Json
+          p_client_id: string
+          p_credential_secret_id: string
+          p_currency: string
+          p_from_date: string
+          p_integration_id: string
+          p_job_id: string
+          p_through_date: string
+        }
+        Returns: string
+      }
+      record_meta_profile_reconciliation_v6: {
+        Args: {
+          p_attempt_id: string
+          p_client_id: string
+          p_observed_value: string
+          p_provider_ref: string
+        }
+        Returns: string
       }
       record_outbound_message_failure: {
         Args: { p_message_id: string; p_reason: string; p_retryable?: boolean }
@@ -30251,6 +41637,34 @@ export type Database = {
           p_summary?: string
         }
         Returns: number
+      }
+      record_paid_operator_event_v7: {
+        Args: {
+          p_bundle_id: string
+          p_detail?: string
+          p_event: string
+          p_external_ad_id?: string
+          p_external_campaign_id?: string
+          p_reference: string
+        }
+        Returns: {
+          bundle_id: string
+          client_id: string
+          detail: string | null
+          event: string
+          external_ad_id: string | null
+          external_campaign_id: string | null
+          id: string
+          recorded_at: string
+          recorded_by: string
+          reference: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "paid_operator_events_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       record_post_publish_failure: {
         Args: {
@@ -30369,6 +41783,15 @@ export type Database = {
         Args: { p_detail?: string; p_placement_id: string }
         Returns: undefined
       }
+      record_proof_retraction_confirmation_v6: {
+        Args: {
+          p_evidence_ref: string
+          p_method: string
+          p_placement_id: string
+          p_reason: string
+        }
+        Returns: string
+      }
       record_qa_result: {
         Args: {
           p_findings: Json
@@ -30478,6 +41901,10 @@ export type Database = {
         }
       }
       recover_lead: { Args: { p_lead_id: string }; Returns: undefined }
+      recruitment_brief_signoff_current_v6: {
+        Args: { p_brief_id: string }
+        Returns: boolean
+      }
       recruitment_brief_snapshot_hash_v6: {
         Args: { p_brief: Database["public"]["Tables"]["client_briefs"]["Row"] }
         Returns: string
@@ -30485,6 +41912,10 @@ export type Database = {
       recruitment_brief_snapshot_v6: {
         Args: { p_brief: Database["public"]["Tables"]["client_briefs"]["Row"] }
         Returns: Json
+      }
+      recruitment_media_current_v6: {
+        Args: { p_asset_id: string }
+        Returns: boolean
       }
       recruitment_meta_build_snapshot_v6: {
         Args: { p_campaign_id: string }
@@ -30553,6 +41984,16 @@ export type Database = {
         Args: { p_asset_id: string; p_sha256: string; p_storage_path: string }
         Returns: string
       }
+      register_gateway_tool_review_v6: {
+        Args: { p_packet: Json }
+        Returns: Json
+      }
+      register_lead_magnet_inbox_v6: {
+        Args: {
+          p_approval: Database["public"]["Tables"]["lead_magnet_approvals"]["Row"]
+        }
+        Returns: string
+      }
       register_organic_publication_package_v6: {
         Args: {
           p_expected_source_hash: string
@@ -30566,9 +42007,47 @@ export type Database = {
         Args: { p_brief: Database["public"]["Tables"]["client_briefs"]["Row"] }
         Returns: string
       }
+      register_service_offer_approval_v6: {
+        Args: {
+          p_version: Database["public"]["Tables"]["service_offer_versions"]["Row"]
+        }
+        Returns: string
+      }
+      reject_opportunity_approval_v6: {
+        Args: {
+          p_opportunity_id: string
+          p_reason: string
+          p_request_id: string
+        }
+        Returns: string
+      }
       reject_opportunity_proposal_v6: {
         Args: { p_proposal_id: string; p_reason: string }
         Returns: undefined
+      }
+      reject_ordinary_media_inbox_v6: {
+        Args: { p_reason: string; p_request_id: string; p_review_id: string }
+        Returns: string
+      }
+      reject_proof_artifact_inbox_v6: {
+        Args: { p_reason: string; p_request_id: string; p_review_id: string }
+        Returns: string
+      }
+      reject_proof_rights_v6: {
+        Args: {
+          p_canonical_id: string
+          p_reason: string
+          p_rights_request_id: string
+        }
+        Returns: string
+      }
+      reject_sales_agent_public_use_v6: {
+        Args: { p_agent_id: string; p_reason: string; p_request_id: string }
+        Returns: string
+      }
+      reject_service_offer_version_v6: {
+        Args: { p_reason: string; p_version_id: string }
+        Returns: string
       }
       reject_slot: {
         Args: { p_reason: string; p_slot_id: string }
@@ -30602,6 +42081,14 @@ export type Database = {
       }
       release_campaign_proof_placements: {
         Args: { p_execution_id: string }
+        Returns: Json
+      }
+      release_campaign_proof_placements_owned_v6: {
+        Args: {
+          p_build_sha: string
+          p_execution_id: string
+          p_worker_id: string
+        }
         Returns: Json
       }
       release_proof_to_sales_agent_v6: {
@@ -30725,6 +42212,10 @@ export type Database = {
         }
         Returns: string
       }
+      request_campaign_budget_readback_v6: {
+        Args: { p_execution_id: string }
+        Returns: string
+      }
       request_campaign_google_build_v6: {
         Args: { p_actor: string; p_campaign_id: string }
         Returns: string
@@ -30768,6 +42259,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      request_campaign_page_readback_v6: {
+        Args: { p_execution_id: string }
+        Returns: string
+      }
       request_campaign_proof_publish_v6: {
         Args: { p_actor: string; p_campaign_id: string }
         Returns: string
@@ -30776,8 +42271,26 @@ export type Database = {
         Args: { p_campaign_id: string }
         Returns: string
       }
+      request_client_activation_target_v6: {
+        Args: { p_client_id: string; p_switch_key: string; p_target_id: string }
+        Returns: string
+      }
+      request_client_authority_assignment_v6: {
+        Args: {
+          p_action: string
+          p_client_id: string
+          p_compensation?: number
+          p_due_date?: string
+          p_member_id: string
+        }
+        Returns: string
+      }
       request_client_sales_entitlement: {
         Args: { p_action: string; p_client_id: string; p_member_id: string }
+        Returns: string
+      }
+      request_client_switch_activation_v6: {
+        Args: { p_client_id: string; p_switch_key: string }
         Returns: string
       }
       request_console_invitation_v6: {
@@ -30795,17 +42308,78 @@ export type Database = {
         }
         Returns: string
       }
+      request_creative_requirement_v6: {
+        Args: { p_client_id: string; p_required: boolean }
+        Returns: string
+      }
+      request_engine_slot_exact_review_v6: {
+        Args: { p_slot_id: string }
+        Returns: string
+      }
+      request_global_engine_activation_v6: { Args: never; Returns: string }
+      request_global_video_owner_v6: {
+        Args: { p_user_id: string }
+        Returns: string
+      }
+      request_google_profile_reconciliation_v6: {
+        Args: { p_attempt_id: string }
+        Returns: string
+      }
+      request_google_profile_review_v6: {
+        Args: { p_change_id: string }
+        Returns: string
+      }
+      request_google_profile_write_v6: {
+        Args: { p_change_id: string }
+        Returns: string
+      }
+      request_google_reply_reconciliation_v6: {
+        Args: { p_attempt_id: string }
+        Returns: string
+      }
+      request_google_reply_send_v6: {
+        Args: { p_reply_id: string }
+        Returns: string
+      }
+      request_human_idea_review_v6: {
+        Args: { p_idea_id: string }
+        Returns: string
+      }
       request_human_video_edit: {
         Args: { p_asset_id: string; p_due_date?: string; p_member_id: string }
+        Returns: string
+      }
+      request_integration_grant_v6: {
+        Args: { p_enable_ingest?: boolean; p_integration_id: string }
+        Returns: string
+      }
+      request_lead_capture_activation_v6: {
+        Args: { p_endpoint_id: string }
         Returns: string
       }
       request_lead_magnet_approval_v6: {
         Args: { p_version_id: string }
         Returns: string
       }
+      request_message_template_review_v6: {
+        Args: { p_consent_basis: string; p_version_id: string }
+        Returns: string
+      }
       request_meta_build: { Args: { p_campaign_id: string }; Returns: string }
       request_meta_build_sheet: {
         Args: { p_campaign_id: string }
+        Returns: string
+      }
+      request_meta_profile_reconciliation_v6: {
+        Args: { p_attempt_id: string }
+        Returns: string
+      }
+      request_meta_profile_review_v6: {
+        Args: { p_change_id: string }
+        Returns: string
+      }
+      request_meta_profile_write_v6: {
+        Args: { p_change_id: string }
         Returns: string
       }
       request_metrics_backfill: {
@@ -30816,6 +42390,15 @@ export type Database = {
           p_until: string
         }
         Returns: string[]
+      }
+      request_metrics_backfill_review_v6: {
+        Args: {
+          p_client_id: string
+          p_since: string
+          p_surface?: string
+          p_until: string
+        }
+        Returns: string
       }
       request_motion_design: {
         Args: {
@@ -30829,6 +42412,14 @@ export type Database = {
         }
         Returns: string
       }
+      request_motion_render_review_v6: {
+        Args: { p_candidate_id: string }
+        Returns: string
+      }
+      request_nurture_sequence_review_v6: {
+        Args: { p_sequence_id: string }
+        Returns: string
+      }
       request_offer_compile_v6: {
         Args: {
           p_client_id: string
@@ -30836,6 +42427,14 @@ export type Database = {
           p_opportunity_id?: string
           p_source: string
         }
+        Returns: string
+      }
+      request_opportunity_activation_v6: {
+        Args: { p_note?: string; p_opportunity_id: string }
+        Returns: string
+      }
+      request_opportunity_approval_v6: {
+        Args: { p_opportunity_id: string }
         Returns: string
       }
       request_opportunity_discovery_v6: {
@@ -30848,6 +42447,14 @@ export type Database = {
       }
       request_opportunity_strategy_v6: {
         Args: { p_client_id: string; p_opportunity_id: string }
+        Returns: string
+      }
+      request_ordinary_media_review_v6: {
+        Args: { p_asset_id: string }
+        Returns: string
+      }
+      request_proof_artifact_signoff_v6: {
+        Args: { p_artifact_version_id: string }
         Returns: string
       }
       request_proof_artifact_v6: {
@@ -30873,8 +42480,30 @@ export type Database = {
         }
         Returns: string
       }
+      request_proof_delivery_review_v6: {
+        Args: { p_delivery_id: string }
+        Returns: string
+      }
+      request_proof_media_rights_v6: {
+        Args: {
+          p_actor_id: string
+          p_expires_on: string
+          p_file_bytes: number
+          p_object_id: string
+          p_object_updated_at: string
+          p_object_version: string
+          p_permission_basis: string
+          p_proof_id: string
+          p_sha256: string
+        }
+        Returns: string
+      }
       request_proof_placement_approval_v6: {
         Args: { p_placement_id: string; p_scope?: Json }
+        Returns: string
+      }
+      request_proof_placement_inbox_v6: {
+        Args: { p_placement_id: string }
         Returns: string
       }
       request_proof_production_v2: {
@@ -30890,6 +42519,14 @@ export type Database = {
         }
         Returns: string
       }
+      request_proof_rights_v6: {
+        Args: {
+          p_expires_on?: string
+          p_permission_basis: string
+          p_proof_id: string
+        }
+        Returns: string
+      }
       request_recruitment_brief_approval_v6: {
         Args: { p_brief_id: string }
         Returns: string
@@ -30900,6 +42537,10 @@ export type Database = {
       }
       request_repurpose_clip: {
         Args: { p_brief_id: string; p_derivative_id: string }
+        Returns: string
+      }
+      request_sales_agent_public_use_v6: {
+        Args: { p_agent_id: string }
         Returns: string
       }
       request_source_video_edit: {
@@ -30922,6 +42563,10 @@ export type Database = {
       request_video_edit: { Args: { p_asset_id: string }; Returns: string }
       request_video_repurpose_insights: {
         Args: { p_asset_id: string; p_direction?: string }
+        Returns: string
+      }
+      request_video_seat_review_v6: {
+        Args: { p_asset_id: string; p_role: string }
         Returns: string
       }
       require_opportunity_proof_v6: {
@@ -31037,6 +42682,87 @@ export type Database = {
         }
       }
       resume_paused_jobs: { Args: never; Returns: number }
+      retry_campaign_conversion_step_v7: {
+        Args: { p_step_id: string }
+        Returns: {
+          agent_key: string
+          blocker: string | null
+          completed_at: string | null
+          created_at: string
+          dependencies: string[]
+          id: string
+          input_from_step_key: string | null
+          input_id: string | null
+          input_params: Json
+          input_table: string
+          job_id: string | null
+          resolved_input_id: string | null
+          run_id: string
+          status: string
+          step_key: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_steps"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      retry_campaign_magnet_step_v7: {
+        Args: { p_step_id: string }
+        Returns: {
+          agent_key: string
+          blocker: string | null
+          completed_at: string | null
+          created_at: string
+          dependencies: string[]
+          id: string
+          input_from_step_key: string | null
+          input_id: string | null
+          input_params: Json
+          input_table: string
+          job_id: string | null
+          resolved_input_id: string | null
+          run_id: string
+          status: string
+          step_key: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_steps"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      retry_campaign_sweep_step_v7: {
+        Args: { p_step_id: string }
+        Returns: {
+          agent_key: string
+          blocker: string | null
+          completed_at: string | null
+          created_at: string
+          dependencies: string[]
+          id: string
+          input_from_step_key: string | null
+          input_id: string | null
+          input_params: Json
+          input_table: string
+          job_id: string | null
+          resolved_input_id: string | null
+          run_id: string
+          status: string
+          step_key: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_steps"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       retry_failed_higgsfield_motion_step: {
         Args: { p_failed_requests: Json; p_step_id: string }
         Returns: {
@@ -31203,12 +42929,66 @@ export type Database = {
         }
         Returns: undefined
       }
+      review_model_section_v7: {
+        Args: {
+          p_confidence: string
+          p_observed_on: string
+          p_record_id: string
+          p_review_note?: string
+          p_source_ref: string
+        }
+        Returns: {
+          client_id: string
+          confidence: string
+          id: string
+          observed_on: string
+          record_hash: string
+          record_id: string
+          record_snapshot: Json
+          review_note: string
+          review_order: number
+          reviewed_at: string
+          reviewed_by: string
+          source_ref: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "model_section_reviews_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      reviewed_offer_strategy_snapshot_v7: {
+        Args: { p_client_id: string }
+        Returns: Json
+      }
       revoke_bot_sessions: {
         Args: { p_user_id: string }
         Returns: {
           refresh_tokens_deleted: number
           sessions_deleted: number
         }[]
+      }
+      revoke_campaign_action_approval_v6: {
+        Args: { p_approval_id: string; p_reason: string }
+        Returns: {
+          approval_id: string
+          client_id: string
+          inbox_decision_id: string
+          reason: string
+          revoked_at: string
+          revoked_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_action_revocations_v6"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      revoke_gateway_tool_review_v6: {
+        Args: { p_approval_id: string; p_reason: string; p_request_id: string }
+        Returns: string
       }
       revoke_lead_magnet_approval_v6: {
         Args: { p_approval_id: string; p_reason: string }
@@ -31217,6 +42997,67 @@ export type Database = {
       revoke_message_template_approval_v6: {
         Args: { p_approval_id: string; p_reason: string }
         Returns: undefined
+      }
+      revoke_sales_agent_public_use_v6: {
+        Args: { p_agent_id: string; p_reason: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
+          archived_at: string | null
+          booking_rule: string | null
+          built_at: string | null
+          client_id: string
+          created_at: string
+          escalation_rule: string | null
+          greeting: string | null
+          guardrails: string | null
+          id: string
+          job_id: string | null
+          name: string
+          objections: Json
+          page_id: string | null
+          public_use_request_token: string | null
+          purpose: string
+          qualification: Json
+          role: string | null
+          status: string
+          system_prompt: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_sales_agents"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      sales_agent_public_hash_v6: {
+        Args: {
+          p_agent: Database["public"]["Tables"]["client_sales_agents"]["Row"]
+        }
+        Returns: string
+      }
+      sales_agent_public_preview_v6: {
+        Args: {
+          p_agent: Database["public"]["Tables"]["client_sales_agents"]["Row"]
+        }
+        Returns: Json
+      }
+      sales_agent_public_scope_v6: {
+        Args: {
+          p_agent: Database["public"]["Tables"]["client_sales_agents"]["Row"]
+        }
+        Returns: Json
+      }
+      sales_agent_public_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      sales_agent_public_use_current_v6: {
+        Args: { p_agent_id: string }
+        Returns: boolean
       }
       sales_entitlement_inbox_binding_valid_v6: {
         Args: {
@@ -31367,6 +43208,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      secondary_offer_source_current_v7: {
+        Args: { p_offer_id: string }
+        Returns: boolean
+      }
       seed_motion_scenes_v6: { Args: { p_project_id: string }; Returns: number }
       select_idea_for_slot: {
         Args: { p_slot_id: string }
@@ -31392,6 +43237,16 @@ export type Database = {
       select_render: { Args: { p_render_id: string }; Returns: undefined }
       sequence_exit_reason_v6: {
         Args: { p_lead_id: string; p_sequence_id: string }
+        Returns: string
+      }
+      service_offer_approval_preview_v6: {
+        Args: {
+          p_version: Database["public"]["Tables"]["service_offer_versions"]["Row"]
+        }
+        Returns: Json
+      }
+      service_offer_source_state_v6: {
+        Args: { p_request_id: string }
         Returns: string
       }
       set_awareness_stage_template_v6: {
@@ -31522,9 +43377,26 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      set_campaign_content_spec_v7: {
+        Args: { p_campaign_id: string; p_pieces: Json }
+        Returns: string
+      }
+      set_campaign_magnet_requirement_v7: {
+        Args: { p_campaign_id: string; p_required: boolean }
+        Returns: undefined
+      }
       set_campaign_route_volumes_v6: {
         Args: { p_campaign_id: string; p_organic: number; p_paid: number }
         Returns: undefined
+      }
+      set_client_archive_v8: {
+        Args: {
+          p_archive: boolean
+          p_client_id: string
+          p_record_id: string
+          p_table_name: string
+        }
+        Returns: string
       }
       set_client_booking_enabled_v6: {
         Args: { p_client_id: string; p_enabled: boolean }
@@ -31872,6 +43744,11 @@ export type Database = {
           p_status: Database["public"]["Enums"]["opportunity_status"]
         }
         Returns: {
+          activated_content_hash: string | null
+          activated_request_id: string | null
+          approval_request_token: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           archived_at: string | null
           buying_situation: string
           client_id: string
@@ -32115,6 +43992,18 @@ export type Database = {
         Returns: string
       }
       sweep_expired_proof_placements: { Args: never; Returns: number }
+      sync_campaign_conversion_work_v7: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
+      sync_campaign_magnet_work_v7: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
+      sync_campaign_sweep_work_v7: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
       system_readiness_catalog: { Args: never; Returns: Json }
       title_overlap: {
         Args: { p_candidate: string; p_other: string }
@@ -32148,6 +44037,8 @@ export type Database = {
       usable_proof: {
         Args: { p_avatar?: string; p_client_id: string; p_limit?: number }
         Returns: {
+          approved_rights_content_hash: string | null
+          approved_rights_request_id: string | null
           avatar_relevance: string | null
           body: string | null
           capture_file_mime: string | null
@@ -32158,6 +44049,7 @@ export type Database = {
           created_at: string
           evidence: string | null
           expires_on: string | null
+          google_source_changed_at: string | null
           id: string
           media_type: Database["public"]["Enums"]["media_type"]
           permission_basis: string | null
@@ -32186,6 +44078,36 @@ export type Database = {
       video_client_approval_email_state: {
         Args: { p_asset_id: string }
         Returns: Json
+      }
+      video_seat_review_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["video_seat_review_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      video_seat_review_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["video_seat_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      video_seat_review_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["video_seat_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      video_seat_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      video_seat_reviewer_v6: {
+        Args: { p_asset_id: string; p_role: string }
+        Returns: string
+      }
+      video_signoff_current_v6: {
+        Args: { p_asset_id: string; p_role: string }
+        Returns: boolean
       }
       weighted_sequence: { Args: { p_weights: Json }; Returns: string[] }
       workflow_run_outcomes: { Args: { p_run_id: string }; Returns: Json }

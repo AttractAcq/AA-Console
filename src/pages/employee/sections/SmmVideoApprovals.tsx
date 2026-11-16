@@ -93,7 +93,7 @@ export function SmmVideoApprovals({ memberId }: { memberId: string }) {
             {urls.get(path) ? <video controls preload="metadata" className="w-full max-w-xl rounded-md"
               src={urls.get(path)} aria-label={`Review ${video.title ?? "video"}`} />
               : <p role="alert" className="text-xs text-destructive">Video preview unavailable. Retry before signing.</p>}
-            {urls.get(path) && <VideoApprovalRoute assetId={video.id}
+            {urls.get(path) && <VideoApprovalRoute clientId={video.client_id} assetId={video.id}
               onFinalApprove={() => finalize(video)} />}
             <div className="space-y-2">
               <button type="button" onClick={() => { setRejecting(video.id); setReason(""); }}

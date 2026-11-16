@@ -23,10 +23,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   fetchMagnets, fetchVersions, fetchApprovals, fetchDeliveriesDue, fetchEndpoints,
-  fetchSubmissions, requestApproval, decideApproval, revokeApproval,
+  fetchSubmissions, fetchMagnetOperatorEvents, fetchDeliverySwitch,
+  downloadAndRecordMagnetVersion, recordMagnetOperatorHandoff,
+  requestApproval, decideApproval, revokeApproval,
 } = vi.hoisted(() => ({
   fetchMagnets: vi.fn(), fetchVersions: vi.fn(), fetchApprovals: vi.fn(),
   fetchDeliveriesDue: vi.fn(), fetchEndpoints: vi.fn(), fetchSubmissions: vi.fn(),
+  fetchMagnetOperatorEvents: vi.fn(), fetchDeliverySwitch: vi.fn(),
+  downloadAndRecordMagnetVersion: vi.fn(), recordMagnetOperatorHandoff: vi.fn(),
   requestApproval: vi.fn(), decideApproval: vi.fn(), revokeApproval: vi.fn(),
 }));
 
@@ -35,6 +39,8 @@ vi.mock("../../lib/leadMagnets", async () => {
   return {
     ...actual,
     fetchMagnets, fetchVersions, fetchApprovals, fetchDeliveriesDue,
+    fetchMagnetOperatorEvents, fetchDeliverySwitch,
+    downloadAndRecordMagnetVersion, recordMagnetOperatorHandoff,
     requestApproval, decideApproval, revokeApproval,
   };
 });
@@ -64,6 +70,7 @@ const search = { value: "" };
 vi.mock("react-router-dom", () => ({
   useParams: () => ({ clientId: "client-1" }),
   useSearchParams: () => [new URLSearchParams(search.value), vi.fn()],
+  Link: ({ to, children }: { to: string; children: string }) => <a href={to}>{children}</a>,
 }));
 
 import { LeadMagnetStudioPanel } from "./LeadMagnetStudioPanel";
@@ -108,6 +115,10 @@ beforeEach(() => {
   fetchVersions.mockResolvedValue([version()]);
   fetchApprovals.mockResolvedValue([]);
   fetchDeliveriesDue.mockResolvedValue([]);
+  fetchMagnetOperatorEvents.mockResolvedValue([]);
+  fetchDeliverySwitch.mockResolvedValue(false);
+  downloadAndRecordMagnetVersion.mockResolvedValue(undefined);
+  recordMagnetOperatorHandoff.mockResolvedValue(undefined);
   fetchEndpoints.mockResolvedValue({ endpoints: [], due: new Map() });
   fetchSubmissions.mockResolvedValue([]);
 });
@@ -158,6 +169,15 @@ describe("which version is live", () => {
 });
 
 describe("the one decision", () => {
+  it("routes new exact-file approvals to the unified Inbox", async () => {
+    openRow();
+    fetchApprovals.mockResolvedValue([approval({ inbox_enforced_v6: true })]);
+    render(<LeadMagnetStudioPanel />);
+    const link = await screen.findByRole("link", { name: "Review in Approval Inbox" });
+    expect(link).toHaveAttribute("href", "/clients/client-1/delivery/approval-inbox?tab=unified");
+    expect(screen.queryByRole("button", { name: "Approve this file and route" })).not.toBeInTheDocument();
+  });
+
   it("shows the file, the hash and the route a person is agreeing to", async () => {
     openRow();
     fetchApprovals.mockResolvedValue([approval()]);
@@ -227,6 +247,48 @@ describe("what is owed", () => {
     render(<LeadMagnetStudioPanel />);
     await screen.findByText("Garage conversion cost guide");
     expect(screen.getByText("2")).toBeInTheDocument();
+  });
+});
+
+describe("manual operator handoff", () => {
+  it("lets an operator verify and download an approved exact version", async () => {
+    openRow();
+    fetchApprovals.mockResolvedValue([approval({ status: "approved",
+      decided_at: "2026-10-24T10:00:00Z", decided_by: "u1" })]);
+    render(<LeadMagnetStudioPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: "Download and verify exact file" }));
+    await waitFor(() => expect(downloadAndRecordMagnetVersion).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "ver-1", content_sha256: "b".repeat(64) })));
+    expect(recordMagnetOperatorHandoff).not.toHaveBeenCalled();
+  });
+
+  it("requires a postapproval download before reporting a manual handoff", async () => {
+    openRow();
+    fetchApprovals.mockResolvedValue([approval({ status: "approved",
+      decided_at: "2026-10-24T10:00:00Z", decided_by: "u1" })]);
+    fetchMagnetOperatorEvents.mockResolvedValue([{ id: "download-1",
+      magnet_version_id: "ver-1", event_kind: "verified_download",
+      approval_id: null, occurred_at: "2026-10-24T09:00:00Z" }]);
+    render(<LeadMagnetStudioPanel />);
+    const button = await screen.findByRole("button", { name: "Record manual handoff" });
+    expect(button).toBeDisabled();
+    expect(recordMagnetOperatorHandoff).not.toHaveBeenCalled();
+  });
+
+  it("records recipient and external reference without claiming delivery", async () => {
+    openRow();
+    fetchApprovals.mockResolvedValue([approval({ status: "approved",
+      decided_at: "2026-10-24T10:00:00Z", decided_by: "u1" })]);
+    fetchMagnetOperatorEvents.mockResolvedValue([{ id: "download-1",
+      magnet_version_id: "ver-1", event_kind: "verified_download",
+      approval_id: "app-1", occurred_at: "2026-10-24T11:00:00Z" }]);
+    const prompt = vi.spyOn(window, "prompt").mockReturnValueOnce("Paid ads operator")
+      .mockReturnValueOnce("ticket-123");
+    render(<LeadMagnetStudioPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: "Record manual handoff" }));
+    await waitFor(() => expect(recordMagnetOperatorHandoff).toHaveBeenCalledWith(
+      "ver-1", "Paid ads operator", "ticket-123"));
+    prompt.mockRestore();
   });
 });
 

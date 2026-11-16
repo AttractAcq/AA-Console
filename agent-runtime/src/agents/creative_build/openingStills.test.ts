@@ -151,12 +151,18 @@ describe("openingStillsRoute", () => {
   });
 });
 
-function creativeHarness(brief: Record<string, unknown>, generationMedia = "image") {
+function creativeHarness(brief: Record<string, unknown>, generationMedia = "image", signoff = false) {
   const sb = {
+    rpc(name: string, params: Record<string, unknown>) {
+      expect(name).toBe("recruitment_brief_signoff_current_v6");
+      expect(params).toEqual({ p_brief_id: "brief-1" });
+      return Promise.resolve({ data: signoff, error: null });
+    },
     from(table: string) {
       const row = {
         select: () => ({
           eq: () => ({
+            eq: async () => ({ count: 0, error: null }),
             maybeSingle: async () => {
               if (table === "creative_renders") {
                 return {
@@ -219,6 +225,23 @@ const agent = { agent_key: "creative_build", name: "Creative Build" } as AgentRo
 const runtime = {} as RuntimeConfig;
 
 describe("creative_build reel stills gate", () => {
+  it("holds recruitment production before contacting a concept provider when signoff is stale", async () => {
+    const result = await runCreativeBuildJob(
+      creativeHarness({
+        id: "brief-1", client_id: "client-1", title: "Editor recruitment",
+        body: "Join the team", media_type: "image", brief_ref: null,
+        purpose: "recruitment", recruitment_role: "editor", content_format: "single",
+        format_code: null, frame_count: null, frame_plan: null,
+      }),
+      { ...runtime, openaiApiKey: "fixture-key", conceptProvider: "anthropic" },
+      agent,
+      { ...job, params: { render_id: "render-1" } },
+      Date.now() + 10_000,
+    );
+    expect(result).toMatchObject({ ok: false, retryable: false });
+    expect(result.failureMessage).toMatch(/exact brief Inbox signoff/);
+  });
+
   it("still refuses a video story", async () => {
     const result = await runCreativeBuildJob(
       creativeHarness({

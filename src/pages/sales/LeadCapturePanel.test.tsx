@@ -164,6 +164,19 @@ describe("the doors", () => {
     await waitFor(() => expect(setEndpointEnabled).toHaveBeenCalledWith("end-1", false));
   });
 
+  it("requests exact review before opening a disabled intake door", async () => {
+    const user = userEvent.setup();
+    fetchEndpoints.mockResolvedValue({
+      endpoints: [endpoint({ enabled: false, submissions: 0 })],
+      due: new Map([["end-1", { endpoint_id: "end-1", blocker: "Switched off" }]]),
+    });
+    render(<LeadCapturePanel />);
+    await user.click(await screen.findByRole("button", { name: /^Actions for / }));
+    await user.click(await screen.findByRole("menuitem", { name: "Request activation" }));
+    await waitFor(() => expect(setEndpointEnabled).toHaveBeenCalledWith("end-1", true));
+    expect(await screen.findByText(/Exact activation review requested/)).toBeInTheDocument();
+  });
+
   it("hands back a new token once, and says why", async () => {
     const user = userEvent.setup();
     render(<LeadCapturePanel />);

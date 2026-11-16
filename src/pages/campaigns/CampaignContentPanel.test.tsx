@@ -95,7 +95,7 @@ it("loads campaign-specific ideas and the production linked to their briefs", as
   show();
   expect(await screen.findByText("WhatsApp photo triage")).toBeInTheDocument();
   expect(screen.getByText("Campaign piece")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Approve & brief" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Request idea review" })).toBeInTheDocument();
   expect(filters).toHaveBeenCalledWith("client_ideas", "campaign_id", "campaign-1");
   expect(filters).toHaveBeenCalledWith("campaign_artifacts", "campaign_id", "campaign-1");
   expect(filters).toHaveBeenCalledWith("client_media_assets", "brief_id", ["brief-1"]);
@@ -123,14 +123,11 @@ it("still offers the planned idea batch when a manual idea was assigned first", 
   expect(screen.getByRole("button", { name: "Generate campaign ideas" })).toBeInTheDocument();
 });
 
-it("manual approval is tightly scoped to the campaign idea", async () => {
+it("requests exact review for the campaign idea", async () => {
   show();
-  fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
-  await waitFor(() => expect(update).toHaveBeenCalledWith({ status: "approved" }));
-  expect(filters).toHaveBeenCalledWith("client_ideas", "id", "idea-1");
-  expect(filters).toHaveBeenCalledWith("client_ideas", "client_id", "client-1");
-  expect(filters).toHaveBeenCalledWith("client_ideas", "campaign_id", "campaign-1");
-  expect(filters).toHaveBeenCalledWith("client_ideas", "status", "draft");
+  fireEvent.click(await screen.findByRole("button", { name: "Request idea review" }));
+  await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_human_idea_review_v6", { p_idea_id: "idea-1" }));
+  expect(update).not.toHaveBeenCalledWith({ status: "approved" });
 });
 
 it("uses the existing combined RPC for campaign briefing", async () => {
@@ -276,7 +273,7 @@ describe("idea Details default collapsed", () => {
   it("still shows production actions and the brief while Details is collapsed", async () => {
     // Collapsing Details must not hide the work — only the prose.
     show();
-    expect(await screen.findByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Request idea review" })).toBeInTheDocument();
     expect(screen.getByText("Campaign piece")).toBeInTheDocument();
   });
 });

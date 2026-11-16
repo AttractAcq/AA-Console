@@ -10,14 +10,21 @@ const PLATFORMS = ["facebook", "instagram", "tiktok", "linkedin", "youtube"] as 
 export type Platform = (typeof PLATFORMS)[number];
 
 export type Route = "organic" | "paid";
+export type SweepPiece = {
+  route: Route;
+  platform: Platform;
+  media_type: "image" | "text" | "video";
+  content_format: "single" | "carousel" | "story" | "reel";
+};
 
 export type SweepStep = {
   stepKey: string;
-  agentKey: "ideation" | "brief" | "creative_build";
+  agentKey: "ideation" | "brief" | "creative_build" | "video_build" | "video_edit";
   dependencies: string[];
   /** Exactly one of these, which add_workflow_agent_step enforces. */
   inputTable: string;
   inputFromStepKey: string | null;
+  inputId: string | null;
   usesClientAsInput: boolean;
   inputParams: Record<string, unknown>;
 };
@@ -58,21 +65,16 @@ export function platformFor(channels: readonly string[] | null): Platform | null
  * written knowing what the earlier ones already said, so a campaign gets
  * genuinely distinct pieces instead of several models' first instinct.
  *
- * WHAT THIS DOES NOT DECIDE
- *
- * The notes ask the planner for "organic volume and type, paid volume and
- * type". Migration 308 gave it volume per route. TYPE is still owed: nothing
- * in the plan says whether a given piece is a reel, a carousel or a single
- * image. So every piece here is composed as a single image, which is the
- * conservative shape, and the mix remains a planner decision rather than
- * something a composer invents. A composer choosing the creative mix would be
- * making a product decision in the wrong place.
+ * When the planner already saved exact ideas, the chain starts at each idea:
+ * brief then creative. Deferred ideation keeps the three-step chain.
  */
 export function sweepSteps(args: {
   organicCount: number;
   paidCount: number;
   platform: Platform;
   campaignId: string;
+  pieces?: readonly SweepPiece[];
+  plannedIdeaIds?: readonly string[];
 }): SweepStep[] {
   const routes: Route[] = [
     ...Array.from({ length: args.organicCount }, () => "organic" as Route),
@@ -82,38 +84,47 @@ export function sweepSteps(args: {
   const steps: SweepStep[] = [];
   let previousIdeaKey: string | null = null;
 
-  routes.forEach((route, index) => {
+  const pieces = args.pieces ?? routes.map((route) => ({
+    route, platform: args.platform, media_type: "image" as const, content_format: "single" as const,
+  }));
+  if (pieces.length !== routes.length) throw new Error("Sweep content requirements disagree with planned volume.");
+  if (args.plannedIdeaIds && args.plannedIdeaIds.length !== pieces.length)
+    throw new Error("Sweep planned ideas disagree with planned volume.");
+  pieces.forEach((piece, index) => {
     const n = index + 1;
     const ideaKey = `piece${n}_idea`;
     const briefKey = `piece${n}_brief`;
     const createKey = `piece${n}_create`;
 
-    steps.push({
+    const plannedId = args.plannedIdeaIds?.[index];
+    if (!plannedId) steps.push({
       stepKey: ideaKey,
       agentKey: "ideation",
       // Sequential, so each idea sees the ones before it.
       dependencies: previousIdeaKey ? [previousIdeaKey] : [],
       inputTable: "clients",
       inputFromStepKey: null,
+      inputId: null,
       usesClientAsInput: true,
       inputParams: {
         idea_count: 1,
         campaign_id: args.campaignId,
-        target_platform: args.platform,
-        media_type: "image",
-        content_format: "single",
+        target_platform: piece.platform,
+        media_type: piece.media_type,
+        content_format: piece.content_format,
         // Which half of a both-route campaign this piece serves. Migration 302
         // put acquisition_route on client_ideas for exactly this.
-        acquisition_route: route,
+        acquisition_route: piece.route,
       },
     });
 
     steps.push({
       stepKey: briefKey,
       agentKey: "brief",
-      dependencies: [ideaKey],
+      dependencies: plannedId ? [] : [ideaKey],
       inputTable: "client_ideas",
-      inputFromStepKey: ideaKey,
+      inputFromStepKey: plannedId ? null : ideaKey,
+      inputId: plannedId ?? null,
       usesClientAsInput: false,
       inputParams: {},
     });
@@ -124,11 +135,27 @@ export function sweepSteps(args: {
       dependencies: [briefKey],
       inputTable: "client_briefs",
       inputFromStepKey: briefKey,
+      inputId: null,
       usesClientAsInput: false,
       inputParams: {},
     });
+    if (piece.media_type === "video") {
+      const motionKey = `piece${n}_motion`;
+      steps.push({
+        stepKey: motionKey, agentKey: "video_build",
+        dependencies: [briefKey, createKey], inputTable: "client_briefs",
+        inputFromStepKey: briefKey, inputId: null, usesClientAsInput: false,
+        inputParams: {},
+      });
+      steps.push({
+        stepKey: `piece${n}_edit`, agentKey: "video_edit",
+        dependencies: [motionKey], inputTable: "client_media_assets",
+        inputFromStepKey: motionKey, inputId: null, usesClientAsInput: false,
+        inputParams: {},
+      });
+    }
 
-    previousIdeaKey = ideaKey;
+    if (!plannedId) previousIdeaKey = ideaKey;
   });
 
   return steps;

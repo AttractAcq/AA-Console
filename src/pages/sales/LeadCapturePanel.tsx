@@ -237,12 +237,12 @@ export function LeadCapturePanel() {
                 busy={busy === endpoint.id}
                 items={[
                   {
-                    label: endpoint.enabled ? "Switch off" : "Switch on",
+                    label: endpoint.enabled ? "Switch off" : "Request activation",
                     onSelect: () =>
                       void act(
                         endpoint.id,
                         () => setEndpointEnabled(endpoint.id, !endpoint.enabled),
-                        endpoint.enabled ? "Switched off." : "Switched on.",
+                        endpoint.enabled ? "Switched off." : "Exact activation review requested in Unified Approval Inbox.",
                       ),
                   },
                 ]}

@@ -6,6 +6,7 @@ import { Store } from "../audit/store.js";
 import { ActionEngine } from "../policy/engine.js";
 import { registry } from "../registry/tools.js";
 import { AAApiAdapter } from "../adapters/aa-api.js";
+import { AaCanonicalApprovalBridge } from "../approvals/canonical-bridge.js";
 process.umask(0o077);
 let c;
 try {
@@ -27,6 +28,9 @@ const engine = new ActionEngine(
       : undefined,
   ),
   c.MCP_DISCOVER_STUBS,
+  c.AA_INTERNAL_API_URL
+    ? new AaCanonicalApprovalBridge(c.AA_INTERNAL_API_URL, c.AA_MCP_SERVICE_SECRET!)
+    : undefined,
 );
 const server = createServer(c, engine);
 server.listen(c.PORT, c.HOST, () =>

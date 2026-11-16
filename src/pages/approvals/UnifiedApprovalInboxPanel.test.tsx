@@ -3,11 +3,18 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from, rpc, getAAL } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), getAAL: vi.fn() }));
+const { from, rpc, getAAL, downloadVerifiedProofFile, downloadVerifiedCreativeFile } = vi.hoisted(() => ({
+  from: vi.fn(), rpc: vi.fn(), getAAL: vi.fn(), downloadVerifiedProofFile: vi.fn(),
+  downloadVerifiedCreativeFile: vi.fn(),
+}));
+vi.mock("../../lib/proofRights", () => ({ downloadVerifiedProofFile }));
+vi.mock("../../lib/creativeReview", () => ({ downloadVerifiedCreativeFile }));
 vi.mock("../../lib/supabase", () => ({ supabase: {
   from, rpc, auth: { mfa: { getAuthenticatorAssuranceLevel: getAAL } },
 } }));
 vi.mock("./ApprovalCoveragePanel", () => ({ ApprovalCoveragePanel: () => null }));
+vi.mock("./ExternalExecutionAlerts", () => ({ ExternalExecutionAlerts: () => null }));
+vi.mock("./HeldExternalJobs", () => ({ HeldExternalJobs: () => null }));
 vi.mock("react-router-dom", async (original) => ({
   ...(await original<typeof import("react-router-dom")>()),
   useParams: () => ({ clientId: "client-1" }),
@@ -42,12 +49,15 @@ const request = {
 
 let requests: unknown[];
 let decisions: unknown[];
+let gatewayOutcomes: unknown[];
 let requestError: { message: string } | null;
 let decisionError: { message: string } | null;
 let freshRequest: unknown | undefined;
 let clientEqValues: string[];
 let requestRanges: Array<[number, number]>;
 let historyIds: string[][];
+let campaignDueRows: unknown[];
+let proofOutcomeRows: unknown[];
 
 const readyCampaign = {
   ...request, source_system: "aa_console", expires_at: "2030-01-01T00:00:00Z",
@@ -121,6 +131,599 @@ const readySalesRevoke = {
   scope: { ...readySales.scope, action: "revoke" },
 };
 
+const offerVersionId = "33333333-3333-4333-8333-333333333333";
+const offerId = "44444444-4444-4444-8444-444444444444";
+const offerHash = "e".repeat(64);
+const readyOffer = {
+  ...request, id: "offer-inbox-1", source_system: "aa_console", source_kind: "service_offer",
+  source_id: offerVersionId, source_version: offerHash, artifact_hash: offerHash,
+  title: "Service offer: Consulting · version 1", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", destination: "campaign_factory:offer_version",
+  account_ref: null, budget: null, owner_role: "admin_or_active_client_manager",
+  preview: { offer_id: offerId, offer_version_id: offerVersionId, client_id: "client-1",
+    version: 1, service_name: "Consulting", audience: "Owners", promise: "Clear plan",
+    inclusions: ["Workshop"], exclusions: ["No guarantee"], price_amount: 1000,
+    currency: "EUR", delivery_cost_estimate: 200, claims: [] },
+  scope: { client_id: "client-1", offer_id: offerId, offer_version_id: offerVersionId,
+    version: 1, content_hash: offerHash },
+  owning_path: `/clients/client-1/delivery/offer-studio?tab=versions&offer=${offerId}`,
+};
+
+const packageId = "99999999-9999-4999-8999-999999999999";
+const packageHash = "9".repeat(64);
+const readyPreparation = {
+  ...request, id: "preparation-inbox-1", source_system: "aa_console",
+  source_kind: "campaign_preparation_package", source_id: packageId,
+  source_version: packageHash, artifact_hash: packageHash,
+  title: "Campaign preparation package v1", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z",
+  destination: "campaign_factory:prepared_package", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", campaign_id: "campaign-1", run_id: "run-1",
+    routes: [{ route: "organic", version: 1 }],
+    outputs: [{ item_key: "content_piece1", output_fingerprint: "a".repeat(64) }] },
+  scope: { client_id: "client-1", campaign_id: "campaign-1", run_id: "run-1",
+    package_id: packageId, snapshot_hash: packageHash, version: 1 },
+  owning_path: "/clients/client-1/delivery/campaign-factory?campaign=campaign-1",
+};
+
+const googleBundleId = "88888888-8888-4888-8888-888888888888";
+const googleBundleHash = "8".repeat(64);
+const readyGoogleOperator = {
+  ...request, id: "google-operator-inbox-1", source_system: "aa_console",
+  source_kind: "google_operator_bundle", source_id: googleBundleId,
+  source_version: googleBundleHash, artifact_hash: googleBundleHash,
+  title: "Google manual operator bundle v1", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z",
+  destination: "google_ads:manual_operator_handoff", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { source: { campaign_id: "campaign-1", sheet_id: "sheet-1" },
+    owner: "Paid operator", headlines: ["One", "Two", "Three"],
+    descriptions: ["First description", "Second description"] },
+  scope: { client_id: "client-1", campaign_id: "campaign-1", sheet_id: "sheet-1",
+    bundle_id: googleBundleId, snapshot_hash: googleBundleHash, version: 1 },
+  owning_path: "/clients/client-1/delivery/google-ads-studio",
+};
+
+const publicAgentId = "55555555-5555-4555-8555-555555555555";
+const publicAgentToken = "66666666-6666-4666-8666-666666666666";
+const publicAgentHash = "1".repeat(64);
+const readyPublicAgent = {
+  ...request, id: "public-agent-inbox-1", source_system: "aa_console",
+  source_kind: "sales_agent_public_use", source_id: publicAgentId,
+  source_version: `${publicAgentHash}:${publicAgentToken}`,
+  artifact_hash: publicAgentHash, title: "Sales agent public use: Qualifier",
+  source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  destination: `public_sales_agent:${publicAgentId}`, account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { agent_id: publicAgentId, client_id: "client-1",
+    request_token: publicAgentToken, name: "Qualifier", status: "live",
+    built_at: "2026-11-14T12:00:00Z", page_id: "page-1",
+    greeting: "Hello", system_prompt: "Answer accurately", guardrails: "No guarantees",
+    qualification: [], objections: [] },
+  scope: { agent_id: publicAgentId, client_id: "client-1",
+    request_token: publicAgentToken, page_id: "page-1",
+    script_hash: publicAgentHash },
+  owning_path: `/clients/client-1/delivery/sales-os?agent=${publicAgentId}`,
+};
+
+const opportunityId = "77777777-7777-4777-8777-777777777777";
+const opportunityToken = "88888888-8888-4888-8888-888888888888";
+const opportunityHash = "2".repeat(64);
+const readyOpportunity = {
+  ...request, id: "opportunity-inbox-1", source_system: "aa_console",
+  source_kind: "opportunity_approve", source_id: opportunityId,
+  source_version: `${opportunityHash}:${opportunityToken}`,
+  artifact_hash: opportunityHash, title: "Approve market opportunity: Winter garage gym",
+  source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  destination: `campaign_factory:opportunity:${opportunityId}`,
+  account_ref: null, budget: null, owner_role: "admin_or_active_client_manager",
+  preview: { opportunity_id: opportunityId, client_id: "client-1",
+    request_token: opportunityToken,
+    opportunity: { name: "Winter garage gym", micro_market: "Homeowners" },
+    score: { total: 72, classification: "test" },
+    attributes: [], awareness: [{ stage: "problem_aware", message: "Winter matters" }],
+    links: [], proof_requirements: [] },
+  scope: { opportunity_id: opportunityId, client_id: "client-1",
+    request_token: opportunityToken, content_hash: opportunityHash },
+  owning_path: `/clients/client-1/delivery/market-opportunities?opportunity=${opportunityId}`,
+};
+
+const proofRightsId = "99999999-9999-4999-8999-999999999999";
+const proofId = "aaaa1111-aaaa-4111-8111-aaaaaaaa1111";
+const proofToken = "bbbb1111-bbbb-4111-8111-bbbbbbbb1111";
+const proofHash = "3".repeat(64);
+const readyProofRights = {
+  ...request, id: "proof-rights-inbox-1", source_system: "aa_console",
+  source_kind: "proof_rights", source_id: proofRightsId,
+  source_version: `${proofHash}:${proofToken}`,
+  artifact_hash: proofHash, title: "Clear proof rights: Testimonial",
+  source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  destination: `proof_bank:clear:${proofId}`, account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", proof_id: proofId, request_token: proofToken,
+    requested_rights: "approved", permission_basis: "Customer signed release",
+    expires_on: null, proof: { id: proofId, media_type: "text", storage_path: null,
+      title: "Testimonial", body: "A customer result" } },
+  scope: { client_id: "client-1", proof_id: proofId,
+    rights_request_id: proofRightsId, request_token: proofToken,
+    content_hash: proofHash, requested_rights: "approved" },
+  owning_path: `/clients/client-1/delivery/proof-production-factory?proof=${proofId}`,
+};
+
+const placementApprovalId = "dddd1111-dddd-4111-8111-dddddddd1111";
+const placementId = "eeee1111-eeee-4111-8111-eeeeeeee1111";
+const placementToken = "ffff1111-ffff-4111-8111-ffffffff1111";
+const placementHash = "4".repeat(64);
+const readyProofPlacement = {
+  ...request, id: "proof-placement-inbox-1", source_system: "aa_console",
+  source_kind: "proof_placement", source_id: placementApprovalId,
+  source_version: `${placementHash}:${placementToken}`,
+  artifact_hash: placementHash, title: "Place proof at third_party_directory",
+  source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  destination: `proof_distribution:third_party_directory:${placementId}`,
+  account_ref: null, budget: null, owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", approval_id: placementApprovalId,
+    placement_id: placementId, request_token: placementToken,
+    destination_key: "third_party_directory", placement_payload_hash: "5".repeat(64),
+    source_proof: { id: proofId, media_type: "text", storage_path: null,
+      body: "Customer result", usage_rights: "approved" },
+    payload_proof: { id: proofId, body: "Customer result" }, artifact: null, media: null },
+  scope: { client_id: "client-1", approval_id: placementApprovalId,
+    placement_id: placementId, request_token: placementToken,
+    destination_key: "third_party_directory", content_hash: placementHash,
+    effect: "release_for_placement" },
+  owning_path: "/clients/client-1/delivery/proof-distribution?tab=placements",
+};
+
+const artifactReviewId = "12121212-1212-4212-8212-121212121212";
+const artifactVersionId = "13131313-1313-4313-8313-131313131313";
+const artifactToken = "14141414-1414-4414-8414-141414141414";
+const artifactHash = "7".repeat(64);
+const readyProofArtifact = {
+  ...request, id: "proof-artifact-inbox-1", source_system: "aa_console",
+  source_kind: "proof_artifact", source_id: artifactReviewId,
+  source_version: `${artifactHash}:${artifactToken}`,
+  artifact_hash: artifactHash, title: "Sign off proof artifact: local_proof_snippet v1",
+  source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  destination: `proof_bank:artifact:${artifactVersionId}`, account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", artifact_version_id: artifactVersionId,
+    request_token: artifactToken,
+    artifact: { id: artifactVersionId, client_id: "client-1", source_proof_id: proofId,
+      content: "Customer result with supported evidence", supported_claim: "Delivered on time",
+      evidence_excerpt: "Signed handover" },
+    source_proof: { id: proofId, client_id: "client-1", usage_rights: "approved",
+      approved_rights_request_id: proofRightsId, body: "Customer result" } },
+  scope: { client_id: "client-1", review_id: artifactReviewId,
+    artifact_version_id: artifactVersionId, request_token: artifactToken,
+    content_hash: artifactHash, effect: "source_and_claim_signoff" },
+  owning_path: "/clients/client-1/delivery/proof-production-factory?tab=artifacts",
+};
+
+const mediaReviewId = "15151515-1515-4515-8515-151515151515";
+const mediaAssetId = "16161616-1616-4616-8616-161616161616";
+const mediaToken = "17171717-1717-4717-8717-171717171717";
+const mediaHash = "8".repeat(64);
+const mediaFileHash = "9".repeat(64);
+const readyOrdinaryMedia = {
+  ...request, id: "ordinary-media-inbox-1", source_system: "aa_console",
+  source_kind: "ordinary_media", source_id: mediaReviewId,
+  source_version: `${mediaHash}:${mediaToken}`, artifact_hash: mediaHash,
+  title: "Review creative: Client image", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", destination: `creative_source:${mediaAssetId}`,
+  account_ref: null, budget: null, owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", asset_id: mediaAssetId, request_token: mediaToken,
+    asset: { id: mediaAssetId, client_id: "client-1", title: "Client image",
+      media_type: "image", content_format: "single", storage_path: "client-1/image.png",
+      file_sha256: mediaFileHash, usage_rights: "agency_owned" },
+    storage: { bucket: "client-media", object_id: "storage-object-1", version: "v1" } },
+  scope: { client_id: "client-1", asset_id: mediaAssetId, review_id: mediaReviewId,
+    request_token: mediaToken, content_hash: mediaHash, effect: "creative_source_signoff" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=assets",
+};
+
+const proofDeliveryReviewId = "20202020-2020-4020-8020-202020202020";
+const proofDeliveryToken = "21212121-2121-4121-8121-212121212121";
+const proofDeliveryHash = "c".repeat(64);
+const readyProofDelivery = {
+  ...request, id: "proof-delivery-inbox-1", source_system: "aa_console",
+  source_kind: "proof_delivery", source_id: proofDeliveryReviewId,
+  source_version: `${proofDeliveryHash}:${proofDeliveryToken}`,
+  artifact_hash: proofDeliveryHash, title: "Send proof request: email to customer",
+  source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  destination: "email:customer@example.invalid", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", delivery_id: "delivery-1",
+    request_token: proofDeliveryToken, config_id: "config-1", link_id: "link-1",
+    channel: "email", recipient: "customer@example.invalid",
+    subject: "Evidence request", message: "Please send evidence",
+    capture_url: "https://example.invalid/capture/private" },
+  scope: { client_id: "client-1", delivery_id: "delivery-1",
+    review_id: proofDeliveryReviewId, request_token: proofDeliveryToken,
+    content_hash: proofDeliveryHash, effect: "proof_request_send" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
+
+const metaProfileReviewId = "22222222-2222-4222-8222-222222222222";
+const metaProfileToken = "23232323-2323-4232-8232-232323232323";
+const metaProfileHash = "d".repeat(64);
+const readyMetaProfileChange = {
+  ...request, id: "meta-profile-inbox-1", source_system: "aa_console",
+  source_kind: "meta_profile_change", source_id: metaProfileReviewId,
+  source_version: `${metaProfileHash}:${metaProfileToken}`,
+  artifact_hash: metaProfileHash, title: "Review instagram profile bio",
+  source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  destination: "meta_profile:instagram:bio", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", change_id: "change-1", request_token: metaProfileToken,
+    platform: "instagram", field: "bio", current_value: "Old bio",
+    proposed_value: "New bio", consequence: "Proposal only" },
+  scope: { client_id: "client-1", change_id: "change-1",
+    review_id: metaProfileReviewId, request_token: metaProfileToken,
+    content_hash: metaProfileHash, effect: "meta_profile_proposal_only" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
+
+const googleProfileReviewId = "24242424-2424-4242-8242-242424242424";
+const googleProfileToken = "25252525-2525-4252-8252-252525252525";
+const googleProfileHash = "e".repeat(64);
+const readyGoogleProfileChange = {
+  ...request, id: "google-profile-inbox-1", source_system: "aa_console",
+  source_kind: "google_profile_change", source_id: googleProfileReviewId,
+  source_version: `${googleProfileHash}:${googleProfileToken}`,
+  artifact_hash: googleProfileHash, title: "Review Google profile description at Test location",
+  source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  destination: "google_profile:accounts/test/locations/one:description",
+  account_ref: "accounts/test/locations/one", budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", change_id: "change-1", request_token: googleProfileToken,
+    location_id: "location-1", location_ref: "accounts/test/locations/one",
+    location_title: "Test location", field: "description",
+    current_value: "Old description", proposed_value: "New description" },
+  scope: { client_id: "client-1", change_id: "change-1", location_id: "location-1",
+    review_id: googleProfileReviewId, request_token: googleProfileToken,
+    content_hash: googleProfileHash, effect: "google_profile_proposal_only" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
+
+const activationReviewId = "26262626-2626-4262-8262-262626262626";
+const activationToken = "27272727-2727-4272-8272-272727272727";
+const activationHash = "f".repeat(64);
+const readyOpportunityActivation = {
+  ...request, id: "activation-inbox-1", source_system: "aa_console",
+  source_kind: "opportunity_activate", source_id: activationReviewId,
+  source_version: `${activationHash}:${activationToken}`,
+  artifact_hash: activationHash, title: "Activate market opportunity: Garage gym",
+  source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  destination: "market_opportunity:opportunity-1:active", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", opportunity_id: "opportunity-1",
+    request_token: activationToken, activation_note: "Begin planning",
+    approved_request_id: "approval-1", approved_content_hash: "a".repeat(64),
+    approved_opportunity: { opportunity_id: "opportunity-1", client_id: "client-1" },
+    campaigns: [{ campaign_id: "campaign-1", role: "campaign" }] },
+  scope: { client_id: "client-1", opportunity_id: "opportunity-1",
+    activation_id: activationReviewId, request_token: activationToken,
+    content_hash: activationHash, effect: "opportunity_status_active" },
+  owning_path: "/clients/client-1/delivery/market-opportunities?opportunity=opportunity-1",
+};
+
+const messageReviewId = "29292929-2929-4292-8292-292929292929";
+const messageToken = "30303030-3030-4030-8030-303030303030";
+const messageHash = "e".repeat(64);
+const readyMessageTemplate = {
+  ...request, id: "message-inbox-1", source_system: "aa_console",
+  source_kind: "message_template", source_id: messageReviewId,
+  source_version: `${messageHash}:${messageToken}`, artifact_hash: messageHash,
+  title: "Approve message: Enquiry response v1", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "outbound_template:email:version-1", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", template_version_id: "version-1",
+    request_token: messageToken, name: "Enquiry response", purpose: "transactional",
+    channel: "email", subject: "Your enquiry", body: "Hello Priya.",
+    consent_basis: "Lead explicitly requested a reply", channel_supported: true },
+  scope: { client_id: "client-1", template_version_id: "version-1",
+    review_id: messageReviewId, request_token: messageToken,
+    content_hash: messageHash, effect: "standing_template_send_permission" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
+
+const sequenceReviewId = "31313131-3131-4131-8131-313131313131";
+const sequenceToken = "32323232-3232-4232-8232-323232323232";
+const sequenceHash = "d".repeat(64);
+const readyNurtureSequence = {
+  ...request, id: "sequence-inbox-1", source_system: "aa_console",
+  source_kind: "nurture_sequence", source_id: sequenceReviewId,
+  source_version: `${sequenceHash}:${sequenceToken}`, artifact_hash: sequenceHash,
+  title: "Approve nurture sequence: Guide follow-up", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "nurture_sequence:sequence-1", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", sequence_id: "sequence-1", request_token: sequenceToken,
+    name: "Guide follow-up", purpose: "magnet_follow_up", trigger_stage: "profile_visit",
+    trigger_after_hours: 24, exit_stages: ["appointment", "sale"],
+    enrolled_automatically: true, steps: [{ template_version_id: "version-1",
+      body: "Here is your guide.", approval_request_id: "message-inbox-1" }] },
+  scope: { client_id: "client-1", sequence_id: "sequence-1", review_id: sequenceReviewId,
+    request_token: sequenceToken, content_hash: sequenceHash,
+    effect: "standing_sequence_enrolment_permission" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
+
+const videoReviewId = "33333333-3333-4333-8333-333333333333";
+const videoReviewerId = "34343434-3434-4434-8434-343434343434";
+const videoToken = "35353535-3535-4535-8535-353535353535";
+const videoHash = "c".repeat(64);
+const videoFileHash = "b".repeat(64);
+const readyVideoSeat = {
+  ...request, id: "video-seat-inbox-1", source_system: "aa_console",
+  source_kind: "video_seat", source_id: videoReviewId,
+  source_version: `${videoHash}:${videoToken}`, artifact_hash: videoHash,
+  title: "Sign video as owner: Exact cut", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "video_seat:owner:asset-1", account_ref: null, budget: null,
+  owner_role: `video_owner:${videoReviewerId}`,
+  preview: { client_id: "client-1", asset_id: "asset-1", request_token: videoToken,
+    approval_role: "owner", assigned_reviewer: videoReviewerId,
+    asset: { title: "Exact cut", media_type: "video", edit_stage: "review_ready",
+      render_path: "client-1/render.mp4", file_sha256: videoFileHash,
+      usage_rights: "agency_owned" },
+    storage: { bucket: "client-media", object_id: "storage-object-1", version: "v1" } },
+  scope: { client_id: "client-1", asset_id: "asset-1", review_id: videoReviewId,
+    approval_role: "owner", assigned_reviewer: videoReviewerId,
+    request_token: videoToken, content_hash: videoHash,
+    effect: "rendered_video_seat_signoff" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=assets",
+};
+
+const motionReviewId = "36363636-3636-4636-8636-363636363636";
+const motionToken = "37373737-3737-4737-8737-373737373737";
+const motionHash = "d".repeat(64);
+const motionFileHash = "e".repeat(64);
+const readyMotionRender = {
+  ...request, id: "motion-inbox-1", source_system: "aa_console",
+  source_kind: "motion_render", source_id: motionReviewId,
+  source_version: `${motionHash}:${motionToken}`, artifact_hash: motionHash,
+  title: "Accept motion render r1", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "motion_render:candidate-1", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", candidate_id: "candidate-1", project_id: "project-1",
+    request_token: motionToken, attempt: 1, render_path: "client-1/motion/r1.mp4",
+    render_sha256: motionFileHash, render_file_bytes: 12,
+    storage: { bucket: "client-media", object_id: "storage-object-1", version: "v1" },
+    qa: { brand: "pass", claim: "pass", proof_source_lost: false }, scenes: [] },
+  scope: { client_id: "client-1", candidate_id: "candidate-1", review_id: motionReviewId,
+    request_token: motionToken, content_hash: motionHash, effect: "motion_candidate_acceptance" },
+  owning_path: "/clients/client-1/delivery/motion-design?tab=renders",
+};
+
+const ideaReviewId = "38383838-3838-4838-8838-383838383838";
+const ideaToken = "39393939-3939-4939-8939-393939393939";
+const ideaHash = "f".repeat(64);
+const readyCampaignIdea = {
+  ...request, id: "idea-inbox-1", source_system: "aa_console",
+  source_kind: "campaign_idea", source_id: ideaReviewId,
+  source_version: `${ideaHash}:${ideaToken}`, artifact_hash: ideaHash,
+  title: "Select idea: A useful buying trigger", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "internal:brief:idea:idea-1", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", idea_id: "idea-1", request_token: ideaToken,
+    selection_route: "human", idea: { id: "idea-1", client_id: "client-1",
+      title: "A useful buying trigger", body: "Exact idea direction" },
+    campaign: null, proof: null },
+  scope: { client_id: "client-1", idea_id: "idea-1", review_id: ideaReviewId,
+    request_token: ideaToken, content_hash: ideaHash,
+    effect: "human_idea_selection_for_brief" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
+
+const switchReviewId = "40404040-4040-4040-8040-404040404040";
+const switchToken = "41414141-4141-4141-8141-414141414141";
+const switchHash = "c".repeat(64);
+const readyActivationSwitch = {
+  ...request, id: "switch-inbox-1", source_system: "aa_console",
+  source_kind: "activation_switch", source_id: switchReviewId,
+  source_version: `${switchHash}:${switchToken}`, artifact_hash: switchHash,
+  title: "Enable client automation: outbound messaging", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "client:automation:client-1:outbound_messaging", account_ref: null, budget: null,
+  owner_role: "admin",
+  preview: { client_id: "client-1", switch_key: "outbound_messaging", action: "enable",
+    request_token: switchToken, settings: { client_id: "client-1", outbound_messaging_enabled: false } },
+  scope: { client_id: "client-1", switch_key: "outbound_messaging", review_id: switchReviewId,
+    request_token: switchToken, content_hash: switchHash,
+    effect: "enable_client_automation_switch" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
+const readyBookingActivation = {
+  ...readyActivationSwitch, id: "booking-inbox-1",
+  title: "Enable client automation: booking",
+  destination: "client:automation:client-1:booking",
+  preview: { client_id: "client-1", switch_key: "booking", action: "enable",
+    request_token: switchToken, settings: { client_id: "client-1", enabled: false,
+      timezone: "Europe/Monaco", slot_minutes: 30 },
+    windows: [{ day_of_week: 1, starts_at_minute: 540, ends_at_minute: 720 }] },
+  scope: { ...readyActivationSwitch.scope, switch_key: "booking" },
+};
+const leadCaptureId = "42424242-4242-4242-8242-424242424242";
+const readyLeadCaptureActivation = {
+  ...readyActivationSwitch, id: "lead-capture-inbox-1",
+  title: "Enable client automation: lead capture",
+  destination: `client:automation:client-1:lead_capture:${leadCaptureId}`,
+  preview: { client_id: "client-1", switch_key: "lead_capture", action: "enable",
+    request_token: switchToken, target_id: leadCaptureId,
+    endpoint: { id: leadCaptureId, client_id: "client-1", enabled: false,
+      token_hash: "d".repeat(64), consent_wording: "I agree to be contacted",
+      expires_at: "2030-01-01T00:00:00Z", max_submissions: 500,
+      submissions: 0, revoked_at: null } },
+  scope: { ...readyActivationSwitch.scope, switch_key: "lead_capture", target_id: leadCaptureId },
+};
+const globalReviewId = "43434343-4343-4343-8343-434343434343";
+const globalToken = "44444444-4444-4444-8444-444444444444";
+const globalHash = "e".repeat(64);
+const readyGlobalEngineActivation = {
+  ...request, id: "global-engine-inbox-1", client_id: null,
+  source_system: "aa_console", source_kind: "global_engine_activation",
+  source_id: globalReviewId, source_version: `${globalHash}:${globalToken}`,
+  artifact_hash: globalHash, title: "Enable the system-wide content Engine",
+  status: "pending", source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  preview_blocker: null, destination: "system:content_engine", account_ref: null,
+  budget: null, owner_role: "admin", owning_path: "/approvals",
+  preview: { action: "enable_system_engine", request_token: globalToken,
+    global_control: { enabled: false, note: null }, client_scope: [] },
+  scope: { effect: "enable_global_content_engine", review_id: globalReviewId,
+    request_token: globalToken, content_hash: globalHash,
+    client_scope: "all individually enabled clients until manually disabled" },
+};
+const globalOwnerReviewId = "50505050-5050-4050-8050-505050505050";
+const globalOwnerToken = "51515151-5151-4151-8151-515151515151";
+const globalOwnerHash = "2".repeat(64);
+const readyGlobalVideoOwner = {
+  ...request, id: "global-owner-inbox-1", client_id: null,
+  source_system: "aa_console", source_kind: "global_video_owner",
+  source_id: globalOwnerReviewId, source_version: `${globalOwnerHash}:${globalOwnerToken}`,
+  artifact_hash: globalOwnerHash, title: "Assign global video approval owner",
+  status: "pending", source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  preview_blocker: null, destination: "agency:video_approval_owner", account_ref: null,
+  budget: null, owner_role: "admin", owning_path: "/approvals",
+  preview: { action: "assign_global_video_approval_owner", request_token: globalOwnerToken,
+    current_owner: "admin-old", proposed_owner: "admin-new", proposed_owner_role: "admin" },
+  scope: { effect: "change_global_video_approval_owner", review_id: globalOwnerReviewId,
+    request_token: globalOwnerToken, content_hash: globalOwnerHash,
+    proposed_owner: "admin-new" },
+};
+
+const integrationReviewId = "45454545-4545-4545-8545-454545454545";
+const integrationId = "46464646-4646-4646-8646-464646464646";
+const integrationToken = "47474747-4747-4747-8747-474747474747";
+const integrationHash = "f".repeat(64);
+const readyIntegrationGrant = {
+  ...request, id: "integration-inbox-1", source_system: "aa_console",
+  source_kind: "integration_grant", source_id: integrationReviewId,
+  source_version: `${integrationHash}:${integrationToken}`, artifact_hash: integrationHash,
+  title: "Grant meta credential access for act_123", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: `client:integration:client-1:${integrationId}`, account_ref: "act_123",
+  budget: null, owner_role: "admin",
+  preview: { client_id: "client-1", integration_id: integrationId,
+    request_token: integrationToken, action: "grant_provider_access", provider: "meta",
+    account_label: "act_123", access_level: "read", recorded_status: "pending_grant",
+    credential_version_hash: "a".repeat(64), enable_daily_ingest: true },
+  scope: { client_id: "client-1", integration_id: integrationId, review_id: integrationReviewId,
+    request_token: integrationToken, content_hash: integrationHash,
+    enable_daily_ingest: true, effect: "grant_client_provider_credential_use" },
+  owning_path: "/clients/client-1/account/integrations",
+};
+const backfillReviewId = "51515151-5151-4515-8515-515151515151";
+const backfillToken = "52525252-5252-4525-8525-525252525252";
+const backfillHash = "2".repeat(64);
+const readyMetricsBackfill = {
+  ...request, id: "metrics-backfill-inbox-1", source_system: "aa_console",
+  source_kind: "metrics_backfill", source_id: backfillReviewId,
+  source_version: `${backfillHash}:${backfillToken}`, artifact_hash: backfillHash,
+  title: "Pull paid metrics history", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "client:metrics:client-1:paid", account_ref: null,
+  budget: null, owner_role: "admin", owning_path: "/clients/client-1/account/integrations",
+  preview: { client_id: "client-1", action: "pull_metrics_history",
+    since: "2026-10-01", until: "2026-10-07", surface: "paid", request_token: backfillToken,
+    accounts: [{ surface: "paid", provider: "meta", credential_version_hash: "a".repeat(64) }] },
+  scope: { client_id: "client-1", review_id: backfillReviewId,
+    request_token: backfillToken, content_hash: backfillHash,
+    effect: "queue_metrics_backfill", surfaces: "paid",
+    since: "2026-10-01", until: "2026-10-07" },
+};
+const creativeReviewId = "48484848-4848-4848-8848-484848484848";
+const creativeToken = "49494949-4949-4949-8949-494949494949";
+const creativeHash = "1".repeat(64);
+const readyCreativeRequirement = {
+  ...request, id: "creative-requirement-inbox-1", source_system: "aa_console",
+  source_kind: "creative_requirement", source_id: creativeReviewId,
+  source_version: `${creativeHash}:${creativeToken}`, artifact_hash: creativeHash,
+  title: "Require creative director sign-off", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "client:creative_authority:client-1", account_ref: null,
+  budget: null, owner_role: "admin",
+  preview: { client_id: "client-1", request_token: creativeToken,
+    action: "change_creative_approval_requirement", current_required: false,
+    proposed_required: true, current_creative_director: "director-1",
+    current_smm: "smm-1" },
+  scope: { client_id: "client-1", review_id: creativeReviewId,
+    request_token: creativeToken, content_hash: creativeHash,
+    proposed_required: true, effect: "change_creative_approval_authority" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
+const authorityReviewId = "52525252-5252-4252-8252-525252525252";
+const authorityToken = "53535353-5353-4353-8353-535353535353";
+const authorityHash = "3".repeat(64);
+const readyClientAuthorityAssignment = {
+  ...request, id: "client-authority-inbox-1", source_system: "aa_console",
+  source_kind: "client_authority_assignment", source_id: authorityReviewId,
+  source_version: `${authorityHash}:${authorityToken}`, artifact_hash: authorityHash,
+  title: "Assign SMM seat", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "client:approval_seat:client-1:member-1", account_ref: null,
+  budget: null, owner_role: "admin",
+  preview: { client_id: "client-1", member_id: "member-1", request_token: authorityToken,
+    action: "assign", member: { id: "member-1", category: "smm", user_id: "employee-1" },
+    current_assignment: null, active_same_category: [], proposed_due_date: null,
+    proposed_compensation: null },
+  scope: { client_id: "client-1", member_id: "member-1", review_id: authorityReviewId,
+    request_token: authorityToken, content_hash: authorityHash, action: "assign",
+    effect: "change_client_approval_seat" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
+const gatewayApprovalId = "54545454-5454-4454-8454-545454545454";
+const gatewayToken = "55555555-5555-4555-8555-555555555555";
+const gatewayHash = "4".repeat(64);
+const readyGatewayTool = {
+  ...request, id: "gateway-tool-inbox-1", source_system: "aa_console",
+  source_kind: "gateway_tool", source_id: gatewayApprovalId,
+  source_version: `${gatewayHash}:${gatewayToken}`, artifact_hash: gatewayHash,
+  title: "Gateway tool: workflow.create_approval", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "gateway:bot_production:workflow.create_approval", account_ref: null,
+  budget: null, owner_role: "admin",
+  preview: { gateway_approval_id: gatewayApprovalId, client_id: "client-1",
+    bot_id: "bot_production", token_id: "token-1", tool: "workflow.create_approval",
+    risk: "MEDIUM", summary: "Review production plan", structured_payload: { client_id: "client-1" },
+    payload_hash: "a".repeat(64), request_token: gatewayToken,
+    consequence: "Informational gateway ticket only; no AA action" },
+  scope: { client_id: "client-1", gateway_approval_id: gatewayApprovalId,
+    bot_id: "bot_production", token_id: "token-1", tool: "workflow.create_approval",
+    payload_hash: "a".repeat(64), content_hash: gatewayHash, request_token: gatewayToken,
+    effect: "allow_one_gateway_tool_execution" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
+
+const engineSlotId = "18181818-1818-4818-8818-181818181818";
+const engineEntryId = "19191919-1919-4919-8919-191919191919";
+const engineTime = "2026-11-20T09:00:00+00:00";
+const readyEngineSlot = {
+  ...request, id: "engine-slot-inbox-1", source_system: "aa_console",
+  source_kind: "engine_slot", source_id: engineSlotId,
+  source_version: engineEntryId, artifact_hash: "b".repeat(64),
+  title: "Engine slot: Client image", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", destination: "organic:instagram",
+  account_ref: "17890000000000000", budget: null, owner_role: "client_media_reviewer",
+  preview: { exact_package: { client_id: "client-1",
+    slot: { id: engineSlotId, asset_id: mediaAssetId, platform: "instagram",
+      scheduled_at: engineTime, format: "single" },
+    asset: { id: mediaAssetId, client_id: "client-1", title: "Client image",
+      media_type: "image", content_format: "single", storage_path: "client-1/image.png",
+      file_sha256: mediaFileHash, usage_rights: "agency_owned" },
+    storage: { bucket: "client-media", object_id: "storage-object-1", version: "v1" },
+    post_copy: [{ platform: "instagram", caption: "Exact caption" }],
+    account_ref: "17890000000000000" } },
+  scope: { client_id: "client-1", slot_id: engineSlotId, asset_id: mediaAssetId,
+    platform: "instagram", scheduled_at: engineTime, approval_entry_id: engineEntryId },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=engine",
+};
+
 function wireDatabase() {
   from.mockImplementation((table: string) => {
     let id: string | null = null;
@@ -134,13 +737,22 @@ function wireDatabase() {
         return query;
       },
       is: (column: string, value: null) => { filters.push([column, value]); return query; },
-      in: (_column: string, ids: string[]) => { historyIds.push(ids); return query; },
+      in: (_column: string, ids: string[]) => {
+        historyIds.push(ids);
+        if (table === "campaign_action_due") return Promise.resolve({ data: campaignDueRows, error: null });
+        if (table === "proof_approval_execution_evidence_v6")
+          return Promise.resolve({ data: proofOutcomeRows, error: null });
+        if (["google_reply_execution_overview_v6", "google_profile_execution_overview_v6",
+          "meta_profile_execution_overview_v6"].includes(table)) return Promise.resolve({ data: [], error: null });
+        return query;
+      },
       maybeSingle: async () => ({
         data: freshRequest === undefined ? requests.find((row) => (row as { id: string }).id === id) ?? null : freshRequest,
         error: requestError,
       }),
       order: () => table === "approval_inbox_v6" ? query
-        : Promise.resolve({ data: decisions, error: decisionError }),
+        : Promise.resolve({ data: table === "gateway_tool_execution_overview_v6"
+          ? gatewayOutcomes : decisions, error: decisionError }),
       range: async (start: number, end: number) => {
         requestRanges.push([start, end]);
         const filtered = requests.filter((row) => filters.every(([column, value]) =>
@@ -160,18 +772,47 @@ beforeEach(() => {
   vi.clearAllMocks();
   requests = [request];
   decisions = [];
+  gatewayOutcomes = [];
   requestError = null;
   decisionError = null;
   freshRequest = undefined;
   clientEqValues = [];
   requestRanges = [];
   historyIds = [];
+  campaignDueRows = [];
+  proofOutcomeRows = [];
   getAAL.mockResolvedValue({ data: { currentLevel: "aal2" }, error: null });
   rpc.mockResolvedValue({ data: null, error: null });
   wireDatabase();
 });
 
 describe("unified approval inbox", () => {
+  it("shows a proof delivery send as recorded without claiming recipient receipt", async () => {
+    requests = [{ ...readyProofDelivery, status: "approved" }];
+    proofOutcomeRows = [{ request_id: readyProofDelivery.id, client_id: "client-1",
+      source_kind: "proof_delivery", state: "sent",
+      detail: "A provider send is recorded for this delivery. The attempt is not bound to this exact approval request; recipient receipt is not proved.",
+      external_ref: "provider-message-1" }];
+    show("client", `/approvals?source=${proofDeliveryReviewId}`);
+    const card = await screen.findByRole("article", { name: readyProofDelivery.title });
+    expect(within(card).getByText("Recorded state: sent")).toBeInTheDocument();
+    expect(within(card).getByText(/recipient receipt is not proved/)).toBeInTheDocument();
+    expect(within(card).getByText("External reference: provider-message-1")).toBeInTheDocument();
+  });
+
+  it("shows an approved campaign action's execution separately from its decision", async () => {
+    requests = [{ ...readyCampaign, status: "approved" }];
+    campaignDueRows = [{ approval_id: "action-1", client_id: "client-1",
+      execution_status: "executed", blocker: null, external_id: "provider-123",
+      external_url: null }];
+    show("client", "/approvals?source=action-1");
+    const card = await screen.findByRole("article", { name: "Build the Meta ad" });
+    expect(within(card).getByText("Execution evidence")).toBeInTheDocument();
+    expect(within(card).getByText("Recorded state: executed")).toBeInTheDocument();
+    expect(within(card).getByText("External reference: provider-123")).toBeInTheDocument();
+    expect(within(card).getByText(/Approval and execution are separate/)).toBeInTheDocument();
+  });
+
   it("shows only manager-owned cards across assigned clients and no admin source links", async () => {
     requests = [
       { ...readyCampaign, id: "manager-client-1", title: "Client one action",
@@ -422,6 +1063,462 @@ describe("unified approval inbox", () => {
     }));
     await waitFor(() => expect(screen.getByText("Decision history (1)")).toBeInTheDocument());
     expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+  });
+
+  it("reviews the exact offer in the unified inbox and calls its owning AAL2 signoff", async () => {
+    const user = userEvent.setup();
+    requests = [readyOffer];
+    show();
+    const card = await screen.findByRole("article", { name: readyOffer.title });
+    expect(within(card).getByText("Service offer decision")).toBeInTheDocument();
+    expect(within(card).getByText(/Clear plan/)).toBeInTheDocument();
+    await user.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_service_offer_version_v6", {
+      p_version_id: offerVersionId,
+    }));
+  });
+
+  it("reviews the frozen campaign preparation package through its own decision RPC", async () => {
+    requests = [readyPreparation];
+    show();
+    const card = await screen.findByRole("article", { name: readyPreparation.title });
+    expect(within(card).getByText("Campaign preparation package decision")).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_campaign_preparation_package_v7", {
+      p_package_id: packageId, p_request_id: readyPreparation.id, p_approved: true,
+    }));
+  });
+
+  it("reviews the exact Google manual operator bundle through its own decision RPC", async () => {
+    requests = [readyGoogleOperator];
+    show();
+    const card = await screen.findByRole("article", { name: readyGoogleOperator.title });
+    expect(within(card).getByText("Google manual operator bundle decision")).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_google_operator_bundle_v7", {
+      p_bundle_id: googleBundleId, p_request_id: readyGoogleOperator.id, p_approved: true,
+    }));
+  });
+
+  it("decides the frozen public sales-agent script through its owning AAL2 RPC", async () => {
+    requests = [readyPublicAgent];
+    show();
+    const card = await screen.findByRole("article", { name: readyPublicAgent.title });
+    expect(within(card).getByText("Sales agent public use decision")).toBeInTheDocument();
+    expect(within(card).getByText(/Answer accurately/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_sales_agent_public_use_v6", {
+      p_agent_id: publicAgentId, p_request_id: readyPublicAgent.id,
+    }));
+  });
+
+  it("decides the exact evaluated opportunity through its owning RPC", async () => {
+    requests = [readyOpportunity];
+    show();
+    const card = await screen.findByRole("article", { name: readyOpportunity.title });
+    expect(within(card).getByText("Market opportunity decision")).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_opportunity_v6", {
+      p_opportunity_id: opportunityId, p_request_id: readyOpportunity.id,
+    }));
+  });
+
+  it("clears the exact text proof through its owning rights RPC", async () => {
+    requests = [readyProofRights];
+    show();
+    const card = await screen.findByRole("article", { name: readyProofRights.title });
+    expect(within(card).getByText("Proof usage rights decision")).toBeInTheDocument();
+    expect(within(card).getByText(/Customer signed release/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_proof_rights_v6", {
+      p_rights_request_id: proofRightsId, p_canonical_id: readyProofRights.id,
+    }));
+  });
+
+  it("shows a trusted stored-image digest on the rights decision", async () => {
+    requests = [{ ...readyProofRights, id: "proof-media-inbox-1",
+      preview: { ...readyProofRights.preview,
+        proof: { id: proofId, media_type: "image", storage_path: "client-1/proof/photo.png",
+          title: "Customer photo" },
+        verified_storage_sha256: "6".repeat(64), verified_file_bytes: 4096,
+        verified_storage_path: "client-1/proof/photo.png",
+        verified_storage_object_id: "77777777-7777-4777-8777-777777777777",
+        verified_storage_object_version: "v1",
+        verified_storage_object_updated_at: "2026-11-14T10:00:00Z" } }];
+    show();
+    const card = await screen.findByRole("article", { name: readyProofRights.title });
+    expect(within(card).getByText(/Customer photo/)).toBeInTheDocument();
+    const approve = within(card).getByRole("button", { name: "Approve exact version" });
+    expect(approve).toBeDisabled();
+    downloadVerifiedProofFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify proof file" }));
+    await waitFor(() => expect(downloadVerifiedProofFile).toHaveBeenCalledWith(
+      "client-1/proof/photo.png", "6".repeat(64), 4096));
+    await waitFor(() => expect(approve).toBeEnabled());
+    await userEvent.click(approve);
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_proof_rights_v6", {
+      p_rights_request_id: proofRightsId, p_canonical_id: "proof-media-inbox-1",
+    }));
+  });
+
+  it("releases standalone text proof for placement through its owning AAL2 RPC", async () => {
+    requests = [readyProofPlacement];
+    show();
+    const card = await screen.findByRole("article", { name: readyProofPlacement.title });
+    expect(within(card).getByText("Proof placement decision")).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_proof_placement_inbox_v6", {
+      p_approval_id: placementApprovalId, p_request_id: readyProofPlacement.id,
+      p_approved: true,
+    }));
+  });
+
+  it("signs off the exact proof artifact and source through the owning AAL2 RPC", async () => {
+    requests = [readyProofArtifact];
+    show();
+    const card = await screen.findByRole("article", { name: readyProofArtifact.title });
+    expect(within(card).getByText("Proof artifact decision")).toBeInTheDocument();
+    expect(within(card).getByText(/Customer result with supported evidence/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_proof_artifact_inbox_v6", {
+      p_review_id: artifactReviewId, p_request_id: readyProofArtifact.id,
+    }));
+  });
+
+  it("routes an exact proof request send decision through its owning Inbox RPC", async () => {
+    requests = [readyProofDelivery];
+    show();
+    const card = await screen.findByRole("article", { name: readyProofDelivery.title });
+    expect(within(card).getByText(/Please send evidence/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_proof_delivery_inbox_v6", {
+      p_review_id: proofDeliveryReviewId, p_request_id: readyProofDelivery.id,
+      p_approved: true,
+    }));
+  });
+
+  it("routes an exact Meta profile proposal through its owning Inbox RPC", async () => {
+    requests = [readyMetaProfileChange];
+    show();
+    const card = await screen.findByRole("article", { name: readyMetaProfileChange.title });
+    expect(within(card).getByText(/New bio/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_meta_profile_inbox_v6", {
+      p_review_id: metaProfileReviewId, p_request_id: readyMetaProfileChange.id,
+      p_approved: true,
+    }));
+  });
+
+  it("routes an exact Google profile proposal through its owning Inbox RPC", async () => {
+    requests = [readyGoogleProfileChange];
+    show();
+    const card = await screen.findByRole("article", { name: readyGoogleProfileChange.title });
+    expect(within(card).getByText(/New description/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_google_profile_inbox_v6", {
+      p_review_id: googleProfileReviewId, p_request_id: readyGoogleProfileChange.id,
+      p_approved: true,
+    }));
+  });
+
+  it("routes opportunity activation through a separate exact Inbox decision", async () => {
+    requests = [readyOpportunityActivation];
+    show();
+    const card = await screen.findByRole("article", { name: readyOpportunityActivation.title });
+    expect(within(card).getByText(/Begin planning/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_opportunity_activation_inbox_v6", {
+      p_activation_id: activationReviewId, p_request_id: readyOpportunityActivation.id,
+      p_approved: true,
+    }));
+  });
+
+  it("decides the exact message words and consent basis through the Inbox", async () => {
+    requests = [readyMessageTemplate];
+    show();
+    const card = await screen.findByRole("article", { name: readyMessageTemplate.title });
+    expect(within(card).getByText(/Lead explicitly requested a reply/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_message_template_inbox_v6", {
+      p_review_id: messageReviewId, p_request_id: readyMessageTemplate.id,
+      p_approved: true,
+    }));
+  });
+
+  it("decides the ordered nurture steps and enrolment settings through the Inbox", async () => {
+    requests = [readyNurtureSequence];
+    show();
+    const card = await screen.findByRole("article", { name: readyNurtureSequence.title });
+    expect(within(card).getByText(/Here is your guide/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_nurture_sequence_inbox_v6", {
+      p_review_id: sequenceReviewId, p_request_id: readyNurtureSequence.id,
+      p_approved: true,
+    }));
+  });
+
+  it("requires exact rendered-video download before its assigned seat decision", async () => {
+    requests = [readyVideoSeat];
+    show();
+    const card = await screen.findByRole("article", { name: readyVideoSeat.title });
+    const approve = within(card).getByRole("button", { name: "Approve exact version" });
+    expect(approve).toBeDisabled();
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify creative file" }));
+    await waitFor(() => expect(downloadVerifiedCreativeFile).toHaveBeenCalledWith(
+      "client-1/render.mp4", videoFileHash));
+    await waitFor(() => expect(approve).toBeEnabled());
+    await userEvent.click(approve);
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_video_seat_inbox_v6", {
+      p_review_id: videoReviewId, p_request_id: readyVideoSeat.id,
+      p_approved: true,
+    }));
+  });
+
+  it("requires motion render download before an exact Inbox decision", async () => {
+    requests = [readyMotionRender];
+    show();
+    const card = await screen.findByRole("article", { name: readyMotionRender.title });
+    const approve = within(card).getByRole("button", { name: "Approve exact version" });
+    expect(approve).toBeDisabled();
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify creative file" }));
+    await waitFor(() => expect(downloadVerifiedCreativeFile).toHaveBeenCalledWith(
+      "client-1/motion/r1.mp4", motionFileHash));
+    await waitFor(() => expect(approve).toBeEnabled());
+    await userEvent.click(approve);
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_motion_render_inbox_v6", {
+      p_review_id: motionReviewId, p_request_id: readyMotionRender.id, p_approved: true,
+    }));
+  });
+
+  it("routes an exact human idea selection through the Inbox", async () => {
+    requests = [readyCampaignIdea];
+    show();
+    const card = await screen.findByRole("article", { name: readyCampaignIdea.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_human_idea_inbox_v6", {
+      p_review_id: ideaReviewId, p_request_id: readyCampaignIdea.id,
+      p_approved: true,
+    }));
+  });
+
+  it("routes an exact client automation activation through the Inbox", async () => {
+    requests = [readyActivationSwitch];
+    show();
+    const card = await screen.findByRole("article", { name: readyActivationSwitch.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_client_switch_activation_v6", {
+      p_review_id: switchReviewId, p_request_id: readyActivationSwitch.id,
+      p_approved: true,
+    }));
+  });
+
+  it.each([readyBookingActivation, readyLeadCaptureActivation])(
+    "routes exact activation for $title", async (activation) => {
+      requests = [activation];
+      show();
+      const card = await screen.findByRole("article", { name: activation.title });
+      await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+      await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_client_switch_activation_v6", {
+        p_review_id: switchReviewId, p_request_id: activation.id, p_approved: true,
+      }));
+    });
+
+  it("decides the exact agency-wide Engine card without inventing a client ID", async () => {
+    requests = [readyGlobalEngineActivation];
+    show("global");
+    const card = await screen.findByRole("article", { name: readyGlobalEngineActivation.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_global_engine_activation_v6", {
+      p_review_id: globalReviewId, p_request_id: readyGlobalEngineActivation.id,
+      p_approved: true,
+    }));
+    expect(clientEqValues).toEqual([]);
+  });
+
+  it("decides an agency-wide video owner card without inventing a client ID", async () => {
+    requests = [readyGlobalVideoOwner];
+    show("global");
+    const card = await screen.findByRole("article", { name: readyGlobalVideoOwner.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_global_video_owner_v6", {
+      p_review_id: globalOwnerReviewId, p_request_id: readyGlobalVideoOwner.id,
+      p_approved: true,
+    }));
+    expect(clientEqValues).toEqual([]);
+  });
+
+  it("decides an exact integration grant", async () => {
+    requests = [readyIntegrationGrant];
+    show();
+    const card = await screen.findByRole("article", { name: readyIntegrationGrant.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_integration_grant_v6", {
+      p_review_id: integrationReviewId, p_request_id: readyIntegrationGrant.id,
+      p_approved: true,
+    }));
+  });
+
+  it("holds an integration grant with a mismatched account", async () => {
+    requests = [{ ...readyIntegrationGrant, account_ref: "another-account" }];
+    show();
+    const mismatched = await screen.findByRole("article", { name: readyIntegrationGrant.title });
+    expect(within(mismatched).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+  });
+
+  it("decides an exact metrics window before a manual provider pull queues", async () => {
+    requests = [readyMetricsBackfill];
+    show();
+    const card = await screen.findByRole("article", { name: readyMetricsBackfill.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_metrics_backfill_review_v6", {
+      p_review_id: backfillReviewId, p_request_id: readyMetricsBackfill.id,
+      p_approved: true,
+    }));
+  });
+
+  it("routes an exact creative authority change through the Inbox", async () => {
+    requests = [readyCreativeRequirement];
+    show();
+    const card = await screen.findByRole("article", { name: readyCreativeRequirement.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_creative_requirement_v6", {
+      p_review_id: creativeReviewId, p_request_id: readyCreativeRequirement.id,
+      p_approved: true,
+    }));
+  });
+
+  it("decides an exact client approval-seat assignment", async () => {
+    requests = [readyClientAuthorityAssignment];
+    show();
+    const card = await screen.findByRole("article", { name: readyClientAuthorityAssignment.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_client_authority_assignment_v6", {
+      p_review_id: authorityReviewId, p_request_id: readyClientAuthorityAssignment.id,
+      p_approved: true,
+    }));
+  });
+
+  it("holds a client approval-seat card with a different member destination", async () => {
+    requests = [{ ...readyClientAuthorityAssignment,
+      destination: "client:approval_seat:client-1:member-2" }];
+    show();
+    const card = await screen.findByRole("article", { name: readyClientAuthorityAssignment.title });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+  });
+
+  it("decides an exact gateway tool only through its canonical Inbox card", async () => {
+    requests = [readyGatewayTool];
+    show();
+    const card = await screen.findByRole("article", { name: readyGatewayTool.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_gateway_tool_review_v6", {
+      p_approval_id: gatewayApprovalId, p_request_id: readyGatewayTool.id,
+      p_approved: true,
+    }));
+  });
+
+  it("holds a gateway card whose destination tool changed", async () => {
+    requests = [{ ...readyGatewayTool,
+      destination: "gateway:bot_production:workflow.create_task" }];
+    show();
+    const card = await screen.findByRole("article", { name: readyGatewayTool.title });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+  });
+
+  it("shows gateway execution outcome and revokes an approved exact card with a reason", async () => {
+    requests = [{ ...readyGatewayTool, status: "approved", source_state: "source_decided" }];
+    gatewayOutcomes = [{ approval_id: gatewayApprovalId, execution_status: "completed",
+      claimed_at: "2026-11-19T12:00:00Z", finished_at: "2026-11-19T12:01:00Z",
+      sites_invocation_id: "sites-route-1", sites_invoked_at: "2026-11-19T12:00:30Z",
+      result_hash: "f".repeat(64) }];
+    show("client", `/approvals?source=${gatewayApprovalId}`);
+    const card = await screen.findByRole("article", { name: readyGatewayTool.title });
+    expect(within(card).getByText("Status: completed")).toBeInTheDocument();
+    expect(within(card).getByText(/Sites adapter started:/)).toBeInTheDocument();
+    expect(within(card).getByText(/not an external provider receipt/)).toBeInTheDocument();
+    await userEvent.type(within(card).getByRole("textbox", { name: "Reason to revoke" }), "Operator stop");
+    await userEvent.click(within(card).getByRole("button", { name: "Revoke with reason" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("revoke_gateway_tool_review_v6", {
+      p_approval_id: gatewayApprovalId, p_request_id: readyGatewayTool.id, p_reason: "Operator stop",
+    }));
+  });
+
+  it("holds revocation when an approved gateway destination changes", async () => {
+    requests = [{ ...readyGatewayTool, status: "approved", source_state: "source_decided",
+      destination: "gateway:bot_production:workflow.create_task" }];
+    show("client", `/approvals?source=${gatewayApprovalId}`);
+    const card = await screen.findByRole("article", { name: readyGatewayTool.title });
+    expect(within(card).queryByRole("button", { name: "Revoke with reason" })).not.toBeInTheDocument();
+  });
+
+  it("unlocks ordinary creative approval only after downloading the exact stored file", async () => {
+    requests = [readyOrdinaryMedia];
+    show();
+    const card = await screen.findByRole("article", { name: readyOrdinaryMedia.title });
+    const approve = within(card).getByRole("button", { name: "Approve exact version" });
+    expect(approve).toBeDisabled();
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify creative file" }));
+    await waitFor(() => expect(downloadVerifiedCreativeFile).toHaveBeenCalledWith(
+      "client-1/image.png", mediaFileHash,
+    ));
+    await waitFor(() => expect(approve).toBeEnabled());
+    await userEvent.click(approve);
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_ordinary_media_inbox_v6", {
+      p_review_id: mediaReviewId, p_request_id: readyOrdinaryMedia.id,
+    }));
+  });
+
+  it("schedules an exact Engine slot only after the reviewer verifies its file", async () => {
+    requests = [readyEngineSlot];
+    show();
+    const card = await screen.findByRole("article", { name: readyEngineSlot.title });
+    const approve = within(card).getByRole("button", { name: "Approve exact version" });
+    expect(approve).toBeDisabled();
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify creative file" }));
+    await waitFor(() => expect(downloadVerifiedCreativeFile).toHaveBeenCalledWith(
+      "client-1/image.png", mediaFileHash));
+    await userEvent.click(approve);
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_engine_slot_inbox_v6", {
+      p_slot_id: engineSlotId, p_request_id: readyEngineSlot.id, p_approved: true,
+    }));
+  });
+
+  it("rejects an offer with a reason", async () => {
+    const user = userEvent.setup();
+    requests = [readyOffer];
+    show();
+    const card = await screen.findByRole("article", { name: readyOffer.title });
+    await user.type(within(card).getByRole("textbox", { name: "Reason to reject" }), "Claim unsupported");
+    await user.click(within(card).getByRole("button", { name: "Reject with reason" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("reject_service_offer_version_v6", {
+      p_version_id: offerVersionId, p_reason: "Claim unsupported",
+    }));
+  });
+
+  it("does not decide an offer when its exact inbox scope changes before the click", async () => {
+    const user = userEvent.setup();
+    requests = [readyOffer];
+    freshRequest = { ...readyOffer, scope: { ...readyOffer.scope, version: 2 } };
+    show();
+    const card = await screen.findByRole("article", { name: readyOffer.title });
+    await user.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/exact request changed/);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("keeps a held offer approval unavailable while allowing a reasoned rejection", async () => {
+    const user = userEvent.setup();
+    requests = [{ ...readyOffer, status: "source_held", source_state: "source_held" }];
+    show();
+    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "all");
+    await user.click(screen.getByRole("button", { name: "Apply filters" }));
+    const card = await screen.findByRole("article", { name: readyOffer.title });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Reject with reason" })).toBeDisabled();
   });
 
   it("requires a reason and fresh AAL2 for campaign rejection", async () => {

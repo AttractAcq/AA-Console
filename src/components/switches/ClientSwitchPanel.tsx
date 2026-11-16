@@ -48,7 +48,72 @@ type SwitchState = {
   settings: EngineSettings | null;
   engineRunning: boolean;
   bookingEnabled: boolean | null;
+  runtime: RuntimeControls | null;
+  activity: Record<string, ControlActivity> | null;
 };
+
+type ControlActivity = {
+  lastRun: { at: string; status: string; sourceId: string } | null;
+  lastExternalReceipt: {
+    at: string; externalRef: string | null; externalUrl: string | null; sourceId: string;
+  } | null;
+};
+
+type RuntimeControls = {
+  state: "observed" | "unknown";
+  reportedAt?: string | null;
+  reason?: string;
+  controls?: Record<string, boolean>;
+  holds?: Record<string, string>;
+  workerEnabled?: boolean;
+  budgetCap?: number | null;
+};
+
+const RUNTIME_KEYS: Record<string, string> = {
+  publishing: "publish",
+  proof_publishing: "proofPublish",
+  google_review_reply_runtime: "googleReviewReply",
+  campaign_actions: "campaignActions",
+  outbound_messaging: "outboundMessaging",
+  lead_magnet_delivery: "leadMagnetDelivery",
+};
+
+const REVIEWED_SWITCHES = new Set([
+  "engine", "auto_approve_ideas", "auto_approve_briefs", "publishing",
+  "proof_publishing", "campaign_actions", "outbound_messaging",
+  "lead_magnet_delivery", "booking",
+]);
+
+function sourcePath(clientId: string, key: string): string {
+  const base = `/clients/${encodeURIComponent(clientId)}/delivery/`;
+  if (["engine", "auto_approve_ideas", "auto_approve_briefs", "publishing"].includes(key))
+    return `${base}organic-content-distribution`;
+  if (key === "proof_publishing") return `${base}proof-distribution`;
+  if (key === "campaign_actions") return `${base}approval-inbox?tab=campaign-actions`;
+  if (key === "lead_magnet_delivery") return `${base}lead-magnet-studio`;
+  return `${base}sales-os`;
+}
+
+function dependency(state: SwitchState, key: string): string | null {
+  if (key === "engine" && !state.engineRunning) return "System-wide content engine is off.";
+  if (key === "engine" && (!state.runtime || !("budgetCap" in state.runtime))) return "Current month spend cap has not been verified.";
+  if (key === "engine" && state.runtime?.budgetCap == null) return "No spend cap is set for this month.";
+  if (key === "engine" && state.runtime?.budgetCap != null && state.runtime.budgetCap <= 0) return "This month's spend cap is zero.";
+  if (key === "engine" && state.runtime?.state !== "observed") return state.runtime?.reason ?? "Runtime state has not been verified.";
+  if (key === "engine" && state.runtime?.workerEnabled !== true) return "Agent runtime worker is off or unreported.";
+  if (key === "auto_approve_ideas" || key === "auto_approve_briefs") {
+    if (!state.settings?.enabled) return "This client's content engine is off.";
+    const engineBlocker = dependency(state, "engine");
+    if (engineBlocker) return `Content engine: ${engineBlocker}`;
+  }
+  const runtimeKey = RUNTIME_KEYS[key];
+  if (!runtimeKey) return null;
+  if (state.runtime?.state !== "observed") return state.runtime?.reason ?? "Runtime state has not been verified.";
+  if (state.runtime.workerEnabled !== true) return "Agent runtime worker is off or unreported.";
+  if (state.runtime.holds?.[runtimeKey]) return state.runtime.holds[runtimeKey];
+  if (state.runtime.controls?.[runtimeKey] !== true) return "Runtime deployment switch is off or unreported.";
+  return null;
+}
 
 /** What a row needs to render itself and to write itself back. */
 type SwitchRow = {
@@ -120,11 +185,21 @@ const SWITCHES: SwitchRow[] = [
   {
     key: "proof_publishing",
     label: "Place approved proof",
-    on: "Approved proof is placed on its destination.",
+    on: "Eligible approved proof placements can reach a verified supported destination.",
     off: "Proof placements wait, however they were approved.",
     caveat: "Only Google Business Profile has transport in the runtime today; the other destinations are recorded as unsupported.",
     value: (s) => s.settings?.proof_publishing_enabled ?? null,
     write: (next) => ({ fn: "set_proof_publishing_enabled", args: { p_enabled: next } }),
+  },
+  {
+    key: "google_review_reply_runtime",
+    label: "Google review reply sender, system-wide",
+    on: "An exact approved reply can be requested for this client's verified Google location.",
+    off: "Google review reply jobs remain held; approval alone does not send a reply.",
+    caveat: "Each reply also needs a usable credential, exact AAL2 decision and one-shot provider readback.",
+    value: (s) => s.runtime?.state === "observed"
+      ? s.runtime.controls?.googleReviewReply === true : null,
+    readOnly: { because: "This is a runtime deployment switch; it cannot be changed from a client page." },
   },
   {
     key: "campaign_actions",
@@ -132,7 +207,7 @@ const SWITCHES: SwitchRow[] = [
     on: "Approved campaign actions are claimed for execution.",
     off: "Approved actions wait and nothing external happens.",
     caveat:
-      "Held in the runtime whatever this says: the generic claim has no atomic handler-ownership gate yet, so switching this on produces a visible job failure rather than an execution.",
+      "Requires an attested deployed handler set, a fresh runtime heartbeat and AAL2 to enable. Each outward action still needs exact approval and provider preflight.",
     value: (s) => s.settings?.campaign_actions_enabled ?? null,
     write: (next) => ({ fn: "set_campaign_actions_enabled", args: { p_enabled: next } }),
   },
@@ -169,6 +244,8 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
     settings: null,
     engineRunning: false,
     bookingEnabled: null,
+    runtime: null,
+    activity: null,
   });
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -176,25 +253,31 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const [settings, controls, booking] = await Promise.all([
+    const [settings, controls, booking, runtime, activity] = await Promise.all([
       supabase.from("client_engine_settings").select("*").eq("client_id", clientId).maybeSingle(),
       supabase.from("engine_controls").select("enabled").maybeSingle(),
       supabase.from("client_booking_settings").select("enabled").eq("client_id", clientId).maybeSingle(),
+      supabase.rpc("client_runtime_controls_v6" as never, { p_client_id: clientId } as never),
+      supabase.rpc("client_control_activity_v6" as never, { p_client_id: clientId } as never),
     ]);
-    const failed = settings.error ?? controls.error ?? booking.error;
-    if (failed) setError(failed.message);
+    const failed = settings.error ?? controls.error ?? booking.error ?? activity.error;
+    setError(failed?.message ?? null);
     setState({
       settings: (settings.data as EngineSettings) ?? null,
       engineRunning: Boolean((controls.data as { enabled?: boolean } | null)?.enabled),
       // null, not false: a client with no booking rules yet is a different
       // state from one whose booking is switched off.
       bookingEnabled: (booking.data as { enabled?: boolean } | null)?.enabled ?? null,
+      runtime: runtime.error ? { state: "unknown", reason: runtime.error.message } : (runtime.data as RuntimeControls | null),
+      activity: activity.error ? null : (activity.data as Record<string, ControlActivity> | null) ?? null,
     });
     setLoading(false);
   }, [clientId]);
 
   useEffect(() => {
     void refresh();
+    const timer = window.setInterval(() => void refresh(), 30_000);
+    return () => window.clearInterval(timer);
   }, [refresh]);
 
   async function flip(row: SwitchRow, next: boolean) {
@@ -202,6 +285,16 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
     setError(null);
     setNote(null);
     if (!row.write) return;
+    if (next && REVIEWED_SWITCHES.has(row.key)) {
+      const { error: reviewError } = await supabase.rpc("request_client_switch_activation_v6", {
+        p_client_id: clientId, p_switch_key: row.key,
+      });
+      setBusy(null);
+      if (reviewError) { setError(reviewError.message); return; }
+      setNote(`${row.label}: exact activation review requested in Unified Approval Inbox.`);
+      await refresh();
+      return;
+    }
     const { fn, args } = row.write(next);
     // Every writer still reachable from here takes the client.
     const payload = { p_client_id: clientId, ...args };
@@ -232,7 +325,8 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
       )}
       {note && (
         <p role="status" className="mb-3 text-sm text-brand-strong">
-          {note}
+          {note} {note.includes("Unified Approval Inbox") &&
+            <a className="underline" href={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>Open Inbox</a>}
         </p>
       )}
       <ul className="divide-y divide-border">
@@ -241,12 +335,37 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
           // A switch whose row does not exist yet cannot be flipped from
           // here: the thing it belongs to has to be configured first.
           const unset = value === null;
+          const blocker = dependency(state, row.key);
+          const effective = value === true && !blocker;
+          const activity = state.activity?.[row.key];
+          const external = RUNTIME_KEYS[row.key] !== undefined;
+          const heldOn = !value && external && blocker !== null;
           return (
             <li key={row.key} className="flex flex-wrap items-start justify-between gap-3 py-3">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-card-foreground">{row.label}</p>
-                <p className="text-sm text-muted-foreground">{value ? row.on : row.off}</p>
+                <p className="text-sm text-muted-foreground">{effective ? row.on : value ? "Requested on; execution is held until the listed prerequisites are met." : row.off}</p>
                 {row.caveat && <p className="mt-1 text-xs text-muted-foreground">{row.caveat}</p>}
+                {!row.readOnly && <p className="mt-1 text-xs text-muted-foreground">Effective state: {effective ? "ready" : value ? "held" : "off"}{blocker ? ` — ${blocker}` : ""}</p>}
+                {RUNTIME_KEYS[row.key] && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Runtime dependency (read only): {state.runtime?.state === "observed"
+                      ? state.runtime.controls?.[RUNTIME_KEYS[row.key]] === true ? "on" : "off or unreported"
+                      : "unverified"}
+                    {state.runtime?.reportedAt ? ` · checked ${new Date(state.runtime.reportedAt).toLocaleString()}` : ""}
+                  </p>
+                )}
+                {!row.readOnly && (
+                  <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                    <p>Last run: {state.activity === null ? "unknown" : activity?.lastRun
+                      ? `${new Date(activity.lastRun.at).toLocaleString()} · ${activity.lastRun.status}` : "none recorded"}</p>
+                    <p>Last external receipt: {!external ? "not applicable" : state.activity === null ? "unknown"
+                      : activity?.lastExternalReceipt
+                        ? `${new Date(activity.lastExternalReceipt.at).toLocaleString()} · ${activity.lastExternalReceipt.externalRef ?? activity.lastExternalReceipt.externalUrl ?? "reference recorded"}`
+                        : "none recorded"}</p>
+                    <a className="text-primary underline" href={sourcePath(clientId, row.key)}>View source records</a>
+                  </div>
+                )}
                 {row.readOnly && (
                   <p className="mt-1 text-xs text-muted-foreground">{row.readOnly.because}</p>
                 )}
@@ -259,12 +378,12 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
                       : "bg-muted text-muted-foreground"
                   }`}
                 >
-                  {unset ? "not set up" : value ? "on" : "off"}
+                  {unset ? "not set up" : value && blocker ? "requested on · held" : value ? "on" : "off"}
                 </span>
                 {!row.readOnly && (
                 <button
                   type="button"
-                  disabled={busy !== null || unset}
+                  disabled={busy !== null || unset || heldOn}
                   onClick={() => void flip(row, !value)}
                   aria-label={`${value ? "Switch off" : "Switch on"} ${row.label}`}
                   className={`rounded-md px-3 py-1.5 text-sm disabled:opacity-50 ${

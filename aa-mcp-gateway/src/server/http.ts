@@ -139,6 +139,8 @@ export function createServer(
             );
           if (!match) return json(404, { error: "not_found", request_id });
           if (match[2] === "decision") {
+            if (engine.approvalBridge)
+              return json(409, { error: "canonical_decision_required", request_id });
             const d = z
               .object({
                 decision: z.enum(["approved", "rejected"]),
@@ -314,9 +316,17 @@ export function createServer(
               ? 400
               : error instanceof Error && error.message === "invalid_transition"
                 ? 409
+                : error instanceof Error && error.message === "canonical_decision_required"
+                  ? 409
+                : error instanceof Error && error.message === "canonical_execution_claimed"
+                  ? 409
                 : 500,
           {
-            error: unauthorized ? "unauthorized" : "request_failed",
+            error: unauthorized ? "unauthorized"
+              : error instanceof Error && error.message === "canonical_decision_required"
+                ? "canonical_decision_required"
+                : error instanceof Error && error.message === "canonical_execution_claimed"
+                  ? "canonical_execution_claimed" : "request_failed",
             request_id,
           },
         );

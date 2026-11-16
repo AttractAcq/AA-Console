@@ -14,7 +14,7 @@ export const CAPTURE_METHODS = [
     label: "Guided Interview Capture",
     description: "Prepare interview questions and an evidence capture script.",
   },
-  { id: "integration", label: "Integration Capture", description: "" },
+  { id: "integration", label: "Integration Capture", description: "Capture ingested Google Business Profile reviews as uncleared raw proof, with their source URL and date. Other providers need verified connectors." },
   {
     id: "manual_import",
     label: "Manual Upload & Import",
@@ -24,7 +24,7 @@ export const CAPTURE_METHODS = [
   {
     id: "outcome_followup",
     label: "Outcome Follow-up Engine",
-    description: "",
+    description: "Prepare proof requests from verified service outcomes, with separate customer consent and exact-message Inbox review.",
   },
 ] as const;
 export const PROOF_CATEGORIES = {

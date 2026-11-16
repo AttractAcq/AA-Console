@@ -83,6 +83,16 @@ describe("what the tab is for", () => {
 });
 
 describe("scheduling from the asset", () => {
+  it("keeps a stale single-file asset visible without offering scheduling", async () => {
+    fetchClientAssets.mockResolvedValue([asset({ content_format: "single" })]);
+    from.mockImplementation((table: string) => table === "ordinary_media_current_status_v6"
+      ? posts([{ asset_id: "a1", current_signoff: false }]) : posts([]));
+    render(<AssetsPanel />);
+    expect(await screen.findByText("Chair shot")).toBeInTheDocument();
+    expect(screen.getByText(/Exact creative signoff is missing or stale/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Schedule/i })).not.toBeInTheDocument();
+  });
+
   it("shows a paid blocker and disables scheduling when paid is selected", async () => {
     render(<AssetsPanel />);
     await userEvent.click(await screen.findByRole("button", { name: /Schedule/i }));

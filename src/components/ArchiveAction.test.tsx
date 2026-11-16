@@ -1,81 +1,66 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { rpc, from } = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }));
+vi.mock("../lib/supabase", () => ({ supabase: { rpc, from } }));
 import { ArchiveAction } from "./ArchiveAction";
 
-const update = vi.fn();
-const eq = vi.fn();
+beforeEach(() => vi.clearAllMocks());
 
-vi.mock("../lib/supabase", () => ({
-  supabase: {
-    from: (table: string) => ({
-      update: (values: Record<string, unknown>) => {
-        update(table, values);
-        return { eq: (col: string, id: string) => { eq(col, id); return Promise.resolve({ error: null }); } };
-      },
-    }),
-  },
-}));
-
-beforeEach(() => {
-  update.mockReset();
-  eq.mockReset();
-});
-
-describe("archiving", () => {
-  // Archiving hides a campaign from the list somebody works from. Doing it
-  // on a misclick, with no confirmation, is how a live campaign disappears.
-  it("asks before archiving", () => {
-    render(
-      <ArchiveAction table="client_campaigns" id="c1" archived={false} noun="campaign" onDone={vi.fn()} onError={vi.fn()} />,
-    );
-    fireEvent.click(screen.getByText("Archive"));
-    expect(screen.getByText("Archive this campaign?")).toBeTruthy();
-    expect(update).not.toHaveBeenCalled();
+describe("client archive action", () => {
+  it("records the exact client, domain and record only after confirmation", async () => {
+    rpc.mockResolvedValue({ data: "2026-11-16T12:00:00Z", error: null });
+    const done = vi.fn();
+    render(<ArchiveAction clientId="client-1" table="market_opportunities" id="record-1"
+      archived={false} noun="opportunity" onDone={done} onError={vi.fn()} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Archive" }));
+    expect(rpc).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Yes" }));
+    expect(rpc).toHaveBeenCalledWith("set_client_archive_v8", {
+      p_client_id: "client-1", p_table_name: "market_opportunities",
+      p_record_id: "record-1", p_archive: true,
+    });
+    expect(done).toHaveBeenCalledOnce();
   });
 
-  it("stamps archived_at on the right row when confirmed", async () => {
-    const onDone = vi.fn();
-    render(
-      <ArchiveAction table="client_campaigns" id="c1" archived={false} noun="campaign" onDone={onDone} onError={vi.fn()} />,
-    );
-    fireEvent.click(screen.getByText("Archive"));
-    fireEvent.click(screen.getByText("Yes"));
-    await waitFor(() => expect(update).toHaveBeenCalled());
-    const [table, values] = update.mock.calls[0]!;
-    expect(table).toBe("client_campaigns");
-    expect(typeof (values as { archived_at: unknown }).archived_at).toBe("string");
-    expect(eq).toHaveBeenCalledWith("id", "c1");
-    expect(onDone).toHaveBeenCalled();
+  it("reports a rejected restore without claiming success", async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: "Record state changed" } });
+    const done = vi.fn(); const fail = vi.fn();
+    render(<ArchiveAction clientId="client-1" table="lead_magnets" id="record-2"
+      archived noun="magnet" onDone={done} onError={fail} />);
+    await userEvent.click(screen.getByRole("button", { name: "Restore" }));
+    expect(rpc).toHaveBeenCalledWith("set_client_archive_v8", {
+      p_client_id: "client-1", p_table_name: "lead_magnets",
+      p_record_id: "record-2", p_archive: false,
+    });
+    expect(done).not.toHaveBeenCalled();
+    expect(fail).toHaveBeenCalledWith("Record state changed");
   });
 
-  it("backs out without writing anything", () => {
-    render(
-      <ArchiveAction table="client_pages" id="p1" archived={false} noun="page" onDone={vi.fn()} onError={vi.fn()} />,
-    );
-    fireEvent.click(screen.getByText("Archive"));
-    fireEvent.click(screen.getByText("Cancel"));
-    expect(screen.getByText("Archive")).toBeTruthy();
-    expect(update).not.toHaveBeenCalled();
-  });
-});
-
-describe("restoring", () => {
-  // Nothing was copied or deleted to archive it, so restoring is clearing
-  // the stamp — which is what makes archiving safe to do without being sure.
-  it("clears archived_at, and needs no confirmation", async () => {
-    render(
-      <ArchiveAction table="client_pages" id="p1" archived noun="page" onDone={vi.fn()} onError={vi.fn()} />,
-    );
-    fireEvent.click(screen.getByText("Restore"));
-    await waitFor(() => expect(update).toHaveBeenCalled());
-    expect(update.mock.calls[0]![1]).toEqual({ archived_at: null });
+  it("keeps the record active when confirmation is cancelled", async () => {
+    render(<ArchiveAction clientId="client-1" table="client_campaigns" id="record-3"
+      archived={false} noun="campaign" onDone={vi.fn()} onError={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Archive" }));
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("offers Restore rather than Archive when already archived", () => {
-    render(
-      <ArchiveAction table="client_pages" id="p1" archived noun="page" onDone={vi.fn()} onError={vi.fn()} />,
-    );
-    expect(screen.getByText("Restore")).toBeTruthy();
-    expect(screen.queryByText("Archive")).toBeNull();
+  it("does not claim an agency page was archived when no row changed", async () => {
+    const single = vi.fn().mockResolvedValue({ data: null, error: { message: "No rows" } });
+    const chain = { update: vi.fn(), eq: vi.fn(), is: vi.fn(), select: vi.fn(), single };
+    chain.update.mockReturnValue(chain); chain.eq.mockReturnValue(chain);
+    chain.is.mockReturnValue(chain); chain.select.mockReturnValue(chain);
+    from.mockReturnValue(chain);
+    const done = vi.fn(); const fail = vi.fn();
+    render(<ArchiveAction table="client_pages" id="recruitment-1"
+      archived={false} noun="page" onDone={done} onError={fail} />);
+    await userEvent.click(screen.getByRole("button", { name: "Archive" }));
+    await userEvent.click(screen.getByRole("button", { name: "Yes" }));
+    expect(chain.is).toHaveBeenCalledWith("client_id", null);
+    expect(done).not.toHaveBeenCalled();
+    expect(fail).toHaveBeenCalledWith("No rows");
   });
 });

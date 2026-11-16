@@ -60,7 +60,8 @@ export type Tool = {
   implementation: "real" | "partial" | "stub";
   dependency: string;
 };
-export type Context = Identity & { request_id: string; execution_id: string };
+export type Context = Identity & { request_id: string; execution_id: string;
+  gatewayApproval?: { approvalId: string; executionKey: string } };
 export interface Adapter {
   execute(
     tool: Tool,

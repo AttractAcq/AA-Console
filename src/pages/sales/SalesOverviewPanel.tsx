@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
@@ -14,9 +14,7 @@ import { cn } from "../../lib/cn";
 import { liveStateOf, sinceLabel, STATE_TONE } from "./liveState";
 import {
   approvalConfirmBody,
-  approveFields,
   revokeConfirmBody,
-  revokeFields,
 } from "./approval";
 
 type QualificationStep = {
@@ -53,6 +51,7 @@ type SalesAgent = {
   built_at: string | null;
   approved_at: string | null;
   approved_by: string | null;
+  approved_request_id: string | null;
   created_at: string;
 };
 
@@ -102,7 +101,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
       supabase
         .from("client_sales_agents")
         .select(
-          "id, name, purpose, status, role, page_id, greeting, system_prompt, qualification, objections, booking_rule, escalation_rule, guardrails, built_at, approved_at, approved_by, created_at",
+          "id, name, purpose, status, role, page_id, greeting, system_prompt, qualification, objections, booking_rule, escalation_rule, guardrails, built_at, approved_at, approved_by, approved_request_id, created_at",
         )
         .eq("client_id", clientId)
         // A retired agent is archived, not listed.
@@ -189,23 +188,18 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
   const applyApproval = async (agent: SalesAgent, kind: "approve" | "revoke") => {
     if (!clientId) throw new Error("No client selected.");
     if (kind === "approve") {
-      const { data, error: authError } = await supabase.auth.getUser();
-      const uid = data.user?.id;
-      if (authError || !uid) throw new Error("Could not confirm who you are.");
-      const { error } = await supabase
-        .from("client_sales_agents")
-        .update(approveFields(uid))
-        .eq("id", agent.id)
-        .eq("client_id", clientId);
+      const { error } = await supabase.rpc("request_sales_agent_public_use_v6", {
+        p_agent_id: agent.id,
+      });
       if (error) throw new Error(error.message);
-      setNotice(`"${agent.name}" is approved for public use.`);
+      setNotice(`"${agent.name}" was sent to Approval Inbox for exact-script review.`);
       return;
     }
-    const { error } = await supabase
-      .from("client_sales_agents")
-      .update(revokeFields())
-      .eq("id", agent.id)
-      .eq("client_id", clientId);
+    const reason = window.prompt("Why is this agent's public approval being revoked?")?.trim();
+    if (!reason) throw new Error("Enter a reason before revoking public use.");
+    const { error } = await supabase.rpc("revoke_sales_agent_public_use_v6", {
+      p_agent_id: agent.id, p_reason: reason,
+    });
     if (error) throw new Error(error.message);
     setNotice(
       `Public approval for "${agent.name}" has been revoked. Status is unchanged.`,
@@ -331,7 +325,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
 
                     <p className="mt-1 text-xs text-muted-foreground">
                       {a.approved_at
-                        ? "Approved for public use"
+                        ? a.approved_request_id ? "Inbox approved for public use" : "Legacy public approval (pre-Inbox)"
                         : "Not approved for public use"}
                     </p>
 
@@ -378,13 +372,14 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
                           onClick={() => setConfirm({ kind: "approve", agent: a })}
                           className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
-                          Approve for public use
+                          Request public-use review
                         </button>
                       )}
                       {/* Retiring an agent takes it off live; it is usually
                           being edited. Archiving is the separate decision
                           that it is finished with for good. */}
                       <ArchiveAction
+                        clientId={clientId}
                         table="client_sales_agents"
                         id={a.id}
                         archived={false}
@@ -543,9 +538,13 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
                 <h3 className="text-sm font-semibold text-foreground">Public use</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {open.approved_at
-                    ? "Approved for public use."
-                    : "Not approved for public use. Site deployment will wait until a person has read what this agent will say."}
+                    ? open.approved_request_id ? "Inbox approved for public use."
+                      : "Legacy public approval (pre-Inbox). Review and replace this signature."
+                    : "Not approved for public use. Site deployment waits for exact-script review in Approval Inbox."}
                 </p>
+                {!open.approved_at && clientId && <Link
+                  to={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}
+                  className="mt-1 inline-block text-xs underline">Open Approval Inbox</Link>}
                 {open.built_at && (
                   <div className="mt-2">
                     {open.approved_at ? (
@@ -570,7 +569,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
                         }}
                         className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        Approve for public use
+                        Request public-use review
                       </button>
                     )}
                   </div>
@@ -687,7 +686,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
         open={confirm !== null}
         onClose={() => setConfirm(null)}
         title={
-          confirm?.kind === "revoke" ? "Revoke approval" : "Approve for public use"
+          confirm?.kind === "revoke" ? "Revoke approval" : "Request public-use review"
         }
         body={
           confirm?.kind === "revoke"
@@ -697,7 +696,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
               : ""
         }
         confirmLabel={
-          confirm?.kind === "revoke" ? "Revoke approval" : "Approve for public use"
+          confirm?.kind === "revoke" ? "Revoke approval" : "Send to Approval Inbox"
         }
         onConfirm={async () => {
           if (!confirm) return;

@@ -148,6 +148,31 @@ export function EnginePanel() {
     await refresh();
   }
 
+  async function requestActivation(key: "engine" | "publishing" | "auto_approve_ideas" | "auto_approve_briefs") {
+    if (!clientId) return;
+    setBusy(true);
+    setError(null);
+    setNote(null);
+    const { error: rpcError } = await supabase.rpc("request_client_switch_activation_v6", {
+      p_client_id: clientId, p_switch_key: key,
+    });
+    setBusy(false);
+    if (rpcError) { setError(rpcError.message); return; }
+    setNote(`Exact ${key.replaceAll("_", " ")} activation review requested in Unified Approval Inbox.`);
+    await refresh();
+  }
+
+  async function requestGlobalActivation() {
+    setBusy(true);
+    setError(null);
+    setNote(null);
+    const { error: rpcError } = await supabase.rpc("request_global_engine_activation_v6");
+    setBusy(false);
+    if (rpcError) { setError(rpcError.message); return; }
+    setNote("Exact system-wide Engine activation review requested in the agency Approval Inbox.");
+    await refresh();
+  }
+
   if (!clientId) return <p className="text-sm text-muted-foreground">Pick a client first.</p>;
 
   const running = readiness?.enabled ?? false;
@@ -171,17 +196,17 @@ export function EnginePanel() {
             type="button"
             disabled={busy || (!running && !canSwitchOn)}
             onClick={() =>
-              void call(
+              !running ? void requestActivation("engine") : void call(
                 "set_engine_enabled",
-                { p_client_id: clientId, p_enabled: !running },
-                running ? "The engine is off." : "The engine is on.",
+                { p_client_id: clientId, p_enabled: false },
+                "The engine is off.",
               )
             }
             className={`rounded-md px-3 py-2 text-sm disabled:opacity-50 ${
               running ? "bg-destructive text-destructive-foreground" : "bg-primary text-primary-foreground"
             }`}
           >
-            {running ? "Switch off" : "Switch on"}
+            {running ? "Switch off" : "Request activation"}
           </button>
         </div>
         {!running && !canSwitchOn ? (
@@ -296,17 +321,13 @@ export function EnginePanel() {
             type="button"
             disabled={busy}
             onClick={() =>
-              void call(
+              !readiness?.engine_running ? void requestGlobalActivation() : void call(
                 "set_engine_running",
                 {
-                  p_enabled: !(readiness?.engine_running ?? false),
-                  p_note: readiness?.engine_running
-                    ? "Switched off from the Engine screen."
-                    : "Switched on from the Engine screen.",
+                  p_enabled: false,
+                  p_note: "Switched off from the Engine screen.",
                 },
-                readiness?.engine_running
-                  ? "The engine is off for every client."
-                  : "The engine is on for every client.",
+                "The engine is off for every client.",
               )
             }
             className={`rounded-md px-3 py-2 text-sm disabled:opacity-50 ${
@@ -315,7 +336,7 @@ export function EnginePanel() {
                 : "bg-primary text-primary-foreground"
             }`}
           >
-            {readiness?.engine_running ? "Switch off globally" : "Switch on globally"}
+            {readiness?.engine_running ? "Switch off globally" : "Request global activation"}
           </button>
         </div>
 
@@ -353,12 +374,10 @@ export function EnginePanel() {
             type="button"
             disabled={busy}
             onClick={() =>
-              void call(
+              !publishing ? void requestActivation("publishing") : void call(
                 "set_publishing_enabled",
-                { p_client_id: clientId, p_enabled: !publishing },
-                publishing
-                  ? "Publishing is off for this client."
-                  : "The client switch is on. Exact outgoing Approval Inbox authority and the runtime gate are still required.",
+                { p_client_id: clientId, p_enabled: false },
+                "Publishing is off for this client.",
               )
             }
             className={`rounded-md px-3 py-2 text-sm disabled:opacity-50 ${
@@ -367,7 +386,7 @@ export function EnginePanel() {
                 : "bg-primary text-primary-foreground"
             }`}
           >
-            {publishing ? "Stop publishing" : "Start publishing"}
+            {publishing ? "Stop publishing" : "Request publishing activation"}
           </button>
         </div>
       </section>
@@ -409,7 +428,10 @@ export function EnginePanel() {
           {error}
         </p>
       ) : null}
-      {note ? <p className="text-sm text-muted-foreground">{note}</p> : null}
+      {note ? <p className="text-sm text-muted-foreground">{note} {note.includes("Unified Approval Inbox") &&
+        <a className="underline" href={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>Open Inbox</a>}
+        {note.includes("agency Approval Inbox") && <a className="underline" href="/approvals">Open agency Inbox</a>}
+      </p> : null}
 
       <section className="space-y-3 rounded-lg border border-border p-4">
         <h3 className="text-sm font-medium text-card-foreground">Platforms and cadence</h3>
@@ -549,10 +571,10 @@ export function EnginePanel() {
               aria-label={key === "auto_approve_ideas" ? "Approve ideas by policy" : "Approve briefs by policy"}
               checked={settings?.[key] ?? false}
               onChange={(e) =>
-                void call(
+                e.target.checked ? void requestActivation(key) : void call(
                   "set_engine_settings",
-                  { p_client_id: clientId, [`p_${key}`]: e.target.checked },
-                  "Saved.",
+                  { p_client_id: clientId, [`p_${key}`]: false },
+                  "Policy approval is off.",
                 )
               }
             />

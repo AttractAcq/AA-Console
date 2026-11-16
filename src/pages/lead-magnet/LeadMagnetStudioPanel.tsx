@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import { Button } from "../../components/Button";
 import { DataTable } from "../../components/DataTable";
@@ -10,11 +10,11 @@ import { dayOrDash } from "../../lib/contentRecords";
 import { supabase } from "../../lib/supabase";
 import {
   CHANNEL_HINT, MAGNET_FORMATS,
-  addVersion, createMagnet, decideApproval, fetchApprovals,
-  fetchDeliveriesDue, fetchMagnets,
-  fetchVersions, requestApproval, revokeApproval,
+  addVersion, attestApprovalFile, createMagnet, decideApproval, downloadAndRecordMagnetVersion,
+  fetchApprovals, fetchDeliveriesDue, fetchDeliverySwitch, fetchMagnetOperatorEvents, fetchMagnets,
+  fetchVersions, recordMagnetOperatorHandoff, requestApproval, revokeApproval,
   type LeadMagnet, type LeadMagnetApproval,
-  type LeadMagnetDue, type LeadMagnetVersion,
+  type LeadMagnetDue, type LeadMagnetOperatorEvent, type LeadMagnetVersion,
 } from "../../lib/leadMagnets";
 import {
   fetchEndpoints, fetchSubmissions,
@@ -65,6 +65,8 @@ export function LeadMagnetStudioPanel() {
   const [magnets, setMagnets] = useState<LeadMagnet[]>([]);
   const [versions, setVersions] = useState<LeadMagnetVersion[]>([]);
   const [approvals, setApprovals] = useState<LeadMagnetApproval[]>([]);
+  const [operatorEvents, setOperatorEvents] = useState<LeadMagnetOperatorEvent[]>([]);
+  const [clientDeliverySwitch, setClientDeliverySwitch] = useState(false);
   const [due, setDue] = useState<LeadMagnetDue[]>([]);
   const [endpoints, setEndpoints] = useState<CaptureEndpoint[]>([]);
   const [submissions, setSubmissions] = useState<LeadSubmission[]>([]);
@@ -82,11 +84,13 @@ export function LeadMagnetStudioPanel() {
       return;
     }
     try {
-      const [m, v, a, d, e, s, camps] = await Promise.all([
+      const [m, v, a, d, operator, deliverySwitch, e, s, camps] = await Promise.all([
         fetchMagnets(clientId),
         fetchVersions(clientId),
         fetchApprovals(clientId),
         fetchDeliveriesDue(clientId),
+        fetchMagnetOperatorEvents(clientId),
+        fetchDeliverySwitch(clientId),
         fetchEndpoints(clientId),
         fetchSubmissions(clientId),
         supabase
@@ -100,6 +104,8 @@ export function LeadMagnetStudioPanel() {
       setVersions(v);
       setApprovals(a);
       setDue(d);
+      setOperatorEvents(operator);
+      setClientDeliverySwitch(deliverySwitch);
       setEndpoints(e.endpoints);
       setSubmissions(s);
       setCampaigns((camps.data ?? []) as { id: string; name: string }[]);
@@ -252,14 +258,28 @@ export function LeadMagnetStudioPanel() {
                         void act(magnet.id, () => requestApproval(newest.id), "Sent for approval."),
                     }]
                   : []),
+                { label: "Archive", onSelect: () => {
+                  if (!clientId || !window.confirm("Archive this magnet? Existing delivery obligations remain owed.")) return;
+                  void act(magnet.id, async () => {
+                    const { error } = await supabase.rpc("set_client_archive_v8", {
+                      p_client_id: clientId, p_table_name: "lead_magnets",
+                      p_record_id: magnet.id, p_archive: true,
+                    });
+                    if (error) throw error;
+                  }, "Magnet archived. Existing deliveries remain owed.");
+                } },
               ]}
             />
           );
         }}
         detail={(magnet) => (
           <MagnetDetail
+            clientId={clientId!}
             magnet={magnet}
             versions={versionsOf(magnet.id)}
+            operatorEvents={operatorEvents.filter((event) =>
+              versionsOf(magnet.id).some((version) => version.id === event.magnet_version_id))}
+            clientDeliverySwitch={clientDeliverySwitch}
             due={dueFor(magnet.id)}
             liveApproval={liveApproval}
             pendingApproval={pendingApproval}
@@ -378,11 +398,15 @@ export function LeadMagnetStudioPanel() {
  * are both shown next to the buttons that approve them.
  */
 function MagnetDetail({
-  magnet, versions, due, liveApproval, pendingApproval, campaignName,
+  clientId, magnet, versions, operatorEvents, clientDeliverySwitch, due,
+  liveApproval, pendingApproval, campaignName,
   busy, loading, onNewVersion, onAct,
 }: {
+  clientId: string;
   magnet: LeadMagnet;
   versions: LeadMagnetVersion[];
+  operatorEvents: LeadMagnetOperatorEvent[];
+  clientDeliverySwitch: boolean;
   due: LeadMagnetDue[];
   liveApproval: (versionId: string) => LeadMagnetApproval | undefined;
   pendingApproval: (versionId: string) => LeadMagnetApproval | undefined;
@@ -401,6 +425,9 @@ function MagnetDetail({
           {campaignName(magnet.campaign_id) ? ` · ${campaignName(magnet.campaign_id)}` : " · evergreen"}
           {magnet.audience ? ` · for ${magnet.audience}` : ""}
         </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Client automatic-delivery switch: {clientDeliverySwitch ? "on" : "off"}. Approval and operator handoff do not send this file.
+        </p>
       </div>
 
       <section className="space-y-2">
@@ -417,6 +444,11 @@ function MagnetDetail({
           versions.map((version) => {
             const live = liveApproval(version.id);
             const pending = pendingApproval(version.id);
+            const versionEvents = operatorEvents.filter((event) => event.magnet_version_id === version.id);
+            const lastDownload = versionEvents.find((event) => event.event_kind === "verified_download");
+            const lastHandoff = versionEvents.find((event) => event.event_kind === "operator_handoff");
+            const downloadedAfterApproval = Boolean(live && versionEvents.some((event) =>
+              event.event_kind === "verified_download" && event.approval_id === live.id));
             return (
               <article key={version.id} className="rounded-lg border border-border bg-card p-4">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -432,7 +464,10 @@ function MagnetDetail({
                       live ? "text-brand-strong" : pending ? "text-amber-600" : "text-muted-foreground"
                     }
                   >
-                    {live ? `approved ${dayOrDash(live.decided_at)}` : pending ? "awaiting approval" : "not asked"}
+                    {live ? `approved ${dayOrDash(live.decided_at)}${
+                      (live as LeadMagnetApproval & { inbox_enforced_v6?: boolean }).inbox_enforced_v6
+                        ? "" : " · legacy approval"
+                    }` : pending ? "awaiting approval" : "not asked"}
                   </span>
                 </div>
 
@@ -444,6 +479,21 @@ function MagnetDetail({
                     {version.delivery_body}
                   </pre>
                 )}
+
+                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+                  <Button disabled={busy === version.id}
+                    onClick={() => void onAct(version.id,
+                      () => downloadAndRecordMagnetVersion(version),
+                      "Downloaded the exact stored file; verification recorded.")}>
+                    Download and verify exact file
+                  </Button>
+                  <span>{lastDownload
+                    ? `Verified download reported ${dayOrDash(lastDownload.occurred_at)}`
+                    : "No verified operator download recorded"}</span>
+                </div>
+                {lastHandoff && <p className="mt-2 text-xs" role="status">
+                  Operator handoff reported {dayOrDash(lastHandoff.occurred_at)} to {lastHandoff.recipient} · {lastHandoff.reference}
+                </p>}
 
                 {pending && (
                   <>
@@ -468,12 +518,22 @@ function MagnetDetail({
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button
                         disabled={busy === pending.id}
-                        onClick={() =>
-                          void onAct(pending.id, () => decideApproval(pending.id, true), "Approved.")
-                        }
+                        onClick={() => void onAct(pending.id,
+                          () => attestApprovalFile(clientId, pending.id),
+                          "Stored file verified. Review the exact request in Approval Inbox.")}
                       >
-                        Approve this file and route
+                        Verify stored bytes
                       </Button>
+                      {(pending as LeadMagnetApproval & { inbox_enforced_v6?: boolean }).inbox_enforced_v6
+                        ? <Link className="rounded-lg border border-border px-4 py-2 text-sm underline"
+                            to={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>
+                            Review in Approval Inbox
+                          </Link>
+                        : <Button
+                            disabled={busy === pending.id}
+                            onClick={() => void onAct(pending.id,
+                              () => decideApproval(pending.id, true), "Approved.")}
+                          >Approve this file and route</Button>}
                       <Button
                         disabled={busy === pending.id}
                         onClick={() => {
@@ -494,7 +554,22 @@ function MagnetDetail({
                 )}
 
                 {live && (
-                  <div className="mt-3">
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Button disabled={busy === version.id || !downloadedAfterApproval}
+                      onClick={() => {
+                        const recipient = window.prompt("Which operator received this exact file?")?.trim();
+                        if (!recipient) return;
+                        const reference = window.prompt("What ticket, message, or handoff reference records it?")?.trim();
+                        if (!reference) return;
+                        void onAct(version.id,
+                          () => recordMagnetOperatorHandoff(version.id, recipient, reference),
+                          "Operator handoff reported. This is not an external delivery receipt.");
+                      }}>
+                      Record manual handoff
+                    </Button>
+                    {!downloadedAfterApproval && <span className="text-xs text-muted-foreground">
+                      Verify a download after approval before recording handoff.
+                    </span>}
                     <Button
                       disabled={busy === live.id}
                       onClick={() => {

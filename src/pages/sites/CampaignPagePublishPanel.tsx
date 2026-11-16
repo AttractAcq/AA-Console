@@ -7,6 +7,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { dayOrDash } from "../../lib/contentRecords";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
+import { callRuntime } from "../../lib/callRuntime";
 
 type PublishDue = Database["public"]["Views"]["campaign_page_publish_due"]["Row"];
 type Publication = Database["public"]["Tables"]["campaign_page_publications"]["Row"];
@@ -19,11 +20,9 @@ type Publication = Database["public"]["Tables"]["campaign_page_publications"]["R
  * exact-version executor existed. It exists now, so this is the board that
  * shows what happened to each decision.
  *
- * The distinction the layout exists to protect is between published and
- * working. A page whose form posts nowhere looks exactly like one that works
- * — same commit, same URL, same screenshot — so "Published. Nobody has
- * tested the form yet." is its own row state here, and deliberately not the
- * same colour as live and tested.
+ * Publication, capture-endpoint checks, and browser-form verification are
+ * separate evidence. A direct endpoint submission does not prove the page's
+ * rendered form works.
  */
 export function CampaignPagePublishPanel() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -31,6 +30,21 @@ export function CampaignPagePublishPanel() {
   const [publications, setPublications] = useState<Publication[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rechecking, setRechecking] = useState<string | null>(null);
+
+  const recheck = async (publicationId: string) => {
+    setRechecking(publicationId);
+    setError(null);
+    try {
+      await callRuntime<{ passed: boolean; detail: string }>(
+        "/admin/sites/recheck-page-capture", { publicationId });
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not recheck the capture endpoint.");
+    } finally {
+      setRechecking(null);
+    }
+  };
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -62,8 +76,9 @@ export function CampaignPagePublishPanel() {
     void refresh();
   }, [refresh]);
 
-  /** Published, probed and passing. The only state that earns the word live. */
+  /** Published and verified by a submission through the rendered browser form. */
   const live = due.filter((row) => row.blocker === "Live and tested.").length;
+  const endpointOnly = due.filter((row) => row.blocker === "Published. Capture endpoint passed; browser form unverified.").length;
   const untested = due.filter(
     (row) => row.blocker === "Published. Nobody has tested the form yet.",
   ).length;
@@ -84,13 +99,14 @@ export function CampaignPagePublishPanel() {
       <div className="rounded-lg border border-border bg-card p-4">
         <p className="text-sm font-medium">
           {live} live and tested
+          {endpointOnly > 0 && ` · ${endpointOnly} endpoint checked, browser form unverified`}
           {untested > 0 && ` · ${untested} published but untested`}
           {due.length === 0 && " · nothing has been approved for publication yet"}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          A page is published when a commit exists and working when a test submission reaches
-          Sales OS carrying its campaign, source and consent. Those are different facts, so they
-          are different states here.
+          A commit proves publication. A direct capture check proves the endpoint accepts a
+          consented lead. The page is tested only after its published form submits successfully
+          and the lead reaches Sales OS with page, campaign, source and consent.
         </p>
       </div>
 
@@ -148,7 +164,7 @@ export function CampaignPagePublishPanel() {
         <section className="space-y-2">
           <h3 className="font-semibold">Every commit, in order</h3>
           <DataTable
-            columns={["When", "URL", "Commit", "Form probe"]}
+            columns={["When", "URL", "Commit", "Capture check", "Action"]}
             emptyLabel="Nothing published yet"
             rows={publications.map((p) => [
               <span key="w">{dayOrDash(p.published_at)}</span>,
@@ -170,9 +186,22 @@ export function CampaignPagePublishPanel() {
                       : "text-muted-foreground"
                 }
               >
-                {p.probe_status ?? "not tested"}
+                {p.probe_status === "passed" && p.probe_kind === "endpoint"
+                  ? "endpoint passed; browser form unverified"
+                  : p.probe_status === "passed" && p.probe_kind === "browser_form"
+                    ? "browser form passed"
+                    : p.probe_status ?? "not tested"}
                 {p.probe_detail && (
                   <span className="block text-xs text-muted-foreground">{p.probe_detail}</span>
+                )}
+              </span>,
+              <span key="a">
+                {p.probe_kind !== "browser_form" && p.probe_status !== "passed" && (
+                  <button type="button" disabled={rechecking !== null}
+                    onClick={() => void recheck(p.id)}
+                    className="text-xs text-brand-strong underline disabled:opacity-50">
+                    {rechecking === p.id ? "Checking…" : "Recheck capture"}
+                  </button>
                 )}
               </span>,
             ])}

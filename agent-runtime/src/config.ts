@@ -70,12 +70,26 @@ export interface RuntimeConfig {
    * per-destination flag and the human placement decision are the others.
    */
   proofPublishEnabled: boolean;
+  /** Separate release for Google review replies; off unless explicitly enabled. */
+  googleReviewReplyEnabled: boolean;
+  /** Separate release for exact Google profile field writes; off by default. */
+  googleProfileFieldWriteEnabled: boolean;
+  /** Read-only Google Ads reporting. Missing token keeps the reader unavailable. */
+  googleAdsDeveloperToken?: string | null;
+  /** Manager account only when the OAuth user accesses clients through one. */
+  googleAdsLoginCustomerId?: string | null;
+  /** Separate release for exact Facebook Page field writes; off by default. */
+  metaProfileFieldWriteEnabled: boolean;
   /**
    * Whether this runtime may perform campaign actions a person has approved.
    * Off unless set, and the first of four: the client flag,
    * campaign_action_executors.supported and the approval itself follow.
    */
   campaignActionsEnabled: boolean;
+  /** A second, explicit release for the atomic owned claim path. Off by default. */
+  campaignActionOwnedClaimEnabled: boolean;
+  /** Assigned by this process's heartbeat, never read from an environment variable. */
+  campaignActionWorkerId?: string;
   /**
    * Whether this runtime may send approved lead magnets. Off unless set, and
    * the first of four: the client flag, the capture endpoint and the human
@@ -316,8 +330,18 @@ export function loadConfig(): RuntimeConfig {
     // another, and one variable covering all three would make them one
     // decision.
     proofPublishEnabled: (optionalEnv("PROOF_PUBLISH_ENABLED") ?? "false").toLowerCase() === "true",
+    googleReviewReplyEnabled:
+      (optionalEnv("GOOGLE_REVIEW_REPLY_ENABLED") ?? "false").toLowerCase() === "true",
+    googleProfileFieldWriteEnabled:
+      (optionalEnv("GOOGLE_PROFILE_FIELD_WRITE_ENABLED") ?? "false").toLowerCase() === "true",
+    googleAdsDeveloperToken: optionalEnv("GOOGLE_ADS_DEVELOPER_TOKEN") ?? null,
+    googleAdsLoginCustomerId: optionalEnv("GOOGLE_ADS_LOGIN_CUSTOMER_ID") ?? null,
+    metaProfileFieldWriteEnabled:
+      (optionalEnv("META_PROFILE_FIELD_WRITE_ENABLED") ?? "false").toLowerCase() === "true",
     campaignActionsEnabled:
       (optionalEnv("CAMPAIGN_ACTIONS_ENABLED") ?? "false").toLowerCase() === "true",
+    campaignActionOwnedClaimEnabled:
+      (optionalEnv("CAMPAIGN_ACTION_OWNED_CLAIM_ENABLED") ?? "false").toLowerCase() === "true",
     leadMagnetDeliveryEnabled:
       (optionalEnv("LEAD_MAGNET_DELIVERY_ENABLED") ?? "false").toLowerCase() === "true",
     openaiApiKey: optionalEnv("OPENAI_API_KEY") ?? null,

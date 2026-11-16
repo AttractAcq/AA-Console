@@ -105,7 +105,7 @@ describe("the switch", () => {
     withState({ client_id: "c1", enabled: false, readiness: "No posting windows", timezone: "Europe/London" });
     render(<EnginePanel />);
 
-    const button = await screen.findByRole("button", { name: "Switch on" });
+    const button = await screen.findByRole("button", { name: "Request activation" });
     expect(button).toBeDisabled();
     expect(screen.getByText(/Fix .No posting windows./)).toBeInTheDocument();
     expect(rpc).not.toHaveBeenCalled();
@@ -115,11 +115,11 @@ describe("the switch", () => {
     withState({ client_id: "c1", enabled: false, readiness: "Ready, switched off", timezone: "Europe/London" });
     render(<EnginePanel />);
 
-    const button = await screen.findByRole("button", { name: "Switch on" });
+    const button = await screen.findByRole("button", { name: "Request activation" });
     expect(button).toBeEnabled();
     await userEvent.click(button);
     await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("set_engine_enabled", { p_client_id: "c1", p_enabled: true }),
+      expect(rpc).toHaveBeenCalledWith("request_client_switch_activation_v6", { p_client_id: "c1", p_switch_key: "engine" }),
     );
   });
 
@@ -145,7 +145,7 @@ describe("the switch", () => {
     withState({ client_id: "c1", enabled: false, readiness: "Ready, switched off", timezone: "Europe/London" });
     rpc.mockResolvedValue({ error: { message: "This client has no posting windows." } });
     render(<EnginePanel />);
-    await userEvent.click(await screen.findByRole("button", { name: "Switch on" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Request activation" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/no posting windows/);
   });
 });
@@ -244,18 +244,18 @@ describe("the second switch", () => {
     withState(ready);
     render(<EnginePanel />);
     expect(await screen.findByText(/Nothing is posted to this client's accounts/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Start publishing" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Request publishing activation" })).toBeInTheDocument();
   });
 
   it("turns publishing on for this client and says the runtime must agree", async () => {
     withState(ready);
     rpc.mockResolvedValue({ error: null });
     render(<EnginePanel />);
-    await userEvent.click(await screen.findByRole("button", { name: "Start publishing" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Request publishing activation" }));
     await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("set_publishing_enabled", { p_client_id: "c1", p_enabled: true }),
+      expect(rpc).toHaveBeenCalledWith("request_client_switch_activation_v6", { p_client_id: "c1", p_switch_key: "publishing" }),
     );
-    expect(await screen.findByText(/Exact outgoing Approval Inbox authority/)).toBeInTheDocument();
+    expect(await screen.findByText(/Exact publishing activation review requested/)).toBeInTheDocument();
   });
 
   it("offers to stop once it is on", async () => {
@@ -276,7 +276,7 @@ describe("the second switch", () => {
     state.noSettings = true;
     render(<EnginePanel />);
     expect(await screen.findByText(/Nothing is posted to this client's accounts/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Start publishing" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Request publishing activation" })).toBeInTheDocument();
   });
 
   it("is a separate act from switching the engine off", async () => {
@@ -395,12 +395,9 @@ describe("the gates nothing could set", () => {
     render(<EnginePanel />);
 
     expect(await screen.findByText(/off for every client/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Switch on globally" }));
+    await userEvent.click(screen.getByRole("button", { name: "Request global activation" }));
     await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("set_engine_running", {
-        p_enabled: true,
-        p_note: expect.any(String),
-      }),
+      expect(rpc).toHaveBeenCalledWith("request_global_engine_activation_v6"),
     );
   });
 

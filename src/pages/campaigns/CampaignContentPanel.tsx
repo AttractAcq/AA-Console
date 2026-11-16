@@ -12,6 +12,7 @@ import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { formatLabel } from "../../lib/contentFormat";
 import { cn } from "../../lib/cn";
 import { RegenerateAction } from "../../components/RegenerateAction";
+import { requestOrdinaryMediaReview } from "../../lib/creativeReview";
 
 type Idea = Database["public"]["Tables"]["client_ideas"]["Row"];
 type Brief = Database["public"]["Tables"]["client_briefs"]["Row"];
@@ -134,6 +135,21 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
     }
   }
 
+  const hasOrdinaryInboxRoute = (asset: CampaignAsset) =>
+    (asset.media_type === "image" || asset.media_type === "text")
+      && asset.content_format === "single" && !asset.render_path;
+  const requestCreativeReview = async (asset: CampaignAsset) => {
+    if (!hasOrdinaryInboxRoute(asset)) {
+      const result = await supabase.rpc("review_media_asset", {
+        p_asset_id: asset.id, p_decision: "approved",
+      });
+      if (result.error) throw result.error;
+      return { error: null };
+    }
+    await requestOrdinaryMediaReview(clientId, asset.id);
+    return { error: null };
+  };
+
   /**
    * Remove one campaign content piece: the idea and the briefs/assets made
    * from it. Never the parent campaign, and never a sibling idea.
@@ -214,7 +230,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
         </button>
       </>}
       {asset.review_status === "pending" && <>
-        <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("review_media_asset", { p_asset_id: asset.id, p_decision: "approved" }), "Asset approved. Ready to distribute.", { id: asset.id, action: "approve" })}>Approve asset</button>
+        <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => requestCreativeReview(asset), hasOrdinaryInboxRoute(asset) ? "Exact asset review requested in Unified Approval Inbox." : "Asset approved through its existing specialist route.", { id: asset.id, action: "approve" })}>{hasOrdinaryInboxRoute(asset) ? "Request asset review" : "Approve asset"}</button>
         <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => { setRejecting(asset); setReason(""); }}>Reject asset</button>
       </>}
     </div>
@@ -229,7 +245,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
 
   const v2AssetActions = (asset: CampaignAsset) => <div className="flex flex-wrap gap-2">
     {asset.review_status === "pending" && <>
-      <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("review_media_asset", { p_asset_id: asset.id, p_decision: "approved" }), "Asset approved. Ready to distribute.", { id: asset.id, action: "approve" })}>Approve</button>
+      <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => requestCreativeReview(asset), hasOrdinaryInboxRoute(asset) ? "Exact asset review requested in Unified Approval Inbox." : "Asset approved through its existing specialist route.", { id: asset.id, action: "approve" })}>{hasOrdinaryInboxRoute(asset) ? "Request review" : "Approve"}</button>
       <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => { setRejecting(asset); setReason(""); }}>Reject</button>
     </>}
     {asset.review_status === "approved" && asset.media_type === "image" && asset.content_format !== "carousel" && <button type="button" className={buttonClass} onClick={() => setCopying(asset)}>{hasAdCopy(asset) ? "Edit ad copy" : "Write ad copy"}</button>}
@@ -264,7 +280,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
         const linkedAssets = linkedBriefs.flatMap((brief) => assetsByBrief.get(brief.id) ?? []) as CampaignAsset[];
         const newest = linkedAssets[linkedAssets.length - 1];
         const open = expanded.has(idea.id);
-        return <Fragment key={idea.id}><tr className="border-b border-border align-top"><td className="p-3"><button type="button" className="font-medium text-brand-strong hover:underline" aria-expanded={open} onClick={() => setExpanded((current) => { const next = new Set(current); if (open) next.delete(idea.id); else next.add(idea.id); return next; })}>{idea.title} {open ? "▾" : "▸"}</button><span className="block text-xs text-muted-foreground">{formatLabel(idea.content_format)} · {idea.media_type}</span></td><td className="p-3">{v2Preview(newest)}</td><td className="p-3 capitalize">{newest ? `Asset · ${newest.review_status}` : linkedBriefs.length ? `Brief · ${linkedBriefs[0].status.replaceAll("_", " ")}` : `Idea · ${idea.status.replaceAll("_", " ")}`}</td><td className="p-3">{linkedBriefs[0] ? <button type="button" className={buttonClass} onClick={() => setViewing(linkedBriefs[0])}>Brief</button> : "—"}</td><td className="p-3"><button type="button" className={buttonClass} aria-expanded={openAssetActions === idea.id} onClick={() => setOpenAssetActions(openAssetActions === idea.id ? null : idea.id)}>Actions</button>{openAssetActions === idea.id && <div className="mt-2 flex flex-wrap gap-2">{idea.status === "draft" && <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.from("client_ideas").update({ status: "approved" }).eq("id", idea.id).eq("client_id", clientId).eq("campaign_id", campaignId).eq("status", "draft"), "Idea approved.", { id: idea.id, action: "approve" })}>Approve idea</button>}{(idea.status === "draft" || idea.status === "approved") && <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("approve_idea_and_generate_brief", { p_idea_id: idea.id }), "Brief queued.", { id: idea.id, action: "brief" })}>Approve &amp; brief</button>}<button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void deleteIdea(idea)}>Delete idea</button></div>}</td></tr>
+        return <Fragment key={idea.id}><tr className="border-b border-border align-top"><td className="p-3"><button type="button" className="font-medium text-brand-strong hover:underline" aria-expanded={open} onClick={() => setExpanded((current) => { const next = new Set(current); if (open) next.delete(idea.id); else next.add(idea.id); return next; })}>{idea.title} {open ? "▾" : "▸"}</button><span className="block text-xs text-muted-foreground">{formatLabel(idea.content_format)} · {idea.media_type}</span></td><td className="p-3">{v2Preview(newest)}</td><td className="p-3 capitalize">{newest ? `Asset · ${newest.review_status}` : linkedBriefs.length ? `Brief · ${linkedBriefs[0].status.replaceAll("_", " ")}` : `Idea · ${idea.status.replaceAll("_", " ")}`}</td><td className="p-3">{linkedBriefs[0] ? <button type="button" className={buttonClass} onClick={() => setViewing(linkedBriefs[0])}>Brief</button> : "—"}</td><td className="p-3"><button type="button" className={buttonClass} aria-expanded={openAssetActions === idea.id} onClick={() => setOpenAssetActions(openAssetActions === idea.id ? null : idea.id)}>Actions</button>{openAssetActions === idea.id && <div className="mt-2 flex flex-wrap gap-2">{idea.status === "draft" && <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("request_human_idea_review_v6", { p_idea_id: idea.id }), "Exact idea review requested in Approval Inbox.", { id: idea.id, action: "approve" })}>Request idea review</button>}{idea.status === "approved" && <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("approve_idea_and_generate_brief", { p_idea_id: idea.id }), "Brief queued.", { id: idea.id, action: "brief" })}>Brief</button>}<button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void deleteIdea(idea)}>Delete idea</button></div>}</td></tr>
           {open && <tr className="border-b border-border bg-muted/20"><td colSpan={5} className="p-3"><p className="text-xs text-muted-foreground">{idea.body ?? idea.source_question ?? "No idea detail recorded."}{idea.strategic_reason && ` · ${idea.strategic_reason}`}</p>{linkedBriefs.length === 0 && <p className="mt-2 text-xs text-muted-foreground">{idea.status === "briefed" ? "Brief being written." : "No brief yet."}</p>}{linkedBriefs.map((brief) => <div key={brief.id} className="mt-3 border-l border-border pl-3"><div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">Brief</span><button type="button" className="text-brand-strong hover:underline" onClick={() => setViewing(brief)}>{brief.title}</button><span className="text-xs text-muted-foreground">{brief.status.replaceAll("_", " ")}</span>{(brief.status === "draft" || brief.status === "approved") && <button type="button" className={buttonClass} onClick={() => setBuilding(brief)}>Approve &amp; Build</button>}</div>{(assetsByBrief.get(brief.id) ?? []).map((asset) => <div key={asset.id} className="mt-2 flex flex-wrap items-center gap-2 border-l border-border pl-3 text-xs"><span>Asset version · {asset.title ?? "Untitled"} · {asset.review_status} · {packageForAsset(asset as CampaignAsset)}</span>{v2Preview(asset)}<button type="button" className={buttonClass} aria-expanded={openAssetActions === asset.id} onClick={() => setOpenAssetActions(openAssetActions === asset.id ? null : asset.id)}>Actions</button>{openAssetActions === asset.id && v2AssetActions(asset as CampaignAsset)}</div>)}</div>)}</td></tr>}
         </Fragment>;
       })}
@@ -355,8 +371,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
           )}
           <div className="flex flex-wrap items-center gap-2">
             {idea.status === "draft" && <>
-              <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.from("client_ideas").update({ status: "approved" }).eq("id", idea.id).eq("client_id", clientId).eq("campaign_id", campaignId).eq("status", "draft"), "Idea approved.", { id: idea.id, action: "approve" })}>{busyFor(idea.id, "approve") ? "Approving…" : "Approve"}</button>
-              <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("approve_idea_and_generate_brief", { p_idea_id: idea.id }), "Approved. The brief agent is writing it now — it appears under this idea in a couple of minutes.", { id: idea.id, action: "brief" })}>{busyFor(idea.id, "brief") ? "Queueing brief…" : "Approve & brief"}</button>
+              <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("request_human_idea_review_v6", { p_idea_id: idea.id }), "Exact idea review requested in Approval Inbox.", { id: idea.id, action: "approve" })}>{busyFor(idea.id, "approve") ? "Requesting…" : "Request idea review"}</button>
             </>}
             {idea.status === "approved" && <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("approve_idea_and_generate_brief", { p_idea_id: idea.id }), "Brief queued. The brief agent is writing it now — it appears under this idea in a couple of minutes.", { id: idea.id, action: "brief" })}>{busyFor(idea.id, "brief") ? "Queueing brief…" : "Brief"}</button>}
             {/* A briefed idea whose brief has not arrived looks identical to one

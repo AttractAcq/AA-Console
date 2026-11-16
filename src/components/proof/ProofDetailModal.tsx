@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { ShieldCheck, ShieldAlert, ShieldX } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { callRuntime } from "../../lib/callRuntime";
 import type { ProofAsset } from "../../lib/media";
 import { cn } from "../../lib/cn";
 
@@ -19,7 +21,7 @@ export const PROOF_TYPES = [
 ] as const;
 
 const RIGHTS: Array<{ id: string; label: string; note: string; icon: typeof ShieldCheck; tone: string }> = [
-  { id: "approved", label: "Cleared", note: "May be used in advertising", icon: ShieldCheck, tone: "text-brand-strong" },
+  { id: "approved", label: "Request clearance", note: "Exact rights review in Approval Inbox", icon: ShieldCheck, tone: "text-brand-strong" },
   { id: "restricted", label: "Restricted", note: "Internal or conditional use only", icon: ShieldAlert, tone: "text-muted-foreground" },
   { id: "not_cleared", label: "Not cleared", note: "No permission on record", icon: ShieldX, tone: "text-destructive" },
 ];
@@ -40,6 +42,7 @@ export function ProofDetailModal({
   const [form, setForm] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
 
   if (!open || !proof) return null;
@@ -61,6 +64,7 @@ export function ProofDetailModal({
       expires_on: proof.expires_on ?? "",
     });
     setError(null);
+    setNotice(null);
   }
 
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -68,26 +72,72 @@ export function ProofDetailModal({
   const save = async () => {
     setBusy(true);
     setError(null);
+    setNotice(null);
+    const wantsClearance = form.usage_rights === "approved";
+    if (wantsClearance && ((proof.media_type === "text" && !!proof.storage_path)
+      || (proof.media_type !== "text" && !proof.storage_path))) {
+      setError("This proof needs a valid source file before rights can be reviewed.");
+      setBusy(false);
+      return;
+    }
+    const metadata = {
+      proof_type: form.proof_type || null,
+      claim: form.claim?.trim() || null,
+      evidence: form.evidence?.trim() || null,
+      avatar_relevance: form.avatar_relevance?.trim() || null,
+      services: form.services?.trim() || null,
+      strength: form.strength || "medium",
+      captured_on: form.captured_on || null,
+    };
+    const metadataChanged = Object.entries(metadata).some(([key, value]) =>
+      String(value ?? "") !== String((proof as unknown as Record<string, unknown>)[key] ?? ""));
+    const basis = form.permission_basis?.trim() || null;
+    const expiry = form.expires_on || null;
     const { error: err } = await supabase
       .from("client_proof_assets")
       .update({
-        proof_type: form.proof_type || null,
-        claim: form.claim?.trim() || null,
-        evidence: form.evidence?.trim() || null,
-        avatar_relevance: form.avatar_relevance?.trim() || null,
-        services: form.services?.trim() || null,
-        strength: form.strength || "medium",
-        usage_rights: form.usage_rights || "not_cleared",
-        permission_basis: form.permission_basis?.trim() || null,
-        captured_on: form.captured_on || null,
-        expires_on: form.expires_on || null,
+        ...metadata,
+        ...(wantsClearance ? {} : {
+          usage_rights: form.usage_rights || "not_cleared",
+          permission_basis: basis,
+          expires_on: expiry,
+        }),
       })
       .eq("id", proof.id);
-    setBusy(false);
     if (err) {
+      setBusy(false);
       setError(err.message);
       return;
     }
+    if (wantsClearance && (proof.usage_rights !== "approved" || !proof.approved_rights_request_id || metadataChanged
+      || basis !== proof.permission_basis || expiry !== proof.expires_on)) {
+      try {
+        if (proof.media_type === "text") {
+          const { error: requestError } = await supabase.rpc("request_proof_rights_v6", {
+            p_proof_id: proof.id,
+            p_permission_basis: basis ?? "",
+            ...(expiry ? { p_expires_on: expiry } : {}),
+          });
+          if (requestError) throw requestError;
+        } else {
+          await callRuntime("/admin/proof-rights/request-media", {
+            clientId: proof.client_id, proofId: proof.id,
+            permissionBasis: basis ?? "", expiresOn: expiry,
+          });
+        }
+      } catch (requestError) {
+        setBusy(false);
+        setError(requestError instanceof Error ? requestError.message
+          : (requestError as { message?: string }).message ?? "Could not request rights review.");
+        onSaved();
+        return;
+      }
+      setBusy(false);
+      onSaved();
+      setNotice("Rights review requested. This proof remains uncleared until the exact request is approved.");
+      return;
+    }
+    setBusy(false);
     onSaved();
     onClose();
   };
@@ -169,6 +219,9 @@ export function ProofDetailModal({
           </div>
 
           {field("permission_basis", "Permission basis", "Record who authorized use and where that authorization is documented. Required when clearing proof.", 2)}
+          {proof.usage_rights === "approved" && !proof.approved_rights_request_id && (
+            <p className="text-xs text-muted-foreground">Legacy clearance predates exact Inbox review. Save with Request clearance selected to create a current decision.</p>
+          )}
 
           {field("claim", "Claim", "The one specific thing this proves. Not \"we do good work\".", 2)}
           {field("evidence", "Evidence", "What backs it, so a sceptic can judge it.", 2)}
@@ -255,6 +308,9 @@ export function ProofDetailModal({
               {error}
             </p>
           )}
+          {notice && <p role="status" className="rounded-md bg-muted px-3 py-2 text-sm">
+            {notice} <Link className="underline" to={`/clients/${proof.client_id}/delivery/approval-inbox?tab=unified`}>Open Approval Inbox</Link>
+          </p>}
         </div>
 
         <footer className="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-3">

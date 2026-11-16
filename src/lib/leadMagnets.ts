@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { uploadThen } from "./options";
 import type { Database } from "../types/database";
+import { callRuntime } from "./callRuntime";
 
 export type { CaptureDue, CaptureEndpoint, LeadSubmission } from "./leadCapture";
 
@@ -20,6 +21,7 @@ export type LeadMagnet = Database["public"]["Tables"]["lead_magnets"]["Row"];
 export type LeadMagnetVersion = Database["public"]["Tables"]["lead_magnet_versions"]["Row"];
 export type LeadMagnetApproval = Database["public"]["Tables"]["lead_magnet_approvals"]["Row"];
 export type LeadMagnetDue = Database["public"]["Views"]["lead_magnet_due"]["Row"];
+export type LeadMagnetOperatorEvent = Database["public"]["Tables"]["lead_magnet_operator_events_v7"]["Row"];
 
 export const MAGNET_FORMATS = [
   { value: "pdf_guide", label: "PDF guide" },
@@ -56,6 +58,32 @@ export async function fetchVersions(clientId: string): Promise<LeadMagnetVersion
     .order("version", { ascending: false });
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+export async function fetchMagnetOperatorEvents(clientId: string): Promise<LeadMagnetOperatorEvent[]> {
+  const { data, error } = await supabase.from("lead_magnet_operator_events_v7")
+    .select("*").eq("client_id", clientId).order("occurred_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+/** The browser verifies the bytes before recording its own download report. */
+export async function downloadAndRecordMagnetVersion(version: LeadMagnetVersion): Promise<void> {
+  await downloadVerifiedMagnetFile(version.storage_path, version.content_sha256, version.file_bytes);
+  const { error } = await supabase.rpc("record_lead_magnet_operator_event_v7", {
+    p_version_id: version.id, p_kind: "verified_download",
+  });
+  if (error) throw new Error(`File downloaded, but its verification could not be recorded: ${error.message}`);
+}
+
+export async function recordMagnetOperatorHandoff(
+  versionId: string, recipient: string, reference: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("record_lead_magnet_operator_event_v7", {
+    p_version_id: versionId, p_kind: "operator_handoff",
+    p_recipient: recipient.trim(), p_reference: reference.trim(),
+  });
+  if (error) throw new Error(error.message);
 }
 
 export async function fetchApprovals(clientId: string): Promise<LeadMagnetApproval[]> {
@@ -184,6 +212,33 @@ export async function requestApproval(versionId: string): Promise<void> {
     p_version_id: versionId,
   });
   if (error) throw new Error(error.message);
+}
+
+export async function attestApprovalFile(clientId: string, approvalId: string): Promise<void> {
+  await callRuntime("/admin/lead-magnets/attest", { clientId, approvalId });
+}
+
+/** Download the reviewed bytes, checking them against the recorded version. */
+export async function downloadVerifiedMagnetFile(
+  storagePath: string, expectedSha256: string, expectedBytes: number,
+): Promise<void> {
+  const { data, error } = await supabase.storage.from(MAGNET_BUCKET).download(storagePath);
+  if (error || !data) throw new Error(error?.message ?? "Could not download the magnet file.");
+  const buffer = await data.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  const actualSha256 = [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  if (actualSha256 !== expectedSha256 || buffer.byteLength !== expectedBytes) {
+    throw new Error("Stored file bytes differ from the exact version under review.");
+  }
+  const url = URL.createObjectURL(new Blob([buffer], { type: data.type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = storagePath.split("/").at(-1) || "lead-magnet";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 export async function decideApproval(

@@ -21,6 +21,7 @@ import { provisionSite, publishPage, type SiteConfig } from "../sites/provision.
 import { supabaseSiteStore } from "../sites/store.js";
 import { pagePath } from "../sites/paths.js";
 import { missingConfig } from "./status.js";
+import { approvedPageCaptureToken, probePageForm } from "../campaigns/actions/page-deploy.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -52,7 +53,7 @@ export async function handleSitesRoute(
   res: ServerResponse,
   sb: SupabaseClient,
   config: RuntimeConfig,
-  action: "provision" | "publish" | "request-page-approval",
+  action: "provision" | "publish" | "request-page-approval" | "recheck-page-capture",
 ): Promise<void> {
   const json = (status: number, body: unknown): void => {
     res.writeHead(status, { "Content-Type": "application/json" });
@@ -84,6 +85,38 @@ export async function handleSitesRoute(
   const store = supabaseSiteStore(sb);
 
   try {
+    if (action === "recheck-page-capture") {
+      const publicationId = String(body.publicationId ?? "");
+      if (!UUID.test(publicationId)) throw new Error("A page publication is required.");
+      const { data: publication, error: publicationError } = await sb
+        .from("campaign_page_publications")
+        .select("id, client_id, page_id, approval_id, rendered_sha256, probe_kind")
+        .eq("id", publicationId).maybeSingle();
+      if (publicationError || !publication) throw new Error("That page publication is unavailable.");
+      if (publication.probe_kind === "browser_form") throw new Error("Browser-form evidence must not be overwritten by an endpoint check.");
+      const [{ data: page }, { data: approval }] = await Promise.all([
+        sb.from("client_pages").select("html, client_id").eq("id", publication.page_id).maybeSingle(),
+        sb.from("campaign_action_approvals").select("campaign_id, client_id").eq("id", publication.approval_id).maybeSingle(),
+      ]);
+      if (!page?.html || page.client_id !== publication.client_id ||
+          !approval || approval.client_id !== publication.client_id ||
+          createHash("sha256").update(page.html).digest("hex") !== publication.rendered_sha256) {
+        throw new Error("The published page no longer matches its approved source revision.");
+      }
+      const token = approvedPageCaptureToken(page.html, config.publicRuntimeBase);
+      if (!token) throw new Error("The approved page contains no AA capture form for this runtime.");
+      const probe = await probePageForm(sb, config, {
+        clientId: publication.client_id, campaignId: approval.campaign_id,
+        pageId: publication.page_id, token,
+      });
+      const { error } = await sb.rpc("record_campaign_page_probe_v6", {
+        p_publication_id: publication.id, p_passed: probe.passed,
+        p_detail: probe.detail, p_lead_id: probe.leadId,
+      });
+      if (error) throw new Error(`The capture check could not be recorded: ${error.message}`);
+      json(200, { ok: true, passed: probe.passed, detail: probe.detail });
+      return;
+    }
     if (action === "request-page-approval") {
       const pageId = String(body.pageId ?? "");
       if (!UUID.test(pageId)) {

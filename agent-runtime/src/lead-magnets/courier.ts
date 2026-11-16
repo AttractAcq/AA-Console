@@ -206,6 +206,17 @@ export async function runLeadMagnetCourierJob(
         );
       }
       const file = await fetchApprovedFile(sb, delivery);
+      const { data: sendReady, error: gateError } = await sb.rpc(
+        "lead_magnet_send_ready_v6",
+        { p_delivery_id: delivery.delivery_id, p_attempt: delivery.attempt } as never,
+      );
+      if (gateError || sendReady !== true) {
+        throw new CourierError(
+          gateError ? `Could not recheck the exact approval: ${gateError.message}`
+            : "The exact approval, consent, switch or send lease changed before the provider call. Nothing was sent.",
+          false,
+        );
+      }
       const providerRef = await sendByEmail(runtime, delivery, file);
 
       const { error: recordError } = await sb.rpc("record_lead_magnet_sent", {

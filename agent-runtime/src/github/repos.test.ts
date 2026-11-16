@@ -6,6 +6,7 @@ import {
   getPages,
   getRepo,
   latestPagesBuild,
+  readRepoFile,
 } from "./repos.js";
 import { GitHubApiError } from "./app-auth.js";
 
@@ -70,6 +71,33 @@ describe("finding a repository", () => {
       "GET /repos/AttractAcqSites/x": { status: 500 },
     });
     await expect(getRepo("t", "AttractAcqSites", "x", fetchImpl)).rejects.toBeInstanceOf(GitHubApiError);
+  });
+});
+
+describe("reading a frozen page file", () => {
+  it("hashes the exact bytes returned by GitHub at the requested ref", async () => {
+    const { fetchImpl, calls } = github({
+      "GET /repos/Org/site/contents/offer/index.html?ref=main": {
+        body: { type: "file", path: "offer/index.html", encoding: "base64",
+          content: Buffer.from("<p>Exact café</p>", "utf8").toString("base64"), sha: "blob-sha" },
+      },
+    });
+    const result = await readRepoFile("short-lived", "Org", "site",
+      "offer/index.html", "main", fetchImpl);
+    expect(result).toEqual({ sha256: "1b38a67c92e7991e6d18caf73bdc8f5abdea31a932e24441f71b7c966b7989bd",
+      blobSha: "blob-sha" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.method).toBe("GET");
+  });
+
+  it("distinguishes a missing file from unreadable or unsafe targets", async () => {
+    const { fetchImpl } = github({});
+    expect(await readRepoFile("t", "Org", "site", "offer/index.html", "main", fetchImpl))
+      .toBeNull();
+    await expect(readRepoFile("t", "Org", "site", "../secret", "main", fetchImpl))
+      .rejects.toBeInstanceOf(GitHubApiError);
+    await expect(readRepoFile("t", "..", "site", "offer/index.html", "main", fetchImpl))
+      .rejects.toBeInstanceOf(GitHubApiError);
   });
 });
 

@@ -109,6 +109,7 @@ function rows(data: unknown[], error: unknown = null) {
   const chain: Record<string, unknown> = {
     select: () => chain,
     eq: () => chain,
+    in: () => chain,
     is: () => chain,
     order: () => chain,
     maybeSingle: noRow,

@@ -1,6 +1,10 @@
 import { handlePublicProof } from "./proof-capture/public-route.js";
 import { handleProofCaptureAdmin } from "./proof-capture/admin-route.js";
 import { handleCampaignActionRequest } from "./campaigns/actions/request-route.js";
+import { handleLeadMagnetAttestation } from "./lead-magnets/attest-route.js";
+import { handleProofMediaRightsRequest } from "./proof-rights/request-media-route.js";
+import { handleCreativeAssetAttestation } from "./creative/attest-asset-route.js";
+import { handleMotionRenderAttestation } from "./creative/attest-motion-route.js";
 import { handlePublicLead } from "./lead-capture/public-route.js";
 import { handlePublicBooking, isBookingRequest } from "./booking/public-route.js";
 import { handleMetaWebhook, isMetaWebhookRequest } from "./dm/webhook.js";
@@ -33,6 +37,7 @@ import { handleMcpAttribution } from "./mcp/attribution-route.js";
 import { handleMcpBrand } from "./mcp/brand-route.js";
 import { handleMcpSites } from "./mcp/sites-mcp-route.js";
 import { handleMcpAuth } from "./mcp/auth-route.js";
+import { handleMcpGatewayApproval } from "./mcp/gateway-approval-route.js";
 import {
   handlePublicSales,
   isPublicSalesRequest,
@@ -71,6 +76,8 @@ logger.info("agent_runtime_starting", {
   pid: process.pid,
 });
 
+const heartbeat = startHeartbeat(sb, config, config.enabled ? config.concurrency : 0);
+config.campaignActionWorkerId = heartbeat.workerId;
 const workers: WorkerHandle[] = [];
 if (config.enabled) {
   for (let i = 0; i < config.concurrency; i += 1) {
@@ -85,7 +92,6 @@ if (config.enabled) {
 const proofCoordinator = config.enabled
   ? startProofCoordinator(sb, config)
   : null;
-const heartbeat = startHeartbeat(sb, config, workers.length);
 const workflows =
   config.enabled && config.workflowEnabled
     ? startWorkflowReconciler(sb, config)
@@ -199,6 +205,11 @@ function dispatchRequest(req: http.IncomingMessage, res: http.ServerResponse): v
   }
   if (req.url?.startsWith("/internal/mcp/auth/")) {
     void handleMcpAuth(req, res, sb, config.mcpServiceSecret);
+    return;
+  }
+  if (req.url?.startsWith("/internal/mcp/gateway-approval/")) {
+    void handleMcpGatewayApproval(req, res, sb, config.mcpServiceSecret,
+      config.githubSitesOrg);
     return;
   }
 
@@ -349,7 +360,8 @@ function dispatchRequest(req: http.IncomingMessage, res: http.ServerResponse): v
   if (
     req.url === "/admin/sites/provision" ||
     req.url === "/admin/sites/publish" ||
-    req.url === "/admin/sites/request-page-approval"
+    req.url === "/admin/sites/request-page-approval" ||
+    req.url === "/admin/sites/recheck-page-capture"
   ) {
     if (req.method !== "POST") {
       json(405, { ok: false, error: "POST only" });
@@ -359,6 +371,8 @@ function dispatchRequest(req: http.IncomingMessage, res: http.ServerResponse): v
       ? "provision"
       : req.url.endsWith("request-page-approval")
         ? "request-page-approval"
+        : req.url.endsWith("recheck-page-capture")
+          ? "recheck-page-capture"
         : "publish";
     void handleSitesRoute(req, res, sb, config, action);
     return;
@@ -373,6 +387,22 @@ function dispatchRequest(req: http.IncomingMessage, res: http.ServerResponse): v
       return;
     }
     void handleCampaignActionRequest(req, res, sb);
+    return;
+  }
+  if (req.url === "/admin/lead-magnets/attest") {
+    void handleLeadMagnetAttestation(req, res, sb);
+    return;
+  }
+  if (req.url === "/admin/proof-rights/request-media") {
+    void handleProofMediaRightsRequest(req, res, sb);
+    return;
+  }
+  if (req.url === "/admin/creative/attest-asset") {
+    void handleCreativeAssetAttestation(req, res, sb);
+    return;
+  }
+  if (req.url === "/admin/motion/attest-render") {
+    void handleMotionRenderAttestation(req, res, sb);
     return;
   }
 

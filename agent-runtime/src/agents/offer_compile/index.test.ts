@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { compiledOfferArgs, requestedOffer, submitTool, validateOffer } from "./index.js";
+import { compiledOfferArgs, requestedOffer, reviewedOfferStrategy, submitTool, validateOffer } from "./index.js";
 
 /**
  * Two things worth pinning here.
@@ -68,6 +68,33 @@ describe("reading what the job asked for", () => {
       .toEqual({ error: "This job does not say what to compile the offer from." });
     expect(requestedOffer({ kind: "main" }))
       .toEqual({ error: "This job does not say what to compile the offer from." });
+  });
+
+  it("refuses a source that does not match the offer kind", () => {
+    expect(requestedOffer({ kind: "secondary", source: "strategy" }))
+      .toEqual({ error: "A main offer uses strategy; a secondary offer needs one approved opportunity." });
+    expect(requestedOffer({ kind: "main", source: "micro_niche" }))
+      .toEqual({ error: "A main offer uses strategy; a secondary offer needs one approved opportunity." });
+  });
+});
+
+describe("reviewed Offer Strategy inputs", () => {
+  const section = { record_id: "section-1", title: "Core offer", body: "Garage conversion",
+    review_state: "supported", source_ref: "Owner interview", observed_on: "2026-11-15", record_hash: "a".repeat(64) };
+
+  it("includes dated source evidence and a stable exact-section fingerprint", () => {
+    expect(reviewedOfferStrategy([section])).toEqual({
+      sourceBlock: "OFFER STRATEGY\nCore offer\nGarage conversion\nSource: Owner interview · observed 2026-11-15",
+      fingerprint: JSON.stringify([["section-1", "a".repeat(64)]]),
+    });
+  });
+
+  it("holds missing or unsupported sections", () => {
+    expect(reviewedOfferStrategy([])).toHaveProperty("error", expect.stringContaining("no Offer Strategy sections"));
+    expect(reviewedOfferStrategy([{ ...section, review_state: "stale" }]))
+      .toHaveProperty("error", expect.stringContaining("Review every Offer Strategy"));
+    expect(reviewedOfferStrategy([{ ...section, source_ref: null }]))
+      .toHaveProperty("error", expect.stringContaining("Review every Offer Strategy"));
   });
 });
 

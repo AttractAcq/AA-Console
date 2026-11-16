@@ -4,7 +4,7 @@ import { verifyCaptureFile } from "./files.js";
 import type { RuntimeConfig } from "../config.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 afterEach(() => vi.unstubAllEnvs());
-function db(row: unknown) {
+function db(row: unknown, sendReady = true) {
   const update = vi.fn();
   const chain = {
     eq: () => chain,
@@ -14,7 +14,10 @@ function db(row: unknown) {
   update.mockReturnValue(chain);
   return {
     sb: {
-      rpc: vi.fn().mockResolvedValue({ data: row, error: null }),
+      rpc: vi.fn().mockImplementation(async (name: string) => ({
+        data: name === "proof_delivery_send_ready_v6" ? sendReady : row,
+        error: null,
+      })),
       from: () => ({ update }),
     } as unknown as SupabaseClient,
     update,
@@ -29,6 +32,13 @@ it("does not contact providers without an approved claim", async () => {
     send = vi.fn();
   await dispatchProofDelivery(sb, config, send);
   expect(send).not.toHaveBeenCalled();
+});
+it("stops when the exact approval or capture link changes after claim", async () => {
+  const { sb, update } = db({ id: "delivery", channel: "email" }, false);
+  const send = vi.fn();
+  await dispatchProofDelivery(sb, config, send);
+  expect(send).not.toHaveBeenCalled();
+  expect(update).toHaveBeenCalledWith(expect.objectContaining({ status: "cancelled" }));
 });
 it("sends a stable idempotency key and stores provider acceptance", async () => {
   const { sb, update } = db({

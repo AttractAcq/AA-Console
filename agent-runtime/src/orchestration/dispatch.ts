@@ -37,12 +37,22 @@ import { runTokenHealthJob } from "../agents/token_health/index.js";
 import { runQaJob } from "../agents/qa/index.js";
 import { runPublisherJob } from "../agents/publisher/index.js";
 import { runCampaignActionJob } from "../campaigns/actions/executor.js";
+import { runCampaignBudgetReconciliationJob } from "../campaigns/actions/budget-reconciliation-job.js";
+import { runCampaignPageReconciliationJob } from "../campaigns/actions/page-reconciliation-job.js";
 import { runProofPlacerJob } from "../proof-distribution/placer.js";
 import { runLeadMagnetCourierJob } from "../lead-magnets/courier.js";
 import { runOutboundCourierJob } from "../outbound/courier.js";
 import { runNurtureSequencerJob } from "../outbound/sequencer.js";
 import { runProfileUpdaterJob } from "../profiles/updater.js";
+import { runGoogleProfileFieldJob } from "../profiles/google-profile-job.js";
+import { runGoogleProfileReconciliationJob } from "../profiles/google-profile-reconciliation-job.js";
+import { runMetaProfileFieldJob } from "../profiles/meta-profile-job.js";
+import { runMetaProfileReconciliationJob } from "../profiles/meta-profile-reconciliation-job.js";
+import { runGoogleReplySenderJob } from "../google-profile/reply-job.js";
+import { runGoogleReplyReconciliationJob } from "../google-profile/reply-reconciliation-job.js";
 import { runGoogleAdsSheetJob } from "../agents/google_ads_sheet/index.js";
+import { runGoogleAdsReadJob } from "../agents/google_ads_read/index.js";
+import { runMetaAdsReadJob } from "../agents/meta_ads_read/index.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
 import { runClientApprovalDispatchJob } from "../agents/client_approval_dispatch/index.js";
 import { deadlineFromNow } from "./deadline.js";
@@ -54,6 +64,7 @@ import { runOpportunityEvaluateJob } from "../agents/opportunity_evaluate/index.
 import { runOpportunityStrategiseJob } from "../agents/opportunity_strategise/index.js";
 import { runOfferCompileJob } from "../agents/offer_compile/index.js";
 import { runCampaignSweepJob } from "../agents/campaign_sweep/index.js";
+import { runLeadMagnetBuildJob } from "../agents/lead_magnet_build/index.js";
 import { runSalesAgentJob } from "../agents/sales_agent/index.js";
 import { runCampaignPlanJob } from "../agents/campaign_plan/index.js";
 import { runPageAuditJob } from "../agents/page_audit/index.js";
@@ -118,6 +129,7 @@ const RUNNERS: Record<string, JobRunner> = {
   // Composes a workflow run for an approved plan. The engine that drives it
   // already existed; this is the composer. Calls no model.
   campaign_sweep: runCampaignSweepJob,
+  lead_magnet_build: runLeadMagnetBuildJob,
   landing_page: runLandingPageJob,
   // The page, and then the thing standing on it.
   sales_agent: runSalesAgentJob,
@@ -181,6 +193,14 @@ const RUNNERS: Record<string, JobRunner> = {
   // G05: only claims fields the platform lets an adapter write, so an
   // Instagram bio never reaches it and stays a job for a person.
   profile_updater: runProfileUpdaterJob,
+  google_profile_field_writer: runGoogleProfileFieldJob,
+  google_profile_field_reconciler: runGoogleProfileReconciliationJob,
+  meta_profile_field_writer: runMetaProfileFieldJob,
+  meta_profile_field_reconciler: runMetaProfileReconciliationJob,
+  campaign_budget_reconciler: runCampaignBudgetReconciliationJob,
+  campaign_page_reconciler: runCampaignPageReconciliationJob,
+  google_reply_sender: runGoogleReplySenderJob,
+  google_reply_reconciler: runGoogleReplyReconciliationJob,
   brief_dispatch: runBriefDispatchJob,
   client_approval_dispatch: runClientApprovalDispatchJob,
   // Approved assets become a paused Meta campaign. No model; launching stays
@@ -194,6 +214,8 @@ const RUNNERS: Record<string, JobRunner> = {
   // object written out for a hand build. Reads only, calls nothing, and holds
   // no credential — so it works precisely when the automated path does not.
   google_ads_sheet: runGoogleAdsSheetJob,
+  google_ads_read: runGoogleAdsReadJob,
+  meta_ads_read: runMetaAdsReadJob,
   // outcome until that product decision is made.
 };
 

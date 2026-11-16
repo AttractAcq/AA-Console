@@ -38,7 +38,8 @@ export const STATE_TONE: Record<LiveState["kind"], string> = {
  * lying about the only thing it is for.
  */
 export function liveStateOf(
-  agent: { status: string; built_at: string | null; approved_at?: string | null },
+  agent: { status: string; built_at: string | null; approved_at?: string | null;
+    approved_request_id?: string | null },
   job: { status: string } | undefined,
 ): LiveState {
   if (job && (job.status === "queued" || job.status === "claimed" || job.status === "running")) {
@@ -51,7 +52,8 @@ export function liveStateOf(
   if (agent.status === "live") {
     // Live and approved are different facts. A live agent that nobody has
     // read is not ready for a site, and the badge has to say so.
-    if (agent.approved_at) return { kind: "approved", label: "Live — approved" };
+    if (agent.approved_at) return { kind: "approved", label: agent.approved_request_id
+      ? "Live — Inbox approved" : "Live — legacy approval" };
     return { kind: "live", label: "Live — not approved" };
   }
   if (agent.status === "retired") return { kind: "retired", label: "Retired" };

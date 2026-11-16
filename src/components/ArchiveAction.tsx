@@ -18,6 +18,7 @@ import { cn } from "../lib/cn";
  * which is what makes archiving safe to do on a hunch.
  */
 export function ArchiveAction({
+  clientId,
   table,
   id,
   archived,
@@ -25,7 +26,9 @@ export function ArchiveAction({
   onDone,
   onError,
 }: {
-  /** The table holding the record. Each has an admin-all policy. */
+  /** Exact client scope; omitted only for agency recruitment pages. */
+  clientId?: string;
+  /** Client tables use the scoped archive RPC; agency pages use their admin policy. */
   table:
     | "client_pages"
     | "client_campaigns"
@@ -45,17 +48,30 @@ export function ArchiveAction({
 
   async function apply() {
     setBusy(true);
-    const { error } = await supabase
-      .from(table)
-      .update({ archived_at: archived ? null : new Date().toISOString() })
-      .eq("id", id);
-    setBusy(false);
-    setConfirming(false);
-    if (error) {
-      onError(error.message);
-      return;
+    try {
+      if (clientId) {
+        const { error } = await supabase.rpc("set_client_archive_v8", {
+          p_client_id: clientId, p_table_name: table, p_record_id: id, p_archive: !archived,
+        });
+        if (error) throw error;
+      } else if (table === "client_pages") {
+        // Agency recruitment pages have no client_id and retain their
+        // existing admin-owned archive path.
+        const { data, error } = await supabase.from("client_pages")
+          .update({ archived_at: archived ? null : new Date().toISOString() })
+          .eq("id", id).is("client_id", null).select("id").single();
+        if (error || !data) throw new Error(error?.message ?? "Recruitment page was not archived.");
+      } else throw new Error("A client is required for this archive action.");
+      onDone();
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message
+        : cause && typeof cause === "object" && "message" in cause
+          ? String(cause.message) : String(cause);
+      onError(message);
+    } finally {
+      setBusy(false);
+      setConfirming(false);
     }
-    onDone();
   }
 
   if (archived) {

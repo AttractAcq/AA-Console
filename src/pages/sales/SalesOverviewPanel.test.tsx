@@ -66,6 +66,7 @@ const built = (over: Record<string, unknown> = {}) => ({
   built_at: "2026-09-08T10:00:00Z",
   approved_at: null,
   approved_by: null,
+  approved_request_id: null,
   created_at: "2026-09-08T09:00:00Z",
   ...over,
 });
@@ -125,6 +126,7 @@ function show(agents: unknown[] = [built()], convs: Conv[] = [], jobs: Job[] = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  rpc.mockResolvedValue({ data: null, error: null });
   useParams.mockReturnValue({ clientId: "client-1" });
   getUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
 });
@@ -186,8 +188,12 @@ describe("liveStateOf", () => {
 
   it("splits live from live-and-approved, because approval is a signature not a status", () => {
     expect(
-      liveStateOf({ status: "live", built_at: "x", approved_at: "2026-09-15T12:00:00Z" }, undefined),
-    ).toEqual({ kind: "approved", label: "Live — approved" });
+      liveStateOf({ status: "live", built_at: "x", approved_at: "2026-09-15T12:00:00Z",
+        approved_request_id: "request-1" }, undefined),
+    ).toEqual({ kind: "approved", label: "Live — Inbox approved" });
+    expect(liveStateOf({ status: "live", built_at: "x",
+      approved_at: "2026-09-15T12:00:00Z" }, undefined))
+      .toEqual({ kind: "approved", label: "Live — legacy approval" });
     expect(liveStateOf({ status: "live", built_at: "x", approved_at: null }, undefined)).toEqual({
       kind: "live",
       label: "Live — not approved",
@@ -322,7 +328,7 @@ describe("approving an agent for public use", () => {
     ]);
     expect(await screen.findByText("Ready")).toBeInTheDocument();
     expect(screen.getByText("Not approved for public use")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Approve for public use" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Request public-use review" })).toHaveLength(1);
   });
 
   it("distinguishes live-unapproved from live-approved on the card", async () => {
@@ -333,19 +339,20 @@ describe("approving an agent for public use", () => {
         name: "Signed off",
         approved_at: "2026-09-15T12:00:00Z",
         approved_by: "user-1",
+        approved_request_id: "request-1",
       }),
     ]);
     expect(await screen.findByText("Live — not approved")).toBeInTheDocument();
-    expect(screen.getByText("Live — approved")).toBeInTheDocument();
-    expect(screen.getByText("Approved for public use")).toBeInTheDocument();
+    expect(screen.getByText("Live — Inbox approved")).toBeInTheDocument();
+    expect(screen.getByText("Inbox approved for public use")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Revoke approval" })).toBeInTheDocument();
   });
 
   it("does not write approval until the operator confirms, and the confirm shows the script", async () => {
     show();
-    await userEvent.click(await screen.findByRole("button", { name: "Approve for public use" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Request public-use review" }));
     expect(update).not.toHaveBeenCalled();
-    const dialog = await screen.findByRole("dialog", { name: "Approve for public use" });
+    const dialog = await screen.findByRole("dialog", { name: "Request public-use review" });
     expect(dialog).toHaveTextContent("Consult Qualifier");
     expect(dialog).toHaveTextContent("Are you looking into replacing several teeth, or just one?");
     expect(dialog).toHaveTextContent("How long has this been bothering you?");
@@ -353,21 +360,14 @@ describe("approving an agent for public use", () => {
     expect(dialog).toHaveTextContent("Never quote a price");
   });
 
-  it("writes approved_at and approved_by, scoped to the client, and does not change status", async () => {
+  it("requests an exact-script Inbox decision without writing a signature", async () => {
     show();
-    await userEvent.click(await screen.findByRole("button", { name: "Approve for public use" }));
-    const dialog = await screen.findByRole("dialog", { name: "Approve for public use" });
-    await userEvent.click(within(dialog).getByRole("button", { name: "Approve for public use" }));
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        approved_by: "user-1",
-        approved_at: expect.any(String),
-      }),
-    );
-    expect(update.mock.calls[0]?.[0]).not.toHaveProperty("status");
-    expect(eq).toHaveBeenCalledWith("id", "sa-1");
-    expect(eq).toHaveBeenCalledWith("client_id", "client-1");
-    expect(await screen.findByText(/is approved for public use/i)).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "Request public-use review" }));
+    const dialog = await screen.findByRole("dialog", { name: "Request public-use review" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Send to Approval Inbox" }));
+    expect(rpc).toHaveBeenCalledWith("request_sales_agent_public_use_v6", { p_agent_id: "sa-1" });
+    expect(update).not.toHaveBeenCalledWith(expect.objectContaining({ approved_at: expect.anything() }));
+    expect(await screen.findByText(/sent to Approval Inbox/i)).toBeInTheDocument();
   });
 
   it("offers approve from the detail drawer as well as the card", async () => {
@@ -375,12 +375,12 @@ describe("approving an agent for public use", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Open" }));
     const drawer = within(screen.getByRole("dialog", { name: "Consult Qualifier" }));
     expect(drawer.getByText(/not approved for public use/i)).toBeInTheDocument();
-    expect(drawer.getByRole("button", { name: "Approve for public use" })).toBeInTheDocument();
+    expect(drawer.getByRole("button", { name: "Request public-use review" })).toBeInTheDocument();
   });
 });
 
 describe("revoking approval", () => {
-  it("clears the signature after confirm and does not write status", async () => {
+  it("requests AAL2 revocation from the source owner with a reason", async () => {
     show([
       built({
         approved_at: "2026-09-15T12:00:00Z",
@@ -390,12 +390,14 @@ describe("revoking approval", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Revoke approval" }));
     const dialog = await screen.findByRole("dialog", { name: "Revoke approval" });
     expect(dialog).toHaveTextContent(/does not change its status \(live\)/);
+    const prompt = vi.spyOn(window, "prompt").mockReturnValue("Incorrect advice");
     await userEvent.click(within(dialog).getByRole("button", { name: "Revoke approval" }));
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({ approved_at: null, approved_by: null }),
-    );
-    expect(update.mock.calls[0]?.[0]).not.toHaveProperty("status");
+    expect(rpc).toHaveBeenCalledWith("revoke_sales_agent_public_use_v6", {
+      p_agent_id: "sa-1", p_reason: "Incorrect advice",
+    });
+    expect(update).not.toHaveBeenCalledWith(expect.objectContaining({ approved_at: null }));
     expect(await screen.findByText(/has been revoked/i)).toBeInTheDocument();
+    prompt.mockRestore();
   });
 });
 

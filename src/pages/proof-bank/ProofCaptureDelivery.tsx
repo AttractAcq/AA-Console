@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { callRuntime } from "../../lib/callRuntime";
 import { supabase } from "../../lib/supabase";
 import { FormModal } from "../../components/forms/FormModal";
@@ -32,6 +33,15 @@ type Snapshot = {
   deliveries: Delivery[];
   channels: string[];
 };
+type OutcomeConsent = {
+  id: string; lead_id: string; channel: string; recipient: string;
+  withdrawn_at: string | null;
+};
+type OutcomeLead = { id: string; name: string | null; stage: string };
+type ServiceOutcome = {
+  id: string; lead_id: string; outcome_summary: string;
+  verified_at: string | null; withdrawn_at: string | null;
+};
 const button =
   "rounded-md border border-border px-3 py-2 text-sm hover:bg-accent disabled:opacity-50";
 export function ProofCaptureDelivery({
@@ -51,6 +61,29 @@ export function ProofCaptureDelivery({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [queue, setQueue] = useState(false);
+  const [outcomeConsents, setOutcomeConsents] = useState<OutcomeConsent[]>([]);
+  const [outcomeLeads, setOutcomeLeads] = useState<OutcomeLead[]>([]);
+  const [serviceOutcomes, setServiceOutcomes] = useState<ServiceOutcome[]>([]);
+  const refreshOutcome = useCallback(async () => {
+    if (setup.method !== "outcome_followup") return;
+    const [c, l, o] = await Promise.all([
+      supabase.from("proof_outcome_followup_consents_v7")
+        .select("id,lead_id,channel,recipient,withdrawn_at")
+        .eq("client_id", clientId).is("withdrawn_at", null).limit(100),
+      supabase.from("client_leads").select("id,name,stage")
+        .eq("client_id", clientId).in("stage", ["sale", "cash"]).limit(100),
+      supabase.from("proof_service_outcomes_v7")
+        .select("id,lead_id,outcome_summary,verified_at,withdrawn_at")
+        .eq("client_id", clientId).not("verified_at", "is", null)
+        .is("withdrawn_at", null).limit(100),
+    ]);
+    if (c.error || l.error || o.error) {
+      setError(c.error?.message ?? l.error?.message ?? o.error?.message ?? "Could not load outcomes."); return;
+    }
+    setOutcomeConsents(c.data ?? []);
+    setOutcomeLeads(l.data ?? []);
+    setServiceOutcomes(o.data ?? []);
+  }, [clientId, setup.method]);
   const refresh = useCallback(async () => {
     try {
       setData(
@@ -71,6 +104,7 @@ export function ProofCaptureDelivery({
     const timer = setInterval(() => void refresh(), 15000);
     return () => clearInterval(timer);
   }, [refresh]);
+  useEffect(() => { void refreshOutcome(); }, [refreshOutcome]);
   async function act(action: () => Promise<unknown>) {
     setBusy(true);
     setError("");
@@ -91,7 +125,7 @@ export function ProofCaptureDelivery({
         </p>
       )}
       <div className="flex flex-wrap gap-2">
-        <button
+        {setup.method !== "outcome_followup" && <button
           className={button}
           disabled={busy}
           onClick={() =>
@@ -105,12 +139,12 @@ export function ProofCaptureDelivery({
           }
         >
           Create capture link
-        </button>
-        {setup.method === "automated_requests" && (
+        </button>}
+        {(setup.method === "automated_requests" || setup.method === "outcome_followup") && (
           <button
             className={button}
             disabled={busy || !data.channels.length}
-            onClick={() => setQueue(true)}
+            onClick={() => { void refreshOutcome(); setQueue(true); }}
           >
             Prepare request
           </button>
@@ -137,12 +171,19 @@ export function ProofCaptureDelivery({
           </button>
         </div>
       )}
-      {setup.method === "automated_requests" && (
+      {(setup.method === "automated_requests" || setup.method === "outcome_followup") && (
         <p className="text-sm text-muted-foreground">
           {data.channels.length
             ? `Available channels: ${data.channels.join(", ")}. Each prepared request needs human approval before sending.`
-            : "Request delivery requires an email or messaging provider to be configured on the server. Capture links work independently."}
+            : setup.method === "outcome_followup"
+              ? "Request delivery requires an email or messaging provider to be configured on the server."
+              : "Request delivery requires an email or messaging provider to be configured on the server. Capture links work independently."}
         </p>
+      )}
+      {(setup.method === "automated_requests" || setup.method === "outcome_followup") && (
+        <Link className="text-sm underline" to={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>
+          Open Approval Inbox to decide prepared requests
+        </Link>
       )}
       {data.links
         .filter((l) => l.config_id === setup.id)
@@ -208,21 +249,16 @@ export function ProofCaptureDelivery({
                     className={button}
                     disabled={busy}
                     onClick={() => {
-                      if (
-                        window.confirm(
-                          `Send this ${d.channel} request to ${d.recipient} at the scheduled time?`,
-                        )
-                      )
-                        void act(async () => {
-                          const r = await supabase.rpc(
-                            "decide_proof_delivery",
-                            { p_delivery_id: d.id, p_approve: true },
-                          );
-                          if (r.error) throw r.error;
-                        });
+                      void act(async () => {
+                        const r = await supabase.rpc(
+                          "request_proof_delivery_review_v6",
+                          { p_delivery_id: d.id },
+                        );
+                        if (r.error) throw r.error;
+                      });
                     }}
                   >
-                    Approve send
+                    Request Inbox review
                   </button>
                 )}
                 <button
@@ -249,7 +285,18 @@ export function ProofCaptureDelivery({
         onClose={() => setQueue(false)}
         title="Prepare evidence request"
         submitLabel="Prepare for approval"
-        fields={[
+        fields={setup.method === "outcome_followup" ? [
+          { name: "eventId", label: "Verified service outcome", kind: "select", required: true,
+            options: serviceOutcomes.filter((outcome) => outcome.verified_at && !outcome.withdrawn_at)
+              .map((outcome) => ({ value: outcome.id,
+                label: `${outcomeLeads.find((lead) => lead.id === outcome.lead_id)?.name ?? "Lead"} · ${outcome.outcome_summary}` })) },
+          { name: "consentId", label: "Matching proof follow-up consent", kind: "select", required: true,
+            options: outcomeConsents.filter((c) => data.channels.includes(c.channel)
+              && outcomeLeads.some((l) => l.id === c.lead_id && (setup.trigger_event === "service_completed" || l.stage === setup.trigger_event))
+              && serviceOutcomes.some((outcome) => outcome.lead_id === c.lead_id && outcome.verified_at && !outcome.withdrawn_at))
+              .map((c) => ({ value: c.id, label: `${outcomeLeads.find((l) => l.id === c.lead_id)?.name ?? "Lead"} · ${c.channel} · ${c.recipient}` })) },
+          { name: "scheduledAt", label: "Send after (ISO date and time, optional)", kind: "text" },
+        ] : [
           {
             name: "channel",
             label: "Channel",
@@ -279,6 +326,18 @@ export function ProofCaptureDelivery({
         ]}
         initialValues={{ channel: data.channels[0] ?? "email" }}
         onSubmit={async (v) => {
+          if (setup.method === "outcome_followup") {
+            const consent = outcomeConsents.find((c) => c.id === v.consentId);
+            const event = serviceOutcomes.find((o) => o.id === v.eventId);
+            if (!consent) throw new Error("Select current follow-up consent.");
+            if (!event || event.lead_id !== consent.lead_id) throw new Error("Select an outcome and consent for the same customer.");
+            await callRuntime("/admin/proof-capture", {
+              action: "queue_delivery", clientId, configId: setup.id,
+              leadId: consent.lead_id, consentId: consent.id, eventId: event.id,
+              scheduledAt: v.scheduledAt,
+            });
+            return;
+          }
           await callRuntime("/admin/proof-capture", {
             ...v,
             action: "queue_delivery",

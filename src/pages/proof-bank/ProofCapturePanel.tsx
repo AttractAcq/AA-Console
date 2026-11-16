@@ -1,4 +1,7 @@
 import { ProofCaptureDelivery } from "./ProofCaptureDelivery";
+import { ProofIntegrationCapture } from "./ProofIntegrationCapture";
+import { ProofOutcomeConsentPanel } from "./ProofOutcomeConsentPanel";
+import { ProofServiceOutcomePanel } from "./ProofServiceOutcomePanel";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
@@ -67,15 +70,18 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
         ))}
       </div>
     );
-  const placeholder =
-    method.id === "integration" || method.id === "outcome_followup";
   return (
     <div className="space-y-4">
       <button type="button" className={button} onClick={() => choose()}>
         Back to capture
       </button>
       <h2 className="text-xl font-semibold">{method.label}</h2>
-      {!placeholder && (
+      {method.id === "integration" && <ProofIntegrationCapture clientId={clientId} />}
+      {method.id === "outcome_followup" && <>
+        <ProofServiceOutcomePanel clientId={clientId} onChange={() => setRevision((n) => n + 1)} />
+        <ProofOutcomeConsentPanel clientId={clientId} onChange={() => setRevision((n) => n + 1)} />
+      </>}
+      {method.id !== "integration" && (
         <>
           <p className="text-sm text-muted-foreground">{method.description}</p>
           {error && (
@@ -110,6 +116,8 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
           <p className="text-xs text-muted-foreground">
             {method.id === "guided_interview"
               ? "Save the questions here, then share a capture link for written answers, recordings and supporting evidence."
+              : method.id === "outcome_followup"
+                ? "Verify the service result and record specific customer consent above, then prepare a bound request. Every request needs exact Inbox approval before delivery."
               : "Create a private capture link for this setup. Submissions enter Raw for review and permission clearance. A website can link to the capture portal."}
           </p>
           {configs
@@ -152,13 +160,16 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
             title={method.label}
             fields={[
               { name: "name", label: "Name", kind: "text", required: true },
-              ...(method.id === "automated_requests"
+              ...(method.id === "automated_requests" || method.id === "outcome_followup"
                 ? [
                     {
                       name: "trigger_event",
                       label: "Delivery event / trigger",
-                      kind: "text" as const,
+                      kind: method.id === "outcome_followup" ? "select" as const : "text" as const,
                       required: true,
+                      ...(method.id === "outcome_followup" ? { options: [
+                        { value: "service_completed", label: "Service completion verified" },
+                      ] } : {}),
                     },
                     {
                       name: "message_template",

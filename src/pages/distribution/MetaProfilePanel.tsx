@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import { DataTable } from "../../components/DataTable";
 import { EmptyState } from "../../components/EmptyState";
@@ -20,8 +20,14 @@ type Presence = Database["public"]["Views"]["meta_profile_presence"]["Row"];
 // the proposal fields used by this screen until the database is scrubbed.
 type ProfileChange = Pick<
   Database["public"]["Tables"]["meta_profile_changes"]["Row"],
-  "id" | "platform" | "field" | "current_value" | "proposed_value" | "offer_version_id" | "status" | "created_at"
+  "id" | "platform" | "field" | "current_value" | "proposed_value" | "offer_version_id" | "status" | "approved_request_id" | "created_at"
 >;
+type ProfileDecision = Pick<Database["public"]["Views"]["approval_inbox_v6"]["Row"],
+  "id" | "status">;
+type ProfileOutcome = Pick<Database["public"]["Views"]["meta_profile_execution_overview_v6"]["Row"],
+  "attempt_id" | "change_id" | "status" | "provider_ref" | "reconciliation_result" | "reconciled_at">;
+type ProfileJob = Pick<Database["public"]["Tables"]["agent_jobs"]["Row"],
+  "id" | "agent_key" | "input_id" | "status">;
 
 type Tab = "identities" | "profile" | "presence";
 
@@ -63,8 +69,12 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
   const [identities, setIdentities] = useState<Identity[]>([]);
   const [presence, setPresence] = useState<Presence[]>([]);
   const [changes, setChanges] = useState<ProfileChange[]>([]);
+  const [profileDecisions, setProfileDecisions] = useState<ReadonlyMap<string, ProfileDecision>>(new Map());
+  const [profileOutcomes, setProfileOutcomes] = useState<ProfileOutcome[]>([]);
+  const [profileJobs, setProfileJobs] = useState<ProfileJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reviewBusy, setReviewBusy] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -72,7 +82,7 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
       return;
     }
     try {
-      const [health, posts, proposed] = await Promise.all([
+      const [health, posts, proposed, profileCards, outcomes, jobs] = await Promise.all([
         supabase.from("meta_identity_health")
           .select("client_id,provider,account_ref,status,token_expires_at,days_left,posts_waiting")
           .eq("client_id", clientId),
@@ -84,16 +94,29 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
           .limit(100),
         supabase
           .from("meta_profile_changes")
-          .select("id,platform,field,current_value,proposed_value,offer_version_id,status,created_at")
+          .select("id,platform,field,current_value,proposed_value,offer_version_id,status,approved_request_id,created_at")
           .eq("client_id", clientId)
           .order("created_at", { ascending: false }),
+        supabase.from("approval_inbox_v6").select("id,status")
+          .eq("client_id", clientId).eq("source_kind", "meta_profile_change"),
+        supabase.from("meta_profile_execution_overview_v6")
+          .select("attempt_id,change_id,status,provider_ref,reconciliation_result,reconciled_at")
+          .eq("client_id", clientId),
+        supabase.from("agent_jobs").select("id,agent_key,input_id,status")
+          .eq("client_id", clientId)
+          .in("agent_key", ["meta_profile_field_writer", "meta_profile_field_reconciler"]),
       ]);
-      for (const result of [health, posts, proposed]) {
+      for (const result of [health, posts, proposed, profileCards, outcomes, jobs]) {
         if (result.error) throw new Error("Profile read failed.");
       }
       setIdentities(health.data ?? []);
       setPresence(posts.data ?? []);
       setChanges(proposed.data ?? []);
+      setProfileDecisions(new Map((profileCards.data ?? [])
+        .filter((row): row is ProfileDecision & { id: string } => Boolean(row.id))
+        .map((row) => [row.id, row])));
+      setProfileOutcomes(outcomes.data ?? []);
+      setProfileJobs(jobs.data ?? []);
       setError(null);
     } catch {
       setError("Could not load the profiles.");
@@ -105,6 +128,50 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  async function requestReview(changeId: string) {
+    setReviewBusy(changeId);
+    setError(null);
+    try {
+      const result = await supabase.rpc("request_meta_profile_review_v6", { p_change_id: changeId });
+      if (result.error) throw result.error;
+      await refresh();
+    } catch {
+      setError("Could not open the exact Meta profile proposal for Inbox review.");
+    } finally {
+      setReviewBusy(null);
+    }
+  }
+
+  async function requestWrite(changeId: string) {
+    setReviewBusy(changeId);
+    setError(null);
+    try {
+      const result = await supabase.rpc("request_meta_profile_write_v6", { p_change_id: changeId });
+      if (result.error) throw result.error;
+      await refresh();
+    } catch {
+      setError("Could not queue the exact Facebook Page field proposal.");
+    } finally {
+      setReviewBusy(null);
+    }
+  }
+
+  async function requestReconciliation(attemptId: string) {
+    setReviewBusy(attemptId);
+    setError(null);
+    try {
+      const result = await supabase.rpc("request_meta_profile_reconciliation_v6", {
+        p_attempt_id: attemptId,
+      });
+      if (result.error) throw result.error;
+      await refresh();
+    } catch {
+      setError("Could not queue a read-only check of the uncertain Page field.");
+    } finally {
+      setReviewBusy(null);
+    }
+  }
 
   const broken = identities.filter((identity) => recordedIdentityAlert(identity)).length;
 
@@ -189,18 +256,21 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="font-semibold">Proposed changes</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              What the profile says now, beside what we would make it say. Direct decisions are
-              held until each exact proposal is bound to the unified Approval Inbox with AAL2
-              approval. This runtime also has no Meta profile-write adapter, so no field change
-              can be applied from this page.
+              What the profile says now, beside what we would make it say. Request review of the
+              exact proposal in Approval Inbox. A Facebook Page field write needs a separate
+              request and runtime release; Instagram profile fields remain manual.
             </p>
             <p role="status" className="mt-2 text-sm text-destructive">{PROFILE_FIELD_PATCH_HOLD}</p>
+            {clientId && <Link className="mt-2 inline-block text-sm underline"
+              to={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>
+              Open Approval Inbox
+            </Link>}
           </div>
           {changes.length === 0 && !loading ? (
             <EmptyState label="No profile change has been proposed" />
           ) : (
             <DataTable
-              columns={["Field", "Says now", "Would say", "State"]}
+              columns={["Field", "Says now", "Would say", "State", "Execution", "Review"]}
               emptyLabel={loading ? "Loading…" : "Nothing proposed"}
               rows={changes.map((change) => [
                 <span key="f">
@@ -231,9 +301,72 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
                   {change.status}
                   {change.status === "approved" && (
                     <span className="block text-xs text-muted-foreground">
-                      held for Inbox binding and an adapter; no field PATCH
+                      {change.approved_request_id
+                        ? profileDecisions.get(change.approved_request_id)?.status === "approved"
+                          ? "Current exact Inbox decision; provider write held"
+                          : `Inbox decision ${profileDecisions.get(change.approved_request_id)?.status ?? "unavailable"}; review again`
+                        : "Pre-Inbox approval; review again"}
                     </span>
                   )}
+                </span>,
+                <span key="execution" className="text-xs text-muted-foreground">
+                  {(() => {
+                    const outcome = profileOutcomes.find((row) => row.change_id === change.id);
+                    const job = profileJobs.find((row) => row.input_id === change.id
+                      && row.agent_key === "meta_profile_field_writer");
+                    const readJob = outcome && profileJobs.find((row) => row.input_id === outcome.attempt_id
+                      && row.agent_key === "meta_profile_field_reconciler");
+                    if (!outcome) return change.platform === "instagram"
+                      ? "Manual profile edit required; no API writer."
+                      : job ? `Queued job ${job.status.replace(/_/g, " ")}; runtime release may hold it.`
+                        : "No provider write requested; adapter held.";
+                    if (outcome.status === "confirmed") return `Provider readback confirmed · ${outcome.provider_ref ?? "reference unavailable"}`;
+                    if (outcome.status === "uncertain") {
+                      if (outcome.reconciliation_result === "matched")
+                        return `Later readback matched the approved Page field · ${dayOrDash(outcome.reconciled_at)}`;
+                      if (outcome.reconciliation_result === "different")
+                        return `Later readback differs · ${dayOrDash(outcome.reconciled_at)}; inspect before any new proposal.`;
+                      return readJob
+                        ? `Provider outcome uncertain; read-only check ${readJob.status.replace(/_/g, " ")}.`
+                        : "Provider outcome uncertain; request a read-only Page check.";
+                    }
+                    if (outcome.status === "refused") return "Provider write refused before start.";
+                    if (outcome.status === "started") return "Provider write started; awaiting readback.";
+                    return "One provider attempt reserved; prewrite pending.";
+                  })()}
+                </span>,
+                <span key="review">
+                  {change.status === "drafted" && <button type="button"
+                    className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50"
+                    disabled={reviewBusy !== null}
+                    onClick={() => void requestReview(change.id)}>
+                    Request Inbox review
+                  </button>}
+                  {change.platform === "facebook" && change.status === "approved"
+                    && change.approved_request_id
+                    && profileDecisions.get(change.approved_request_id)?.status === "approved"
+                    && !profileJobs.some((row) => row.input_id === change.id)
+                    && !profileOutcomes.some((row) => row.change_id === change.id)
+                    && <button type="button"
+                      className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50"
+                      disabled={reviewBusy !== null}
+                      onClick={() => void requestWrite(change.id)}>
+                      Request Page write
+                    </button>}
+                  {(() => {
+                    const outcome = profileOutcomes.find((row) => row.change_id === change.id);
+                    const activeRead = profileJobs.some((row) => row.agent_key === "meta_profile_field_reconciler"
+                      && row.input_id === outcome?.attempt_id
+                      && ["queued", "claimed", "running", "paused"].includes(row.status));
+                    return outcome?.status === "uncertain"
+                      && outcome.attempt_id && outcome.reconciliation_result !== "matched"
+                      && !activeRead && <button type="button"
+                        className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50"
+                        disabled={reviewBusy !== null}
+                        onClick={() => void requestReconciliation(outcome.attempt_id!)}>
+                        Check Page read-only
+                      </button>;
+                  })()}
                 </span>,
               ])}
             />

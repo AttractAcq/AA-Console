@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { RuntimeConfig } from "../../config.js";
@@ -12,6 +12,8 @@ import { GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD } from "./preclaim-hold.js";
 
 const agent = { agent_key: "campaign_action_executor" } as AgentRow;
 const on = { campaignActionsEnabled: true } as RuntimeConfig;
+const owned = { campaignActionsEnabled: true, campaignActionOwnedClaimEnabled: true,
+  campaignActionWorkerId: "agent-runtime:1:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee" } as RuntimeConfig;
 const off = { campaignActionsEnabled: false } as RuntimeConfig;
 const job = (params: Record<string, unknown> = { limit: 3 }) =>
   ({ id: "job-1", params }) as AgentJobRow;
@@ -28,6 +30,8 @@ const ACTION: ClaimedAction = {
   scope: { placements: [{ placement_id: "pl-1", payload_hash: "b".repeat(64) }] },
   attempt: 1,
 };
+
+afterEach(() => vi.unstubAllEnvs());
 
 function database(options: {
   registry?: { metaAdBuildSupported: boolean };
@@ -123,7 +127,133 @@ describe("generic campaign action preclaim hold", () => {
   });
 });
 
+describe("owned campaign action claim path", () => {
+  const SHA = "c".repeat(40);
+  function ownedDb(options: { claim?: ClaimedAction[]; releaseError?: string;
+    releaseCode?: string; releaseCount?: number; claimError?: string; prewriteError?: string;
+    outcomeRecordError?: string } = {}) {
+    const events: Record<string, unknown>[] = [];
+    const rpc = vi.fn(async (name: string) => {
+      if (name === "claim_campaign_actions_owned_v6") return {
+        data: options.claim ?? [ACTION],
+        error: options.claimError ? { message: options.claimError } : null,
+      };
+      if (name === "release_campaign_proof_placements_owned_v6") return {
+        data: { released: options.releaseCount ?? 1, skipped: [] },
+        error: options.prewriteError ? { message: options.prewriteError, code: "23514" }
+          : options.releaseError ? { message: options.releaseError, code: options.releaseCode ?? "40001" } : null,
+      };
+      if (name === "record_campaign_action_executed" && options.outcomeRecordError) {
+        return { data: null, error: { message: options.outcomeRecordError } };
+      }
+      return { data: null, error: null };
+    });
+    const from = vi.fn((table: string) => {
+      if (table !== "agent_job_events") throw new Error(`Unexpected table ${table}`);
+      return { insert: async (row: Record<string, unknown>) => {
+        events.push(row); return { error: null };
+      } };
+    });
+    return { sb: { rpc, from } as unknown as SupabaseClient, rpc, events };
+  }
+
+  it("claims only its attested handlers and records a completed attempt", async () => {
+    vi.stubEnv("RAILWAY_GIT_COMMIT_SHA", SHA);
+    const { sb, rpc, events } = ownedDb();
+    expect(await runCampaignActionJob(sb, owned, agent, job({ limit: 1 })))
+      .toEqual({ ok: true, retryable: false });
+    expect(rpc).toHaveBeenCalledWith("claim_campaign_actions_owned_v6", {
+      p_worker_id: owned.campaignActionWorkerId, p_build_sha: SHA,
+      p_handlers: { proof_publish: "proof_distribution", page_deploy: "website_studio",
+        lead_message: "sales_os", budget_change: "meta_ads_studio" },
+      p_limit: 1,
+    });
+    expect(rpc).toHaveBeenCalledWith("record_campaign_action_executed", expect.objectContaining({
+      p_execution_id: ACTION.execution_id,
+      p_result: expect.objectContaining({ released: 1 }),
+    }));
+    expect(rpc).toHaveBeenCalledWith("release_campaign_proof_placements_owned_v6", {
+      p_execution_id: ACTION.execution_id,
+      p_worker_id: owned.campaignActionWorkerId,
+      p_build_sha: SHA,
+    });
+    expect(rpc).not.toHaveBeenCalledWith("record_campaign_action_failure", expect.anything());
+    expect(events.some((event) => String(event.description).includes("completed"))).toBe(true);
+  });
+
+  it("records a failed attempt without inventing provider success", async () => {
+    vi.stubEnv("RAILWAY_GIT_COMMIT_SHA", SHA);
+    const { sb, rpc } = ownedDb({ releaseError: "provider refused" });
+    const result = await runCampaignActionJob(sb, owned, agent, job());
+    expect(result).toMatchObject({ ok: false, retryable: false });
+    expect(rpc).toHaveBeenCalledWith("record_campaign_action_failure", {
+      p_execution_id: ACTION.execution_id,
+      p_reason: "Proof placement release was refused: provider refused",
+      p_retryable: true,
+    });
+    expect(rpc).not.toHaveBeenCalledWith("record_campaign_action_executed", expect.anything());
+  });
+
+  it("records uncertainty when the handler completed but its outcome receipt failed", async () => {
+    vi.stubEnv("RAILWAY_GIT_COMMIT_SHA", SHA);
+    const { sb, rpc } = ownedDb({ outcomeRecordError: "connection reset" });
+    const result = await runCampaignActionJob(sb, owned, agent, job());
+    expect(result).toMatchObject({ ok: false, retryable: false });
+    expect(rpc).toHaveBeenCalledWith("record_campaign_action_uncertain_v6",
+      expect.objectContaining({ p_execution_id: ACTION.execution_id,
+        p_reason: expect.stringContaining("outcome could not be recorded") }));
+    expect(rpc).not.toHaveBeenCalledWith("record_campaign_action_failure", expect.anything());
+  });
+
+  it("holds a proof release when its RPC response does not prove rollback", async () => {
+    vi.stubEnv("RAILWAY_GIT_COMMIT_SHA", SHA);
+    const { sb, rpc } = ownedDb({ releaseError: "connection reset after request", releaseCode: "" });
+    expect(await runCampaignActionJob(sb, owned, agent, job())).toMatchObject({
+      ok: false, retryable: false,
+    });
+    expect(rpc).toHaveBeenCalledWith("record_campaign_action_uncertain_v6",
+      expect.objectContaining({ p_execution_id: ACTION.execution_id,
+        p_reason: expect.stringContaining("Inspect the source records") }));
+    expect(rpc).not.toHaveBeenCalledWith("record_campaign_action_failure", expect.anything());
+  });
+
+  it("refuses the effect when the approval or client switch changes after claim", async () => {
+    vi.stubEnv("RAILWAY_GIT_COMMIT_SHA", SHA);
+    const { sb, rpc } = ownedDb({ prewriteError: "External campaign actions are off for this client." });
+    const result = await runCampaignActionJob(sb, owned, agent, job());
+    expect(result).toMatchObject({ ok: false, retryable: false });
+    expect(rpc).not.toHaveBeenCalledWith("release_campaign_proof_placements", expect.anything());
+    expect(rpc).toHaveBeenCalledWith("record_campaign_action_failure", expect.objectContaining({
+      p_retryable: false,
+      p_reason: expect.stringContaining("External campaign actions are off"),
+    }));
+  });
+
+  it("fails closed before claim without a complete deployed build", async () => {
+    vi.stubEnv("RAILWAY_GIT_COMMIT_SHA", "short");
+    vi.stubEnv("RENDER_GIT_COMMIT", "");
+    vi.stubEnv("VERCEL_GIT_COMMIT_SHA", "");
+    vi.stubEnv("SOURCE_VERSION", "");
+    const { sb, rpc } = ownedDb();
+    expect(await runCampaignActionJob(sb, owned, agent, job())).toMatchObject({ ok: false });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("does not run a handler when the atomic claim refuses ownership", async () => {
+    vi.stubEnv("RAILWAY_GIT_COMMIT_SHA", SHA);
+    const { sb, rpc } = ownedDb({ claimError: "registry not attested" });
+    expect(await runCampaignActionJob(sb, owned, agent, job())).toMatchObject({
+      ok: false, retryable: true,
+      failureMessage: expect.stringContaining("registry not attested"),
+    });
+    expect(rpc).not.toHaveBeenCalledWith("release_campaign_proof_placements_owned_v6", expect.anything());
+  });
+});
+
 describe("dormant handler bodies", () => {
+  const SHA = "c".repeat(40);
+  afterEach(() => vi.unstubAllEnvs());
+  const attested = () => { vi.stubEnv("RAILWAY_GIT_COMMIT_SHA", SHA); return owned; };
   it("has no fallback handler for unknown campaign actions", () => {
     expect(Object.keys(HANDLERS)).toEqual([
       "proof_publish", "page_deploy", "lead_message", "budget_change",
@@ -134,20 +264,26 @@ describe("dormant handler bodies", () => {
 
   it("releases only the exact claimed proof execution and preserves skips", async () => {
     const skipped = [{ placement_id: "pl-9", reason: "Payload changed after approval." }];
-    const rpc = vi.fn(async () => ({ data: { released: 2, skipped }, error: null }));
-    const outcome = await releaseProofPlacements({ rpc } as unknown as SupabaseClient, on, ACTION);
-    expect(rpc).toHaveBeenCalledExactlyOnceWith("release_campaign_proof_placements", {
+    const rpc = vi.fn(async (name: string) => ({
+      data: name === "release_campaign_proof_placements_owned_v6" ? { released: 2, skipped } : null,
+      error: null,
+    }));
+    const outcome = await releaseProofPlacements({ rpc } as unknown as SupabaseClient, attested(), ACTION);
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("release_campaign_proof_placements_owned_v6", {
       p_execution_id: ACTION.execution_id,
+      p_worker_id: owned.campaignActionWorkerId,
+      p_build_sha: SHA,
     });
     expect(outcome.result).toEqual({ released: 2, skipped });
   });
 
   it("does not call an empty proof release a success", async () => {
-    const rpc = vi.fn(async () => ({
-      data: { released: 0, skipped: [{ reason: "The placement is retracted." }] },
+    const rpc = vi.fn(async (name: string) => ({
+      data: name === "release_campaign_proof_placements_owned_v6"
+        ? { released: 0, skipped: [{ reason: "The placement is retracted." }] } : null,
       error: null,
     }));
-    await expect(releaseProofPlacements({ rpc } as unknown as SupabaseClient, on, ACTION))
+    await expect(releaseProofPlacements({ rpc } as unknown as SupabaseClient, attested(), ACTION))
       .rejects.toMatchObject({
         name: "ActionError", retryable: false,
         message: expect.stringContaining("retracted"),
@@ -155,29 +291,47 @@ describe("dormant handler bodies", () => {
   });
 
   it("keeps a failed proof-release transaction retryable", async () => {
-    const rpc = vi.fn(async () => ({ data: null, error: { message: "serialization failure" } }));
-    await expect(releaseProofPlacements({ rpc } as unknown as SupabaseClient, on, ACTION))
+    const rpc = vi.fn(async (name: string) => ({ data: null,
+      error: name === "release_campaign_proof_placements_owned_v6"
+        ? { message: "serialization failure", code: "40001" } : null }));
+    await expect(releaseProofPlacements({ rpc } as unknown as SupabaseClient, attested(), ACTION))
       .rejects.toMatchObject({ retryable: true });
   });
 
+  it("holds an ambiguous lead enrolment but treats an exact SQL refusal as rolled back", async () => {
+    const action = { ...ACTION, action_key: "lead_message" };
+    const rpc = vi.fn().mockResolvedValueOnce({ data: null,
+      error: { message: "connection closed", code: "" } });
+    await expect(enrolCampaignLeads({ rpc } as unknown as SupabaseClient, attested(), action))
+      .rejects.toMatchObject({ outcomeUncertain: true, retryable: false });
+    rpc.mockResolvedValueOnce({ data: null,
+      error: { message: "stale approval", code: "23514" } });
+    await expect(enrolCampaignLeads({ rpc } as unknown as SupabaseClient, attested(), action))
+      .rejects.toMatchObject({ outcomeUncertain: false, retryable: false });
+  });
+
   it("enrols only the exact claimed lead-message execution", async () => {
-    const rpc = vi.fn(async () => ({
-      data: { enrolled: 4, skipped: [], sequence_name: "Objections" }, error: null,
+    const rpc = vi.fn(async (name: string) => ({
+      data: name === "enrol_campaign_leads_owned_v6"
+        ? { enrolled: 4, skipped: [], sequence_name: "Objections" } : null, error: null,
     }));
-    const outcome = await enrolCampaignLeads({ rpc } as unknown as SupabaseClient, on, {
+    const outcome = await enrolCampaignLeads({ rpc } as unknown as SupabaseClient, attested(), {
       ...ACTION, action_key: "lead_message",
     });
-    expect(rpc).toHaveBeenCalledExactlyOnceWith("enrol_campaign_leads_in_sequence_v6", {
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("enrol_campaign_leads_owned_v6", {
       p_execution_id: ACTION.execution_id,
+      p_worker_id: owned.campaignActionWorkerId,
+      p_build_sha: SHA,
     });
     expect(outcome.result).toMatchObject({ enrolled: 4, sequence: "Objections" });
   });
 
   it("treats a zero-recipient enrolment as a nonretryable failure", async () => {
-    const rpc = vi.fn(async () => ({
-      data: { enrolled: 0, skipped: [{ reason: "Unsubscribed." }] }, error: null,
+    const rpc = vi.fn(async (name: string) => ({
+      data: name === "enrol_campaign_leads_owned_v6"
+        ? { enrolled: 0, skipped: [{ reason: "Unsubscribed." }] } : null, error: null,
     }));
-    await expect(enrolCampaignLeads({ rpc } as unknown as SupabaseClient, on, {
+    await expect(enrolCampaignLeads({ rpc } as unknown as SupabaseClient, attested(), {
       ...ACTION, action_key: "lead_message",
     })).rejects.toMatchObject({
       name: ActionError.name, retryable: false,

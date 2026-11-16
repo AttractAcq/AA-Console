@@ -2,10 +2,11 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { rpc, signPaths, useParams } = vi.hoisted(() => ({
+const { rpc, signPaths, useParams, requestEngineSlotReview } = vi.hoisted(() => ({
   rpc: vi.fn(),
   signPaths: vi.fn(),
   useParams: vi.fn(),
+  requestEngineSlotReview: vi.fn(),
 }));
 
 let inboxRows: unknown[] = [];
@@ -25,6 +26,7 @@ vi.mock("../../lib/media", async () => {
   const actual = await vi.importActual<typeof import("../../lib/media")>("../../lib/media");
   return { ...actual, signPaths };
 });
+vi.mock("../../lib/creativeReview", () => ({ requestEngineSlotReview }));
 
 vi.mock("../../lib/supabase", () => {
   function table(name: string) {
@@ -86,6 +88,7 @@ beforeEach(() => {
   rpc.mockImplementation((fn: string) => Promise.resolve(fn === "video_approval_state"
     ? { data: routeState, error: null } : { data: null, error: null }));
   signPaths.mockResolvedValue(new Map([["client-1/a.mp4", "https://signed/a.mp4"]]));
+  requestEngineSlotReview.mockResolvedValue("request-1");
 });
 
 describe("what is waiting on a person", () => {
@@ -182,20 +185,23 @@ describe("what is waiting on a person", () => {
 });
 
 describe("approving", () => {
-  it("calls approve_slot, which is the only thing that also schedules the post", async () => {
-    // review_media_asset would sign the asset off and move nothing.
+  it("holds scheduling while the exact Engine Inbox review is incomplete", async () => {
     render(<EngineInboxPanel />);
-    await userEvent.click(await screen.findByRole("button", { name: /final approve/i }));
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_slot", { p_slot_id: "slot-1" }));
+    expect(await screen.findByText(/Scheduling is held until this slot/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /approve and schedule/i })).toBeDisabled();
+    expect(rpc).not.toHaveBeenCalledWith("approve_slot", expect.anything());
   });
 
-  it("shows what the database said when it refused", async () => {
-    rpc.mockImplementation((fn: string) => Promise.resolve(fn === "video_approval_state"
-      ? { data: routeState, error: null }
-      : { data: null, error: { message: "That slot is qa, not waiting for approval." } }));
+  it("prepares a single-file image for exact Unified Inbox review", async () => {
+    inboxRows = [row({ format: "single" })];
+    assetRows = [{ id: "asset-1", storage_path: "client-1/image.png",
+      render_path: null, media_type: "image", content_format: "single" }];
     render(<EngineInboxPanel />);
-    await userEvent.click(await screen.findByRole("button", { name: /final approve/i }));
-    expect(await screen.findByText(/not waiting for approval/)).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: /prepare exact review/i }));
+    await waitFor(() => expect(requestEngineSlotReview).toHaveBeenCalledWith(
+      "client-1", "slot-1", "asset-1"));
+    expect(await screen.findByText(/Exact review prepared/)).toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalledWith("approve_slot", expect.anything());
   });
 });
 

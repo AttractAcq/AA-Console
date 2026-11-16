@@ -14,6 +14,7 @@ import { supabase } from "../../lib/supabase";
 import { ContentJourney } from "../../components/ContentJourney";
 import { CreativeAuthorityStrip } from "./CreativeAuthorityStrip";
 import { VideoApprovalRoute } from "../../components/VideoApprovalRoute";
+import { requestOrdinaryMediaReview } from "../../lib/creativeReview";
 
 /**
  * The gate between "made" and "shippable". Only approved assets can be
@@ -35,6 +36,7 @@ export function ApprovalsPanel() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [preview, setPreview] = useState<MediaAsset | null>(null);
   // Rejecting without saying why sends the maker back with nothing to act on,
   // so the reason is asked for rather than left optional.
@@ -122,17 +124,27 @@ export function ApprovalsPanel() {
   ) {
     setBusyId(asset.id);
     setError(null);
-    const { error: rpcError } = await supabase.rpc("review_media_asset", {
-      p_asset_id: asset.id,
-      p_decision: decision,
-      p_reason: why?.trim() || undefined,
-    });
-    setBusyId(null);
-    if (rpcError) {
-      setError(rpcError.message);
-      return;
+    setNotice(null);
+    try {
+      if (decision === "approved" && (asset.media_type === "image" || asset.media_type === "text")
+        && asset.content_format === "single" && !asset.render_path) {
+        if (!clientId) throw new Error("Client unavailable.");
+        await requestOrdinaryMediaReview(clientId, asset.id);
+        setNotice("Exact creative review requested. Decide it in Unified Approval Inbox.");
+      } else {
+        const { error: rpcError } = await supabase.rpc("review_media_asset", {
+          p_asset_id: asset.id,
+          p_decision: decision,
+          p_reason: why?.trim() || undefined,
+        });
+        if (rpcError) throw rpcError;
+      }
+      void refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusyId(null);
     }
-    void refresh();
   }
 
   const activeLabel = mediaFilters.find((f) => f.id === activeFilter)?.label ?? "";
@@ -154,6 +166,9 @@ export function ApprovalsPanel() {
           {error}
         </p>
       )}
+      {notice && clientId && <p role="status" className="mb-3 text-sm text-primary">
+        {notice} <Link className="underline" to={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>Open Inbox</Link>
+      </p>}
 
       {engineHeld > 0 && (
         <p className="mb-3 text-sm text-muted-foreground">
@@ -206,14 +221,16 @@ export function ApprovalsPanel() {
                   >
                     <Eye className="h-4 w-4" aria-hidden="true" />
                   </button>
-                  {asset.media_type === "video" ? <VideoApprovalRoute assetId={asset.id}
+                  {asset.media_type === "video" ? <VideoApprovalRoute clientId={clientId!} assetId={asset.id}
                     onFinalApprove={() => review(asset, "approved")} /> : <button
                     type="button"
                     disabled={busyId === asset.id}
                     onClick={() => void review(asset, "approved")}
                     className="flex-1 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    Approve
+                    {(asset.media_type === "image" || asset.media_type === "text")
+                      && asset.content_format === "single" && !asset.render_path
+                      ? "Request review" : "Approve"}
                   </button>}
                   <button
                     type="button"

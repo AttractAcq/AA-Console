@@ -14,9 +14,20 @@ import { PROFILE_FIELD_PATCH_HOLD } from "../../../agent-runtime/src/profiles/pr
 type Location = Database["public"]["Tables"]["client_google_locations"]["Row"];
 type ProfileDue = Database["public"]["Views"]["google_profile_due"]["Row"];
 type ProfileChange = Pick<Database["public"]["Tables"]["google_profile_changes"]["Row"],
-  "id" | "location_id" | "field" | "current_value" | "proposed_value" | "status">;
+  "id" | "location_id" | "field" | "current_value" | "proposed_value" | "status" | "approved_request_id">;
+type ProfileOutcome = Pick<Database["public"]["Views"]["google_profile_execution_overview_v6"]["Row"],
+  "attempt_id" | "change_id" | "status" | "provider_ref" | "reconciliation_result" | "reconciled_at">;
+type ProfileJob = Pick<Database["public"]["Tables"]["agent_jobs"]["Row"],
+  "id" | "agent_key" | "input_id" | "status">;
 type Review = Database["public"]["Tables"]["google_reviews"]["Row"];
 type Reply = Database["public"]["Tables"]["google_review_replies"]["Row"];
+type ReplyOutcome = Pick<Database["public"]["Views"]["google_reply_execution_overview_v6"]["Row"],
+  "attempt_id" | "reply_id" | "status" | "provider_state" | "reconciliation_result"
+  | "reconciled_at" | "reconciled_provider_state">;
+type ReplyJob = Pick<Database["public"]["Tables"]["agent_jobs"]["Row"],
+  "id" | "agent_key" | "input_id" | "status">;
+type ProfileDecision = Pick<Database["public"]["Views"]["approval_inbox_v6"]["Row"],
+  "id" | "status">;
 type Placement = Database["public"]["Tables"]["proof_placements"]["Row"];
 
 type Tab = "location" | "reviews" | "posts" | "metrics";
@@ -50,8 +61,13 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
   const [locations, setLocations] = useState<Location[]>([]);
   const [due, setDue] = useState<ReadonlyMap<string, ProfileDue>>(new Map());
   const [changes, setChanges] = useState<ProfileChange[]>([]);
+  const [profileDecisions, setProfileDecisions] = useState<ReadonlyMap<string, ProfileDecision>>(new Map());
+  const [profileOutcomes, setProfileOutcomes] = useState<ProfileOutcome[]>([]);
+  const [profileJobs, setProfileJobs] = useState<ProfileJob[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
+  const [replyOutcomes, setReplyOutcomes] = useState<ReplyOutcome[]>([]);
+  const [replyJobs, setReplyJobs] = useState<ReplyJob[]>([]);
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -73,7 +89,8 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
       return;
     }
     try {
-      const [locs, board, proposed, revs, reps, place] = await Promise.all([
+      const [locs, board, proposed, profileCards, profileAttempts, profileQueued,
+        revs, reps, outcomes, jobs, place] = await Promise.all([
         supabase
           .from("client_google_locations")
           .select("*")
@@ -81,8 +98,16 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           .order("created_at", { ascending: false }),
         supabase.from("google_profile_due").select("*").eq("client_id", clientId),
         supabase.from("google_profile_changes")
-          .select("id,location_id,field,current_value,proposed_value,status")
+          .select("id,location_id,field,current_value,proposed_value,status,approved_request_id")
           .eq("client_id", clientId).order("created_at", { ascending: false }).limit(100),
+        supabase.from("approval_inbox_v6").select("id,status")
+          .eq("client_id", clientId).eq("source_kind", "google_profile_change"),
+        supabase.from("google_profile_execution_overview_v6")
+          .select("attempt_id,change_id,status,provider_ref,reconciliation_result,reconciled_at")
+          .eq("client_id", clientId),
+        supabase.from("agent_jobs").select("id,agent_key,input_id,status")
+          .eq("client_id", clientId)
+          .in("agent_key", ["google_profile_field_writer", "google_profile_field_reconciler"]),
         supabase
           .from("google_reviews")
           .select("*")
@@ -90,6 +115,12 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           .order("reviewed_at", { ascending: false })
           .limit(100),
         supabase.from("google_review_replies").select("*").eq("client_id", clientId),
+        supabase.from("google_reply_execution_overview_v6")
+          .select("attempt_id,reply_id,status,provider_state,reconciliation_result,reconciled_at,reconciled_provider_state")
+          .eq("client_id", clientId),
+        supabase.from("agent_jobs").select("id,agent_key,input_id,status")
+          .eq("client_id", clientId)
+          .in("agent_key", ["google_reply_sender", "google_reply_reconciler"]),
         supabase
           .from("proof_placements")
           .select("*")
@@ -97,15 +128,23 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           .eq("destination_key", "google_business_profile")
           .order("created_at", { ascending: false }),
       ]);
-      for (const result of [locs, board, proposed, revs, reps, place]) {
+      for (const result of [locs, board, proposed, profileCards, profileAttempts,
+        profileQueued, revs, reps, outcomes, jobs, place]) {
         if (result.error) throw new Error(result.error.message);
       }
       if (!isCurrent()) return;
       setLocations(locs.data ?? []);
       setDue(new Map((board.data ?? []).map((r) => [String(r.location_id), r])));
       setChanges(proposed.data ?? []);
+      setProfileDecisions(new Map((profileCards.data ?? [])
+        .filter((row): row is ProfileDecision & { id: string } => Boolean(row.id))
+        .map((row) => [row.id, row])));
+      setProfileOutcomes(profileAttempts.data ?? []);
+      setProfileJobs(profileQueued.data ?? []);
       setReviews(revs.data ?? []);
       setReplies(reps.data ?? []);
+      setReplyOutcomes(outcomes.data ?? []);
+      setReplyJobs(jobs.data ?? []);
       setPlacements(place.data ?? []);
       setError(null);
     } catch (cause) {
@@ -282,30 +321,103 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
             <div>
               <h3 className="font-semibold">Recent recorded field proposals</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Approval in the older profile-change table does not authorize a provider PATCH.
-                These records need an exact Approval Inbox decision and prewrite verification.
+                Request an exact Approval Inbox decision, then queue that proposal once. The
+                dedicated provider worker is off until its release is approved and verified.
               </p>
+              {clientId && <Link className="mt-2 inline-block text-xs underline"
+                to={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>
+                Open Approval Inbox
+              </Link>}
             </div>
             <DataTable
-              columns={["Location", "Field", "Current", "Proposed", "Record status", "Execution"]}
+              columns={["Location", "Field", "Current", "Proposed", "Record status", "Execution", "Review"]}
               emptyLabel={loading ? "Loading…" : "No profile field proposal has been recorded"}
-              rows={changes.map((change) => [
+              rows={changes.map((change) => {
+                const attempt = profileOutcomes.find((row) => row.change_id === change.id);
+                const queued = profileJobs.find((row) => row.input_id === change.id
+                  && row.agent_key === "google_profile_field_writer");
+                const readJob = profileJobs.find((row) => row.input_id === attempt?.attempt_id
+                  && row.agent_key === "google_profile_field_reconciler");
+                return [
                 <span key="location" className="text-xs">
                   {locations.find((location) => location.id === change.location_id)?.title ?? "Unknown location"}
                 </span>,
                 <span key="field">{change.field.replace(/_/g, " ")}</span>,
                 <span key="current" className="text-xs">{change.current_value ?? "empty"}</span>,
                 <span key="proposed" className="text-xs">{change.proposed_value}</span>,
-                <span key="status">{change.status.replace(/_/g, " ")}</span>,
-                <span key="execution" className={change.status === "applied"
-                  ? "text-xs text-muted-foreground" : "text-xs text-destructive"}>
-                  {change.status === "applied"
-                    ? "Recorded as applied; external readback remains separate."
-                    : change.status === "rejected"
-                      ? "Rejected; no field PATCH."
-                      : "Held; no field PATCH will be claimed."}
+                <span key="status">
+                  {change.status.replace(/_/g, " ")}
+                  {change.status === "approved" && <span className="block text-xs text-muted-foreground">
+                    {change.approved_request_id
+                      ? profileDecisions.get(change.approved_request_id)?.status === "approved"
+                        ? "Current exact Inbox decision"
+                        : `Inbox decision ${profileDecisions.get(change.approved_request_id)?.status ?? "unavailable"}; review again`
+                      : "Pre-Inbox approval; review again"}
+                  </span>}
                 </span>,
-              ])}
+                <span key="execution" className="text-xs text-muted-foreground">
+                  {attempt?.status === "confirmed"
+                    ? `Provider readback confirmed · ${attempt.provider_ref ?? "reference unavailable"}`
+                    : attempt?.status === "uncertain"
+                      ? attempt.reconciliation_result === "matched"
+                        ? `Later merchant-record readback matched · ${dayOrDash(attempt.reconciled_at)}`
+                        : attempt.reconciliation_result === "different"
+                          ? `Later merchant-record value differs · ${dayOrDash(attempt.reconciled_at)}; inspect before a new proposal.`
+                          : readJob
+                            ? `Outcome uncertain; read-only check ${readJob.status.replace(/_/g, " ")}.`
+                            : "Outcome uncertain; request a read-only merchant-record check."
+                      : attempt?.status === "refused"
+                        ? "Write refused before provider call."
+                        : attempt?.status === "started"
+                          ? "Provider write started; awaiting readback."
+                          : attempt?.status === "reserved"
+                            ? "One provider attempt reserved; prewrite pending."
+                            : queued
+                              ? `Queued job ${queued.status.replace(/_/g, " ")}`
+                              : change.status === "rejected"
+                                ? "Rejected; no field PATCH."
+                                : "No provider write requested."}
+                </span>,
+                <span key="review">
+                  {["drafted", "awaiting_approval"].includes(change.status) &&
+                    <button type="button" className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50"
+                      disabled={busy !== null}
+                      onClick={() => void act(`profile-review:${change.id}`, async () => {
+                        const result = await supabase.rpc("request_google_profile_review_v6", {
+                          p_change_id: change.id,
+                        });
+                        if (result.error) throw result.error;
+                      }, "Exact profile proposal sent to Approval Inbox.")}
+                    >Request Inbox review</button>}
+                  {change.status === "approved"
+                    && change.approved_request_id
+                    && profileDecisions.get(change.approved_request_id)?.status === "approved"
+                    && !queued && !attempt &&
+                    <button type="button" className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50"
+                      disabled={busy !== null}
+                      onClick={() => void act(`profile-write:${change.id}`, async () => {
+                        const result = await supabase.rpc("request_google_profile_write_v6", {
+                          p_change_id: change.id,
+                        });
+                        if (result.error) throw result.error;
+                      }, "Exact profile write queued; runtime release remains off.")}
+                    >Request field write</button>}
+                  {attempt?.status === "uncertain" && attempt.attempt_id
+                    && attempt.reconciliation_result !== "matched"
+                    && !profileJobs.some((row) => row.agent_key === "google_profile_field_reconciler"
+                      && row.input_id === attempt.attempt_id
+                      && ["queued", "claimed", "running", "paused"].includes(row.status)) &&
+                    <button type="button" className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50"
+                      disabled={busy !== null}
+                      onClick={() => void act(`profile-reconcile:${attempt.attempt_id}`, async () => {
+                        const result = await supabase.rpc("request_google_profile_reconciliation_v6", {
+                          p_attempt_id: attempt.attempt_id!,
+                        });
+                        if (result.error) throw result.error;
+                      }, "Read-only merchant-record check queued.")}
+                    >Check merchant record read-only</button>}
+                </span>,
+              ]; })}
             />
           </section>
         </div>
@@ -316,13 +428,19 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           <p className="text-sm text-muted-foreground">
             Capturing a review brings its author, its url and its date with it, and it arrives in
             the Proof Bank uncleared — a public review is not a blanket permission to republish
-            it.
+            it. An approved reply needs a separate send request; the runtime may hold it until its
+            Google credential and release switch are ready.
           </p>
           <DataTable
             columns={["Review", "Rating", "When", "Proof", "Reply", "Actions"]}
             emptyLabel={loading ? "Loading reviews…" : "No reviews have been read yet"}
             rows={reviews.map((r) => {
               const reply = replyFor(r.id);
+              const outcome = replyOutcomes.find((x) => x.reply_id === reply?.id);
+              const sendJob = replyJobs.find((x) => x.input_id === reply?.id
+                && x.agent_key === "google_reply_sender");
+              const readJob = replyJobs.find((x) => x.input_id === outcome?.attempt_id
+                && x.agent_key === "google_reply_reconciler");
               return [
                 <span key="r">
                   {r.author_name ?? "A Google reviewer"}
@@ -342,7 +460,35 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                   {r.captured_proof_id ? "captured" : "not captured"}
                 </span>,
                 <span key="y" className="text-xs">
-                  {reply ? reply.status.replace(/_/g, " ") : "none"}
+                  {!reply ? "none" : outcome?.status === "confirmed" && outcome.provider_state === "APPROVED"
+                    ? "Provider readback confirmed (approved moderation)"
+                    : outcome?.status === "confirmed"
+                      ? "Historical confirmation lacks approved moderation; inspect the review."
+                    : outcome?.status === "uncertain"
+                      ? outcome.reconciliation_result === "matched"
+                        ? `Later approved provider reply matched · ${dayOrDash(outcome.reconciled_at)}`
+                        : outcome.reconciliation_result
+                          ? `Later readback ${outcome.reconciliation_result.replace(/_/g, " ")}${outcome.reconciled_provider_state ? ` (${outcome.reconciled_provider_state.toLowerCase()})` : ""}; inspect the review.`
+                          : readJob
+                            ? `Outcome uncertain; read-only check ${readJob.status.replace(/_/g, " ")}.`
+                            : "Outcome uncertain; request a read-only review check."
+                      : outcome?.status === "started"
+                        ? "Provider write started — awaiting readback"
+                        : outcome?.status === "refused"
+                          ? "Send refused — inspect outcome"
+                          : outcome?.status === "reserved"
+                            ? "Send reserved — no provider write yet"
+                            : sendJob?.status === "paused"
+                              ? "Send held — inspect the job"
+                              : sendJob?.status === "failed"
+                                ? "Send job failed — inspect the job"
+                                : sendJob
+                                  ? `Send requested — ${sendJob.status.replace(/_/g, " ")}`
+                            : reply.status === "posted"
+                              ? "Legacy posted status; no one-shot provider receipt."
+                            : reply.status === "approved"
+                              ? "Approved — not sent"
+                              : reply.status.replace(/_/g, " ")}
                   {reply && (reply.status === "drafted" || reply.status === "awaiting_approval")
                     && clientId && (
                       <Link className="mt-1 block text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -375,6 +521,36 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                       : []),
                     ...(!reply && !r.gone_at
                       ? [{ label: "Draft a reply", onSelect: () => openReply(r) }]
+                      : []),
+                    ...(reply?.status === "approved" && !outcome && !r.gone_at
+                      ? [{
+                          label: "Request approved reply send",
+                          onSelect: () => void act(
+                            r.id,
+                            async () => {
+                              const { error: rpcError } = await supabase.rpc(
+                                "request_google_reply_send_v6", { p_reply_id: reply.id },
+                              );
+                              if (rpcError) throw new Error(rpcError.message);
+                            },
+                            "Reply send requested. Check the recorded outcome; approval alone does not prove delivery.",
+                          ),
+                        }]
+                      : []),
+                    ...(outcome?.status === "uncertain" && outcome.attempt_id
+                      && outcome.reconciliation_result !== "matched"
+                      && !replyJobs.some((row) => row.agent_key === "google_reply_reconciler"
+                        && row.input_id === outcome.attempt_id
+                        && ["queued", "claimed", "running", "paused"].includes(row.status))
+                      ? [{
+                          label: "Check review read-only",
+                          onSelect: () => void act(r.id, async () => {
+                            const result = await supabase.rpc("request_google_reply_reconciliation_v6", {
+                              p_attempt_id: outcome.attempt_id!,
+                            });
+                            if (result.error) throw result.error;
+                          }, "Read-only review check queued."),
+                        }]
                       : []),
                   ]}
                 />,

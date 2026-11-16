@@ -43,8 +43,9 @@ export class WorkflowService {
         status: "completed",
         capability: tool.name,
         data: {
-          decision: "approved",
-          message: "Informational approval; no downstream action executed.",
+          decision: "informational_only",
+          execution: "no_downstream_action",
+          message: "The gateway recorded an informational review; it did not approve or execute an AA Console action.",
         },
       };
     return undefined;

@@ -16,7 +16,7 @@ const job = { id: 'job', client_id: 'client', input_table: 'client_ideas', input
 const config = { anthropicApiKeyByAgent: {}, anthropicApiKey: 'test' } as RuntimeConfig;
 const agent = { agent_key: 'brief' } as AgentRow;
 const existing = { id: 'brief', client_id: 'client', source_idea_id: 'idea', title: 'Human edited' };
-function database(options: { existing?: typeof existing; conflict?: boolean; error?: string; wrongOwner?: boolean; proof?: Record<string, unknown> } = {}) {
+function database(options: { existing?: typeof existing; conflict?: boolean; error?: string; wrongOwner?: boolean; proof?: Record<string, unknown>; selectionCurrent?: boolean } = {}) {
   let saved: Record<string, unknown> | undefined = options.existing;
   const insert = vi.fn(async (row: Record<string, unknown>) => {
     if (options.error) return { error: { code: options.error, message: 'write failed' } };
@@ -39,7 +39,8 @@ function database(options: { existing?: typeof existing; conflict?: boolean; err
     };
     return query;
   });
-  return { sb: { from } as unknown as SupabaseClient, insert, saved: () => saved };
+  const rpc = vi.fn(async () => ({ data: options.selectionCurrent !== false, error: null }));
+  return { sb: { from, rpc } as unknown as SupabaseClient, insert, rpc, saved: () => saved };
 }
 beforeEach(() => {
   vi.clearAllMocks();
@@ -53,6 +54,13 @@ beforeEach(() => {
 });
 const run = (sb: SupabaseClient) => runBriefJob(sb, config, agent, job, Date.now() + 60_000);
 describe('brief worker retry persistence', () => {
+  it('holds a stale selection before calling the model or writing a brief', async () => {
+    const db = database({ selectionCurrent: false });
+    expect((await run(db.sb)).ok).toBe(false);
+    expect(db.rpc).toHaveBeenCalledWith('brief_job_selection_current_v6', { p_job_id: job.id });
+    expect(model).not.toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
   it('reuses a persisted output on retry without another model call or overwrite', async () => {
     const db = database();
     expect((await run(db.sb)).ok).toBe(true);

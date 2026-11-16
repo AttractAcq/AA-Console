@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { Modal } from "../../components/Modal";
-import { VideoApprovalRoute } from "../../components/VideoApprovalRoute";
+import { requestEngineSlotReview } from "../../lib/creativeReview";
 import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { supabase } from "../../lib/supabase";
 import { cn } from "../../lib/cn";
@@ -15,24 +15,9 @@ import {
   type Urgency,
 } from "../../lib/approvalInbox";
 
-/**
- * The one human commit, as a screen.
- *
- * M4 put approve_slot, reject_slot and regenerate_slot in the database and
- * nothing called any of them. The engine could plan a slot, pick an idea,
- * brief it, build it, write its copy and pass its own QA, and then stop
- * forever — because the only thing that could finish it was a SQL prompt.
- *
- * Deliberately separate from the Approvals panel beside it. That one calls
- * review_media_asset, which signs off an asset and moves nothing: an
- * engine-made asset approved there is approved and still never reaches a
- * calendar, which is the exact fault M4 was written to fix. So the two
- * queues do not overlap, and the asset panel sends engine work here.
- *
- * Three acts, three buttons, and rejecting asks why. The reason is what the
- * engine writes the next attempt from, so reject_slot refuses an empty one
- * and this does not offer to send it.
- */
+/** The specialist Engine queue. Exact approval and scheduling stay held while
+ * the canonical request lacks trusted bytes, rights and destination evidence.
+ * Rejection and regeneration remain available to operators. */
 
 const URGENCY_TONE: Record<Urgency, string> = {
   overdue: "border-destructive/50 bg-destructive/5",
@@ -62,6 +47,7 @@ type AssetFile = {
   render_path?: string | null;
   storage_path?: string | null;
   media_type?: string | null;
+  content_format?: string | null;
 };
 
 function findingList(label: string, findings: Finding[], tone: string) {
@@ -93,6 +79,7 @@ export function EngineInboxPanel() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [preparedSlot, setPreparedSlot] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<InboxCard | null>(null);
   const [reason, setReason] = useState("");
@@ -127,7 +114,7 @@ export function EngineInboxPanel() {
       if (assetIds.length > 0) {
         const { data: assets } = await supabase
           .from("client_media_assets")
-          .select("id, storage_path, render_path, media_type")
+          .select("id, storage_path, render_path, media_type, content_format")
           .in("id", assetIds);
         // render_path first: for a reel the cut is the thing being approved,
         // and storage_path is the opening still.
@@ -151,7 +138,7 @@ export function EngineInboxPanel() {
   const cards = useMemo(() => inboxOrder(rows.map(inboxCard)), [rows]);
 
   async function act(
-    fn: "approve_slot" | "reject_slot" | "regenerate_slot",
+    fn: "reject_slot" | "regenerate_slot",
     slotId: string,
     args: Record<string, unknown> = {},
   ) {
@@ -164,6 +151,21 @@ export function EngineInboxPanel() {
       return;
     }
     await refresh();
+  }
+
+  async function prepare(slotId: string, assetId: string) {
+    if (!clientId) return;
+    setBusy(slotId);
+    setError(null);
+    try {
+      await requestEngineSlotReview(clientId, slotId, assetId);
+      setPreparedSlot(slotId);
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not prepare exact Engine review.");
+    } finally {
+      setBusy(null);
+    }
   }
 
   if (loadError) {
@@ -278,17 +280,23 @@ export function EngineInboxPanel() {
                 )}
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                {card.assetId && urls.get(card.assetId)?.mediaType === "video"
-                  ? <VideoApprovalRoute assetId={card.assetId}
-                    onFinalApprove={() => act("approve_slot", card.slotId)} /> : <button
-                  type="button"
-                  disabled={busy === card.slotId}
-                  onClick={() => void act("approve_slot", card.slotId)}
-                  className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  Approve and schedule
-                </button>}
+              <p className="mt-4 text-xs text-muted-foreground">
+                {preparedSlot === card.slotId
+                  ? "Exact review prepared. Open the Unified tab to verify the file and decide this slot."
+                  : "Scheduling is held until this slot has an exact media and destination review in the Unified Inbox."}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button type="button" disabled
+                  className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground opacity-50"
+                >Approve and schedule</button>
+                {card.assetId && card.format === "single"
+                  && assetFiles.some((file) => file.id === card.assetId
+                    && file.content_format === "single"
+                    && (file.media_type === "image" || file.media_type === "text"))
+                  && <button type="button" disabled={busy === card.slotId}
+                    onClick={() => void prepare(card.slotId, card.assetId!)}
+                    className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50"
+                  >Prepare exact review</button>}
                 <button
                   type="button"
                   disabled={busy === card.slotId}

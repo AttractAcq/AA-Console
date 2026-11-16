@@ -108,7 +108,24 @@ snapshot_schema() {
 # A fresh project start is itself a clean migration replay. Reset below
 # exercises the CLI's separate reset path as well.
 started=1
-run_logged start supabase_local start
+start_args=(start)
+if [[ "${AA_SCHEMA_EXCLUDE_VECTOR:-0}" == "1" && "${AA_SCHEMA_EXCLUDE_STORAGE:-0}" == "1" ]]; then
+  # The schema gate needs the database, not the optional log collector or
+  # Storage API. Excluding either does not skip a migration or database check.
+  start_args+=(--exclude vector,storage)
+elif [[ "${AA_SCHEMA_EXCLUDE_VECTOR:-0}" == "1" ]]; then
+  # Some local Colima setups cannot mount the Docker socket into the optional
+  # log collector. The database and migration checks remain unchanged.
+  start_args+=(--exclude vector)
+elif [[ "${AA_SCHEMA_EXCLUDE_STORAGE:-0}" == "1" ]]; then
+  start_args+=(--exclude storage)
+fi
+if [[ "${AA_SCHEMA_IGNORE_OPTIONAL_HEALTH:-0}" == "1" ]]; then
+  # CLI 2.101 can still health-check an excluded Storage container. The psql
+  # migration, schema and fixture checks below independently require a live DB.
+  start_args+=(--ignore-health-check)
+fi
+run_logged start supabase_local "${start_args[@]}"
 head_version="$(AA_SCHEMA_MANIFEST="$evidence_dir/manifest.json" node -p \
   "JSON.parse(require('fs').readFileSync(process.env.AA_SCHEMA_MANIFEST)).headVersion")"
 released_version="$(AA_SCHEMA_MANIFEST="$evidence_dir/manifest.json" node -p \
@@ -192,5 +209,110 @@ diff -u src/types/database.ts "$evidence_dir/database.generated.ts" \
     echo 'Generated database types differ from src/types/database.ts.' >&2
     exit 1
   }
+
+if [[ "${AA_SCHEMA_PHASE2_SMOKES:-0}" == "1" ]]; then
+  smoke_count=0
+  for smoke_file in scripts/phase2-*-smoke.sql; do
+    smoke_name="${smoke_file##*/}"
+    if psql_local -qAt -f "$smoke_file" >"$run_dir/$smoke_name.private.log" 2>&1; then
+      smoke_count=$((smoke_count + 1))
+    else
+      echo "$smoke_name failed; raw fixture output is in the disposable private log." >&2
+      grep -E 'ERROR:|psql:' "$run_dir/$smoke_name.private.log" | tail -3 >&2 || true
+      exit 1
+    fi
+  done
+  echo "$smoke_count Phase 2 rollback fixtures passed."
+fi
+
+if [[ "${AA_SCHEMA_PHASE3_SMOKES:-0}" == "1" ]]; then
+  smoke_count=0
+  for smoke_file in scripts/phase3-*-smoke.sql; do
+    smoke_name="${smoke_file##*/}"
+    if psql_local -qAt -f "$smoke_file" >"$run_dir/$smoke_name.private.log" 2>&1; then
+      smoke_count=$((smoke_count + 1))
+    else
+      echo "$smoke_name failed; raw fixture output is in the disposable private log." >&2
+      grep -E 'ERROR:|psql:' "$run_dir/$smoke_name.private.log" | tail -3 >&2 || true
+      exit 1
+    fi
+  done
+  echo "$smoke_count Phase 3 rollback fixtures passed."
+fi
+
+if [[ "${AA_SCHEMA_PHASE4_SMOKES:-0}" == "1" ]]; then
+  smoke_count=0
+  for smoke_file in scripts/phase4-*-smoke.sql; do
+    smoke_name="${smoke_file##*/}"
+    if psql_local -qAt -f "$smoke_file" >"$run_dir/$smoke_name.private.log" 2>&1; then
+      smoke_count=$((smoke_count + 1))
+    else
+      echo "$smoke_name failed; raw fixture output is in the disposable private log." >&2
+      grep -E 'ERROR:|psql:' "$run_dir/$smoke_name.private.log" | tail -3 >&2 || true
+      exit 1
+    fi
+  done
+  echo "$smoke_count Phase 4 rollback fixtures passed."
+fi
+
+if [[ "${AA_SCHEMA_PHASE5_SMOKES:-0}" == "1" ]]; then
+  smoke_count=0
+  for smoke_file in scripts/phase5-*-smoke.sql; do
+    smoke_name="${smoke_file##*/}"
+    if psql_local -qAt -f "$smoke_file" >"$run_dir/$smoke_name.private.log" 2>&1; then
+      smoke_count=$((smoke_count + 1))
+    else
+      echo "$smoke_name failed; raw fixture output is in the disposable private log." >&2
+      grep -E 'ERROR:|psql:' "$run_dir/$smoke_name.private.log" | tail -3 >&2 || true
+      exit 1
+    fi
+  done
+  echo "$smoke_count Phase 5 rollback fixtures passed."
+fi
+
+if [[ "${AA_SCHEMA_PHASE6_SMOKES:-0}" == "1" ]]; then
+  smoke_count=0
+  for smoke_file in scripts/phase6-*-smoke.sql; do
+    smoke_name="${smoke_file##*/}"
+    if psql_local -qAt -f "$smoke_file" >"$run_dir/$smoke_name.private.log" 2>&1; then
+      smoke_count=$((smoke_count + 1))
+    else
+      echo "$smoke_name failed; raw fixture output is in the disposable private log." >&2
+      grep -E 'ERROR:|psql:' "$run_dir/$smoke_name.private.log" | tail -3 >&2 || true
+      exit 1
+    fi
+  done
+  echo "$smoke_count Phase 6 rollback fixtures passed."
+fi
+
+if [[ "${AA_SCHEMA_PHASE7_SMOKES:-0}" == "1" ]]; then
+  smoke_count=0
+  for smoke_file in scripts/phase7-*-smoke.sql; do
+    smoke_name="${smoke_file##*/}"
+    if psql_local -qAt -f "$smoke_file" >"$run_dir/$smoke_name.private.log" 2>&1; then
+      smoke_count=$((smoke_count + 1))
+    else
+      echo "$smoke_name failed; raw fixture output is in the disposable private log." >&2
+      grep -E 'ERROR:|psql:' "$run_dir/$smoke_name.private.log" | tail -3 >&2 || true
+      exit 1
+    fi
+  done
+  echo "$smoke_count Phase 7 rollback fixtures passed."
+fi
+
+if [[ "${AA_SCHEMA_PHASE8_SMOKES:-0}" == "1" ]]; then
+  smoke_count=0
+  for smoke_file in scripts/phase8-*-smoke.sql; do
+    smoke_name="${smoke_file##*/}"
+    if psql_local -qAt -f "$smoke_file" >"$run_dir/$smoke_name.private.log" 2>&1; then
+      smoke_count=$((smoke_count + 1))
+    else
+      echo "$smoke_name failed; raw fixture output is in the disposable private log." >&2
+      grep -E 'ERROR:|psql:' "$run_dir/$smoke_name.private.log" | tail -3 >&2 || true
+      exit 1
+    fi
+  done
+  echo "$smoke_count Phase 8 rollback fixtures passed."
+fi
 
 echo "Schema replay, upgrade equivalence, catalog contract and generated types passed."

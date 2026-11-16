@@ -1,4 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -13,7 +15,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { from, rpc, select } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), select: vi.fn() }));
 vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc } }));
-vi.mock("react-router-dom", () => ({ useParams: () => ({ clientId: "client-1" }) }));
+vi.mock("react-router-dom", () => ({
+  useParams: () => ({ clientId: "client-1" }),
+  Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
+}));
 
 import { MetaProfilePanel } from "./MetaProfilePanel";
 
@@ -28,7 +33,8 @@ const change = (over: Record<string, unknown> = {}) => ({
   id: "chg-1", client_id: "client-1", platform: "instagram", field: "bio",
   current_value: "Home improvements Portsmouth", proposed_value: "Garage conversions, dry in four days",
   offer_version_id: "ver-3", reason: null, status: "drafted",
-  approved_by: null, approved_at: null, rejection_reason: null, applied_at: null,
+  approved_by: null, approved_at: null, approved_request_id: null,
+  rejection_reason: null, applied_at: null,
   external_ref: null, last_error: null, created_by: null,
   created_at: "2026-10-24T09:00:00Z", updated_at: "2026-10-24T09:00:00Z", ...over,
 });
@@ -42,11 +48,16 @@ const post = (over: Record<string, unknown> = {}) => ({
   carries_placed_proof: true, ...over,
 });
 
-function database(options: { identities?: unknown[]; changes?: unknown[]; presence?: unknown[]; healthError?: string } = {}) {
+function database(options: { identities?: unknown[]; changes?: unknown[]; presence?: unknown[];
+  profileCards?: unknown[]; profileOutcomes?: unknown[]; profileJobs?: unknown[];
+  healthError?: string } = {}) {
   from.mockImplementation((table: string) => {
     const payload = () => {
       if (table === "meta_identity_health") return options.identities ?? [identity()];
       if (table === "meta_profile_changes") return options.changes ?? [];
+      if (table === "approval_inbox_v6") return options.profileCards ?? [];
+      if (table === "meta_profile_execution_overview_v6") return options.profileOutcomes ?? [];
+      if (table === "agent_jobs") return options.profileJobs ?? [];
       return options.presence ?? [];
     };
     const response = () => ({
@@ -59,6 +70,7 @@ function database(options: { identities?: unknown[]; changes?: unknown[]; presen
     Object.assign(chain, {
       select: (columns: string) => { select(table, columns); return chain; },
       eq: () => chain,
+      in: () => chain,
       order: () => chain,
       limit: async () => response(),
       then: (...a: Parameters<Promise<unknown>["then"]>) =>
@@ -171,7 +183,7 @@ describe("proposed changes", () => {
     expect(await screen.findByText("Garage conversions, dry in four days")).toBeInTheDocument();
     expect(select).toHaveBeenCalledWith(
       "meta_profile_changes",
-      "id,platform,field,current_value,proposed_value,offer_version_id,status,created_at",
+      "id,platform,field,current_value,proposed_value,offer_version_id,status,approved_request_id,created_at",
     );
     expect(document.body.textContent).not.toContain(marker);
   });
@@ -189,19 +201,87 @@ describe("proposed changes", () => {
     render(<MetaProfilePanel tab="profile" />);
     // The older decision cannot authorize the provider write; the runtime
     // hold is visible even where the profile has a recorded approval.
-    expect(await screen.findByText("held for Inbox binding and an adapter; no field PATCH")).toBeInTheDocument();
+    expect(await screen.findByText("Pre-Inbox approval; review again")).toBeInTheDocument();
     expect(screen.getByText(/exact-version AAL2 Approval Inbox decision/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+  });
+
+  it("shows a Meta attempt outcome without fetching provider error text", async () => {
+    const marker = "credential-marker-private-error";
+    database({ changes: [change({ id: "chg-1", platform: "facebook", field: "about",
+      status: "approved", approved_request_id: "card-1" })],
+      profileCards: [{ id: "card-1", status: "approved" }],
+      profileOutcomes: [{ attempt_id: "attempt-1", change_id: "chg-1", status: "uncertain",
+        provider_ref: null, reconciliation_result: null, reconciled_at: null,
+        outcome_note: marker }] });
+    render(<MetaProfilePanel tab="profile" />);
+    expect(await screen.findByText("Provider outcome uncertain; request a read-only Page check."))
+      .toBeInTheDocument();
+    expect(select).toHaveBeenCalledWith("meta_profile_execution_overview_v6",
+      "attempt_id,change_id,status,provider_ref,reconciliation_result,reconciled_at");
+    expect(document.body.textContent).not.toContain(marker);
+    await userEvent.click(screen.getByRole("button", { name: "Check Page read-only" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_meta_profile_reconciliation_v6", {
+      p_attempt_id: "attempt-1",
+    }));
+  });
+
+  it("shows a later readback while preserving the uncertain original attempt", async () => {
+    database({ changes: [change({ platform: "facebook", field: "about", status: "applied" })],
+      profileOutcomes: [{ attempt_id: "attempt-1", change_id: "chg-1", status: "uncertain",
+        provider_ref: null, reconciliation_result: "matched", reconciled_at: "2026-11-15T12:00:00Z" }] });
+    render(<MetaProfilePanel tab="profile" />);
+    expect(await screen.findByText(/Later readback matched the approved Page field/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Check Page read-only" })).not.toBeInTheDocument();
+  });
+
+  it("queues only a current approved Facebook Page proposal", async () => {
+    database({ changes: [change({ platform: "facebook", field: "about",
+      status: "approved", approved_request_id: "card-1" })],
+      profileCards: [{ id: "card-1", status: "approved" }] });
+    render(<MetaProfilePanel tab="profile" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Request Page write" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_meta_profile_write_v6", {
+      p_change_id: "chg-1",
+    }));
+  });
+
+  it("keeps Instagram profile changes on the manual path", async () => {
+    database({ changes: [change({ status: "approved", approved_request_id: "card-1" })],
+      profileCards: [{ id: "card-1", status: "approved" }] });
+    render(<MetaProfilePanel tab="profile" />);
+    expect(await screen.findByText("Manual profile edit required; no API writer."))
+      .toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Request Page write" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("labels a superseded Inbox decision as stale", async () => {
+    database({
+      changes: [change({ status: "approved", approved_request_id: "card-1" })],
+      profileCards: [{ id: "card-1", status: "superseded" }],
+    });
+    render(<MetaProfilePanel tab="profile" />);
+    expect(await screen.findByText("Inbox decision superseded; review again")).toBeInTheDocument();
   });
 
   it("holds direct legacy decisions until exact AAL2 Inbox binding exists", async () => {
     database({ changes: [change()] });
     render(<MetaProfilePanel tab="profile" />);
     expect(await screen.findByText("Garage conversions, dry in four days")).toBeInTheDocument();
-    expect(screen.getByText(/Direct decisions are/)).toBeInTheDocument();
+    expect(screen.getByText(/Request review of the/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("requests an exact Inbox review for a draft proposal", async () => {
+    database({ changes: [change()] });
+    render(<MetaProfilePanel tab="profile" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Request Inbox review" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_meta_profile_review_v6", {
+      p_change_id: "chg-1",
+    }));
   });
 });
 

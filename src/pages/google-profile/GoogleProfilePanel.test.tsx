@@ -55,13 +55,15 @@ const review = (over: Record<string, unknown> = {}) => ({
 const change = (over: Record<string, unknown> = {}) => ({
   id: "change-1", client_id: "client-1", location_id: "loc-1",
   field: "description", current_value: "Old description", proposed_value: "New description",
-  status: "approved", attempts: 0, applied_at: null, last_error: null,
+  status: "approved", approved_request_id: null, attempts: 0, applied_at: null, last_error: null,
   created_at: "2026-10-24T09:00:00Z", ...over,
 });
 
 function database(options: {
   locations?: unknown[]; due?: unknown[]; reviews?: unknown[];
-  replies?: unknown[]; placements?: unknown[]; changes?: unknown[];
+  replies?: unknown[]; replyOutcomes?: unknown[]; replyJobs?: unknown[];
+  placements?: unknown[]; changes?: unknown[]; profileCards?: unknown[];
+  profileOutcomes?: unknown[]; profileJobs?: unknown[];
 } = {}) {
   from.mockImplementation((table: string) => {
     const payload = () => {
@@ -69,8 +71,12 @@ function database(options: {
         case "client_google_locations": return options.locations ?? [location()];
         case "google_profile_due": return options.due ?? [due()];
         case "google_profile_changes": return options.changes ?? [];
+        case "approval_inbox_v6": return options.profileCards ?? [];
+        case "google_profile_execution_overview_v6": return options.profileOutcomes ?? [];
         case "google_reviews": return options.reviews ?? [review()];
         case "google_review_replies": return options.replies ?? [];
+        case "google_reply_execution_overview_v6": return options.replyOutcomes ?? [];
+        case "agent_jobs": return options.replyJobs ?? [];
         default: return options.placements ?? [];
       }
     };
@@ -78,6 +84,7 @@ function database(options: {
     Object.assign(chain, {
       select: () => chain,
       eq: () => chain,
+      in: () => chain,
       order: () => chain,
       limit: async () => ({ data: payload(), error: null }),
       insert: async () => ({ error: null }),
@@ -126,6 +133,7 @@ function routeDatabase(pending: Record<string, Promise<ReadResult>> = {}) {
         if (key === "client_id") selectedClient = String(value);
         return chain;
       },
+      in: () => chain,
       order: () => chain,
       limit: () => response(),
       insert: async (value: unknown) => { insert(value); return { error: null }; },
@@ -178,9 +186,63 @@ describe("the location", () => {
     render(<GoogleProfilePanel tab="location" />);
     expect(await screen.findByText("New description")).toBeInTheDocument();
     expect(screen.getByText("Old description")).toBeInTheDocument();
-    expect(screen.getByText("Held; no field PATCH will be claimed.")).toBeInTheDocument();
+    expect(screen.getByText("No provider write requested.")).toBeInTheDocument();
     expect(screen.getByText(/exact-version AAL2 Approval Inbox decision/)).toBeInTheDocument();
     expect(from).toHaveBeenCalledWith("google_profile_changes");
+    expect(screen.getByText("Pre-Inbox approval; review again")).toBeInTheDocument();
+  });
+
+  it("distinguishes a current exact decision from a stale one", async () => {
+    database({
+      changes: [change({ approved_request_id: "card-1" })],
+      profileCards: [{ id: "card-1", status: "superseded" }],
+    });
+    render(<GoogleProfilePanel tab="location" />);
+    expect(await screen.findByText("Inbox decision superseded; review again")).toBeInTheDocument();
+  });
+
+  it("requests exact Inbox review for a pending location proposal", async () => {
+    database({ changes: [change({ status: "drafted" })] });
+    render(<GoogleProfilePanel tab="location" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Request Inbox review" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_google_profile_review_v6", {
+      p_change_id: "change-1",
+    }));
+  });
+
+  it("queues only a current exact approved profile proposal", async () => {
+    database({ changes: [change({ approved_request_id: "card-1" })],
+      profileCards: [{ id: "card-1", status: "approved" }] });
+    render(<GoogleProfilePanel tab="location" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Request field write" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_google_profile_write_v6", {
+      p_change_id: "change-1",
+    }));
+  });
+
+  it("shows provider attempt outcomes separately from the approval", async () => {
+    database({ changes: [change({ approved_request_id: "card-1" })],
+      profileCards: [{ id: "card-1", status: "approved" }],
+      profileOutcomes: [{ attempt_id: "attempt-1", change_id: "change-1", status: "uncertain",
+        reconciliation_result: null, reconciled_at: null, provider_ref: null }] });
+    render(<GoogleProfilePanel tab="location" />);
+    expect(await screen.findByText(/Outcome uncertain; request a read-only merchant-record check/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Request field write" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Check merchant record read-only" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_google_profile_reconciliation_v6", {
+      p_attempt_id: "attempt-1",
+    }));
+  });
+
+  it("shows a later merchant-record match without offering another check or write", async () => {
+    database({ changes: [change({ status: "applied" })], profileOutcomes: [{
+      attempt_id: "attempt-1", change_id: "change-1", status: "uncertain",
+      reconciliation_result: "matched", reconciled_at: "2026-11-15T09:00:00Z", provider_ref: null,
+    }] });
+    render(<GoogleProfilePanel tab="location" />);
+    expect(await screen.findByText(/Later merchant-record readback matched/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Check merchant record read-only" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Request field write" })).not.toBeInTheDocument();
   });
 
   it("leads with the blocker when the credential cannot see the location", async () => {
@@ -372,6 +434,79 @@ describe("reviews", () => {
     expect(screen.queryByRole("menuitem", { name: "Approve this reply" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Reject it" })).not.toBeInTheDocument();
     expect(rpc).not.toHaveBeenCalledWith("decide_google_review_reply_v6", expect.anything());
+  });
+
+  it("shows approval separately from a provider outcome", async () => {
+    database({ replies: [{
+      id: "reply-1", client_id: "client-1", review_id: "rev-1", status: "approved",
+    }] });
+    render(<GoogleProfilePanel tab="reviews" />);
+    expect(await screen.findByText("Approved — not sent")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Actions for / }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Request approved reply send" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_google_reply_send_v6", {
+      p_reply_id: "reply-1",
+    }));
+  });
+
+  it("shows an uncertain provider attempt as requiring reconciliation", async () => {
+    database({
+      replies: [{ id: "reply-1", client_id: "client-1", review_id: "rev-1", status: "approved" }],
+      replyOutcomes: [{ attempt_id: "attempt-1", reply_id: "reply-1",
+        client_id: "client-1", status: "uncertain", reconciliation_result: null }],
+    });
+    render(<GoogleProfilePanel tab="reviews" />);
+    expect(await screen.findByText("Outcome uncertain; request a read-only review check."))
+      .toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Actions for/i }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Check review read-only" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_google_reply_reconciliation_v6", {
+      p_attempt_id: "attempt-1",
+    }));
+  });
+
+  it("shows a later provider-approved match without requesting another send", async () => {
+    database({
+      replies: [{ id: "reply-1", client_id: "client-1", review_id: "rev-1", status: "posted" }],
+      replyOutcomes: [{ attempt_id: "attempt-1", reply_id: "reply-1",
+        client_id: "client-1", status: "uncertain", reconciliation_result: "matched",
+        reconciled_at: "2026-11-15T09:00:00Z", reconciled_provider_state: "APPROVED" }],
+    });
+    render(<GoogleProfilePanel tab="reviews" />);
+    expect(await screen.findByText(/Later approved provider reply matched/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Actions for/i }));
+    expect(screen.queryByRole("menuitem", { name: "Check review read-only" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Request approved reply send" })).not.toBeInTheDocument();
+  });
+
+  it("flags historical posted replies without a verified moderation receipt", async () => {
+    database({
+      replies: [{ id: "reply-1", client_id: "client-1", review_id: "rev-1", status: "posted" }],
+      replyOutcomes: [{ attempt_id: "attempt-1", reply_id: "reply-1",
+        client_id: "client-1", status: "confirmed", provider_state: "PENDING" }],
+    });
+    render(<GoogleProfilePanel tab="reviews" />);
+    expect(await screen.findByText(/Historical confirmation lacks approved moderation/))
+      .toBeInTheDocument();
+  });
+
+  it("flags a legacy posted reply without a one-shot provider receipt", async () => {
+    database({
+      replies: [{ id: "reply-1", client_id: "client-1", review_id: "rev-1", status: "posted" }],
+    });
+    render(<GoogleProfilePanel tab="reviews" />);
+    expect(await screen.findByText(/Legacy posted status; no one-shot provider receipt/))
+      .toBeInTheDocument();
+  });
+
+  it("shows a held send job before any provider attempt exists", async () => {
+    database({
+      replies: [{ id: "reply-1", client_id: "client-1", review_id: "rev-1", status: "approved" }],
+      replyJobs: [{ id: "job-1", agent_key: "google_reply_sender", input_id: "reply-1", status: "paused" }],
+    });
+    render(<GoogleProfilePanel tab="reviews" />);
+    expect(await screen.findByText("Send held — inspect the job"))
+      .toBeInTheDocument();
   });
 });
 

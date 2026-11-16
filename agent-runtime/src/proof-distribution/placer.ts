@@ -195,6 +195,20 @@ export async function place(
   }
 
   const payload = await resolvePayload(sb, placement);
+  // A claim is only a lease. Rights, source signoff, the exact placement
+  // decision or a client switch can change while the provider payload is
+  // being resolved, so check the live gate again immediately before posting.
+  const { data: allowed, error: gateError } = await sb.rpc("proof_placement_effect_allowed_v6", {
+    p_placement_id: placement.placement_id,
+  } as never);
+  if (gateError || allowed !== true) {
+    throw new PlacementTransportError(
+      gateError
+        ? `Could not re-check the placement gate: ${gateError.message}`
+        : "The placement is no longer approved for this destination. Review its current rights, signoff and switches.",
+      Boolean(gateError),
+    );
+  }
   return createLocalPost({
     accessToken: String(token),
     accountRef,

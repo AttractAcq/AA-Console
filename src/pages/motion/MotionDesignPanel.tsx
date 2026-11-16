@@ -11,6 +11,9 @@ type Project = { id: string; prompt: string; preset: Preset; aspect: Aspect;
   error: string | null; revision_of: string | null; created_at: string };
 type Brief = { id: string; title: string };
 type Attachment = { project_id: string; asset_id: string; brief_id: string | null };
+type AcceptedCut = { project_id: string; render_path: string | null; accepted_at: string | null;
+  brand_qa: string | null; claim_qa: string | null; accepted_request_id: string | null;
+  accepted_content_hash: string | null };
 
 /** Independent prompt-to-motion page; output can later be attached to content or sites. */
 export function MotionDesignPanel() {
@@ -24,6 +27,7 @@ export function MotionDesignPanel() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [briefs, setBriefs] = useState<Brief[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [acceptedCuts, setAcceptedCuts] = useState<AcceptedCut[]>([]);
   const [attachSelections, setAttachSelections] = useState<Record<string, string>>({});
   const urls = useSignedPreviewPaths("client-media", projects.flatMap((project) => [project.render_path, project.poster_path]));
   const [loading, setLoading] = useState(true);
@@ -46,13 +50,21 @@ export function MotionDesignPanel() {
       if (briefResult.error) throw briefResult.error;
       const rows = (result.data ?? []) as Project[];
       const ids = rows.map((project) => project.id);
-      const attachmentResult = ids.length ? await supabase.from("motion_design_attachments")
-        .select("project_id, asset_id, brief_id").in("project_id", ids)
-        : { data: [], error: null };
+      const [attachmentResult, candidateResult] = await Promise.all([
+        ids.length ? supabase.from("motion_design_attachments")
+          .select("project_id, asset_id, brief_id").in("project_id", ids)
+          : Promise.resolve({ data: [], error: null }),
+        ids.length ? supabase.from("motion_render_candidates")
+          .select("project_id, render_path, accepted_at, brand_qa, claim_qa, accepted_request_id, accepted_content_hash")
+          .in("project_id", ids).not("accepted_at", "is", null)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
       if (attachmentResult.error) throw attachmentResult.error;
+      if (candidateResult.error) throw candidateResult.error;
       setProjects(rows);
       setBriefs((briefResult.data ?? []) as Brief[]);
       setAttachments((attachmentResult.data ?? []) as Attachment[]);
+      setAcceptedCuts((candidateResult.data ?? []) as AcceptedCut[]);
       setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load motion projects.");
@@ -170,7 +182,12 @@ export function MotionDesignPanel() {
         <button type="button" onClick={() => void refresh()} className="text-xs font-medium text-brand-strong hover:underline">Refresh projects</button></div>
       {loading ? <p className="text-sm text-muted-foreground">Loading motion designs…</p>
         : projects.length === 0 ? <p className="text-sm text-muted-foreground">No motion designs yet.</p>
-          : projects.map((project) => <article key={project.id} className="space-y-2 rounded-lg border border-border p-4">
+          : projects.map((project) => {
+            const acceptedCut = acceptedCuts.some((cut) => cut.project_id === project.id
+              && cut.render_path === project.render_path && cut.brand_qa === "pass"
+              && cut.claim_qa === "pass" && cut.accepted_at
+              && cut.accepted_request_id && cut.accepted_content_hash);
+            return <article key={project.id} className="space-y-2 rounded-lg border border-border p-4">
             <div className="flex justify-between gap-2"><h3 className="text-sm font-medium capitalize">{project.preset} · {project.duration_sec}s</h3>
               <span className="text-xs capitalize text-muted-foreground">{project.status}</span></div>
             <p className="whitespace-pre-wrap text-xs text-muted-foreground">{project.prompt}</p>
@@ -197,12 +214,16 @@ export function MotionDesignPanel() {
                 && item.brief_id === (attachSelections[project.id] || null))
                 ? <Link to={`/clients/${clientId}/delivery/approval-inbox?tab=assets`}
                   className="text-xs font-medium text-brand-strong hover:underline">Open approval asset</Link>
-                : <button type="button" disabled={busy} onClick={() => void attach(project)}
+                : <button type="button" disabled={busy || !acceptedCut} onClick={() => void attach(project)}
                   className="rounded-md border border-border px-3 py-2 text-xs font-medium disabled:opacity-50">
                   Send to approvals
                 </button>}
+              {!acceptedCut && <p className="w-full text-xs text-amber-700">
+                Accept this exact cut in Renders before sending it to content approvals.
+              </p>}
             </div>}
-          </article>)}
+          </article>;
+          })}
     </section>
   </div>;
 }

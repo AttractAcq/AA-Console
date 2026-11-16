@@ -57,10 +57,9 @@ export function RecruitmentDistributionPanel() {
         supabase.from("client_integrations")
           .select("status,ad_account_id,meta_page_id,meta_pixel_id")
           .eq("client_id", clientId).eq("provider", "meta").maybeSingle(),
-        supabase.from("client_media_assets")
+        supabase.from("recruitment_media_ready_v6")
           .select("id,brief_id,title,storage_path,media_type,content_format")
-          .eq("client_id", clientId).eq("purpose", "recruitment")
-          .eq("review_status", "approved").order("created_at", { ascending: false }),
+          .eq("client_id", clientId).order("title", { ascending: true }),
         supabase.from("client_briefs")
           .select("id,title,recruitment_role,hook,script,apply_url,call_to_action")
           .eq("client_id", clientId).eq("purpose", "recruitment"),
@@ -166,7 +165,7 @@ export function RecruitmentDistributionPanel() {
         <label className="text-sm">Countries<input aria-label="Countries" placeholder="ZA, GB" value={countries} onChange={(e) => setCountries(e.target.value)} className="mt-1 w-full rounded border border-input bg-background p-2" /></label>
       </div>
       <p className="text-xs text-muted-foreground">The budget, countries, selected creative and account are frozen in a held Inbox request. No build or spend starts here.</p>
-      {eligible.length === 0 ? <p className="text-sm text-muted-foreground">No approved recruitment image has a complete brief and HTTPS apply URL yet.</p> :
+      {eligible.length === 0 ? <p className="text-sm text-muted-foreground">No currently Inbox-cleared recruitment image has a complete brief and HTTPS apply URL yet.</p> :
         <fieldset className="space-y-2"><legend className="text-sm font-medium">Select ads</legend>
           {eligible.map((asset) => {
             const brief = byBrief.get(asset.brief_id ?? "");

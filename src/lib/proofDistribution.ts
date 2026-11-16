@@ -53,6 +53,37 @@ export interface ClientDestination {
   account_ref: string | null;
 }
 
+export interface DestinationIntegration {
+  provider: string;
+  status: string;
+  credential_secret_id: string | null;
+  token_expires_at: string | null;
+}
+
+/** Metadata preflight only. A live provider read-back is still required. */
+export function destinationPreflight(
+  destination: Destination,
+  client: ClientDestination | undefined,
+  integrations: readonly DestinationIntegration[],
+): string[] {
+  const blockers: string[] = [];
+  if (!destination.supported) blockers.push("Route is not implemented.");
+  if (!client?.enabled) blockers.push("Destination is off for this client.");
+  if (destination.requires_integration) {
+    const matches = integrations.filter((row) => row.provider === destination.provider);
+    if (matches.length !== 1) blockers.push(matches.length ? "Provider connection is ambiguous." : "No provider connection is recorded.");
+    else {
+      const row = matches[0];
+      if (!row.credential_secret_id) blockers.push("Provider credential is missing.");
+      if (!["connected", "active"].includes(row.status)) blockers.push(`Provider status is ${row.status}.`);
+      if (row.token_expires_at && (!Number.isFinite(Date.parse(row.token_expires_at))
+        || Date.parse(row.token_expires_at) <= Date.now())) blockers.push("Recorded provider token has expired.");
+    }
+    if (!client?.account_ref) blockers.push("Destination account reference is missing.");
+  }
+  return blockers;
+}
+
 export interface Placement {
   id: string;
   client_id: string;
@@ -62,14 +93,30 @@ export interface Placement {
   artifact_version_id: string | null;
   proof_id: string | null;
   asset_id: string | null;
+  payload_hash: string;
   approval_id: string | null;
   /** The campaign this placement belongs to, where it belongs to one. */
   campaign_id: string | null;
+  external_id: string | null;
   external_url: string | null;
   attempts: number;
   placed_at: string | null;
+  verified_at: string | null;
+  bound_revision_id: string | null;
+  retracted_at: string | null;
   created_at: string;
   last_error: string | null;
+}
+
+export type PlacementEvent = Database["public"]["Tables"]["proof_placement_events"]["Row"];
+
+export interface RetractionReceipt {
+  placement_id: string;
+  method: string;
+  evidence_ref: string | null;
+  reason: string;
+  recorded_at: string;
+  legacy_audit: boolean;
 }
 
 export interface PlacementDue {
@@ -110,13 +157,36 @@ export async function fetchClientDestinations(clientId: string): Promise<Map<str
 }
 
 export async function fetchPlacements(clientId: string): Promise<Placement[]> {
-  const { data, error } = await supabase
-    .from("proof_placements")
-    .select("id, client_id, destination_key, status, source_proof_id, artifact_version_id, proof_id, asset_id, approval_id, campaign_id, external_url, attempts, placed_at, created_at, last_error")
-    .eq("client_id", clientId)
-    .order("created_at", { ascending: false });
+  const all: Placement[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const { data, error } = await supabase
+      .from("proof_placements")
+      .select("id, client_id, destination_key, status, source_proof_id, artifact_version_id, proof_id, asset_id, payload_hash, approval_id, campaign_id, external_id, external_url, attempts, placed_at, verified_at, bound_revision_id, retracted_at, created_at, last_error")
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: false }).order("id", { ascending: false })
+      .range(offset, offset + 499);
+    if (error) throw new Error(error.message);
+    all.push(...((data ?? []) as Placement[]));
+    if ((data ?? []).length < 500) return all;
+  }
+}
+
+export async function fetchPlacementEvents(clientId: string, placementId: string, offset = 0): Promise<PlacementEvent[]> {
+  const { data, error } = await supabase.from("proof_placement_events")
+    .select("id, placement_id, client_id, event, actor, detail, external_ref, occurred_at")
+    .eq("client_id", clientId).eq("placement_id", placementId)
+    .order("occurred_at", { ascending: false }).range(offset, offset + 49);
   if (error) throw new Error(error.message);
-  return (data ?? []) as Placement[];
+  return data ?? [];
+}
+
+export async function fetchRetractionReceipts(clientId: string): Promise<Map<string, RetractionReceipt>> {
+  const { data, error } = await supabase
+    .from("proof_placement_retraction_receipts_v6")
+    .select("placement_id, method, evidence_ref, reason, recorded_at, legacy_audit")
+    .eq("client_id", clientId);
+  if (error) throw new Error(error.message);
+  return new Map(((data ?? []) as RetractionReceipt[]).map((row) => [row.placement_id, row]));
 }
 
 export async function fetchPlacementDue(clientId: string): Promise<Map<string, PlacementDue>> {
@@ -144,9 +214,13 @@ export async function setDestinationEnabled(
 }
 
 export async function setProofPublishingEnabled(clientId: string, enabled: boolean): Promise<void> {
-  const { error } = await supabase.rpc("set_proof_publishing_enabled", {
-    p_client_id: clientId, p_enabled: enabled,
-  });
+  const { error } = enabled
+    ? await supabase.rpc("request_client_switch_activation_v6", {
+        p_client_id: clientId, p_switch_key: "proof_publishing",
+      })
+    : await supabase.rpc("set_proof_publishing_enabled", {
+        p_client_id: clientId, p_enabled: false,
+      });
   if (error) throw new Error(error.message);
 }
 
@@ -171,34 +245,38 @@ export async function createPlacement(args: {
 }
 
 export async function requestApproval(placementId: string): Promise<void> {
-  const { error } = await supabase.rpc("request_proof_placement_approval_v6", {
+  const { error } = await supabase.rpc("request_proof_placement_inbox_v6", {
     p_placement_id: placementId,
-  });
-  if (error) throw new Error(error.message);
-}
-
-export async function decideApproval(
-  approvalId: string, approved: boolean, reason?: string,
-): Promise<void> {
-  const { error } = await supabase.rpc("decide_proof_placement_approval_v6", {
-    p_approval_id: approvalId,
-    p_approved: approved,
-    ...(reason ? { p_reason: reason } : {}),
   });
   if (error) throw new Error(error.message);
 }
 
 export async function markPlacedByHand(placementId: string, url: string): Promise<void> {
-  const { error } = await supabase.rpc("mark_proof_placement_placed_v6", {
+  const { error } = await supabase.rpc("mark_proof_placement_placed_inbox_v6", {
     p_placement_id: placementId, p_external_url: url,
   });
   if (error) throw new Error(error.message);
 }
 
-export async function recordRetracted(placementId: string, detail?: string): Promise<void> {
-  const { error } = await supabase.rpc("record_proof_retracted_v6", {
+export async function recordRetracted(
+  placementId: string,
+  confirmation: { method: "cancelled_before_placement" | "human_checked";
+    reason: string; evidenceRef?: string | null },
+): Promise<void> {
+  const { error } = await supabase.rpc("record_proof_retraction_confirmation_v6", {
     p_placement_id: placementId,
-    ...(detail ? { p_detail: detail } : {}),
+    p_method: confirmation.method,
+    p_reason: confirmation.reason,
+    p_evidence_ref: confirmation.evidenceRef ?? "",
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function auditLegacyRetraction(
+  placementId: string, evidenceRef: string, reason: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("audit_legacy_proof_retraction_v6", {
+    p_placement_id: placementId, p_evidence_ref: evidenceRef, p_reason: reason,
   });
   if (error) throw new Error(error.message);
 }

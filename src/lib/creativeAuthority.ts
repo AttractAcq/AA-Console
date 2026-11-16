@@ -47,18 +47,14 @@ export async function fetchCreativeDecisions(
 }
 
 /**
- * Turns creative director sign-off on or off for a client.
- *
- * Off by default, and turning it on is a change to who may approve creative —
- * so it is a deliberate act by whoever runs the client, not a default.
+ * Requests an exact governance review before changing who may approve creative.
  */
 export async function setCreativeDirectorRequired(
   clientId: string,
   required: boolean,
 ): Promise<void> {
-  const { error } = await supabase
-    .from("client_engine_settings")
-    .upsert({ client_id: clientId, creative_director_required: required } as never,
-      { onConflict: "client_id" });
+  const { error } = await supabase.rpc("request_creative_requirement_v6", {
+    p_client_id: clientId, p_required: required,
+  });
   if (error) throw new Error(error.message);
 }

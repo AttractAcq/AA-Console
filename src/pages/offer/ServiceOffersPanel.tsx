@@ -132,16 +132,6 @@ export function ServiceOffersPanel() {
     await refresh();
   }
 
-  async function approve(version: Version) {
-    setBusy(version.id); setError(null);
-    const { error: rpcError } = await supabase.rpc("approve_service_offer_version_v6", {
-      p_version_id: version.id,
-    });
-    setBusy(null);
-    if (rpcError) { setError(rpcError.message); return; }
-    await refresh();
-  }
-
   async function attach(event: FormEvent) {
     event.preventDefault();
     if (!selectedManifestId || !selectedOfferVersionId || busy) return;
@@ -290,8 +280,8 @@ export function ServiceOffersPanel() {
                 </div>
               </details>
               <div className="mt-4 flex gap-2">
-                {!signed && <button type="button" disabled={Boolean(busy)} onClick={() => void approve(version)}
-                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">Approve version</button>}
+                {!signed && <Link to={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Review in Approval Inbox</Link>}
                 <button type="button" onClick={() => revise(offer, version)}
                   className="rounded-lg border border-border px-4 py-2 text-sm">Create revision</button>
               </div>

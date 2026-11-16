@@ -96,7 +96,7 @@ describe("the global profile-write hold", () => {
     expect(rpc).not.toHaveBeenCalled();
     expect(from).toHaveBeenCalledTimes(1);
     expect(from).toHaveBeenCalledWith("agent_job_events");
-    expect(String(events[0]!.description)).toMatch(/last-moment prewrite verification/);
+    expect(String(events[0]!.description)).toMatch(/no one-shot provider writer and readback receipt/);
   });
 });
 
@@ -125,21 +125,100 @@ describe("the body it builds", () => {
 });
 
 describe("the held Google transport in isolation", () => {
+  const providerIdentity = (url: RequestInfo | URL): Response | null => {
+    const target = String(url);
+    if (target.includes("accountmanagement")) {
+      return new Response(JSON.stringify({ name: "accounts/123" }), { status: 200 });
+    }
+    if (target.includes("/v1alpha/accounts/123/locations")) {
+      return new Response(JSON.stringify({ locations: [{ name: "locations/456" }] }), { status: 200 });
+    }
+    return null;
+  };
   const request = {
     accessToken: "test-token",
     accountRef: "accounts/123/locations/456",
     field: "description",
     value: "Approved exact description",
+    currentValue: "Old exact description",
+    assertPrewrite: vi.fn(async () => {}),
   };
 
-  it("patches only one field and returns a stable external reference", async () => {
-    const fetchImpl = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
-      new Response("{}", { status: 200 }));
+  it("compares the live before value, attests immediately before PATCH and reads back", async () => {
+    const fetchImpl = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) =>
+      providerIdentity(url) ?? new Response(JSON.stringify({ name: "locations/456", profile: {
+        description: init?.method === "PATCH" || fetchImpl.mock.calls.length === 5
+          ? request.value : request.currentValue,
+      } }), { status: 200 }));
     const result = await patchLocationField({ ...request, fetchImpl: fetchImpl as never });
-    expect(result.externalRef).toBe("accounts/123/locations/456#description");
-    expect(String(fetchImpl.mock.calls[0]![0])).toContain("updateMask=profile.description");
-    expect(JSON.parse(String((fetchImpl.mock.calls[0]![1] as RequestInit).body)))
-      .toEqual({ profile: { description: request.value } });
+    expect(result).toEqual({ externalRef: "locations/456#description",
+      readbackValue: request.value });
+    expect(fetchImpl).toHaveBeenCalledTimes(5);
+    expect(String(fetchImpl.mock.calls[0]![0])).toContain("/v1/accounts/123");
+    expect(String(fetchImpl.mock.calls[1]![0])).toContain("/v1alpha/accounts/123/locations?readMask=name");
+    expect(String(fetchImpl.mock.calls[2]![0])).toContain("/v1/locations/456?readMask=profile.description");
+    expect(String(fetchImpl.mock.calls[3]![0])).toContain("updateMask=profile.description");
+    expect(request.assertPrewrite).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String((fetchImpl.mock.calls[3]![1] as RequestInit).body)))
+      .toEqual({ name: "locations/456", profile: { description: request.value } });
+  });
+
+  it("refuses a changed live before value without attesting or writing", async () => {
+    const assertPrewrite = vi.fn();
+    const fetchImpl = vi.fn(async (url: RequestInfo | URL) => providerIdentity(url)
+      ?? new Response(JSON.stringify({ name: "locations/456",
+        profile: { description: "Someone else's edit" } }), { status: 200 }));
+    await expect(patchLocationField({ ...request, assertPrewrite, fetchImpl: fetchImpl as never }))
+      .rejects.toThrow(/differs from the reviewed before value/);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(assertPrewrite).not.toHaveBeenCalled();
+  });
+
+  it("refuses a location absent from the reviewed account before field read or PATCH", async () => {
+    const fetchImpl = vi.fn(async (url: RequestInfo | URL) =>
+      String(url).includes("accountmanagement")
+        ? new Response(JSON.stringify({ name: "accounts/123" }), { status: 200 })
+        : new Response(JSON.stringify({ locations: [] }), { status: 200 }));
+    await expect(patchLocationField({ ...request, fetchImpl: fetchImpl as never }))
+      .rejects.toThrow(/absent from the reviewed Business Profile account/);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("finds the reviewed location on a later account page", async () => {
+    const fetchImpl = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      const target = String(url);
+      if (target.includes("accountmanagement")) return providerIdentity(url)!;
+      if (target.includes("/v1alpha/accounts/123/locations")) {
+        return new Response(JSON.stringify(target.includes("pageToken=next")
+          ? { locations: [{ name: "locations/456" }] }
+          : { locations: [{ name: "locations/other" }], nextPageToken: "next" }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ name: "locations/456", profile: {
+        description: init?.method === "PATCH" || fetchImpl.mock.calls.length === 6
+          ? request.value : request.currentValue,
+      } }), { status: 200 });
+    });
+    await expect(patchLocationField({ ...request, fetchImpl: fetchImpl as never }))
+      .resolves.toMatchObject({ readbackValue: request.value });
+    expect(fetchImpl).toHaveBeenCalledTimes(6);
+    expect(String(fetchImpl.mock.calls[2]![0])).toContain("pageToken=next");
+  });
+
+  it("preserves additional numbers when replacing the primary phone", async () => {
+    const calls: RequestInit[] = [];
+    const fetchImpl = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(init ?? {});
+      return providerIdentity(url) ?? new Response(JSON.stringify(
+        { name: "locations/456", phoneNumbers: {
+          primaryPhone: calls.length === 3 ? "+44111" : "+44222",
+          additionalPhones: ["+44333"],
+        } }), { status: 200 });
+    });
+    await patchLocationField({ ...request, field: "primary_phone",
+      currentValue: "+44111", value: "+44222", fetchImpl: fetchImpl as never });
+    expect(String(fetchImpl.mock.calls[3]![0])).toContain("updateMask=phoneNumbers");
+    expect(JSON.parse(String(calls[3]?.body))).toEqual({ name: "locations/456",
+      phoneNumbers: { primaryPhone: "+44222", additionalPhones: ["+44333"] } });
   });
 
   it("rejects a field the adapter does not write before transport", async () => {
@@ -158,5 +237,26 @@ describe("the held Google transport in isolation", () => {
     const refused = vi.fn(async () => new Response("bad field", { status: 400 }));
     await expect(patchLocationField({ ...request, fetchImpl: refused as never }))
       .rejects.toMatchObject({ retryable: false } satisfies Partial<PlacementTransportError>);
+  });
+
+  it("holds an uncertain PATCH response and mismatched readback", async () => {
+    const before = () => new Response(JSON.stringify({ name: "locations/456",
+      profile: { description: request.currentValue } }), { status: 200 });
+    const uncertain = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      const identity = providerIdentity(url);
+      if (identity) return identity;
+      if (init?.method === "PATCH") throw new Error("socket dropped");
+      return before();
+    });
+    await expect(patchLocationField({ ...request, fetchImpl: uncertain as never }))
+      .rejects.toMatchObject({ retryable: false,
+        message: expect.stringContaining("outcome is uncertain") });
+
+    const staleReadback = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) =>
+      providerIdentity(url) ?? (init?.method === "PATCH"
+        ? new Response(JSON.stringify({ name: "locations/456" }), { status: 200 })
+        : before()));
+    await expect(patchLocationField({ ...request, fetchImpl: staleReadback as never }))
+      .rejects.toThrow(/readback differs/);
   });
 });

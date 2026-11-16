@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { MetaWriteError, updateAdSetDailyBudget } from "./ads.js";
+import { MetaWriteError, readAdSetBudget, updateAdSetDailyBudget } from "./ads.js";
 
 /**
  * Changing an ad set's daily budget — G07.
@@ -81,5 +81,32 @@ describe("failing", () => {
     fetchMock(400, { error: { message: "Invalid parameter" } });
     await expect(updateAdSetDailyBudget(account, "23848", 50))
       .rejects.toMatchObject({ retryable: false });
+  });
+});
+
+describe("budget provider readback", () => {
+  it("reads the exact ad set, owning account, amount and currency", async () => {
+    const impl = vi.fn(async (url: RequestInfo | URL) => new Response(JSON.stringify(
+      String(url).includes("act_1")
+        ? { id: "act_1", currency: "GBP" }
+        : { id: "23848", account_id: "1", daily_budget: "5000" },
+    ), { status: 200 }));
+    vi.stubGlobal("fetch", impl);
+    await expect(readAdSetBudget(account, "23848")).resolves.toEqual({
+      id: "23848", accountId: "act_1", dailyBudgetMinor: 5000, currency: "GBP",
+    });
+    expect(impl).toHaveBeenCalledTimes(2);
+    expect(impl).toHaveBeenCalledWith(expect.stringContaining("fields=id%2Caccount_id%2Cdaily_budget"),
+      expect.objectContaining({ method: "GET" }));
+  });
+
+  it("refuses an ad set in a different account", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: RequestInfo | URL) => new Response(JSON.stringify(
+      String(url).includes("act_1")
+        ? { id: "act_1", currency: "GBP" }
+        : { id: "23848", account_id: "2", daily_budget: "5000" },
+    ), { status: 200 })));
+    await expect(readAdSetBudget(account, "23848"))
+      .rejects.toThrow(/did not confirm the exact ad set/);
   });
 });

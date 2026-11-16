@@ -1,5 +1,5 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { fetchProofAssets, type ProofAsset } from "../../lib/media";
 import type { Database } from "../../types/database";
@@ -124,13 +124,14 @@ export function ProofArtifactsPanel() {
     await refresh();
   }
 
-  async function approve(artifact: Artifact) {
+  async function requestSignoff(artifact: Artifact) {
     setBusy(artifact.id); setError(null);
-    const { error: rpcError } = await supabase.rpc("approve_proof_artifact_v6", {
+    const { error: rpcError } = await supabase.rpc("request_proof_artifact_signoff_v6", {
       p_artifact_version_id: artifact.id,
     });
     setBusy(null);
     if (rpcError) { setError(rpcError.message); return; }
+    setNotice("Source and claim review requested. The artifact remains a draft until its exact Inbox decision.");
     await refresh();
   }
 
@@ -160,7 +161,7 @@ export function ProofArtifactsPanel() {
       </p>
     </div>
     {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
-    {notice && <p role="status" className="text-sm text-primary">{notice}</p>}
+    {notice && <p role="status" className="text-sm text-primary">{notice}{notice.includes("Inbox") && clientId && <> <Link className="underline" to={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>Open Approval Inbox</Link></>}</p>}
     <form onSubmit={(event) => void save(event)} className="space-y-4 rounded-xl border border-border bg-card p-5">
       <h3 className="font-semibold">Draft an artifact</h3>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -224,12 +225,13 @@ export function ProofArtifactsPanel() {
         : artifacts.length === 0 ? <p className="text-sm text-muted-foreground">No proof artifacts have been drafted yet.</p>
           : artifacts.map((artifact) => {
             const source = sources.find((item) => item.id === artifact.source_proof_id);
-            const approved = signoffs.some((item) => item.artifact_version_id === artifact.id);
+            const signoff = signoffs.find((item) => item.artifact_version_id === artifact.id);
+            const approved = !!signoff?.approved_request_id;
             return <article key={artifact.id} className="rounded-xl border border-border bg-card p-5">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <h4 className="font-semibold">{kinds.find((kind) => kind.id === artifact.artifact_kind)?.label ?? artifact.artifact_kind} · v{artifact.version}</h4>
-                  <p className="text-xs text-muted-foreground">{source?.title ?? artifact.source_proof_id} · {approved ? "Approved" : "Draft"}</p>
+                  <p className="text-xs text-muted-foreground">{source?.title ?? artifact.source_proof_id} · {approved ? "Signed off; rechecked at use" : signoff ? "Pre-Inbox legacy signoff; create a new version" : "Draft"}</p>
                 </div>
                 <span className="font-mono text-xs text-muted-foreground">{artifact.content_hash.slice(0, 16)}…</span>
               </div>
@@ -237,9 +239,9 @@ export function ProofArtifactsPanel() {
               <p className="mt-2 text-sm text-muted-foreground">Evidence: “{artifact.evidence_excerpt}”</p>
               <p className="mt-3 whitespace-pre-wrap text-sm">{artifact.content}</p>
               <div className="mt-4 flex gap-2">
-                {!approved && <button type="button" disabled={Boolean(busy)} onClick={() => void approve(artifact)}
+                {!signoff && <button type="button" disabled={Boolean(busy)} onClick={() => void requestSignoff(artifact)}
                   className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
-                  Approve source and claim
+                  Request source and claim signoff
                 </button>}
                 <button type="button" onClick={() => {
                   setForm({ sourceId: artifact.source_proof_id, kind: artifact.artifact_kind,

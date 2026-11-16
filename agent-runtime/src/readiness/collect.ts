@@ -38,6 +38,8 @@ type Heartbeat = {
   enabled: boolean | null;
   queueDepth: number | null;
   activeJobs: number | null;
+  campaignActionHold: string | null;
+  campaignActionRuntimeEnabled: boolean | null;
 };
 
 type ClientInventory = {
@@ -106,7 +108,7 @@ export type SystemReadinessSnapshot = {
     switches: Record<string, boolean>;
     actionHolds: {
       profileFieldPatch: { state: "held"; reason: string };
-      genericCampaignActionClaim: { state: "held"; reason: string };
+      genericCampaignActionClaim: { state: "held" | "ready" | "unknown"; reason: string };
     };
     credentialPresence: Record<string, boolean>;
     heartbeats: Observation<Heartbeat[]>;
@@ -264,6 +266,8 @@ async function heartbeats(sb: SupabaseClient): Promise<Observation<Heartbeat[]>>
       enabled: asBool(record(row.metadata).enabled),
       queueDepth: asNumber(row.queue_depth),
       activeJobs: asNumber(row.active_jobs),
+      campaignActionHold: asString(record(record(row.metadata).holds).campaignActions),
+      campaignActionRuntimeEnabled: asBool(record(record(row.metadata).controls).campaignActions),
     })).sort((a, b) => b.reportedAt.localeCompare(a.reportedAt)));
   } catch {
     return failed("Runtime heartbeats could not be read.");
@@ -479,6 +483,19 @@ export async function collectSystemReadiness(
   const [heartbeatResult, catalogResult, globalResult, clientResult, gatewayResult] = await Promise.all([
     heartbeats(sb), catalog(sb), globalConfiguration(sb), clients(sb), gateway(config, fetcher),
   ]);
+  const runtimeSha = deployedCommitSha(env);
+  const liveActionWorkers = heartbeatResult.state === "observed"
+    ? heartbeatResult.value?.filter((beat) => beat.isLive) ?? [] : [];
+  const actionClaimStatus = !config.campaignActionOwnedClaimEnabled
+    ? { state: "held" as const, reason: GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD }
+    : !config.enabled || !config.campaignActionsEnabled || !runtimeSha
+      ? { state: "held" as const, reason: "Owned campaign action claims need an enabled runtime and complete deployed build SHA." }
+      : liveActionWorkers.length === 0
+        ? { state: "unknown" as const, reason: "No fresh campaign action worker heartbeat is observed." }
+        : liveActionWorkers.every((beat) => beat.enabled === true && beat.sha === runtimeSha
+          && beat.campaignActionRuntimeEnabled === true && beat.campaignActionHold === null)
+          ? { state: "ready" as const, reason: "Fresh workers report the owned claim path and matching deployed build." }
+          : { state: "held" as const, reason: "A live worker reports a hold, disabled action control or different build." };
   const snapshot: Omit<SystemReadinessSnapshot, "evidenceCoverage"> = {
     schemaVersion: 2,
     capturedAt,
@@ -488,16 +505,19 @@ export async function collectSystemReadiness(
       supabaseProjectRef: projectRef(config.supabaseUrl),
     },
     runtime: {
-      sha: deployedCommitSha(env),
+      sha: runtimeSha,
       actionHolds: {
         profileFieldPatch: { state: "held", reason: PROFILE_FIELD_PATCH_HOLD },
-        genericCampaignActionClaim: { state: "held", reason: GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD },
+        genericCampaignActionClaim: actionClaimStatus,
       },
       switches: {
         workers: config.enabled,
         workflow: config.workflowEnabled,
         publishing: config.publishEnabled,
         proofPublishing: config.proofPublishEnabled,
+        googleReviewReply: config.googleReviewReplyEnabled,
+        googleProfileFieldWrite: config.googleProfileFieldWriteEnabled,
+        metaProfileFieldWrite: config.metaProfileFieldWriteEnabled,
         campaignActions: config.campaignActionsEnabled,
         leadMagnetDelivery: config.leadMagnetDeliveryEnabled,
         outboundMessaging: config.outboundMessagingEnabled,

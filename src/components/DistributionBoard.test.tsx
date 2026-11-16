@@ -29,14 +29,20 @@ const post = (over: Record<string, unknown> = {}) => ({
   media_type: "image",
   platform: "instagram",
   published_at: null,
+  publication_status: "scheduled",
+  publish_attempts: 0,
+  external_id: null,
+  external_url: null,
+  failure_reason: null,
   ...over,
 });
 
-function postsReturn(rows: unknown[]) {
+function postsReturn(rows: unknown[], paged = false) {
   const chain = {
     select: () => chain,
     eq: () => chain,
-    order: () => Promise.resolve({ data: rows, error: null }),
+    order: () => paged ? chain : Promise.resolve({ data: rows, error: null }),
+    range: () => Promise.resolve({ data: rows, error: null }),
   };
   return chain;
 }
@@ -62,8 +68,10 @@ const dueRow = (over: Record<string, unknown> = {}) => ({
  * tests pass by accident: the due view returned posts, which carry no state,
  * so the banner stayed silent whatever the data said.
  */
-function byTable(posts: unknown[], due: unknown[] = []) {
-  return (table: string) => postsReturn(table === "distribution_due" ? due : posts);
+function byTable(posts: unknown[], due: unknown[] = [], events: unknown[] = []) {
+  return (table: string) => table === "post_publication_events_v6"
+    ? postsReturn(events, true)
+    : postsReturn(table === "distribution_due" ? due : posts);
 }
 
 beforeEach(() => {
@@ -87,10 +95,28 @@ async function openScheduler() {
 }
 
 describe("the board", () => {
+  it("shows recorded attempts, retries and provider IDs without claiming read-back", async () => {
+    const events = [
+      { id: "e3", post_id: "p1", ref_number: "AA-014", platform: "instagram", event: "published",
+        publication_status: "published", attempt_number: 2, external_id: "ig-42",
+        external_url: "https://instagram.com/p/42", detail: null, occurred_at: "2026-11-16T12:00:00Z" },
+      { id: "e2", post_id: "p1", ref_number: "AA-014", platform: "instagram", event: "retry_queued",
+        publication_status: "scheduled", attempt_number: 1, external_id: null,
+        external_url: null, detail: "Rate limited", occurred_at: "2026-11-16T11:00:00Z" },
+    ];
+    from.mockImplementation(byTable([post({ publication_status: "published", publish_attempts: 2,
+      external_id: "ig-42", external_url: "https://instagram.com/p/42" })], [], events));
+    render(<DistributionBoard channel="organic" />);
+    expect(await screen.findByText("Distribution log")).toBeInTheDocument();
+    expect(screen.getByText("retry queued")).toBeInTheDocument();
+    expect(screen.getByText("Rate limited")).toBeInTheDocument();
+    expect(screen.getByText(/read-back before it is verified/)).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "ig-42" })).toHaveLength(2);
+  });
   it("shows which platform a scheduled post goes to", async () => {
     render(<DistributionBoard channel="organic" />);
     expect(await screen.findByText("Instagram")).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Platform" })).toBeInTheDocument();
+    expect(screen.getAllByRole("columnheader", { name: "Platform" })).toHaveLength(2);
     expect(screen.getByText(/A post without an approved Engine slot stays blocked/i))
       .toBeInTheDocument();
   });
@@ -100,9 +126,9 @@ describe("the board", () => {
   it("shows a dash for a post scheduled before platforms were recorded", async () => {
     from.mockImplementation(byTable([post({ platform: null })]));
     render(<DistributionBoard channel="organic" />);
-    const table = await screen.findByRole("table");
+    const table = (await screen.findAllByRole("table"))[0]!;
     const cell = await within(table).findByRole("cell", { name: "AA-014" });
-    expect(within(cell.closest("tr")!).getByText("—")).toBeInTheDocument();
+    expect(within(cell.closest("tr")!).getAllByRole("cell")[3]).toHaveTextContent("—");
   });
 });
 

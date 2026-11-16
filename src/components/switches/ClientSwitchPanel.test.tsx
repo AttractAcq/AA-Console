@@ -16,6 +16,8 @@ const state = {
   controls: { enabled: false } as { enabled: boolean } | null,
   booking: null as { enabled: boolean } | null,
   error: null as string | null,
+  runtime: null as Record<string, unknown> | null,
+  activity: null as Record<string, unknown> | null,
 };
 
 const SETTINGS = {
@@ -57,7 +59,13 @@ beforeEach(() => {
   state.controls = { enabled: false };
   state.booking = null;
   state.error = null;
-  rpc.mockResolvedValue({ error: null });
+  state.runtime = null;
+  state.activity = null;
+  rpc.mockImplementation((name: string) => Promise.resolve(
+    name === "client_runtime_controls_v6" ? { data: state.runtime, error: null }
+      : name === "client_control_activity_v6" ? { data: state.activity, error: null }
+        : { error: null },
+  ));
 });
 
 describe("every switch in one place", () => {
@@ -75,6 +83,8 @@ describe("every switch in one place", () => {
     expect(await screen.findByText("Content engine, this client")).toBeInTheDocument();
     expect(screen.getByText(/No client runs, whatever its own switch says/)).toBeInTheDocument();
     expect(screen.getByText(/Approved posts sit on the calendar/)).toBeInTheDocument();
+    expect(screen.getByText("Google review reply sender, system-wide")).toBeInTheDocument();
+    expect(screen.getByText(/Google review reply jobs remain held/)).toBeInTheDocument();
   });
 
   it("owns the lead magnet delivery switch, which Lead Magnet Studio no longer duplicates", async () => {
@@ -82,14 +92,15 @@ describe("every switch in one place", () => {
     // copy of this switch, on the grounds that the notes put every switch
     // here. That made this panel the only control over whether a machine
     // emails a stranger a file, so it is asserted rather than assumed.
+    state.runtime = { state: "observed", workerEnabled: true, controls: { leadMagnetDelivery: true } };
     render(<ClientSwitchPanel clientId="c1" />);
     expect(await screen.findByText("Deliver lead magnets")).toBeInTheDocument();
     expect(screen.getByText(/Opt-ins are recorded and nothing is delivered/)).toBeInTheDocument();
 
     await userEvent.click(await screen.findByLabelText("Switch on Deliver lead magnets"));
     await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("set_lead_magnet_delivery_enabled", {
-        p_client_id: "c1", p_enabled: true,
+      expect(rpc).toHaveBeenCalledWith("request_client_switch_activation_v6", {
+        p_client_id: "c1", p_switch_key: "lead_magnet_delivery",
       }),
     );
   });
@@ -99,14 +110,65 @@ describe("every switch in one place", () => {
     // Publishing needs a deployment variable the browser cannot set.
     expect(await screen.findByText(/PUBLISH_ENABLED must also be on/)).toBeInTheDocument();
     // And campaign actions are held in the runtime regardless of this switch.
-    expect(screen.getByText(/produces a visible job failure rather than an execution/)).toBeInTheDocument();
+    expect(screen.getByText(/attested deployed handler set/)).toBeInTheDocument();
+  });
+
+  it("holds campaign action activation even if a client setting is off", async () => {
+    state.runtime = { state: "observed", workerEnabled: true,
+      controls: { campaignActions: true }, holds: { campaignActions: "Registry not attested" } };
+    render(<ClientSwitchPanel clientId="c1" />);
+    const button = await screen.findByLabelText("Switch on Execute approved campaign actions");
+    expect(button).toBeDisabled();
+    expect(screen.getByText(/Effective state: off — Registry not attested/)).toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalledWith("set_campaign_actions_enabled", expect.anything());
+  });
+
+  it("allows an AAL2-gated request when the owned worker is observed and attested", async () => {
+    state.runtime = { state: "observed", workerEnabled: true,
+      controls: { campaignActions: true }, holds: {} };
+    render(<ClientSwitchPanel clientId="c1" />);
+    const button = await screen.findByLabelText("Switch on Execute approved campaign actions");
+    expect(button).toBeEnabled();
+    await userEvent.click(button);
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_client_switch_activation_v6", {
+      p_client_id: "c1", p_switch_key: "campaign_actions",
+    }));
+  });
+
+  it("reports a requested switch as held when the runtime is unverified", async () => {
+    state.settings = { ...SETTINGS, publishing_enabled: true };
+    render(<ClientSwitchPanel clientId="c1" />);
+    expect(await screen.findByText(/Effective state: held — Runtime state has not been verified/)).toBeInTheDocument();
+    expect(screen.getByText("requested on · held")).toBeInTheDocument();
+    expect(screen.getAllByText(/Runtime dependency \(read only\): unverified/).length).toBeGreaterThan(0);
+  });
+
+  it("shows a recorded attempt separately from an external receipt", async () => {
+    state.settings = { ...SETTINGS, publishing_enabled: true };
+    state.runtime = { state: "observed", workerEnabled: true, controls: { publish: true } };
+    state.activity = {
+      publishing: {
+        lastRun: { at: "2026-11-14T08:00:00Z", status: "failed", sourceId: "post-2" },
+        lastExternalReceipt: { at: "2026-11-13T08:00:00Z", externalRef: "meta-1", externalUrl: null, sourceId: "post-1" },
+      },
+    };
+    render(<ClientSwitchPanel clientId="c1" />);
+    expect(await screen.findByText(/Last run: .*failed/)).toBeInTheDocument();
+    expect(screen.getByText(/Last external receipt: .*meta-1/)).toBeInTheDocument();
+  });
+
+  it("disables an outward switch when its executor cannot be verified", async () => {
+    render(<ClientSwitchPanel clientId="c1" />);
+    const button = await screen.findByLabelText("Switch on Publish approved posts");
+    expect(button).toBeDisabled();
+    expect(screen.getAllByText(/Last external receipt: unknown/).length).toBeGreaterThan(0);
   });
 
   it("writes a per-client switch with the client on it", async () => {
     render(<ClientSwitchPanel clientId="c1" />);
     await userEvent.click(await screen.findByLabelText("Switch on Content engine, this client"));
     await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("set_engine_enabled", { p_client_id: "c1", p_enabled: true }),
+      expect(rpc).toHaveBeenCalledWith("request_client_switch_activation_v6", { p_client_id: "c1", p_switch_key: "engine" }),
     );
   });
 
@@ -142,7 +204,7 @@ describe("every switch in one place", () => {
   it("will not offer to flip something that has not been set up", async () => {
     // No booking rules recorded, which is a different state from switched off.
     render(<ClientSwitchPanel clientId="c1" />);
-    expect(await screen.findByText("not set up")).toBeInTheDocument();
+    expect((await screen.findAllByText("not set up")).length).toBeGreaterThan(0);
     expect(screen.getByLabelText("Switch on Let prospects book a call")).toBeDisabled();
   });
 
@@ -153,9 +215,9 @@ describe("every switch in one place", () => {
     expect(button).toBeEnabled();
     await userEvent.click(button);
     await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("set_client_booking_enabled_v6", {
+      expect(rpc).toHaveBeenCalledWith("request_client_switch_activation_v6", {
         p_client_id: "c1",
-        p_enabled: true,
+        p_switch_key: "booking",
       }),
     );
   });

@@ -112,6 +112,7 @@ export function IntegrationsPanel() {
   const [snapshot, setSnapshot] = useState<{ clientId: string; rows: Integration[]; observedAtMs: number } | null>(null);
   const [pendingIngest, setPendingIngest] = useState<Record<string, number>>({});
   const [error, setError] = useState<{ clientId: string; message: string } | null>(null);
+  const [notice, setNotice] = useState<{ clientId: string; message: string } | null>(null);
   const [loadError, setLoadError] = useState<{ clientId: string; message: string } | null>(null);
   const activeClient = useRef<string | null>(null);
   const routeVisit = useRef(0);
@@ -159,6 +160,7 @@ export function IntegrationsPanel() {
     setAdSettings(null);
     setAddOpenClient(null);
     setError(null);
+    setNotice(null);
     void refresh();
     return () => {
       activeClient.current = null;
@@ -216,6 +218,29 @@ export function IntegrationsPanel() {
     if (activeIngestWrites.current.has(key)) return;
     const token = ++nextIngestToken.current;
     const visit = routeVisit.current;
+    if (enabled) {
+      activeIngestWrites.current.set(key, token);
+      setPendingIngest((prev) => ({ ...prev, [key]: token }));
+      setError(null);
+      setNotice(null);
+      const { error: requestError } = await supabase.rpc("request_integration_grant_v6", {
+        p_integration_id: integration.id,
+        p_enable_ingest: true,
+      });
+      if (activeClient.current === clientId && routeVisit.current === visit) {
+        if (requestError) setError({ clientId, message: requestError.message });
+        else setNotice({ clientId, message: `Access and daily sync review requested for ${integration.provider}. Sync remains off until an AAL2 decision.` });
+        await refresh();
+      }
+      if (activeIngestWrites.current.get(key) === token) activeIngestWrites.current.delete(key);
+      setPendingIngest((prev) => {
+        if (prev[key] !== token) return prev;
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      return;
+    }
     // A read begun before this optimistic write cannot replace its pending
     // value. The final read below reconciles all fields after confirmation.
     const evidenceGeneration = ++requestGeneration.current;
@@ -262,6 +287,21 @@ export function IntegrationsPanel() {
   if (!clientId) return <p role="alert">No client selected.</p>;
   if (!snapshot || snapshot.clientId !== clientId) return <p className="text-sm text-muted-foreground">Loading integrations…</p>;
 
+  const requestAccessReview = async (integration: Integration) => {
+    if (!clientId || activeClient.current !== clientId || integration.client_id !== clientId) return;
+    setError(null);
+    setNotice(null);
+    const visit = routeVisit.current;
+    const { error: requestError } = await supabase.rpc("request_integration_grant_v6", {
+      p_integration_id: integration.id,
+      p_enable_ingest: false,
+    });
+    if (activeClient.current !== clientId || routeVisit.current !== visit) return;
+    if (requestError) setError({ clientId, message: requestError.message });
+    else setNotice({ clientId, message: `Access review requested for ${integration.provider}. The credential remains unavailable until an AAL2 decision.` });
+    await refresh();
+  };
+
   // The credentials onboarding asks for, and whether they have arrived. Read
   // from the same list onboarding scores itself against, so the two cannot
   // disagree about what "credentials collected" means.
@@ -293,6 +333,7 @@ export function IntegrationsPanel() {
           {error.message}
         </p>
       )}
+      {notice?.clientId === clientId && <p role="status" className="mb-3 rounded-md bg-muted px-3 py-2 text-sm text-foreground">{notice.message}</p>}
 
       <section aria-label="Provider access evidence" className="mb-4 rounded-lg border border-border bg-card p-4">
         <h3 className="text-sm font-semibold text-card-foreground">Provider access evidence</h3>
@@ -337,8 +378,14 @@ export function IntegrationsPanel() {
                     : "bg-muted text-foreground",
               )}
             >
-              {r.status}
+              {r.status.replaceAll("_", " ")}
             </span>
+            {r.status === "pending_grant" && (
+              <button type="button" onClick={() => void requestAccessReview(r)}
+                className="block text-xs text-brand-strong hover:underline">
+                Request access review
+              </button>
+            )}
             {/* metrics_ingest and token_health both write this timestamp. */}
             {dateLabel(r.last_checked_at) &&
               <span className="block text-xs text-muted-foreground">Last recorded integration activity {dateLabel(r.last_checked_at)}</span>}
@@ -397,8 +444,9 @@ export function IntegrationsPanel() {
       {rows.some((r) => SYNCS[r.provider]) && (
         <p className="mt-3 text-xs text-muted-foreground">
           Daily sync runs at 03:15 UTC and re-pulls the last 7 days, because these numbers keep
-          moving for about a week after the fact. Turning it off stops the schedule; you can still
-          pull a window by hand below.
+          moving for about a week after the fact. Replacing a credential turns daily sync off and
+          clears its old health check. Turning it on requests an AAL2 access review; turning it off stops the schedule. You can still pull a
+          window by hand below.
         </p>
       )}
 
@@ -413,7 +461,7 @@ export function IntegrationsPanel() {
           setAdSettings((prev) => prev === adSettings ? null : prev);
         }}
         title="Meta ad settings"
-        intro="What building ads in Meta needs beyond the credential. Ads are always built paused; launching happens in Ads Manager."
+        intro="What building ads in Meta needs beyond the credential. Changing the Page or Pixel pauses credential use until a new access review. Ads are built paused; launching happens in Ads Manager."
         fields={META_AD_FIELDS}
         initialValues={adSettingsValues}
         submitLabel="Save"
@@ -462,7 +510,7 @@ export function IntegrationsPanel() {
             p_provider: v.provider as string,
             p_label: (v.credential_label as string)?.trim() || "default",
             p_secret: v.secret as string,
-            p_access_level: (v.access_level as string) || undefined,
+            p_access_level: (v.access_level as string) || "read",
           });
           if (error) throw new Error(error.message);
         }}

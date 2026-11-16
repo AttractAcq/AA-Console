@@ -17,10 +17,11 @@
  *
  * UNPROVEN, AND SAYING SO
  *
- * The existing source decisions have no exact AAL2 Approval Inbox binding
- * or last-moment prewrite verifier. The worker stays held before any claim,
- * credential read or provider call. The adapter code remains available for
- * later integration and testing, but it does not establish live acceptance.
+ * Current Google source decisions have exact AAL2 Inbox binding, a local
+ * prewrite predicate and a one-shot attempt ledger. This worker still uses
+ * the legacy claim/record functions and stays held before any claim,
+ * credential read or provider call. The v1 adapter and its readback path
+ * are tested in isolation; they do not establish live acceptance.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -131,11 +132,34 @@ export async function applyProfileChanges(
         );
       }
 
+      const { data: source, error: sourceError } = await sb.from("google_profile_changes")
+        .select("client_id,field,current_value,proposed_value,status")
+        .eq("id", change.change_id).eq("client_id", change.client_id).maybeSingle();
+      if (sourceError || !source || source.status !== "approved"
+        || source.field !== change.field || source.proposed_value !== change.proposed_value) {
+        throw new PlacementTransportError("The claimed profile proposal is no longer current.", false);
+      }
+
       const { externalRef } = await patchLocationField({
         accessToken: token,
         accountRef: change.location_ref,
         field: change.field,
         value: change.proposed_value,
+        currentValue: source.current_value,
+        assertPrewrite: async () => {
+          const { data: allowed, error: gateError } = await sb.rpc(
+            "google_profile_prewrite_current_v6", { p_change_id: change.change_id },
+          );
+          if (gateError || allowed !== true) {
+            throw new PlacementTransportError("The exact Google profile decision is no longer current.", false);
+          }
+          const { data: liveToken, error: tokenCheckError } = await sb.rpc("integration_secret", {
+            p_client_id: change.client_id, p_provider: "google_business",
+          });
+          if (tokenCheckError || liveToken !== token) {
+            throw new PlacementTransportError("The Google Business credential changed before PATCH.", false);
+          }
+        },
         fetchImpl,
       });
 
@@ -145,8 +169,8 @@ export async function applyProfileChanges(
       } as never);
       if (recordError) {
         throw new PlacementTransportError(
-          `Changed, but could not record it: ${recordError.message}`,
-          true,
+          `Google readback confirmed the change, but local recording failed: ${recordError.message}. Reconcile before retrying.`,
+          false,
         );
       }
 

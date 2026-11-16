@@ -161,17 +161,10 @@ export function GenerationPanel({ watchJobs = true, refreshToken, showJourney = 
     setNotice(null);
     try {
       if (action === "approve") {
-        const { data, error } = await supabase
-          .from("client_ideas")
-          .update({ status: "approved" })
-          .eq("id", ideaId)
-          .eq("client_id", clientId)
-          .eq("status", "draft")
-          .select("id")
-          .single();
+        const { data, error } = await supabase.rpc("request_human_idea_review_v6", { p_idea_id: ideaId });
         if (error) throw error;
-        if (!data) throw new Error("This idea is no longer a draft. Refresh and try again.");
-        setNotice({ kind: "ok", text: "Idea approved." });
+        if (!data) throw new Error("This idea is no longer reviewable. Refresh and try again.");
+        setNotice({ kind: "ok", text: "Exact idea review requested in Approval Inbox." });
       } else {
         const { error } = await supabase.rpc("approve_idea_and_generate_brief", { p_idea_id: ideaId });
         if (error) throw error;
@@ -374,13 +367,13 @@ export function GenerationPanel({ watchJobs = true, refreshToken, showJourney = 
             busy={busyAction?.ideaId === i.id}
             items={[
               ...(i.status === "draft"
-                ? [{ label: "Approve", busyLabel: "Approving…", onSelect: () => void actOnIdea(i.id, "approve") }]
+                ? [{ label: "Request idea review", busyLabel: "Requesting…", onSelect: () => void actOnIdea(i.id, "approve") }]
                 : []),
-              ...(i.status === "draft" || i.status === "approved"
+              ...(i.status === "approved"
                 ? [{
-                    label: i.status === "draft" ? "Approve & brief" : "Brief",
+                    label: "Brief",
                     busyLabel: "Queueing…",
-                    onSelect: () => void actOnIdea(i.id, i.status === "draft" ? "approve-and-brief" : "brief"),
+                    onSelect: () => void actOnIdea(i.id, "brief"),
                   }]
                 : []),
               ...(i.body ? [{ label: "View source and direction", onSelect: () => setViewing(i) }] : []),

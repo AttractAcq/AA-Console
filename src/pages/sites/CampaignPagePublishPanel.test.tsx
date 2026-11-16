@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -11,8 +11,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * a green row with a footnote.
  */
 
-const { from } = vi.hoisted(() => ({ from: vi.fn() }));
+const { from, callRuntime } = vi.hoisted(() => ({ from: vi.fn(), callRuntime: vi.fn() }));
 vi.mock("../../lib/supabase", () => ({ supabase: { from } }));
+vi.mock("../../lib/callRuntime", () => ({ callRuntime }));
 vi.mock("react-router-dom", () => ({
   useParams: () => ({ clientId: "client-1" }),
   Link: ({ to, children }: { to: string; children: unknown }) =>
@@ -34,6 +35,7 @@ const publication = (over: Record<string, unknown> = {}) => ({
   revision_id: "rev-1", published_url: "https://harbourhome.co.uk/garage-survey",
   commit_sha: "a41f9cdef", rendered_sha256: "7b31c9f0".repeat(8),
   probe_status: "passed", probe_detail: null, probe_lead_id: "lead-1",
+  probe_kind: "browser_form",
   probed_at: "2026-10-24T10:00:00Z", published_at: "2026-10-24T09:55:00Z", ...over,
 });
 
@@ -54,6 +56,7 @@ function database(due: unknown[], publications: unknown[] = []) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  callRuntime.mockResolvedValue({ ok: true, passed: true, detail: "Endpoint passed." });
 });
 
 describe("published is not the same as working", () => {
@@ -74,6 +77,27 @@ describe("published is not the same as working", () => {
       await screen.findByText("Published. Nobody has tested the form yet."),
     ).toBeInTheDocument();
     expect(screen.queryByText("Live and tested.")).not.toBeInTheDocument();
+  });
+
+  it("shows an endpoint pass without counting the browser form as tested", async () => {
+    database([
+      row({ blocker: "Published. Capture endpoint passed; browser form unverified." }),
+    ], [publication({ probe_kind: "endpoint" })]);
+    render(<CampaignPagePublishPanel />);
+    expect(await screen.findByText(/0 live and tested/)).toBeInTheDocument();
+    expect(screen.getByText(/1 endpoint checked, browser form unverified/)).toBeInTheDocument();
+    expect(screen.getByText("Published. Capture endpoint passed; browser form unverified.")).toBeInTheDocument();
+    expect(screen.getByText("endpoint passed; browser form unverified")).toBeInTheDocument();
+  });
+
+  it("can recheck a failed capture endpoint without republishing the page", async () => {
+    database([row({ blocker: "Published, but the capture endpoint probe failed: endpoint disabled.", probe_status: "failed" })],
+      [publication({ probe_kind: "endpoint", probe_status: "failed" })]);
+    render(<CampaignPagePublishPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "Recheck capture" }));
+    await waitFor(() => expect(callRuntime).toHaveBeenCalledWith(
+      "/admin/sites/recheck-page-capture", { publicationId: "pub-1" },
+    ));
   });
 
   it("shows what the probe found when it failed", async () => {

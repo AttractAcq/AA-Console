@@ -24,7 +24,7 @@ beforeEach(() => {
     if (table === "client_integrations") return chain(null, {
       status: "connected", ad_account_id: "act_123", meta_page_id: "456", meta_pixel_id: "789",
     });
-    if (table === "client_media_assets") return chain([{
+    if (table === "recruitment_media_ready_v6") return chain([{
       id: "asset-1", brief_id: "brief-1", title: "Editor image", media_type: "image",
       content_format: "single", storage_path: "hiring/ad.png",
     }]);
@@ -36,7 +36,7 @@ beforeEach(() => {
   });
 });
 
-it("selects approved AA ads and records a held Inbox request without promising a Meta build", async () => {
+it("selects current Inbox-cleared AA ads and records a held request", async () => {
   render(<RecruitmentDistributionPanel />);
   expect(await screen.findByText(/Connected: act_123/)).toBeInTheDocument();
   fireEvent.change(screen.getByRole("textbox", { name: "Campaign name" }), { target: { value: "Editor hiring" } });
@@ -50,6 +50,17 @@ it("selects approved AA ads and records a held Inbox request without promising a
   }));
   expect(await screen.findByRole("status")).toHaveTextContent(/No Meta objects were created/i);
   expect(screen.getByRole("link", { name: "Open Approval Inbox" })).toHaveAttribute("href", "/approvals");
+});
+
+it("withholds legacy approved images without a current exact signoff", async () => {
+  const base = from.getMockImplementation()!;
+  from.mockImplementation((table: string) => table === "recruitment_media_ready_v6"
+    ? chain([]) : base(table));
+  render(<RecruitmentDistributionPanel />);
+  expect(await screen.findByText(/No currently Inbox-cleared recruitment image/)).toBeInTheDocument();
+  expect(screen.queryByRole("checkbox", { name: /Editor image/ })).toBeNull();
+  expect(screen.getByRole("button", { name: "Save campaign and request Inbox review" }))
+    .toBeDisabled();
 });
 
 it("allows a held request while the Meta account still needs connection", async () => {
@@ -76,7 +87,7 @@ it("flags a historical partial provider write for assisted reconciliation", asyn
   expect(screen.getByRole("link", { name: "Open in Ads Manager" })).toBeInTheDocument();
 });
 
-// If migration 133 is missing during a rollout, the approved ads and Meta
+// If migration 133 is missing during a rollout, the current ads and Meta
 // account status remain useful even while campaign requests are unavailable.
 describe("when migration 133 has not been applied", () => {
   const MISSING_TABLE = {
@@ -104,7 +115,7 @@ describe("when migration 133 has not been applied", () => {
     render(<RecruitmentDistributionPanel />);
 
     expect(await screen.findByText(/Recruitment campaign requests are unavailable/)).toBeInTheDocument();
-    // The ad list reads client_media_assets, which exists. Before the guard the
+    // The ad list reads the exact-signoff view. Before the guard the
     // whole panel collapsed into one error and showed none of this.
     expect(screen.getByText("Editor image")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();

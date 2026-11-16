@@ -17,6 +17,7 @@ import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import type { MediaAsset } from "../../lib/media";
 import { supabase } from "../../lib/supabase";
 import { VideoApprovalRoute } from "../../components/VideoApprovalRoute";
+import { requestOrdinaryMediaReview } from "../../lib/creativeReview";
 
 type ClientRow = { id: string; name: string; sector: string | null; tier: string | null };
 type ContextRow = { business_overview: string | null; main_offer: string | null };
@@ -36,6 +37,7 @@ export function ClientConsolePage() {
   const [proofOpen, setProofOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -89,17 +91,24 @@ export function ClientConsolePage() {
   async function approve(asset: MediaAsset) {
     setBusyId(asset.id);
     setError(null);
-    const { error: rpcError } = await supabase.rpc("review_media_asset", {
-      p_asset_id: asset.id,
-      p_decision: "approved",
-      p_reason: undefined,
-    });
-    setBusyId(null);
-    if (rpcError) {
-      setError(rpcError.message);
-      return;
+    setNotice(null);
+    try {
+      if (clientId && (asset.media_type === "image" || asset.media_type === "text")
+        && asset.content_format === "single" && !asset.render_path) {
+        await requestOrdinaryMediaReview(clientId, asset.id);
+        setNotice("Submitted for account-manager review of the exact file.");
+      } else {
+        const { error: rpcError } = await supabase.rpc("review_media_asset", {
+          p_asset_id: asset.id, p_decision: "approved",
+        });
+        if (rpcError) throw rpcError;
+      }
+      void refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusyId(null);
     }
-    void refresh();
   }
 
   const stats = [
@@ -133,6 +142,7 @@ export function ClientConsolePage() {
             ) : undefined
           }
         >
+          {notice && <p role="status" className="mb-3 text-sm text-primary">{notice}</p>}
           <DataTable
             columns={["Asset", "Ref", "Type", "Delivered", ""]}
             emptyLabel="Nothing is waiting on you"
@@ -145,7 +155,7 @@ export function ClientConsolePage() {
                 {videoUrls.get(asset.render_path ?? asset.storage_path) && <video controls preload="metadata"
                   className="max-h-52 max-w-xs rounded-md" aria-label={`Review ${asset.title ?? "video"}`}
                   src={videoUrls.get(asset.render_path ?? asset.storage_path)} />}
-                <VideoApprovalRoute assetId={asset.id} onFinalApprove={() => approve(asset)} />
+                <VideoApprovalRoute clientId={clientId!} assetId={asset.id} onFinalApprove={() => approve(asset)} />
               </div> : <button
                 key={asset.id}
                 type="button"
@@ -153,7 +163,9 @@ export function ClientConsolePage() {
                 onClick={() => void approve(asset)}
                 className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                {busyId === asset.id ? "Approving…" : "Approve"}
+                {busyId === asset.id ? "Submitting…" : (asset.media_type === "image" || asset.media_type === "text")
+                  && asset.content_format === "single" && !asset.render_path
+                  ? "Submit for review" : "Approve"}
               </button>,
             ])}
           />

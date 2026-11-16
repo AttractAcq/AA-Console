@@ -42,6 +42,7 @@ function database(claimed: ClaimedMessage[] = [message()], claimError?: string) 
     if (name === "claim_outbound_messages") {
       return claimError ? { data: null, error: { message: claimError } } : { data: claimed, error: null };
     }
+    if (name === "outbound_message_send_ready_v6") return { data: true, error: null };
     return { data: null, error: null };
   });
   const from = vi.fn(() => ({
@@ -87,6 +88,21 @@ describe("sending", () => {
     await deliverClaimedMessages(sb, config(), job, fetchImpl as never);
     expect(rpc).toHaveBeenCalledWith("record_outbound_message_sent",
       expect.objectContaining({ p_message_id: "m-1", p_external_id: "resend-abc" }));
+    expect(rpc).toHaveBeenCalledWith("outbound_message_send_ready_v6", { p_message_id: "m-1" });
+  });
+
+  it("never calls the provider when the last-moment database gate denies the send", async () => {
+    const { sb, rpc } = database();
+    rpc.mockImplementation(async (name: string) => name === "claim_outbound_messages"
+      ? { data: [message()], error: null }
+      : name === "outbound_message_send_ready_v6"
+        ? { data: false, error: null }
+        : { data: null, error: null });
+    const fetchImpl = ok();
+    await deliverClaimedMessages(sb, config(), job, fetchImpl as never);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledWith("record_outbound_message_failure",
+      expect.objectContaining({ p_message_id: "m-1", p_retryable: false }));
   });
 
   it("keys the provider request on the message, so a retry is not a second email", async () => {
@@ -160,6 +176,7 @@ describe("recording what happened", () => {
     const { sb, rpc } = database();
     rpc.mockImplementation(async (name: string, _args?: unknown) => {
       if (name === "claim_outbound_messages") return { data: [message()], error: null };
+      if (name === "outbound_message_send_ready_v6") return { data: true, error: null };
       if (name === "record_outbound_message_sent") {
         return { data: null, error: { message: "write failed" } };
       }

@@ -60,6 +60,8 @@ import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
 import { compositionNote, frameVerdict, isNearlyBlank, measureComposition } from "./screen.js";
 
+class RecruitmentApprovalHold extends Error {}
+
 /** Review ambiguous compositions; prevent an almost-empty frame being filed. */
 async function noteComposition(
   sb: SupabaseClient,
@@ -576,7 +578,9 @@ export async function runCreativeBuildJob(
       .from("creative_generations")
       .update({ stage: "failed", error: message, updated_at: new Date().toISOString() })
       .eq("id", generationId);
-    await sb.from("client_briefs").update({ status: "approved" }).eq("id", typed.id);
+    if (!isRecruitment) {
+      await sb.from("client_briefs").update({ status: "approved" }).eq("id", typed.id);
+    }
     return { ok: false, retryable: false, failureMessage: message };
   }
   if (config.conceptProvider === "openai" && !config.openaiApiKey) {
@@ -586,7 +590,9 @@ export async function runCreativeBuildJob(
       .from("creative_generations")
       .update({ stage: "failed", error: message, updated_at: new Date().toISOString() })
       .eq("id", generationId);
-    await sb.from("client_briefs").update({ status: "approved" }).eq("id", typed.id);
+    if (!isRecruitment) {
+      await sb.from("client_briefs").update({ status: "approved" }).eq("id", typed.id);
+    }
     return { ok: false, retryable: false, failureMessage: message };
   }
   const fail = async (message: string) => {
@@ -606,10 +612,30 @@ export async function runCreativeBuildJob(
       .select("id", { count: "exact", head: true })
       .eq("generation_id", generationId)
       .eq("status", "done");
-    if (!count) {
+    if (!count && !isRecruitment) {
       await sb.from("client_briefs").update({ status: "approved" }).eq("id", typed.id);
     }
   };
+
+  const checkRecruitmentSignoff = async () => {
+    if (!isRecruitment) return;
+    const { data, error } = await sb.rpc("recruitment_brief_signoff_current_v6", {
+      p_brief_id: typed.id,
+    });
+    if (error || data !== true) {
+      throw new RecruitmentApprovalHold(
+        "Recruitment production is held: the exact brief Inbox signoff is missing or stale.",
+      );
+    }
+  };
+
+  try {
+    await checkRecruitmentSignoff();
+  } catch (error) {
+    if (!(error instanceof RecruitmentApprovalHold)) throw error;
+    await fail(error.message);
+    return { ok: false, retryable: false, failureMessage: error.message };
+  }
 
   // ---- stage one: the concept -------------------------------------------
   await appendEvent(
@@ -751,6 +777,7 @@ Call ${submitTool.name} once when you are done.`;
       "Reusing the existing concept — no reasoning cost for this render.",
     );
   } else try {
+    await checkRecruitmentSignoff();
     if (config.conceptProvider === "openai") {
       const out = await runStructuredCompletion({
         apiKey: config.openaiApiKey as string,
@@ -787,6 +814,10 @@ Call ${submitTool.name} once when you are done.`;
       };
     }
   } catch (error) {
+    if (error instanceof RecruitmentApprovalHold) {
+      await fail(error.message);
+      return { ok: false, retryable: false, failureMessage: error.message };
+    }
     if (error instanceof ProviderError || error instanceof OpenAiError) {
       await fail(error.message);
       return { ok: false, retryable: error.retryable, failureMessage: error.message };
@@ -921,6 +952,7 @@ Call ${submitTool.name} once when you are done.`;
         identity,
         brand,
       );
+      await checkRecruitmentSignoff();
       const out = await renderImage(config, framePrompt(replacement, total, composed), {
         size: renderSize,
         quality: renderQuality,
@@ -956,7 +988,7 @@ Call ${submitTool.name} once when you are done.`;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       await fail(message);
-      return { ok: false, retryable: error instanceof RenderError ? error.retryable : true, failureMessage: message, usage };
+      return { ok: false, retryable: error instanceof RecruitmentApprovalHold ? false : error instanceof RenderError ? error.retryable : true, failureMessage: message, usage };
     }
 
     const carried = framesToCarry(sourceFrames, remake.position).map((frame) => ({
@@ -1069,6 +1101,7 @@ Call ${submitTool.name} once when you are done.`;
               String(concept.cast_anchor ?? ""), Boolean(visualReference),
               openingShots[frame.position - 1])
             : framePrompt(frame, total, composed);
+          await checkRecruitmentSignoff();
           const out = await renderImage(config, prompt, {
             size: renderSize,
             quality: renderQuality,
@@ -1103,7 +1136,7 @@ Call ${submitTool.name} once when you are done.`;
       // Stored frames survive a retry. A nearly blank frame instead stops for
       // an operator decision, so repeated paid calls cannot hide the defect.
       await fail(message);
-      return { ok: false, retryable: error instanceof RenderError ? error.retryable : true, failureMessage: message, usage };
+      return { ok: false, retryable: error instanceof RecruitmentApprovalHold ? false : error instanceof RenderError ? error.retryable : true, failureMessage: message, usage };
     }
 
     const filedFormat = openingShots ? "reel" : typed.content_format;
@@ -1190,6 +1223,7 @@ Call ${submitTool.name} once when you are done.`;
 
   let image;
   try {
+    await checkRecruitmentSignoff();
     image = await renderImage(config, imagePrompt, {
       size: renderSize,
       quality: renderQuality,
@@ -1197,6 +1231,10 @@ Call ${submitTool.name} once when you are done.`;
     });
     await noteComposition(sb, job.id, image.bytes, "render");
   } catch (error) {
+    if (error instanceof RecruitmentApprovalHold) {
+      await fail(error.message);
+      return { ok: false, retryable: false, failureMessage: error.message, usage };
+    }
     if (error instanceof RenderError) {
       // The concept survives a render failure on purpose: it is the
       // expensive half, and a retry should not pay for it twice.

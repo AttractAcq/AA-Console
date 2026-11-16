@@ -6,14 +6,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * The line this page holds.
  *
  * Brand QA and claim QA both passing means a candidate is waiting for a
- * person, not that it has shipped — so a clean candidate must read as waiting
- * and must offer Accept rather than appearing done. And a cut whose scene
+ * person, not that it has shipped — so a clean candidate must request exact
+ * Inbox review rather than appearing done. And a cut whose scene
  * cites proof that has lost its permission must be stopped and say so,
  * because the QA ran before the rights changed.
  */
 
 const { from, rpc } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }));
+const { requestMotionRenderReview } = vi.hoisted(() => ({ requestMotionRenderReview: vi.fn() }));
 vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc } }));
+vi.mock("../../lib/creativeReview", () => ({ requestMotionRenderReview }));
 vi.mock("react-router-dom", () => ({ useParams: () => ({ clientId: "client-1" }) }));
 
 import { MotionScenesPanel } from "./MotionScenesPanel";
@@ -62,6 +64,7 @@ function database(options: { projects?: unknown[]; scenes?: unknown[]; candidate
     return chain;
   });
   rpc.mockResolvedValue({ data: null, error: null });
+  requestMotionRenderReview.mockResolvedValue("request-1");
 }
 
 beforeEach(() => {
@@ -103,8 +106,8 @@ describe("scenes", () => {
 describe("candidates", () => {
   it("treats a clean candidate as waiting for a person, not as shipped", async () => {
     render(<MotionScenesPanel tab="renders" />);
-    expect(await screen.findByText("QA passed — waiting for a person")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Accept this cut" })).toBeInTheDocument();
+    expect(await screen.findByText("QA passed — request exact render review")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Request render review" })).toBeInTheDocument();
   });
 
   it("names which QA failed and offers no acceptance", async () => {
@@ -146,20 +149,13 @@ describe("candidates", () => {
     expect(screen.getAllByText("not run")).toHaveLength(2);
   });
 
-  it("accepts a cut, and needs a reason to reject one", async () => {
-    const prompt = vi.spyOn(window, "prompt").mockReturnValue("  ");
+  it("requests exact render review without a direct accept or reject", async () => {
     render(<MotionScenesPanel tab="renders" />);
-    await userEvent.click(await screen.findByRole("button", { name: "Reject" }));
-    expect(rpc).not.toHaveBeenCalled();
-    prompt.mockRestore();
-
-    await userEvent.click(screen.getByRole("button", { name: "Accept this cut" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Request render review" }));
     await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("accept_motion_candidate_v6", {
-        p_candidate_id: "cand-1",
-        p_accepted: true,
-      }),
+      expect(requestMotionRenderReview).toHaveBeenCalledWith("client-1", "cand-1"),
     );
+    expect(rpc).not.toHaveBeenCalledWith("accept_motion_candidate_v6", expect.anything());
   });
 
   it("says a candidate has not been benchmarked rather than implying it has", async () => {
