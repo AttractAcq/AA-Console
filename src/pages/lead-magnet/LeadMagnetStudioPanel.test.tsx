@@ -23,10 +23,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   fetchMagnets, fetchVersions, fetchApprovals, fetchDeliveriesDue, fetchEndpoints,
-  fetchSubmissions, requestApproval, decideApproval, revokeApproval,
+  fetchSubmissions, fetchMagnetOperatorEvents, fetchDeliverySwitch,
+  downloadAndRecordMagnetVersion, recordMagnetOperatorHandoff,
+  requestApproval, decideApproval, revokeApproval,
 } = vi.hoisted(() => ({
   fetchMagnets: vi.fn(), fetchVersions: vi.fn(), fetchApprovals: vi.fn(),
   fetchDeliveriesDue: vi.fn(), fetchEndpoints: vi.fn(), fetchSubmissions: vi.fn(),
+  fetchMagnetOperatorEvents: vi.fn(), fetchDeliverySwitch: vi.fn(),
+  downloadAndRecordMagnetVersion: vi.fn(), recordMagnetOperatorHandoff: vi.fn(),
   requestApproval: vi.fn(), decideApproval: vi.fn(), revokeApproval: vi.fn(),
 }));
 
@@ -35,6 +39,8 @@ vi.mock("../../lib/leadMagnets", async () => {
   return {
     ...actual,
     fetchMagnets, fetchVersions, fetchApprovals, fetchDeliveriesDue,
+    fetchMagnetOperatorEvents, fetchDeliverySwitch,
+    downloadAndRecordMagnetVersion, recordMagnetOperatorHandoff,
     requestApproval, decideApproval, revokeApproval,
   };
 });
@@ -109,6 +115,10 @@ beforeEach(() => {
   fetchVersions.mockResolvedValue([version()]);
   fetchApprovals.mockResolvedValue([]);
   fetchDeliveriesDue.mockResolvedValue([]);
+  fetchMagnetOperatorEvents.mockResolvedValue([]);
+  fetchDeliverySwitch.mockResolvedValue(false);
+  downloadAndRecordMagnetVersion.mockResolvedValue(undefined);
+  recordMagnetOperatorHandoff.mockResolvedValue(undefined);
   fetchEndpoints.mockResolvedValue({ endpoints: [], due: new Map() });
   fetchSubmissions.mockResolvedValue([]);
 });
@@ -237,6 +247,48 @@ describe("what is owed", () => {
     render(<LeadMagnetStudioPanel />);
     await screen.findByText("Garage conversion cost guide");
     expect(screen.getByText("2")).toBeInTheDocument();
+  });
+});
+
+describe("manual operator handoff", () => {
+  it("lets an operator verify and download an approved exact version", async () => {
+    openRow();
+    fetchApprovals.mockResolvedValue([approval({ status: "approved",
+      decided_at: "2026-10-24T10:00:00Z", decided_by: "u1" })]);
+    render(<LeadMagnetStudioPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: "Download and verify exact file" }));
+    await waitFor(() => expect(downloadAndRecordMagnetVersion).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "ver-1", content_sha256: "b".repeat(64) })));
+    expect(recordMagnetOperatorHandoff).not.toHaveBeenCalled();
+  });
+
+  it("requires a postapproval download before reporting a manual handoff", async () => {
+    openRow();
+    fetchApprovals.mockResolvedValue([approval({ status: "approved",
+      decided_at: "2026-10-24T10:00:00Z", decided_by: "u1" })]);
+    fetchMagnetOperatorEvents.mockResolvedValue([{ id: "download-1",
+      magnet_version_id: "ver-1", event_kind: "verified_download",
+      approval_id: null, occurred_at: "2026-10-24T09:00:00Z" }]);
+    render(<LeadMagnetStudioPanel />);
+    const button = await screen.findByRole("button", { name: "Record manual handoff" });
+    expect(button).toBeDisabled();
+    expect(recordMagnetOperatorHandoff).not.toHaveBeenCalled();
+  });
+
+  it("records recipient and external reference without claiming delivery", async () => {
+    openRow();
+    fetchApprovals.mockResolvedValue([approval({ status: "approved",
+      decided_at: "2026-10-24T10:00:00Z", decided_by: "u1" })]);
+    fetchMagnetOperatorEvents.mockResolvedValue([{ id: "download-1",
+      magnet_version_id: "ver-1", event_kind: "verified_download",
+      approval_id: "app-1", occurred_at: "2026-10-24T11:00:00Z" }]);
+    const prompt = vi.spyOn(window, "prompt").mockReturnValueOnce("Paid ads operator")
+      .mockReturnValueOnce("ticket-123");
+    render(<LeadMagnetStudioPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: "Record manual handoff" }));
+    await waitFor(() => expect(recordMagnetOperatorHandoff).toHaveBeenCalledWith(
+      "ver-1", "Paid ads operator", "ticket-123"));
+    prompt.mockRestore();
   });
 });
 

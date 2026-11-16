@@ -328,6 +328,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Exit gate:** representative campaign and recurring-organic assets of each supported format pass blind human review, have approved source/claim rights, and can be traced to their brief and source. Rejected work is retrievable with its reason.
 
+**Production-count source gap, 16 November 2026:** Current campaign work and daily-package items identify requested work and final accepted artifacts, but not every rejected or revised candidate is tied to its exact demand item. The asset table also lacks a universal producer-job reference across image and video paths. Do not present a combined requested/produced/rejected/revised/accepted rate by campaign, format and destination until these attempt-level links exist; counting all assets against the latest plan would mix old attempts with current demand. Add durable attempt-to-demand lineage, then aggregate from that link and human review events.
+
 ## Phase 6 — Website Studio, Sales OS and Lead Magnet Studio
 
 ### Website Studio
@@ -346,6 +348,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 - Keep opt-in, consent and owed-delivery visibility in the magnet detail and Sales Capture even though the old Opt-ins tab is archived. Do not enable delivery merely because a version is approved.
 
 **Exit gate:** an approved page and agent receive a real test submission with campaign, route, source and consent, visible in Sales and Attribution. The optional magnet can be downloaded for manual handoff and has a separately testable delivery path if enabled.
+
+**Lead-magnet operator handoff checkpoint, 16 November 2026:** A version can now be downloaded and byte-verified from its detail view after approval as well as during review. The UI records the operator's verified-download report, then permits a separately reported manual handoff only for a live exact approval, a named recipient and an external ticket or message reference. The events are append-only, retain the version and file hash, and do not create a delivery or enable its switch. Repeating a handoff reference returns the original event; using the same reference for another recipient is rejected. The detail view shows the client delivery switch, approval, reported download, reported handoff and owed deliveries separately. This is an operator report rather than an independently observed external transfer. The real page/agent submission and enabled-delivery tests in the Phase 6 exit gate remain open.
 
 ## Phase 7 — organic, proof and paid distribution; Meta and Google profiles
 

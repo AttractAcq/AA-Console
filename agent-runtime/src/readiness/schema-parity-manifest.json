@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "3533479eac59d987a33a7ca59a24425d5b17c2e91b5886c47024c4c79e734acb",
-  "generatedTypesSha256": "f2ccd996f9af8c0673ac78f7cca61dcdb078a3c65bbf5020e52dc8f87e62a935",
-  "generatedSchemaBodySha256": "4b726ab17c332307eda110765b00d85a4ca939793565fd68adb5218a5bdb1acf",
+  "migrationSourceDigest": "34a7c5e63069f232a27db213049d5b1392c4e2b551dc84a948dd87874b4bd258",
+  "generatedTypesSha256": "a81b8215fe2c99aacf3562a7146c90031780448651ae16d7d12612db85bd6160",
+  "generatedSchemaBodySha256": "a0e8f1778dcc55d2e0f3d20daf506ac1ae9c6336ec30dc3869c695dc16abbbb6",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3839,6 +3839,13 @@
       "filename": "20261122160000_531_campaign_magnet_retry.sql",
       "sha256": "4f4e52e0708d10b7be277b774d227545193c93f6434bf03cfbb382c5434d3cb8",
       "trimmedMd5": "8ef0c46abc0cee24e73c810e747db89e"
+    },
+    {
+      "version": "20261122170000",
+      "name": "532_lead_magnet_operator_handoff",
+      "filename": "20261122170000_532_lead_magnet_operator_handoff.sql",
+      "sha256": "0ef0594e360e6c4426f835eab510c31d4f6067c0eeba82b98f8abf045b743cf9",
+      "trimmedMd5": "e76b51488992857df5af6d066dd43d37"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

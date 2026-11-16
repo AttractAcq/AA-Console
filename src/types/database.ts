@@ -16399,6 +16399,95 @@ export type Database = {
           },
         ]
       }
+      lead_magnet_operator_events_v7: {
+        Row: {
+          actor_id: string
+          approval_id: string | null
+          client_id: string
+          content_sha256: string
+          event_kind: string
+          id: string
+          magnet_version_id: string
+          occurred_at: string
+          recipient: string | null
+          reference: string | null
+        }
+        Insert: {
+          actor_id: string
+          approval_id?: string | null
+          client_id: string
+          content_sha256: string
+          event_kind: string
+          id?: string
+          magnet_version_id: string
+          occurred_at?: string
+          recipient?: string | null
+          reference?: string | null
+        }
+        Update: {
+          actor_id?: string
+          approval_id?: string | null
+          client_id?: string
+          content_sha256?: string
+          event_kind?: string
+          id?: string
+          magnet_version_id?: string
+          occurred_at?: string
+          recipient?: string | null
+          reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_magnet_operator_events_v7_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_operator_events_v7_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_operator_events_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_operator_events_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_operator_events_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_operator_events_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_operator_events_v7_magnet_version_id_client_id_fkey"
+            columns: ["magnet_version_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_versions"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
       lead_magnet_versions: {
         Row: {
           client_id: string
@@ -39702,6 +39791,32 @@ export type Database = {
       record_lead_magnet_failure: {
         Args: { p_delivery_id: string; p_reason: string; p_retryable?: boolean }
         Returns: undefined
+      }
+      record_lead_magnet_operator_event_v7: {
+        Args: {
+          p_kind: string
+          p_recipient?: string
+          p_reference?: string
+          p_version_id: string
+        }
+        Returns: {
+          actor_id: string
+          approval_id: string | null
+          client_id: string
+          content_sha256: string
+          event_kind: string
+          id: string
+          magnet_version_id: string
+          occurred_at: string
+          recipient: string | null
+          reference: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "lead_magnet_operator_events_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       record_lead_magnet_sent: {
         Args: { p_delivery_id: string; p_provider_ref: string }

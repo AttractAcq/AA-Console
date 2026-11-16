@@ -21,6 +21,7 @@ export type LeadMagnet = Database["public"]["Tables"]["lead_magnets"]["Row"];
 export type LeadMagnetVersion = Database["public"]["Tables"]["lead_magnet_versions"]["Row"];
 export type LeadMagnetApproval = Database["public"]["Tables"]["lead_magnet_approvals"]["Row"];
 export type LeadMagnetDue = Database["public"]["Views"]["lead_magnet_due"]["Row"];
+export type LeadMagnetOperatorEvent = Database["public"]["Tables"]["lead_magnet_operator_events_v7"]["Row"];
 
 export const MAGNET_FORMATS = [
   { value: "pdf_guide", label: "PDF guide" },
@@ -57,6 +58,32 @@ export async function fetchVersions(clientId: string): Promise<LeadMagnetVersion
     .order("version", { ascending: false });
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+export async function fetchMagnetOperatorEvents(clientId: string): Promise<LeadMagnetOperatorEvent[]> {
+  const { data, error } = await supabase.from("lead_magnet_operator_events_v7")
+    .select("*").eq("client_id", clientId).order("occurred_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+/** The browser verifies the bytes before recording its own download report. */
+export async function downloadAndRecordMagnetVersion(version: LeadMagnetVersion): Promise<void> {
+  await downloadVerifiedMagnetFile(version.storage_path, version.content_sha256, version.file_bytes);
+  const { error } = await supabase.rpc("record_lead_magnet_operator_event_v7", {
+    p_version_id: version.id, p_kind: "verified_download",
+  });
+  if (error) throw new Error(`File downloaded, but its verification could not be recorded: ${error.message}`);
+}
+
+export async function recordMagnetOperatorHandoff(
+  versionId: string, recipient: string, reference: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("record_lead_magnet_operator_event_v7", {
+    p_version_id: versionId, p_kind: "operator_handoff",
+    p_recipient: recipient.trim(), p_reference: reference.trim(),
+  });
+  if (error) throw new Error(error.message);
 }
 
 export async function fetchApprovals(clientId: string): Promise<LeadMagnetApproval[]> {
