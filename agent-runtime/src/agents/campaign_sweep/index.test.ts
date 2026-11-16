@@ -13,7 +13,7 @@ describe("campaign sweep uses planned ideas", () => {
       content_spec_id: "spec-1", content_spec_hash: "hash-1",
       content_ideas_generated_at: "2026-11-15T00:00:00Z",
       plan_approved_fingerprint: "fingerprint-1",
-      needs_landing_page: true, needs_sales_agent: true,
+      needs_landing_page: true, needs_sales_agent: true, needs_lead_magnet: true,
     };
     const spec = { client_id: "client-1", campaign_id: "campaign-1", content_hash: "hash-1",
       pieces: [
@@ -43,6 +43,9 @@ describe("campaign sweep uses planned ideas", () => {
           page_id: "page-1", page_work_item_id: "page-work-1",
           sales_agent_id: "agent-1", sales_work_item_id: "agent-work-1",
         }, error: null };
+        if (name === "ensure_campaign_magnet_draft_v7") return { data: {
+          magnet_id: "magnet-1", work_item_id: "magnet-work-1",
+        }, error: null };
         return { data: null, error: null };
       },
     } as unknown as Parameters<typeof runCampaignSweepJob>[0];
@@ -56,14 +59,17 @@ describe("campaign sweep uses planned ideas", () => {
     expect(steps.map((step) => step.args.p_step_key)).toEqual([
       "piece1_brief", "piece1_create", "piece1_motion", "piece1_edit",
       "piece2_brief", "piece2_create", "conversion_page", "conversion_sales_agent",
+      "conversion_lead_magnet",
     ]);
     expect(steps[0]?.args).toMatchObject({ p_input_id: "idea-1", p_input_from_step_key: null });
     expect(steps[4]?.args).toMatchObject({ p_input_id: "idea-2", p_input_from_step_key: null });
     expect(calls.find((call) => call.name === "create_workflow_run")?.args.p_input_snapshot)
       .toMatchObject({ planned_idea_ids: ["idea-1", "idea-2"],
-        needs_landing_page: true, needs_sales_agent: true });
+        needs_landing_page: true, needs_sales_agent: true, needs_lead_magnet: true });
     expect(steps[7]?.args).toMatchObject({ p_step_key: "conversion_sales_agent",
       p_dependencies: ["conversion_page"], p_input_id: "agent-1" });
+    expect(steps[8]?.args).toMatchObject({ p_step_key: "conversion_lead_magnet",
+      p_dependencies: [], p_agent_key: "lead_magnet_build", p_input_id: "magnet-1" });
     expect(calls.filter((call) => call.name === "create_delivery_work_item_v6"))
       .toHaveLength(2);
     expect(calls.filter((call) => call.name === "bind_campaign_conversion_work_v7"))

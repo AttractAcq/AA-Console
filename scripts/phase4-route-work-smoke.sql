@@ -18,7 +18,7 @@ select set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 select set_config('request.jwt.claims',
   '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
 select public.set_campaign_content_spec_v7('cccccccc-cccc-4ccc-8ccc-cccccccccccc',
-  '[{"route":"organic","platform":"instagram","media_type":"image","content_format":"single"},
+  '[{"route":"organic","platform":"instagram","media_type":"video","content_format":"reel"},
     {"route":"paid","platform":"facebook","media_type":"image","content_format":"carousel"}]'::jsonb);
 select public.approve_campaign_plan_v6('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
 select set_config('request.jwt.claim.role','service_role',true);
@@ -34,6 +34,10 @@ begin
     'route-work-1','{}'::jsonb,now()+interval '1 day',cid);
   perform public.add_workflow_agent_step(run1,'piece1_create','{}',
     'creative_build','client_briefs','dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+  perform public.add_workflow_agent_step(run1,'piece1_motion','{piece1_create}',
+    'video_build','client_briefs','dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+  perform public.add_workflow_agent_step(run1,'piece1_edit','{piece1_motion}',
+    'video_edit','client_media_assets','dddddddd-dddd-4ddd-8ddd-dddddddddddd');
   perform public.add_workflow_agent_step(run1,'piece2_create','{}',
     'creative_build','client_briefs','eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
   select * into organic1 from public.ensure_campaign_route_packages_v7(cid,run1)
@@ -48,15 +52,15 @@ begin
   select id into work2 from public.create_delivery_work_item_v6(cid,paid1.id,
     null,null,'content_piece2',paid1.version,'content_production_factory',true,
     jsonb_build_object('workflow_run_id',run1),'{"artifact_kind":"asset"}'::jsonb);
-  perform public.bind_campaign_sweep_work_v7(work1,run1,'piece1','piece1_create');
+  perform public.bind_campaign_sweep_work_v7(work1,run1,'piece1','piece1_edit');
   perform public.bind_campaign_sweep_work_v7(work2,run1,'piece2','piece2_create');
   perform public.seal_workflow_run(run1);
   n:=public.sync_campaign_sweep_work_v7(10);
   if n<>2 or (select count(*) from public.delivery_work_items_v6
     where id in (work1,work2) and state='prepared')<>2 then
     raise exception 'Sealed pieces were not prepared'; end if;
-  update public.workflow_steps set status='blocked',blocker='Fix only organic source'
-    where run_id=run1 and step_key='piece1_create';
+  update public.workflow_steps set status='blocked',blocker='Video edit failed; fix only this cut'
+    where run_id=run1 and step_key='piece1_edit';
   n:=public.sync_campaign_sweep_work_v7(10);
   if n<>1 or (select state from public.delivery_work_items_v6 where id=work1)<>'held'
     or (select state from public.delivery_work_items_v6 where id=work2)<>'prepared' then
@@ -66,16 +70,16 @@ begin
   perform set_config('request.jwt.claims',
     '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
   perform public.retry_campaign_sweep_step_v7((select id from public.workflow_steps
-    where run_id=run1 and step_key='piece1_create'));
+    where run_id=run1 and step_key='piece1_edit'));
   if (select status from public.workflow_steps where run_id=run1
-      and step_key='piece1_create')<>'pending'
+      and step_key='piece1_edit')<>'pending'
     or (select status from public.workflow_steps where run_id=run1
       and step_key='piece2_create')<>'pending'
     or (select count(*) from public.campaign_sweep_step_retries_v7 where run_id=run1)<>1
     then raise exception 'Retry reset a sibling or lost its audit'; end if;
   begin
     perform public.retry_campaign_sweep_step_v7((select id from public.workflow_steps
-      where run_id=run1 and step_key='piece1_create'));
+      where run_id=run1 and step_key='piece1_edit'));
     raise exception 'A second retry reset pending work';
   exception when raise_exception then
     if sqlerrm='A second retry reset pending work' then raise; end if;
