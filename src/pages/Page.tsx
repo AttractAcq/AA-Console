@@ -232,6 +232,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     avatars: () => <TeamCategoryPanel category="avatars" />,
     editors: () => <TeamCategoryPanel category="editors" />,
     smm: () => <TeamCategoryPanel category="smm" />,
+    creative_director: () => <TeamCategoryPanel category="creative_director" />,
     recruitment: () => <RecruitmentPanel />,
     "recruitment-pages": () => <RecruitmentPagesPanel />,
     "recruitment-distribution": () => <RecruitmentDistributionPanel />,

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "./supabase";
-import type { TeamCategory } from "../data/team";
+import { isTeamCategory, type TeamCategory } from "../data/team";
 
 export type RouteScope = {
   clientId?: string;
@@ -9,10 +9,6 @@ export type RouteScope = {
   memberId?: string;
   agentId?: string;
 };
-
-function isCategory(v: string | undefined): v is TeamCategory {
-  return v === "avatars" || v === "editors" || v === "smm" || v === "creative_director";
-}
 
 /**
  * Reads the route scope from the pathname rather than useParams(), because
@@ -26,7 +22,7 @@ export function useRouteScope(): RouteScope {
 
   if (parts[0] === "clients" && parts[1]) return { clientId: parts[1] };
   if (parts[0] === "team" && parts[1] === "agents" && parts[2]) return { agentId: parts[2] };
-  if (parts[0] === "team" && isCategory(parts[1]) && parts[2]) {
+  if (parts[0] === "team" && isTeamCategory(parts[1]) && parts[2]) {
     return { category: parts[1], memberId: parts[2] };
   }
   return {};
