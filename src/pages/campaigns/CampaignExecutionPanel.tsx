@@ -618,8 +618,10 @@ export function CampaignExecutionPanel() {
     }
     if (kind === "launch") { await act("launch_campaign", campaign, () => `"${campaign.name}" is live.`); return; }
     setBusy(true);
-    const { error } = await supabase.from("client_campaigns")
-      .update({ archived_at: new Date().toISOString() }).eq("id", campaign.id).eq("client_id", clientId);
+    const { error } = await supabase.rpc("set_client_archive_v8", {
+      p_client_id: clientId, p_table_name: "client_campaigns",
+      p_record_id: campaign.id, p_archive: true,
+    });
     setBusy(false);
     if (error) setProblem(error.message);
     else if (campaignId) navigate(`/clients/${clientId}/delivery/campaign-factory`);

@@ -379,6 +379,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
                           being edited. Archiving is the separate decision
                           that it is finished with for good. */}
                       <ArchiveAction
+                        clientId={clientId}
                         table="client_sales_agents"
                         id={a.id}
                         archived={false}

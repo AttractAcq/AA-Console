@@ -569,6 +569,75 @@ export type Database = {
           },
         ]
       }
+      archive_decisions_v8: {
+        Row: {
+          acted_at: string
+          acted_by: string
+          action: string
+          archive_stamp: string | null
+          client_id: string
+          id: string
+          record_id: string
+          table_name: string
+        }
+        Insert: {
+          acted_at?: string
+          acted_by: string
+          action: string
+          archive_stamp?: string | null
+          client_id: string
+          id?: string
+          record_id: string
+          table_name: string
+        }
+        Update: {
+          acted_at?: string
+          acted_by?: string
+          action?: string
+          archive_stamp?: string | null
+          client_id?: string
+          id?: string
+          record_id?: string
+          table_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "archive_decisions_v8_acted_by_fkey"
+            columns: ["acted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "archive_decisions_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "archive_decisions_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "archive_decisions_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "archive_decisions_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       archived_leads: {
         Row: {
           archived_at: string
@@ -43275,6 +43344,15 @@ export type Database = {
       set_campaign_route_volumes_v6: {
         Args: { p_campaign_id: string; p_organic: number; p_paid: number }
         Returns: undefined
+      }
+      set_client_archive_v8: {
+        Args: {
+          p_archive: boolean
+          p_client_id: string
+          p_record_id: string
+          p_table_name: string
+        }
+        Returns: string
       }
       set_client_booking_enabled_v6: {
         Args: { p_client_id: string; p_enabled: boolean }

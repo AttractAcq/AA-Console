@@ -499,6 +499,7 @@ export function PageBuilderPanel({
                       every time somebody reaches for Delete on a finished
                       page, and it keeps the page and its published URL. */}
                   <ArchiveAction
+                    clientId={clientId}
                     table="client_pages"
                     id={p.id}
                     archived={false}

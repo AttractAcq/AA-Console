@@ -100,6 +100,7 @@ export async function loadUpstreamRecords(
     .select("domain, item_key, title, body")
     .eq("client_id", clientId)
     .in("domain", domains)
+    .is("archived_at", null)
     .order("domain")
     .order("display_order");
   if (error) throw new Error(`Failed to load upstream records: ${error.message}`);
@@ -256,11 +257,14 @@ export async function persistRecords(
 ): Promise<PersistResult> {
   const { clientId, domain, jobId, templates, sections, period = null } = args;
 
-  const { data: existing, error: existingError } = await sb
+  const existingQuery = sb
     .from("client_agent_records")
-    .select("item_key, edited_at")
+    .select("id, item_key, edited_at")
     .eq("client_id", clientId)
-    .eq("domain", domain);
+    .eq("domain", domain)
+    .is("archived_at", null);
+  const { data: existing, error: existingError } = await (period === null
+    ? existingQuery.is("period", null) : existingQuery.eq("period", period));
   if (existingError) throw new Error(`Failed to read existing records: ${existingError.message}`);
 
   const humanEdited = new Set(
@@ -282,11 +286,22 @@ export async function persistRecords(
       status: "draft" as const,
     }));
 
-  if (rows.length > 0) {
-    const { error } = await sb
-      .from("client_agent_records")
-      .upsert(rows, { onConflict: "client_id,domain,item_key,period" });
-    if (error) throw new Error(`Failed to write records: ${error.message}`);
+  // The archived version is immutable history. A rerun updates an active
+  // section or inserts a new version; it never upserts into an archived row.
+  const activeByKey = new Map((existing ?? []).map((r) => [r.item_key, r.id]));
+  for (const row of rows) {
+    const activeId = activeByKey.get(row.item_key);
+    if (activeId) {
+      const { data, error } = await sb.from("client_agent_records")
+        .update({ job_id: jobId, item_type: row.item_type, title: row.title,
+          body: row.body, display_order: row.display_order, status: "draft" })
+        .eq("id", activeId).eq("client_id", clientId).is("archived_at", null)
+        .select("id").single();
+      if (error || !data) throw new Error(`Failed to update active record: ${error?.message ?? row.item_key}`);
+    } else {
+      const { error } = await sb.from("client_agent_records").insert(row);
+      if (error) throw new Error(`Failed to create active record: ${error.message}`);
+    }
   }
 
   const preserved = [...humanEdited];

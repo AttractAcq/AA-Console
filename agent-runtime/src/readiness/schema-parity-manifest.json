@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "1b4e7cbf891c6645c58feca8a41ccf8d69f1147d9289d28e689213b6e0941e8d",
-  "generatedTypesSha256": "fb4fd700a1c8ee196a7ec3a28704048add49e0044d20b9990e9625907cb79101",
-  "generatedSchemaBodySha256": "01a2122be8a62a84112433436a806bd5ee265643f2c7152c6452f313c7c3b0de",
+  "migrationSourceDigest": "a7e91dc242013bde4bf0576bfb5388bb809fa0d68d85e45acc7f34a248cb5338",
+  "generatedTypesSha256": "80d9983544f617cec815f6a3b096ad9a7403effd40902fffc935ad044bedc1b8",
+  "generatedSchemaBodySha256": "8f967c3b65b7f83c652605ae44bf76075f2e76e5af79d6d210d5e68da8712774",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3930,6 +3930,20 @@
       "filename": "20261123050000_544_attribution_coverage.sql",
       "sha256": "385d803e2cef53b91928b0bddf5b65cd732c475b111464b4bf19c5b139617948",
       "trimmedMd5": "a078fdec32b7da4c6276671207847a63"
+    },
+    {
+      "version": "20261123060000",
+      "name": "545_archive_action_gate",
+      "filename": "20261123060000_545_archive_action_gate.sql",
+      "sha256": "e04d314723e1d7214b7c5be6ca1e7e43c7800530529b414bb86c37862a5a8fe0",
+      "trimmedMd5": "e4a17f65cb1a67c759bc788a391ce8ee"
+    },
+    {
+      "version": "20261123070000",
+      "name": "546_model_archive_versions",
+      "filename": "20261123070000_546_model_archive_versions.sql",
+      "sha256": "55a82fc338e3adc617f831a96089debe637cf4a4d8c892b739c9334132b2717b",
+      "trimmedMd5": "c85fa2a172fd5f1775095ddf5343dafe"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

@@ -567,6 +567,19 @@ function opportunityActions({
         }
       },
     },
+    ...(clientId ? [{
+      label: "Archive",
+      onSelect: () => {
+        if (!window.confirm("Archive this opportunity? This files the record; it does not stop a live campaign.")) return;
+        void onAct(o.id, async () => {
+          const { error } = await supabase.rpc("set_client_archive_v8", {
+            p_client_id: clientId, p_table_name: "market_opportunities",
+            p_record_id: o.id, p_archive: true,
+          });
+          if (error) throw error;
+        }, "Opportunity archived. Its history remains in Archive.");
+      },
+    }] : []),
   ];
 }
 

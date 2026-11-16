@@ -258,6 +258,16 @@ export function LeadMagnetStudioPanel() {
                         void act(magnet.id, () => requestApproval(newest.id), "Sent for approval."),
                     }]
                   : []),
+                { label: "Archive", onSelect: () => {
+                  if (!clientId || !window.confirm("Archive this magnet? Existing delivery obligations remain owed.")) return;
+                  void act(magnet.id, async () => {
+                    const { error } = await supabase.rpc("set_client_archive_v8", {
+                      p_client_id: clientId, p_table_name: "lead_magnets",
+                      p_record_id: magnet.id, p_archive: true,
+                    });
+                    if (error) throw error;
+                  }, "Magnet archived. Existing deliveries remain owed.");
+                } },
               ]}
             />
           );

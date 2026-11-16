@@ -250,6 +250,7 @@ export function SimpleArchivePanel({ domain }: { domain: ArchiveDomain }) {
           ) : (
             <ArchiveAction
               key="x"
+              clientId={clientId}
               table={domain.table}
               id={row.id}
               archived

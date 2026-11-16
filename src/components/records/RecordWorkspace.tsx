@@ -11,6 +11,7 @@ import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
 import { cn } from "../../lib/cn";
 import { AgentActivityBar } from "../agents/AgentActivityBar";
+import { ArchiveAction } from "../ArchiveAction";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 
 type RecordDomain = Database["public"]["Enums"]["record_domain"];
@@ -95,6 +96,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [runOpen, setRunOpen] = useState(false);
   const [editing, setEditing] = useState<{ itemKey: string; title: string; body: string } | null>(
     null,
@@ -273,6 +275,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
           {job.error}
         </p>
       )}
+      {actionError && <p role="alert" className="mb-4 text-sm text-destructive">{actionError}</p>}
 
       {displayTemplates.length === 0 ? (
         <EmptyState label="No template or record defined for this domain" />
@@ -339,6 +342,10 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
                     className="rounded text-xs font-medium text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     Review source
                   </button>}
+                  {record && clientId && <ArchiveAction clientId={clientId}
+                    table="client_agent_records" id={record.id} archived={false}
+                    noun="model section" onDone={() => { setActionError(null); void loadRecords(); }}
+                    onError={setActionError} />}
                   <button
                     type="button"
                     onClick={() =>
