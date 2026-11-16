@@ -39767,6 +39767,28 @@ export type Database = {
         Args: { p_email: string; p_phone: string }
         Returns: string
       }
+      lead_journey_trace_v8: {
+        Args: { p_client_id: string; p_days?: number; p_limit?: number }
+        Returns: {
+          asset_id: string
+          asset_title: string
+          campaign_id: string
+          campaign_mode: string
+          campaign_name: string
+          cash_collected: number
+          lead_created_at: string
+          lead_id: string
+          lead_stage: string
+          offer_version_id: string
+          opportunity_ids: string[]
+          outcome_events: number
+          page_id: string
+          page_title: string
+          sale_value: number
+          sales_agent_id: string
+          source_channel: string
+        }[]
+      }
       lead_magnet_inbox_preview_v6: {
         Args: {
           p_approval: Database["public"]["Tables"]["lead_magnet_approvals"]["Row"]

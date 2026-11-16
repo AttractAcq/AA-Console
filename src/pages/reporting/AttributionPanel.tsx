@@ -47,6 +47,26 @@ type Coverage = {
   latest_google_read_at: string | null;
 };
 
+type Journey = {
+  lead_id: string;
+  lead_created_at: string;
+  lead_stage: string;
+  source_channel: string | null;
+  campaign_id: string | null;
+  campaign_name: string | null;
+  campaign_mode: string | null;
+  opportunity_ids: string[];
+  offer_version_id: string | null;
+  asset_id: string | null;
+  asset_title: string | null;
+  page_id: string | null;
+  page_title: string | null;
+  sales_agent_id: string | null;
+  sale_value: number | null;
+  cash_collected: number | null;
+  outcome_events: number;
+};
+
 const WINDOWS = [
   { days: 7, label: "7 days" },
   { days: 30, label: "30 days" },
@@ -69,6 +89,7 @@ export function AttributionPanel() {
   const [funnel, setFunnel] = useState<Funnel | null>(null);
   const [top, setTop] = useState<TopContent[]>([]);
   const [coverage, setCoverage] = useState<Coverage | null>(null);
+  const [journeys, setJourneys] = useState<Journey[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,21 +99,23 @@ export function AttributionPanel() {
       return;
     }
     setLoading(true);
-    const [f, t, c] = await Promise.all([
+    const [f, t, c, j] = await Promise.all([
       supabase.rpc("acquisition_funnel", { p_client_id: clientId, p_days: days }),
       supabase.rpc("top_content_by_revenue", { p_client_id: clientId, p_limit: 10 }),
       supabase.rpc("acquisition_coverage_v8", { p_client_id: clientId, p_days: days }),
+      supabase.rpc("lead_journey_trace_v8", { p_client_id: clientId, p_days: days, p_limit: 50 }),
     ]);
-    if (f.error || t.error || c.error || !f.data?.[0] || !c.data?.[0]) {
-      setError(f.error?.message ?? t.error?.message ?? c.error?.message
+    if (f.error || t.error || c.error || j.error || !f.data?.[0] || !c.data?.[0]) {
+      setError(f.error?.message ?? t.error?.message ?? c.error?.message ?? j.error?.message
         ?? "Attribution data is unavailable.");
-      setFunnel(null); setTop([]); setCoverage(null); setLoading(false);
+      setFunnel(null); setTop([]); setCoverage(null); setJourneys([]); setLoading(false);
       return;
     }
     setError(null);
     setFunnel(f.data[0] as Funnel);
     setTop((t.data ?? []) as TopContent[]);
     setCoverage(c.data[0] as Coverage);
+    setJourneys((j.data ?? []) as Journey[]);
     setLoading(false);
   }, [clientId, days]);
 
@@ -140,6 +163,22 @@ export function AttributionPanel() {
           </button>
         ))}
       </div>
+
+      <section>
+        <h2 className="mb-2 text-sm font-semibold text-foreground">Recorded lead journeys</h2>
+        <p className="mb-3 text-xs text-muted-foreground">Latest 50 non-test leads in this window. A campaign mode does not prove which route package or provider action caused a lead. Unknown links remain unknown; archived source records remain traceable. Lead sale and cash amounts have no stored currency.</p>
+        <DataTable columns={["Lead", "Source", "Campaign", "Opportunity / offer", "Asset / page / agent", "Outcome", "Recorded sale / cash"]}
+          emptyLabel="No recorded lead journeys in this window."
+          rows={journeys.map((j) => [
+            <span title={j.lead_id}>{j.lead_id.slice(0, 8)} · {new Date(j.lead_created_at).toLocaleDateString()}</span>,
+            j.source_channel ?? "unknown",
+            j.campaign_id ? <span title={j.campaign_id}>{j.campaign_name ?? j.campaign_id.slice(0, 8)}{j.campaign_mode ? ` · ${j.campaign_mode}` : ""}</span> : "unknown",
+            <span>{j.opportunity_ids.length ? `${j.opportunity_ids.length} linked` : "opportunity unknown"}<br />{j.offer_version_id ? <span title={j.offer_version_id}>offer {j.offer_version_id.slice(0, 8)}</span> : "offer unknown"}</span>,
+            <span>{j.asset_id ? <span title={j.asset_id}>{j.asset_title ?? `asset ${j.asset_id.slice(0, 8)}`}</span> : "asset unknown"}<br />{j.page_id ? <span title={j.page_id}>{j.page_title ?? `page ${j.page_id.slice(0, 8)}`}</span> : "page unknown"}<br />{j.sales_agent_id ? <span title={j.sales_agent_id}>agent {j.sales_agent_id.slice(0, 8)}</span> : "agent unknown"}</span>,
+            <span>{j.lead_stage}{j.outcome_events ? ` · ${j.outcome_events} outcome event${j.outcome_events === 1 ? "" : "s"}` : " · no outcome event"}</span>,
+            `${j.sale_value === null ? "unknown" : Number(j.sale_value).toLocaleString()} / ${j.cash_collected === null ? "unknown" : Number(j.cash_collected).toLocaleString()}`,
+          ])} />
+      </section>
 
       <div>
         <h2 className="mb-3 text-sm font-semibold text-foreground">The chain</h2>

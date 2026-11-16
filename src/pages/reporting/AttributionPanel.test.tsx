@@ -38,10 +38,11 @@ const coverage = (over: Record<string, unknown> = {}) => ({
 });
 
 function show(f: Record<string, unknown> | null = funnel(), top: unknown[] = [content()],
-  c: Record<string, unknown> = coverage()) {
+  c: Record<string, unknown> = coverage(), journeys: unknown[] = []) {
   rpc.mockImplementation((name: string) =>
     Promise.resolve({ data: name === "acquisition_funnel" ? (f ? [f] : [])
-      : name === "acquisition_coverage_v8" ? [c] : top, error: null }),
+      : name === "acquisition_coverage_v8" ? [c]
+        : name === "lead_journey_trace_v8" ? journeys : top, error: null }),
   );
   return render(<AttributionPanel />);
 }
@@ -67,6 +68,26 @@ describe("the chain", () => {
     show();
     expect(await screen.findByText("The photo nobody shows you")).toBeInTheDocument();
     expect(screen.getByText("Show the ordinary one")).toBeInTheDocument();
+  });
+});
+
+describe("recorded lead journeys", () => {
+  it("keeps missing source links unknown while showing recorded cash and outcome evidence", async () => {
+    show(funnel(), [content()], coverage(), [{
+      lead_id: "12345678-1111-4111-8111-111111111111",
+      lead_created_at: "2026-11-15T12:00:00Z", lead_stage: "cash",
+      source_channel: "organic", campaign_id: null, campaign_name: null,
+      campaign_mode: null, opportunity_ids: [], offer_version_id: null,
+      asset_id: null, asset_title: null, page_id: null, page_title: null,
+      sales_agent_id: null, sale_value: 12000, cash_collected: 9000,
+      outcome_events: 1,
+    }]);
+    const journeys = within((await screen.findByRole("heading", { name: "Recorded lead journeys" })).parentElement as HTMLElement);
+    expect(journeys.getByText(/12345678/)).toBeInTheDocument();
+    expect(journeys.getByText(/opportunity unknown/)).toBeInTheDocument();
+    expect(journeys.getByText(/asset unknown/)).toBeInTheDocument();
+    expect(journeys.getByText("cash · 1 outcome event")).toBeInTheDocument();
+    expect(journeys.getByText("12,000 / 9,000")).toBeInTheDocument();
   });
 });
 

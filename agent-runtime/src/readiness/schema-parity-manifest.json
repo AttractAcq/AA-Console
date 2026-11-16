@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "a7e91dc242013bde4bf0576bfb5388bb809fa0d68d85e45acc7f34a248cb5338",
-  "generatedTypesSha256": "80d9983544f617cec815f6a3b096ad9a7403effd40902fffc935ad044bedc1b8",
-  "generatedSchemaBodySha256": "8f967c3b65b7f83c652605ae44bf76075f2e76e5af79d6d210d5e68da8712774",
+  "migrationSourceDigest": "eb4a938dc7136067aa9edae596f8b251d19f9185eb7f5777d9d756bba5695d9e",
+  "generatedTypesSha256": "d17ae0974a240dd9096db45b563354916e1810f3c54cf1bbbe7bf1bf8a555162",
+  "generatedSchemaBodySha256": "5cab5f30d2fe66708d8d01e2040b7f61678f98a64e25f2b98638159defb5b9bf",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3944,6 +3944,13 @@
       "filename": "20261123070000_546_model_archive_versions.sql",
       "sha256": "55a82fc338e3adc617f831a96089debe637cf4a4d8c892b739c9334132b2717b",
       "trimmedMd5": "c85fa2a172fd5f1775095ddf5343dafe"
+    },
+    {
+      "version": "20261123080000",
+      "name": "547_lead_journey_trace",
+      "filename": "20261123080000_547_lead_journey_trace.sql",
+      "sha256": "d215493694edff7dc5f986270c3b446dcc3906ff4f97970847fa9e08c79abe62",
+      "trimmedMd5": "80b54f340f18b9184c5af09f9154905c"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
