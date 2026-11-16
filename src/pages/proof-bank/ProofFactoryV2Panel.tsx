@@ -30,6 +30,17 @@ type Raw = Database["public"]["Tables"]["client_proof_assets"]["Row"];
 type Brief = Database["public"]["Tables"]["client_briefs"]["Row"];
 type Request = Database["public"]["Tables"]["proof_production_requests"]["Row"];
 type Job = { id: string; status: string; error: string | null };
+type ProductionCounts = {
+  request_id: string; attempts: number; produced: number; rejected: number;
+  revised: number; awaiting_review: number; human_approved: number;
+  render_cost_usd: number | null;
+};
+type ProductionAttempt = {
+  attempt_id: string; request_id: string; asset_id: string | null;
+  attempt_kind: string; attempt_status: string; cost_usd: number | null;
+  latency_seconds: number | null; revised: boolean;
+  human_review_status: string | null;
+};
 const button =
   "rounded-md border border-border px-3 py-2 text-sm hover:bg-accent disabled:opacity-50";
 const primary =
@@ -58,6 +69,9 @@ function ProofProductionWorkspace({
   const [briefs, setBriefs] = useState<Brief[]>([]);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [requests, setRequests] = useState<Request[]>([]);
+  const [counts, setCounts] = useState<ProductionCounts[]>([]);
+  const [attempts, setAttempts] = useState<ProductionAttempt[]>([]);
+  const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const urls = useSignedPreviewPaths("client-media", assets.map((asset) => asset.render_path || asset.storage_path));
   const [textBodies, setTextBodies] = useState<Map<string, string>>(new Map());
@@ -101,7 +115,7 @@ function ProofProductionWorkspace({
       if (r.error || b.error || q.error) throw r.error ?? b.error ?? q.error;
       const bs = b.data ?? [],
         qs = q.data ?? [];
-      const [a, j] = await Promise.all([
+      const [a, j, countResult, attemptResult] = await Promise.all([
         bs.length
           ? supabase
               .from("client_media_assets")
@@ -123,12 +137,25 @@ function ProofProductionWorkspace({
                 qs.flatMap((x) => (x.job_id ? [x.job_id] : [])),
               )
           : Promise.resolve({ data: [], error: null }),
+        qs.length
+          ? supabase.from("proof_production_counts_v7")
+              .select("request_id, attempts, produced, rejected, revised, awaiting_review, human_approved, render_cost_usd")
+              .eq("client_id", clientId).in("request_id", qs.map((x) => x.id))
+          : Promise.resolve({ data: [], error: null }),
+        qs.length
+          ? supabase.from("proof_production_attempts_v7")
+              .select("attempt_id, request_id, asset_id, attempt_kind, attempt_status, cost_usd, latency_seconds, revised, human_review_status")
+              .eq("client_id", clientId).in("request_id", qs.map((x) => x.id))
+          : Promise.resolve({ data: [], error: null }),
       ]);
-      if (a.error || j.error) throw a.error ?? j.error;
+      if (a.error || j.error || countResult.error || attemptResult.error)
+        throw a.error ?? j.error ?? countResult.error ?? attemptResult.error;
       const rows = (a.data ?? []) as MediaAsset[];
       setRaw(r.data ?? []);
       setBriefs(bs);
       setRequests(qs);
+      setCounts((countResult.data ?? []) as ProductionCounts[]);
+      setAttempts((attemptResult.data ?? []) as ProductionAttempt[]);
       setJobs(j.data ?? []);
       setAssets(rows);
       setTextBodies(
@@ -404,6 +431,7 @@ function ProofProductionWorkspace({
           {pending.map((r) => {
             const b = briefs.find((x) => x.source_idea_id === r.idea_id);
             const j = jobs.find((x) => x.id === r.job_id);
+            const summary = counts.find((x) => x.request_id === r.id);
             return (
               <div
                 key={r.id}
@@ -416,11 +444,44 @@ function ProofProductionWorkspace({
                 </span>
                 <span className="text-sm text-muted-foreground">
                   {r.auto_produce
-                    ? r.production_status
+                    ? r.production_status === "complete"
+                      ? summary?.human_approved
+                        ? "Human approved"
+                        : summary?.awaiting_review
+                          ? "Ready for human review"
+                          : "Produced; review required"
+                      : r.production_status
                     : b
                       ? b.status
                       : (j?.status ?? "Queued")}
                 </span>
+                {summary && <p className="w-full text-xs text-muted-foreground">
+                  1 requested · {summary.produced} produced · {summary.rejected} failed or rejected attempts · {summary.revised} revised · {summary.awaiting_review} awaiting human review · {summary.human_approved} human approved
+                  {summary.render_cost_usd !== null ? ` · $${Number(summary.render_cost_usd).toFixed(2)} render cost` : ""}
+                </p>}
+                {summary && summary.attempts > 0 && <button
+                  className={button}
+                  type="button"
+                  aria-expanded={expandedRequest === r.id}
+                  onClick={() => setExpandedRequest(expandedRequest === r.id ? null : r.id)}
+                >Compare attempts</button>}
+                {expandedRequest === r.id && <ul className="w-full space-y-1 text-xs" aria-label="Proof production attempts">
+                  {attempts.filter((a) => a.request_id === r.id).map((a) => {
+                    const output = assets.find((asset) => asset.id === a.asset_id);
+                    return <li key={a.attempt_id} className="flex flex-wrap items-center gap-2 border-t border-border pt-1">
+                      <span>{a.attempt_kind.replaceAll("_", " ")} · {a.attempt_status}{a.revised ? " · revision" : ""}</span>
+                      <span>{a.latency_seconds === null ? "Duration unknown" : `${a.latency_seconds}s`}</span>
+                      <span>{a.cost_usd === null ? "Cost unknown" : `$${Number(a.cost_usd).toFixed(2)}`}</span>
+                      <span>{a.human_review_status ?? "No asset to review"}</span>
+                      {output && a.attempt_kind !== "video_cut" &&
+                        <button className={button} type="button" onClick={() => setAssetOpen(output)}>Preview output</button>}
+                      {a.attempt_kind === "video_cut" && <Link className="underline"
+                        to={`/clients/${clientId}/delivery/content-production-factory?tab=assets&library=reel-shots`}>
+                        Inspect exact cut in video quality reviews
+                      </Link>}
+                    </li>;
+                  })}
+                </ul>}
                 {(r.production_error || j?.error) && (
                   <p role="alert" className="text-sm text-destructive">
                     {r.production_error || j?.error}
