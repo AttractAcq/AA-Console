@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "ffa57f59bf891ed6f4ec5f62b9b39be031277422a51855ad69f23174b93e8b12",
+  "migrationSourceDigest": "0a3e061b074d4ebd0b96a34d561323bae9ebacd4ac6d316848469763efd3d482",
   "generatedTypesSha256": "d93e4ae277a403a3278d0aa12fa20d6f41accc00727a5d5010e62e98421a4a49",
   "generatedSchemaBodySha256": "4fc694481c35b42cf37b0e203bc45b6a66a139846fc844f08f61e66ff9af996a",
   "localMigrations": [
@@ -3858,8 +3858,15 @@
       "version": "20261122190000",
       "name": "534_proof_production_attempts",
       "filename": "20261122190000_534_proof_production_attempts.sql",
-      "sha256": "c682044457f242c5d3a9e7e10351937724bd7944e39491b3ef1d5f76891f4699",
-      "trimmedMd5": "f034d214f5319a890e4e6cb55b55a158"
+      "sha256": "c441b4026ee291f7c65a55146b3025af57381926125749ee008e40d6675323dc",
+      "trimmedMd5": "b7af01b282b4fc610f07568dc6f5cacf"
+    },
+    {
+      "version": "20261122200000",
+      "name": "535_motion_attachment_requires_accepted_cut",
+      "filename": "20261122200000_535_motion_attachment_requires_accepted_cut.sql",
+      "sha256": "823ec24d4c4e32cf165846895bcfc60f341ab9280d2b30541f42c72a7c50354d",
+      "trimmedMd5": "40fe0238f09a84147c81857ec30ce25e"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

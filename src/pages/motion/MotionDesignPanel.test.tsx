@@ -5,15 +5,19 @@ import { expect, it, vi } from "vitest";
 
 const { rpc, scenario } = vi.hoisted(() => ({
   rpc: vi.fn(async () => ({ data: "project-1", error: null })),
-  scenario: { projects: [] as Record<string, unknown>[], briefs: [] as Record<string, unknown>[] },
+  scenario: { projects: [] as Record<string, unknown>[], briefs: [] as Record<string, unknown>[],
+    acceptedCuts: [] as Record<string, unknown>[] },
 }));
 vi.mock("../../lib/media", () => ({ signPaths: async () => new Map() }));
 vi.mock("../../lib/supabase", () => ({ supabase: {
   rpc,
   from: (table: string) => { const chain = { select: () => chain, eq: () => chain,
-    order: () => chain, limit: async () => ({ data: table === "motion_design_projects"
-      ? scenario.projects : table === "client_briefs" ? scenario.briefs : [], error: null }),
-    in: async () => ({ data: [], error: null }) }; return chain; },
+    order: () => chain, limit: () => chain, in: () => chain, not: () => chain,
+    then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data:
+      table === "motion_design_projects" ? scenario.projects
+        : table === "client_briefs" ? scenario.briefs
+          : table === "motion_render_candidates" ? scenario.acceptedCuts : [],
+      error: null }).then(resolve) }; return chain; },
 } }));
 vi.mock("react-router-dom", async (original) => ({
   ...(await original<typeof import("react-router-dom")>()),
@@ -38,12 +42,15 @@ it("queues a hero motion video from its own client page", async () => {
   });
 });
 
-it("sends a completed motion project to the normal approval gate", async () => {
+it("sends an exact accepted motion cut to the normal approval gate", async () => {
   scenario.projects = [{ id: "motion-1", prompt: "A short motion explainer for our service.",
     preset: "explainer", aspect: "horizontal", duration_sec: 8, brand_mode: "on_brand",
     status: "completed", scene_plan: { scenes: [] }, render_path: "client-1/motion.mp4",
     poster_path: null, error: null, revision_of: null, created_at: "2026-10-10" }];
   scenario.briefs = [{ id: "brief-1", title: "Approved explainer brief" }];
+  scenario.acceptedCuts = [{ project_id: "motion-1", render_path: "client-1/motion.mp4",
+    accepted_at: "2026-10-10", brand_qa: "pass", claim_qa: "pass",
+    accepted_request_id: "review-1", accepted_content_hash: "hash-1" }];
   rpc.mockClear();
   render(<MemoryRouter><MotionDesignPanel /></MemoryRouter>);
   await userEvent.selectOptions(await screen.findByRole("combobox", {
@@ -52,4 +59,19 @@ it("sends a completed motion project to the normal approval gate", async () => {
   expect(rpc).toHaveBeenCalledWith("attach_motion_design", {
     p_project_id: "motion-1", p_brief_id: "brief-1",
   });
+});
+
+it("holds a completed project whose cut has not been accepted", async () => {
+  scenario.projects = [{ id: "motion-2", prompt: "A motion explainer awaiting review.",
+    preset: "explainer", aspect: "horizontal", duration_sec: 8,
+    brand_mode: "on_brand", status: "completed", scene_plan: null,
+    render_path: "client-1/unreviewed.mp4", poster_path: null, error: null,
+    revision_of: null, created_at: "2026-10-10" }];
+  scenario.briefs = [];
+  scenario.acceptedCuts = [];
+  rpc.mockClear();
+  render(<MemoryRouter><MotionDesignPanel /></MemoryRouter>);
+  expect(await screen.findByText(/Accept this exact cut in Renders/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Send to approvals" })).toBeDisabled();
+  expect(rpc).not.toHaveBeenCalledWith("attach_motion_design", expect.anything());
 });
