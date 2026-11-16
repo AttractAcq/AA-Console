@@ -14,7 +14,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../config.js";
 import { createHash } from "node:crypto";
-import { AuthError, requireAdmin } from "../master/auth.js";
+import { AuthError, BOT_FORBIDDEN_CODE, requireHumanAdmin } from "../master/auth.js";
 import { readJsonBody } from "../mcp/http.js";
 import { logger } from "../logging/logger.js";
 import { provisionSite, publishPage, type SiteConfig } from "../sites/provision.js";
@@ -61,9 +61,11 @@ export async function handleSitesRoute(
   };
 
   try {
-    await requireAdmin(sb, req.headers.authorization);
+    await requireHumanAdmin(sb, req.headers.authorization);
   } catch (err) {
-    json(err instanceof AuthError ? err.status : 401, { ok: false, error: "Not permitted." });
+    const status = err instanceof AuthError ? err.status : 401;
+    const bot = err instanceof AuthError && err.code === BOT_FORBIDDEN_CODE;
+    json(status, { ok: false, error: bot ? BOT_FORBIDDEN_CODE : "Not permitted." });
     return;
   }
 

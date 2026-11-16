@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import type { RuntimeConfig } from "../config.js";
+import { AuthError, BOT_FORBIDDEN_CODE, requireAdminOrClientManager } from "../master/auth.js";
 import { readJsonBody, UUID } from "../mcp/http.js";
 import { hashCaptureToken } from "./public-route.js";
 export const captureBase = () =>
@@ -63,22 +64,19 @@ export async function handleProofCaptureAdmin(
       }
       body.action = "queue_delivery";
     } else {
-      const { data: auth, error } = await sb.auth.getUser(token);
-      if (error || !auth.user) {
-        json(401, { ok: false, error: "Sign in again." });
-        return;
-      }
-      userId = auth.user.id;
-      const [{ data: profile, error: pe }, { data: manager, error: me }] =
-        await Promise.all([
-          sb.from("profiles").select("role").eq("id", userId).maybeSingle(),
-          sb.rpc("active_video_approval_manager", { p_client_id: clientId }),
-        ]);
-      if (pe || me || !(profile?.role === "admin" || manager === userId)) {
-        json(403, {
+      try {
+        const caller = await requireAdminOrClientManager(sb, req.headers.authorization, clientId);
+        userId = caller.userId;
+      } catch (err) {
+        const status = err instanceof AuthError ? err.status : 401;
+        json(status, {
           ok: false,
           error:
-            "Only the client manager or an admin can manage proof capture.",
+            err instanceof AuthError && err.code === BOT_FORBIDDEN_CODE
+              ? BOT_FORBIDDEN_CODE
+              : err instanceof AuthError
+                ? err.message
+                : "Not permitted.",
         });
         return;
       }

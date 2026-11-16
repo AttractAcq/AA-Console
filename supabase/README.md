@@ -73,6 +73,97 @@ Then confirm nothing slipped through:
 git diff --cached | grep -E "^\+.*('Alex@Acq'|'AA123')"
 ```
 
+## Bot console logins
+
+Migration 324 adds `profiles.is_bot` and `profiles.bot_key` and denies bot
+admins on hard-hold RPCs and on admin `FOR ALL` writes. It does not create
+the bot users. `create_console_user` is not the path for that.
+
+Run the provisioner only with a service-role key, and only after a separate
+CLEAR for the target project. Do not point it at staging
+(`vmmertwoboqiazcsougw`) or production (`bancbdztffokwiifzoiv`) from this
+change. The password is piped on stdin. It is not read from the
+environment, not accepted from an interactive prompt, not logged, and not
+written to disk.
+
+```bash
+BOT_PROVISION_CONFIRM=create-bot-user \
+SUPABASE_URL=https://<project>.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
+node --experimental-strip-types scripts/provision-bot-user.ts \
+  --bot-key bot-cos \
+  --full-name "Chief of Staff" <<'EOF'
+<at-least-16-chars>
+EOF
+```
+
+`--bot-key` must be one of the keys below. The email is that mapped address.
+These addresses have no mailbox. Creation sets `email_confirm: true` and
+does not send confirmation, magic-link, or reset mail. Any other email and
+bot_key pair is rejected.
+
+| bot_key | email |
+| --- | --- |
+| `bot-cos` | `cos@attractacq.com` |
+| `bot-cdm` | `delivery@attractacq.com` |
+| `bot-marketing` | `marketing@attractacq.com` |
+| `bot-production` | `production@attractacq.com` |
+| `bot-distribution` | `distribution@attractacq.com` |
+| `bot-sales` | `sales@attractacq.com` |
+| `bot-admin` | `ops-admin@attractacq.com` |
+| `bot-finance` | `finance@attractacq.com` |
+| `bot-engineering` | `engineering@attractacq.com` |
+| `bot-security` | `security@attractacq.com` |
+
+The script calls `auth.admin.createUser` with `email_confirm` and
+`app_metadata.is_bot` / `bot_key`, then inserts `profiles` (`role=admin`,
+`is_bot=true`). If that insert fails, it deletes the Auth user it just
+created. If that email already belongs to an Auth user, the script
+refuses and does not promote the account into a bot.
+
+Password resets and MFA removal use the same script. Without their own
+confirm value they dry-run and do not write. Both refuse a profile that is
+not `is_bot=true` with that `bot_key`. After a real reset or unenroll, the
+script deletes that bot's rows in auth.sessions and auth.refresh_tokens
+through public.revoke_bot_sessions. That function refuses every non-bot
+and is executable only by service_role.
+
+`bot-production` may review an asset, approve an idea, and approve a
+campaign plan. A bot review sets `bot_reviewed_at` and does not set
+`human_approved_at`. A rejection clears `human_approved_at`.
+`schedule_asset` is human-only. Scheduling a bot-reviewed asset is limited
+to a human admin, the creative director, or the active SMM, and that
+schedule calls `review_media_asset` so the seat gates run and a
+`client_asset_reviews` row records the human. `organic_publication_source_snapshot_v6`
+still requires `human_approved_at`. `approve_slot` stays human-only.
+`bot-sales` may decide a pending lead magnet. `decided_by_bot` is stored
+on that row at decision time. Deleting the bot or clearing `is_bot` does
+not make the approval deliverable, and an approved row with a null
+decider stays blocked. A human decision clears the flag. Turning delivery
+on, and the `lead_magnet_courier` worker, stay refused for every bot.
+Bots cannot revoke a magnet approval or cancel its queued deliveries.
+
+```bash
+BOT_RESET_CONFIRM=reset-bot-password \
+node --experimental-strip-types scripts/provision-bot-user.ts reset-password \
+  --bot-key bot-cos <<'EOF'
+<new-password>
+EOF
+BOT_MFA_CONFIRM=unenroll-bot-mfa \
+node --experimental-strip-types scripts/provision-bot-user.ts unenroll-mfa \
+  --bot-key bot-cos
+```
+
+`reset-password` passes the stdin password only to
+`auth.admin.updateUserById`. `unenroll-mfa` lists factors with
+`auth.admin.mfa.listFactors` and deletes each with
+`auth.admin.mfa.deleteFactor`. Each command has its own confirm string.
+`BOT_PROVISION_CONFIRM` does not authorize a reset or an unenroll.
+
+There is no database test job in CI. The same checks run in the agent-runtime
+test suite. A local pgTAP file is `supabase/tests/bot_console_identity.sql`,
+run with `supabase test db` after the migrations are applied locally.
+
 ## Local state
 
 `.temp/` is machine-specific CLI state (project ref, service versions,

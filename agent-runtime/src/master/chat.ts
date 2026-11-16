@@ -68,6 +68,10 @@ export async function runChatTurn(opts: {
   history: Array<{ role: "user" | "assistant"; content: string }>;
   lastUserMessageAt: string;
   actorId: string;
+  /** Console bot. Write tools refuse this even if the route was bypassed. */
+  isBot: boolean;
+  /** Human admin. Sensitive service-role tables require it. */
+  humanAdmin: boolean;
   /**
    * Dollars this turn may spend before a ceiling is reached. One turn is up
    * to MAX_TURNS model calls, so checking only before the turn would let a
@@ -85,6 +89,8 @@ export async function runChatTurn(opts: {
     conversationId,
     actorId: opts.actorId,
     lastUserMessageAt: opts.lastUserMessageAt,
+    isBot: opts.isBot,
+    humanAdmin: opts.humanAdmin,
   };
 
   const messages: Anthropic.Messages.MessageParam[] = history.map((m) => ({

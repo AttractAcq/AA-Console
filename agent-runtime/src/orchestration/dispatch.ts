@@ -159,6 +159,11 @@ const RUNNERS: Record<string, JobRunner> = {
   copywriter: runCopywriterJob,
   token_health: runTokenHealthJob,
   qa: runQaJob,
+  // Enqueue of publisher and the runners that follow (through
+  // recruitment_meta_build) is gated in the database by PR #353
+  // (public.is_human_admin() on the request and decision RPCs). This
+  // dispatcher runs as service_role after a job is already queued, so it
+  // does not re-check the console session. Do not add a second bot gate here.
   // The end of the chain, and the only thing here that makes a client's
   // account say something in public. Does nothing at all unless
   // PUBLISH_ENABLED is on in this runtime AND publishing is on for that

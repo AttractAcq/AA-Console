@@ -8619,6 +8619,7 @@ export type Database = {
           ad_link_url: string | null
           ad_primary_text: string | null
           archived_at: string | null
+          bot_reviewed_at: string | null
           brief_id: string | null
           client_id: string
           content_format: Database["public"]["Enums"]["content_format"]
@@ -8656,6 +8657,7 @@ export type Database = {
           ad_link_url?: string | null
           ad_primary_text?: string | null
           archived_at?: string | null
+          bot_reviewed_at?: string | null
           brief_id?: string | null
           client_id: string
           content_format?: Database["public"]["Enums"]["content_format"]
@@ -8693,6 +8695,7 @@ export type Database = {
           ad_link_url?: string | null
           ad_primary_text?: string | null
           archived_at?: string | null
+          bot_reviewed_at?: string | null
           brief_id?: string | null
           client_id?: string
           content_format?: Database["public"]["Enums"]["content_format"]
@@ -16661,6 +16664,7 @@ export type Database = {
           client_id: string
           decided_at: string | null
           decided_by: string | null
+          decided_by_bot: boolean
           id: string
           inbox_enforced_v6: boolean
           magnet_version_id: string
@@ -16677,6 +16681,7 @@ export type Database = {
           client_id: string
           decided_at?: string | null
           decided_by?: string | null
+          decided_by_bot?: boolean
           id?: string
           inbox_enforced_v6?: boolean
           magnet_version_id: string
@@ -16693,6 +16698,7 @@ export type Database = {
           client_id?: string
           decided_at?: string | null
           decided_by?: string | null
+          decided_by_bot?: boolean
           id?: string
           inbox_enforced_v6?: boolean
           magnet_version_id?: string
@@ -23339,15 +23345,18 @@ export type Database = {
       }
       profiles: {
         Row: {
+          bot_key: string | null
           created_at: string
           email: string | null
           employee_category: Database["public"]["Enums"]["team_category"] | null
           full_name: string | null
           id: string
+          is_bot: boolean
           role: Database["public"]["Enums"]["app_role"]
           updated_at: string
         }
         Insert: {
+          bot_key?: string | null
           created_at?: string
           email?: string | null
           employee_category?:
@@ -23355,10 +23364,12 @@ export type Database = {
             | null
           full_name?: string | null
           id: string
+          is_bot?: boolean
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
         }
         Update: {
+          bot_key?: string | null
           created_at?: string
           email?: string | null
           employee_category?:
@@ -23366,6 +23377,7 @@ export type Database = {
             | null
           full_name?: string | null
           id?: string
+          is_bot?: boolean
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
         }
@@ -37098,6 +37110,7 @@ export type Database = {
         Args: { p_client_id: string }
         Returns: boolean
       }
+      bot_may: { Args: { p_action: string }; Returns: boolean }
       brief_job_selection_current_v6: {
         Args: { p_job_id: string }
         Returns: boolean
@@ -38835,6 +38848,7 @@ export type Database = {
           client_id: string
           decided_at: string | null
           decided_by: string | null
+          decided_by_bot: boolean
           id: string
           inbox_enforced_v6: boolean
           magnet_version_id: string
@@ -39761,6 +39775,7 @@ export type Database = {
         Args: { p_client_id: string; p_member_id: string }
         Returns: boolean
       }
+      is_human_admin: { Args: never; Returns: boolean }
       is_member: { Args: { target: string }; Returns: boolean }
       launch_campaign: { Args: { p_campaign_id: string }; Returns: undefined }
       lead_dedupe_key: {
@@ -42946,6 +42961,13 @@ export type Database = {
       reviewed_offer_strategy_snapshot_v7: {
         Args: { p_client_id: string }
         Returns: Json
+      }
+      revoke_bot_sessions: {
+        Args: { p_user_id: string }
+        Returns: {
+          refresh_tokens_deleted: number
+          sessions_deleted: number
+        }[]
       }
       revoke_campaign_action_approval_v6: {
         Args: { p_approval_id: string; p_reason: string }
