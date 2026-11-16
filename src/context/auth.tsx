@@ -12,6 +12,8 @@ export type Profile = {
   full_name: string | null;
   email: string | null;
   employee_category: EmployeeCategory | null;
+  /** Provisioned console bot. Hard-hold screens are not gated on this yet. */
+  is_bot: boolean;
   /** The client this user belongs to, for role === "client". */
   client_id: string | null;
   /** The team_members row for this user, for role === "employee". */
@@ -32,7 +34,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 async function loadProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, role, full_name, email, employee_category")
+    .select("id, role, full_name, email, employee_category, is_bot")
     .eq("id", userId)
     .maybeSingle();
   if (error || !data) return null;
@@ -51,6 +53,7 @@ async function loadProfile(userId: string): Promise<Profile | null> {
     full_name: data.full_name,
     email: data.email,
     employee_category: data.employee_category as EmployeeCategory | null,
+    is_bot: data.is_bot === true,
     client_id: link?.client_id ?? null,
     member_id: member?.id ?? null,
   };

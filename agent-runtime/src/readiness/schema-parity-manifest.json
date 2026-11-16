@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "f4a21e2f88f513511ed09a55995e929ae62b6ce5dfd17cec5ad28f91f46bb218",
-  "generatedTypesSha256": "aa8f07d66bf8ae2abcbdf1d55c75ece591fd6fb11b9eb2f9e82bd6fbb67aef33",
-  "generatedSchemaBodySha256": "d2f3248d4edd94a3c2671467a3e27988af37227e4314f08485a6dc10c203bf7e",
+  "migrationSourceDigest": "5fe1fd7eb3f9cd9d237217bbd916357cefd8f7ad2c446d3d8298e16e73d0f4e1",
+  "generatedTypesSha256": "2b20ba9e33b5e550d3e2e707aa81c8d0ef52eb49e6c128e430bb93ee632682e9",
+  "generatedSchemaBodySha256": "b8b58edca504f9c92597a96c6649dbd401136dbbad9a001f612db6768ac67a15",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2383,6 +2383,13 @@
       "filename": "20261114070000_323_storage_change_invalidates_creative.sql",
       "sha256": "6bcfc81335cce5882c7a2c7500637c35ac384d5825d3864dfc807ae3becb98e3",
       "trimmedMd5": "eb05c597d48abc6962629f52406662ea"
+    },
+    {
+      "version": "20261115190000",
+      "name": "324_bot_console_identity",
+      "filename": "20261115190000_324_bot_console_identity.sql",
+      "sha256": "8677596bdd24077e6d42a82846c93ed3a82cc324610516aa2a6f60bc07446733",
+      "trimmedMd5": "0c83f0d90ff0a7207ee556213fcd3431"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
