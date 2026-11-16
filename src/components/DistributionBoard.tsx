@@ -26,6 +26,25 @@ type Post = {
   media_type: MediaFilterId;
   platform: string | null;
   published_at: string | null;
+  publication_status: string;
+  publish_attempts: number;
+  external_id: string | null;
+  external_url: string | null;
+  failure_reason: string | null;
+};
+
+type PublicationEvent = {
+  id: string;
+  post_id: string;
+  ref_number: string | null;
+  platform: string | null;
+  event: string;
+  publication_status: string;
+  attempt_number: number;
+  external_id: string | null;
+  external_url: string | null;
+  detail: string | null;
+  occurred_at: string;
 };
 
 /**
@@ -37,6 +56,9 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
   const { clientId } = useParams<{ clientId: string }>();
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [events, setEvents] = useState<PublicationEvent[]>([]);
+  const [eventsMore, setEventsMore] = useState(false);
+  const [eventsLoading, setEventsLoading] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [assetOptions, setAssetOptions] = useState<Array<{ value: string; label: string }>>([]);
 
@@ -52,7 +74,7 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
     if (!clientId) return;
     const { data, error } = await supabase
       .from("scheduled_posts")
-      .select("id, scheduled_for, ref_number, media_type, platform, published_at")
+      .select("id, scheduled_for, ref_number, media_type, platform, published_at, publication_status, publish_attempts, external_id, external_url, failure_reason")
       .eq("client_id", clientId)
       .eq("channel", channel)
       .order("scheduled_for");
@@ -63,10 +85,40 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
     // say either, which is why the board called a 13-day-old post
     // "Scheduled".
     setDue(await fetchDue(clientId, channel));
+    if (channel === "organic") {
+      const { data: eventRows, error: eventError } = await supabase
+        .from("post_publication_events_v6")
+        .select("id, post_id, ref_number, platform, event, publication_status, attempt_number, external_id, external_url, detail, occurred_at")
+        .eq("client_id", clientId).eq("channel", "organic")
+        .order("occurred_at", { ascending: false }).order("id", { ascending: false })
+        .range(0, 49);
+      if (eventError) throw eventError;
+      setEvents((eventRows ?? []) as PublicationEvent[]);
+      setEventsMore((eventRows ?? []).length === 50);
+    }
     } catch (error) {
       setLoadError("Failed to load schedule: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
     }
   }, [clientId, channel]);
+
+  const loadOlderEvents = async () => {
+    if (!clientId || eventsLoading) return;
+    setEventsLoading(true);
+    try {
+      const { data, error } = await supabase.from("post_publication_events_v6")
+        .select("id, post_id, ref_number, platform, event, publication_status, attempt_number, external_id, external_url, detail, occurred_at")
+        .eq("client_id", clientId).eq("channel", "organic")
+        .order("occurred_at", { ascending: false }).order("id", { ascending: false })
+        .range(events.length, events.length + 49);
+      if (error) throw error;
+      setEvents((current) => [...current, ...((data ?? []) as PublicationEvent[])]);
+      setEventsMore((data ?? []).length === 50);
+    } catch (cause) {
+      setLoadError(`Could not load older publication events: ${cause instanceof Error ? cause.message : "Unknown error"}`);
+    } finally {
+      setEventsLoading(false);
+    }
+  };
 
   useEffect(() => {
     void refresh();
@@ -168,14 +220,21 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
           <FilterPills options={mediaFilters} activeId={activeFilter} onChange={setActiveFilter} />
         </div>
         <DataTable
-          columns={["Date", "Ref Number", "Type", "Platform", "Status", "Copy"]}
+          columns={["Date", "Ref Number", "Type", "Platform", "Status", "Attempts", "External record", "Copy"]}
           emptyLabel={`No ${activeLabel.toLowerCase()} assets scheduled`}
           rows={shown.map((p) => [
             p.scheduled_for,
             p.ref_number ?? "—",
             p.media_type,
             platformLabel(p.platform),
-            p.published_at ? "Published" : (statusFor(p.id) ?? "Scheduled"),
+            p.publication_status === "published" ? "Published (recorded)"
+              : p.publication_status === "failed" ? `Failed: ${p.failure_reason ?? "reason not recorded"}`
+                : p.publication_status === "publishing" ? "Publishing attempt in progress"
+                  : (statusFor(p.id) ?? "Scheduled"),
+            p.publish_attempts ?? 0,
+            p.external_url ? <a key={`external-${p.id}`} href={p.external_url} target="_blank" rel="noreferrer"
+              className="text-brand-strong underline">{p.external_id ?? "Open post"}</a>
+              : p.external_id ?? (p.publication_status === "published" ? "Provider ID missing" : "—"),
             <button
               key={`copy-${p.id}`}
               type="button"
@@ -187,6 +246,31 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
           ])}
         />
       </div>
+
+      {channel === "organic" && (
+        <section className="space-y-2">
+          <h3 className="font-semibold">Distribution log</h3>
+          <p className="text-xs text-muted-foreground">Recorded state changes, including attempts and retries. A recorded publish needs a provider ID or URL and read-back before it is verified on the external account. Legacy snapshots do not reconstruct earlier history.</p>
+          <DataTable columns={["When", "Post", "Platform", "Event", "Attempt", "External record / reason"]}
+            emptyLabel="No publication events recorded"
+            rows={events.map((event) => [
+              <span key="when">{new Date(event.occurred_at).toLocaleString()}</span>,
+              <span key="post">{event.ref_number ?? event.post_id.slice(0, 8)}</span>,
+              <span key="platform">{platformLabel(event.platform)}</span>,
+              <span key="event">{event.event === "legacy_snapshot" ? `Legacy snapshot: ${event.publication_status}`
+                : event.event === "removed_from_calendar" ? "Removed from calendar; provider state unverified"
+                  : event.event.replace(/_/g, " ")}</span>,
+              <span key="attempt">{event.attempt_number}</span>,
+              <span key="evidence" className="text-xs">
+                {event.external_url ? <a href={event.external_url} target="_blank" rel="noreferrer" className="text-brand-strong underline">{event.external_id ?? event.external_url}</a>
+                  : event.external_id ?? (event.event === "published" ? "Provider ID missing" : "—")}
+                {event.detail && <span className="block text-muted-foreground">{event.detail}</span>}
+              </span>,
+            ])} />
+          {eventsMore && <button type="button" disabled={eventsLoading} onClick={() => void loadOlderEvents()}
+            className="text-xs text-brand-strong underline disabled:opacity-50">Load older events</button>}
+        </section>
+      )}
 
       <PostCopyEditor
         open={copyFor !== null}

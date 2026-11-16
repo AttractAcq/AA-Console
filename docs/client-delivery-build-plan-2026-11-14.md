@@ -381,6 +381,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Proof distribution log checkpoint, 16 November 2026:** The existing Placements view now shows the exact approved payload hash, artifact or page revision reference, current source-proof rights and expiry, attempt count, external URL/ID, placed and verified dates, and removal confirmation. Each placement has a paged, append-only event trail with actor, detail and external reference. This exposes recorded history; an external ID or a human-entered URL alone is not provider read-back. Destination-specific preflight, missing adapters, and a verified provider placement remain Phase 7 exit work.
 
+**Organic distribution log checkpoint, 16 November 2026:** New scheduled posts now record append-only schedule, reschedule, attempt, retry, failure, recorded publication and calendar-removal events. Existing posts receive one clearly labeled legacy snapshot; earlier transitions are not invented. Organic Content Distribution shows the current attempt count, failure reason and external ID/URL, plus a paged event log. Removal from the calendar is explicitly labeled as separate from provider removal. A recorded publication with no provider ID or URL is shown as incomplete evidence; provider read-back and a live approved post remain open Phase 7 exit checks.
+
 ## Phase 8 — Attribution, Master AI feedback and Archive
 
 ### Attribution OS

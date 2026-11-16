@@ -22142,6 +22142,66 @@ export type Database = {
           },
         ]
       }
+      post_publication_events_v6: {
+        Row: {
+          actor_role: string | null
+          asset_id: string | null
+          attempt_number: number
+          channel: string
+          client_id: string | null
+          detail: string | null
+          event: string
+          external_id: string | null
+          external_url: string | null
+          id: string
+          media_type: string
+          occurred_at: string
+          platform: string | null
+          post_id: string
+          publication_status: string
+          ref_number: string | null
+          scheduled_at: string
+        }
+        Insert: {
+          actor_role?: string | null
+          asset_id?: string | null
+          attempt_number: number
+          channel: string
+          client_id?: string | null
+          detail?: string | null
+          event: string
+          external_id?: string | null
+          external_url?: string | null
+          id?: string
+          media_type: string
+          occurred_at?: string
+          platform?: string | null
+          post_id: string
+          publication_status: string
+          ref_number?: string | null
+          scheduled_at: string
+        }
+        Update: {
+          actor_role?: string | null
+          asset_id?: string | null
+          attempt_number?: number
+          channel?: string
+          client_id?: string | null
+          detail?: string | null
+          event?: string
+          external_id?: string | null
+          external_url?: string | null
+          id?: string
+          media_type?: string
+          occurred_at?: string
+          platform?: string | null
+          post_id?: string
+          publication_status?: string
+          ref_number?: string | null
+          scheduled_at?: string
+        }
+        Relationships: []
+      }
       production_release_approval_bindings_v6: {
         Row: {
           attestation_id: string
