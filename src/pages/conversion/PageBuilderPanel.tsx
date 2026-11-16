@@ -50,6 +50,15 @@ type PageCampaignLink = {
   manifest_id: string | null;
 };
 
+type RoutePackage = {
+  id: string;
+  campaign_id: string;
+  route: string;
+  paid_platform: string | null;
+  version: number;
+  plan_fingerprint: string;
+};
+
 export type PageBuilderType = "landing" | "offer" | "recruitment";
 
 /**
@@ -82,6 +91,7 @@ export function PageBuilderPanel({
   const [pages, setPages] = useState<Page[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [pageLinks, setPageLinks] = useState<PageCampaignLink[]>([]);
+  const [routePackages, setRoutePackages] = useState<RoutePackage[]>([]);
   const [pageApprovalState, setPageApprovalState] = useState<Record<string, string>>({});
   const [manifestVersions, setManifestVersions] = useState<Record<string, number>>({});
   const [repos, setRepos] = useState<SiteRepo[]>([]);
@@ -98,7 +108,7 @@ export function PageBuilderPanel({
     setLoadError(null);
     try {
       if (!clientId) return;
-      const [pageRows, campaignRows, linkRows, adRows, repoRows, approvalRows, manifestRows] = await Promise.all([
+      const [pageRows, campaignRows, linkRows, adRows, repoRows, approvalRows, manifestRows, routeRows] = await Promise.all([
         supabase
           .from("client_pages")
           .select(
@@ -147,14 +157,21 @@ export function PageBuilderPanel({
           .select("id, version").eq("client_id", clientId).eq("campaign_id", selectedCampaignId)
           .order("version", { ascending: false })
           : Promise.resolve({ data: [], error: null }),
+        isRecruitment ? Promise.resolve({ data: [], error: null })
+          : supabase.from("campaign_route_packages_v6")
+            .select("id, campaign_id, route, paid_platform, version, plan_fingerprint")
+            .eq("client_id", clientId)
+            .order("version", { ascending: false }),
       ]);
       if (pageRows.error) throw pageRows.error;
       if (campaignRows.error) throw campaignRows.error;
       if (linkRows.error) throw linkRows.error;
+      if (routeRows.error) throw routeRows.error;
       setPages((pageRows.data ?? []) as Page[]);
       setCampaigns((campaignRows.data ?? []) as CampaignOption[]);
       const links = (linkRows.data ?? []) as PageCampaignLink[];
       setPageLinks(links);
+      setRoutePackages((routeRows.data ?? []) as RoutePackage[]);
       if (selectedCampaignId && !manifestRows.error) {
         setManifestVersions(Object.fromEntries((manifestRows.data ?? []).map((row) => [row.id, row.version])));
       }
@@ -521,6 +538,17 @@ export function PageBuilderPanel({
         intro="This adds a no-script form to a new page revision before approval. The capture endpoint starts disabled; activate it in Sales OS Capture before testing the published page."
         submitLabel="Add form"
         fields={[
+          { name: "route_package_id", label: "Campaign route package", kind: "select", required: true,
+            hint: "Choose the exact route version this form measures. A new campaign plan needs a new form revision.",
+            options: [
+              { value: "", label: "Select a route package" },
+              ...routePackages.filter((route) => {
+                const campaignId = pageLinks.find((link) => link.page_id === formPageId)?.campaign_id;
+                return route.campaign_id === campaignId
+                  && route.version === Math.max(...routePackages.filter((p) => p.campaign_id === campaignId && p.route === route.route).map((p) => p.version));
+              }).map((route) => ({ value: route.id,
+                label: `${route.route === "paid" ? `Paid ${route.paid_platform ?? ""}` : "Organic"} · v${route.version} · ${route.id.slice(0, 8)}` })),
+            ] },
           { name: "consent_wording", label: "Consent wording shown beside the checkbox", kind: "textarea", required: true },
           { name: "source_channel", label: "Source channel", kind: "text", required: true, placeholder: "paid_search" },
         ]}
@@ -534,10 +562,13 @@ export function PageBuilderPanel({
           if (page.published_url) throw new Error("A published page needs a separate republish review.");
           const consentWording = String(values.consent_wording ?? "").trim();
           const sourceChannel = String(values.source_channel ?? "").trim();
+          const routePackageId = String(values.route_package_id ?? "").trim();
+          if (!routePackages.some((route) => route.id === routePackageId && route.campaign_id === campaignId))
+            throw new Error("Select a route package linked to this campaign.");
           if (!sourceChannel) throw new Error("A source channel is required for attribution.");
           appendPageCaptureForm(page.html, runtimeBase, "a".repeat(64), consentWording);
           const endpoint = await createEndpoint({ clientId, purpose: "page_form", consentWording,
-            campaignId, pageId: page.id, sourceChannel });
+            campaignId, pageId: page.id, sourceChannel, routePackageId });
           const html = appendPageCaptureForm(page.html, runtimeBase, endpoint.token, consentWording);
           const { error } = await supabase.rpc("record_page_revision", {
             p_page_id: page.id, p_html: html, p_source: "manual_edit",

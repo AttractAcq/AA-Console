@@ -16323,6 +16323,7 @@ export type Database = {
           page_id: string | null
           purpose: string
           revoked_at: string | null
+          route_package_id: string | null
           source_channel: string | null
           submissions: number
           token_hash: string
@@ -16342,6 +16343,7 @@ export type Database = {
           page_id?: string | null
           purpose: string
           revoked_at?: string | null
+          route_package_id?: string | null
           source_channel?: string | null
           submissions?: number
           token_hash: string
@@ -16361,12 +16363,20 @@ export type Database = {
           page_id?: string | null
           purpose?: string
           revoked_at?: string | null
+          route_package_id?: string | null
           source_channel?: string | null
           submissions?: number
           token_hash?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_capture_endpoint_route_campaign_v9"
+            columns: ["route_package_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_route_packages_v6"
+            referencedColumns: ["id", "campaign_id", "client_id"]
+          },
           {
             foreignKeyName: "lead_capture_endpoints_campaign_client_fk"
             columns: ["campaign_id", "client_id"]
@@ -17488,6 +17498,7 @@ export type Database = {
           name: string | null
           phone: string | null
           rejected_reason: string | null
+          route_package_id: string | null
           status: string
           utm: Json | null
         }
@@ -17507,6 +17518,7 @@ export type Database = {
           name?: string | null
           phone?: string | null
           rejected_reason?: string | null
+          route_package_id?: string | null
           status?: string
           utm?: Json | null
         }
@@ -17526,10 +17538,18 @@ export type Database = {
           name?: string | null
           phone?: string | null
           rejected_reason?: string | null
+          route_package_id?: string | null
           status?: string
           utm?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_submission_route_client_v9"
+            columns: ["route_package_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_route_packages_v6"
+            referencedColumns: ["id", "client_id"]
+          },
           {
             foreignKeyName: "lead_submissions_client_id_fkey"
             columns: ["client_id"]
@@ -38234,6 +38254,7 @@ export type Database = {
           page_id: string | null
           purpose: string
           revoked_at: string | null
+          route_package_id: string | null
           source_channel: string | null
           submissions: number
           token_hash: string
@@ -38452,6 +38473,44 @@ export type Database = {
           p_target_countries: string[]
         }
         Returns: string
+      }
+      create_route_lead_capture_endpoint_v9: {
+        Args: {
+          p_campaign_id: string
+          p_client_id: string
+          p_consent_wording: string
+          p_days?: number
+          p_page_id: string
+          p_route_package_id: string
+          p_source_channel: string
+          p_token_hash: string
+        }
+        Returns: {
+          campaign_id: string | null
+          client_id: string
+          consent_wording: string
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          expires_at: string
+          id: string
+          magnet_version_id: string | null
+          max_submissions: number
+          page_id: string | null
+          purpose: string
+          revoked_at: string | null
+          route_package_id: string | null
+          source_channel: string | null
+          submissions: number
+          token_hash: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "lead_capture_endpoints"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       create_secondary_offer_v7: {
         Args: { p_opportunity_id: string }
@@ -39802,6 +39861,31 @@ export type Database = {
           sale_value: number
           sales_agent_id: string
           source_channel: string
+        }[]
+      }
+      lead_journey_trace_v9: {
+        Args: { p_client_id: string; p_days?: number; p_limit?: number }
+        Returns: {
+          asset_id: string
+          asset_title: string
+          campaign_id: string
+          campaign_mode: string
+          campaign_name: string
+          capture_submissions: number
+          cash_collected: number
+          lead_created_at: string
+          lead_id: string
+          lead_stage: string
+          offer_version_id: string
+          opportunity_ids: string[]
+          outcome_events: number
+          page_id: string
+          page_title: string
+          route_package_ids: string[]
+          sale_value: number
+          sales_agent_id: string
+          source_channel: string
+          unknown_route_submissions: number
         }[]
       }
       lead_magnet_inbox_preview_v6: {
@@ -43631,6 +43715,7 @@ export type Database = {
           page_id: string | null
           purpose: string
           revoked_at: string | null
+          route_package_id: string | null
           source_channel: string | null
           submissions: number
           token_hash: string

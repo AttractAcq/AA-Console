@@ -13,6 +13,7 @@ const { from, rpc, useParams, useAgentJobs, createEndpoint, inserts, deletes, ro
   rows: {
     pages: [] as Array<{ id: string; title: string; status: string; html: string | null; published_url: string | null }>,
     links: [] as Array<{ id: string; page_id: string; campaign_id: string }>,
+    routes: [] as Array<{ id: string; campaign_id: string; route: string; paid_platform: string | null; version: number; plan_fingerprint: string }>,
   },
 }));
 
@@ -39,6 +40,7 @@ beforeEach(() => {
   deletes.length = 0;
   rows.pages = [];
   rows.links = [];
+  rows.routes = [];
   useParams.mockReturnValue({ clientId: "client-1" });
   useAgentJobs.mockReturnValue({ inFlight: [], recentFailures: [] });
   rpc.mockResolvedValue({ error: null });
@@ -72,6 +74,7 @@ beforeEach(() => {
           data: deleting
             ? table === "client_pages" ? [{ id: "page-1" }] : deletedLinks.map((link) => ({ id: link.id }))
             : table === "client_campaigns" ? [campaign]
+              : table === "campaign_route_packages_v6" ? rows.routes
               : table === "campaign_action_approvals" || table === "campaign_manifest_versions" ? []
               : table === "client_pages" ? rows.pages : rows.links,
         }).then(resolve);
@@ -213,14 +216,17 @@ it("saves the consented form in a page revision before requesting approval", asy
     rows.pages = [{ id: "page-1", title: "Campaign landing", status: "approved",
       html: "<!doctype html><html><body><h1>Offer</h1></body></html>", published_url: null }];
     rows.links = [{ id: "link-1", page_id: "page-1", campaign_id: "campaign-1" }];
+    rows.routes = [{ id: "route-1", campaign_id: "campaign-1", route: "paid", paid_platform: "meta", version: 1, plan_fingerprint: "a".repeat(32) }];
     render(<PageBuilderPanel campaignId="campaign-1" />);
     fireEvent.click(await screen.findByRole("button", { name: "Add lead form to revision" }));
     fireEvent.change(screen.getByLabelText(/Consent wording shown/), { target: { value: "I agree to be contacted." } });
     fireEvent.change(screen.getByLabelText(/Source channel/), { target: { value: "paid_search" } });
+    fireEvent.change(screen.getByLabelText(/Campaign route package/), { target: { value: "route-1" } });
     fireEvent.click(screen.getByRole("button", { name: "Add form" }));
     await waitFor(() => expect(createEndpoint).toHaveBeenCalledWith(expect.objectContaining({
       clientId: "client-1", purpose: "page_form", campaignId: "campaign-1", pageId: "page-1",
       sourceChannel: "paid_search", consentWording: "I agree to be contacted.",
+      routePackageId: "route-1",
     })));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("record_page_revision", expect.objectContaining({
       p_page_id: "page-1", p_source: "manual_edit",

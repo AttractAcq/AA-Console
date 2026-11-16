@@ -42,7 +42,7 @@ function show(f: Record<string, unknown> | null = funnel(), top: unknown[] = [co
   rpc.mockImplementation((name: string) =>
     Promise.resolve({ data: name === "acquisition_funnel" ? (f ? [f] : [])
       : name === "acquisition_coverage_v8" ? [c]
-        : name === "lead_journey_trace_v8" ? journeys : top, error: null }),
+        : name === "lead_journey_trace_v9" ? journeys : top, error: null }),
   );
   return render(<AttributionPanel />);
 }
@@ -72,6 +72,21 @@ describe("the chain", () => {
 });
 
 describe("recorded lead journeys", () => {
+  it("shows the exact capture route while keeping its causal meaning limited", async () => {
+    show(funnel(), [content()], coverage(), [{
+      lead_id: "12345678-1111-4111-8111-111111111111",
+      lead_created_at: "2026-11-15T12:00:00Z", lead_stage: "new",
+      source_channel: "paid_search", campaign_id: null, campaign_name: null,
+      campaign_mode: null, opportunity_ids: [], offer_version_id: null,
+      asset_id: null, asset_title: null, page_id: null, page_title: null,
+      sales_agent_id: null, sale_value: null, cash_collected: null,
+      outcome_events: 0, route_package_ids: ["87654321-1111-4111-8111-111111111111"],
+      capture_submissions: 1, unknown_route_submissions: 0,
+    }]);
+    expect(await screen.findByText(/route 87654321/)).toHaveAttribute("title", "87654321-1111-4111-8111-111111111111");
+    expect(screen.getByText(/capture doors, not which route caused a sale/)).toBeInTheDocument();
+  });
+
   it("keeps missing source links unknown while showing recorded cash and outcome evidence", async () => {
     show(funnel(), [content()], coverage(), [{
       lead_id: "12345678-1111-4111-8111-111111111111",
@@ -81,6 +96,7 @@ describe("recorded lead journeys", () => {
       asset_id: null, asset_title: null, page_id: null, page_title: null,
       sales_agent_id: null, sale_value: 12000, cash_collected: 9000,
       outcome_events: 1,
+      route_package_ids: [], capture_submissions: 0, unknown_route_submissions: 0,
     }]);
     const journeys = within((await screen.findByRole("heading", { name: "Recorded lead journeys" })).parentElement as HTMLElement);
     expect(journeys.getByText(/12345678/)).toBeInTheDocument();

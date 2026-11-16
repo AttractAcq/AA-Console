@@ -59,6 +59,12 @@ config = config.replace(/(\[db\.seed\]\s*\n(?:#[^\n]*\n)*)enabled = true/, '$1en
 if (!/\[db\.seed\]\s*\n(?:#[^\n]*\n)*enabled = false/.test(config)) {
   throw new Error('Could not disable local seed.sql in copied config')
 }
+// Analytics is unrelated to catalog parity and its Vector sidecar cannot
+// mount a Colima socket on macOS. Keep the replay's isolated database only.
+config = config.replace(/(\[analytics\]\s*\n)enabled = true/, '$1enabled = false')
+if (!/\[analytics\]\s*\nenabled = false/.test(config)) {
+  throw new Error('Could not disable optional analytics in copied config')
+}
 writeFileSync(join(target, 'config.toml'), config)
 
 if (process.env.AA_SCHEMA_REPLAY_RAW_SOURCE &&
