@@ -27146,6 +27146,7 @@ export type Database = {
         Args: { p_client_id: string }
         Returns: boolean
       }
+      bot_may: { Args: { p_action: string }; Returns: boolean }
       brief_video_repurpose_candidate: {
         Args: {
           p_candidate_index: number
@@ -28428,6 +28429,7 @@ export type Database = {
           client_id: string
           decided_at: string | null
           decided_by: string | null
+          decided_by_bot: boolean
           id: string
           magnet_version_id: string
           payload_hash: string
@@ -28928,13 +28930,13 @@ export type Database = {
       }
       is_active_assigned_smm: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
-      is_human_admin: { Args: never; Returns: boolean }
       is_channel_member: { Args: { target: string }; Returns: boolean }
       is_client_user: { Args: { target: string }; Returns: boolean }
       is_eligible_lead_owner: {
         Args: { p_client_id: string; p_member_id: string }
         Returns: boolean
       }
+      is_human_admin: { Args: never; Returns: boolean }
       is_member: { Args: { target: string }; Returns: boolean }
       launch_campaign: { Args: { p_campaign_id: string }; Returns: undefined }
       lead_dedupe_key: {
@@ -31200,6 +31202,13 @@ export type Database = {
           p_reason?: string
         }
         Returns: undefined
+      }
+      revoke_bot_sessions: {
+        Args: { p_user_id: string }
+        Returns: {
+          refresh_tokens_deleted: number
+          sessions_deleted: number
+        }[]
       }
       revoke_lead_magnet_approval_v6: {
         Args: { p_approval_id: string; p_reason: string }
