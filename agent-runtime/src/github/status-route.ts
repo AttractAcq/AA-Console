@@ -7,7 +7,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../config.js";
-import { AuthError, requireAdmin } from "../master/auth.js";
+import { AuthError, BOT_FORBIDDEN_CODE, requireHumanAdmin } from "../master/auth.js";
 import { readGitHubStatus } from "./status.js";
 import { logger } from "../logging/logger.js";
 
@@ -23,10 +23,11 @@ export async function handleGitHubStatus(
   };
 
   try {
-    await requireAdmin(sb, req.headers.authorization);
+    await requireHumanAdmin(sb, req.headers.authorization);
   } catch (err) {
     const status = err instanceof AuthError ? err.status : 401;
-    json(status, { ok: false, error: "Not permitted." });
+    const bot = err instanceof AuthError && err.code === BOT_FORBIDDEN_CODE;
+    json(status, { ok: false, error: bot ? BOT_FORBIDDEN_CODE : "Not permitted." });
     return;
   }
 

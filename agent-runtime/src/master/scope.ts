@@ -137,6 +137,61 @@ export const TABLES: Record<string, TableRule> = {
   mrr_from_billing: { scope: { by: "global" }, clientRead: false, clientWrite: false, readOnly: true },
 };
 
+/**
+ * Tables write_rows must not change unless the caller is a human admin.
+ * Company scope still lists several of these as writable; the tool applies
+ * this denylist on top, because the runtime writes as service_role and RLS
+ * does not. There is no invoices table and no subscriptions table —
+ * client_billing is the plan and monthly amount. Token tables live in
+ * mcp_internal; the bare names are listed so a public exposure is still
+ * refused for anyone who is not a human admin.
+ */
+export const SENSITIVE_SERVICE_ROLE_TABLES = [
+  "campaign_budget_changes",
+  "client_billing",
+  "client_billing_view",
+  "client_contracts",
+  "client_engine_budgets",
+  "client_integrations",
+  "client_marketing_spend",
+  "client_sales_entitlement_controls",
+  "client_sales_entitlement_requests",
+  "client_sales_entitlements",
+  "client_users",
+  "contract_payments",
+  "finance_entries",
+  "finance_periods",
+  "github_app_installations",
+  "mcp_bot_permissions",
+  "mcp_bot_token_audit",
+  "mcp_bot_tokens",
+  "mcp_bots",
+  "mrr_from_billing",
+  "sales_runtime_daily_budgets",
+  "sales_runtime_reservations",
+] as const;
+
+const SENSITIVE_SERVICE_ROLE_TABLE_SET: ReadonlySet<string> = new Set(SENSITIVE_SERVICE_ROLE_TABLES);
+
+/** profiles columns that name a console bot. write_rows never sets these. */
+export const BOT_IDENTITY_COLUMNS = ["is_bot", "bot_key"] as const;
+
+export function bareTableName(table: string): string {
+  const trimmed = table.trim().toLowerCase();
+  const dot = trimmed.lastIndexOf(".");
+  return dot === -1 ? trimmed : trimmed.slice(dot + 1);
+}
+
+export function isSensitiveServiceRoleTable(table: string): boolean {
+  return SENSITIVE_SERVICE_ROLE_TABLE_SET.has(bareTableName(table));
+}
+
+export function writeTouchesBotIdentity(table: string, values: Record<string, unknown>): boolean {
+  if (bareTableName(table) !== "profiles") return false;
+  const columns = new Set<string>(BOT_IDENTITY_COLUMNS);
+  return Object.keys(values).some((key) => columns.has(key.toLowerCase()));
+}
+
 export class ScopeError extends Error {
   constructor(message: string) {
     super(message);

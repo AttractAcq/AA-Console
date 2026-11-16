@@ -14,7 +14,15 @@
 import crypto from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type Anthropic from "@anthropic-ai/sdk";
-import { ScopeError, ruleFor, tableNames, type MasterScope } from "./scope.js";
+import { botForbidden } from "./auth.js";
+import {
+  ScopeError,
+  isSensitiveServiceRoleTable,
+  ruleFor,
+  tableNames,
+  writeTouchesBotIdentity,
+  type MasterScope,
+} from "./scope.js";
 
 const MAX_ROWS = 200;
 const MAX_PARENT_IDS = 1000;
@@ -27,6 +35,13 @@ export interface ToolContext {
   actorId: string;
   /** Latest user message time; a nonce older than this had a human after it. */
   lastUserMessageAt: string;
+  /**
+   * Verified console bot. requireHumanAdmin refuses these before a turn
+   * starts; the tool checks again so a write cannot depend on the route.
+   */
+  isBot: boolean;
+  /** Verified human admin. Sensitive tables require this even when isBot is false. */
+  humanAdmin: boolean;
 }
 
 export interface ToolOutcome {
@@ -155,7 +170,7 @@ export function toolDefinitions(scope: MasterScope): Anthropic.Messages.Tool[] {
     {
       name: "write_rows",
       description:
-        "Insert, update or delete rows. A delete, or an update touching more than one row, is refused the first time: describe the change to the operator, and once they agree call again with confirmed:true.",
+        "Insert, update or delete rows. A delete, or an update touching more than one row, is refused the first time: describe the change to the operator, and once they agree call again with confirmed:true. Never sets profiles.is_bot or profiles.bot_key. Integrations, credentials, tokens, contracts, billing and finance tables are refused unless the caller is a human admin. Bot sessions cannot call this tool.",
       input_schema: {
         type: "object",
         properties: {
@@ -317,6 +332,8 @@ export async function runTool(
     }
 
     case "write_rows":
+      // Service-role write. Bots are refused entirely, before any row is touched.
+      if (ctx.isBot) throw botForbidden();
       return writeRows(ctx, input, audit);
 
     case "list_agents": {
@@ -330,6 +347,8 @@ export async function runTool(
     }
 
     case "run_agent": {
+      // enqueue_agent_job_as runs as service_role. A bot does not get that.
+      if (ctx.isBot) throw botForbidden();
       const clientId = resolveClientId(ctx, input);
       const { data, error } = await ctx.sb.rpc("enqueue_agent_job_as", {
         p_actor: ctx.actorId,
@@ -346,6 +365,7 @@ export async function runTool(
     }
 
     case "run_all_agents": {
+      if (ctx.isBot) throw botForbidden();
       const clientId = resolveClientId(ctx, input);
       const { data, error } = await ctx.sb.rpc("start_master_run_as", {
         p_actor: ctx.actorId,
@@ -428,9 +448,21 @@ async function writeRows(
 ): Promise<ToolOutcome> {
   const table = String(input.table);
   const op = String(input.op);
-  const rule = ruleFor(table, ctx.scope, "write");
   const filters = (input.filters ?? []) as Filter[];
   const values = (input.values ?? {}) as Record<string, unknown>;
+
+  if (ctx.isBot) throw botForbidden();
+
+  // Independent of who is asking. service_role may change these columns in
+  // the database (migration 324's guard allows it), so the tool must not.
+  if (writeTouchesBotIdentity(table, values)) {
+    throw new ScopeError("write_rows cannot set or change profiles.is_bot or profiles.bot_key.");
+  }
+  if (!ctx.humanAdmin && isSensitiveServiceRoleTable(table)) {
+    throw new ScopeError(`write_rows cannot change ${table} unless the caller is a human admin.`);
+  }
+
+  const rule = ruleFor(table, ctx.scope, "write");
 
   if (op !== "insert" && filters.length === 0) {
     throw new ScopeError(`A ${op} needs filters. Refusing to touch every row in ${table}.`);
