@@ -137,6 +137,17 @@ begin
     end if;
   end loop;
 
+  if to_regprocedure('public.link_delivery_current_source_v6(public.delivery_entity_versions_v6, text, text, text)') is null then
+    raise exception 'link_delivery_current_source_v6 signature missing';
+  end if;
+  if has_function_privilege('public', 'public.link_delivery_current_source_v6(public.delivery_entity_versions_v6, text, text, text)', 'EXECUTE')
+     or has_function_privilege('anon', 'public.link_delivery_current_source_v6(public.delivery_entity_versions_v6, text, text, text)', 'EXECUTE')
+     or has_function_privilege('authenticated', 'public.link_delivery_current_source_v6(public.delivery_entity_versions_v6, text, text, text)', 'EXECUTE')
+     or not has_function_privilege('service_role', 'public.link_delivery_current_source_v6(public.delivery_entity_versions_v6, text, text, text)', 'EXECUTE')
+     or not has_function_privilege('postgres', 'public.link_delivery_current_source_v6(public.delivery_entity_versions_v6, text, text, text)', 'EXECUTE') then
+    raise exception 'link_delivery_current_source_v6 execute grants drifted';
+  end if;
+
   -- Migration 11 must never leave its known fallback password in the local
   -- fixture, even before B004 removes that fallback from source control.
   if exists (
