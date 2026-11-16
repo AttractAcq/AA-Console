@@ -45,11 +45,11 @@ Record the test client, operator, time, application SHA, runtime SHA, database m
 
 ## Release sequence and stop conditions
 
-Alex via Chief of Staff reviews the PR and executes merge, production migrations and Railway deployment under `AGENTS.md`. Before each step, record the source and target SHA, migration list, backup/recovery state, owner and time. Keep outward switches off until provider preflight and approval gates pass. After deployment, verify frontend/runtime/gateway identity, migration head, inbox blockers, error queues, provider read-back and both journeys again. Stop release if a required approval class, credential scope, route receipt, cross-client boundary or migration parity check fails. Reverting a frontend/runtime SHA does not reverse additive database migrations; assess data compatibility before rollback.
+Alex via Chief of Staff reviews the PR and executes merge, production migrations and Railway deployment under `AGENTS.md`. Before each step, record the source and target SHA, migration list, backup/recovery state, owner and time. Apply and verify the route-capture migration before deploying the browser code that calls its new RPC. Keep outward switches off until provider preflight and approval gates pass. After deployment, verify frontend/runtime/gateway identity, migration head, inbox blockers, error queues, provider read-back and both journeys again. Stop release if a required approval class, credential scope, route receipt, cross-client boundary or migration parity check fails. Reverting a frontend/runtime SHA does not reverse additive database migrations; assess data compatibility before rollback.
 
 ## Open work before completion
 
-- The lead record currently stores campaign and source references but no exact route package ID. Add capture of that immutable ID or an equivalent execution receipt before claiming approved-route-to-cash attribution.
+- The draft change records exact route package IDs on new campaign-page submissions, but is not deployed. Existing leads remain route-unknown. After deployment, verify a real consented submission and join its route ID to the lead and outcome records before claiming an approved-route-to-cash trace; provider execution still needs its own receipt.
 - CI clean and upgrade schema replay passed at the merged source. Configure production parity read access and reconcile the live migration head before deployment.
 - Execute the two authorized account journeys, negative cases, provider receipts and post-release identity checks. Record dates, owners, IDs and results here. Until then, Phases 8 and 9 remain incomplete.
 
