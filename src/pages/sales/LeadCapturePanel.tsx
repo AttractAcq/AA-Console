@@ -299,6 +299,7 @@ export function LeadCapturePanel() {
               { value: "", label: "No campaign" },
               ...campaigns.map((c) => ({ value: c.id, label: c.name })),
             ],
+            hint: "For a campaign page form, add the form in Website Studio so it binds an exact route package.",
           },
           {
             name: "page_id", label: "On which page", kind: "select",
@@ -315,6 +316,9 @@ export function LeadCapturePanel() {
           const purpose = String(values.purpose);
           if (purpose !== "page_form" && purpose !== "agent_handoff" && purpose !== "magnet_optin") {
             throw new Error("Choose what the link is for.");
+          }
+          if (purpose === "page_form" && values.campaign_id) {
+            throw new Error("Add a campaign page form in Website Studio to select its exact route package.");
           }
           const result = await createEndpoint({
             clientId,

@@ -78,7 +78,7 @@ export async function createEndpoint(args: {
   if (args.routePackageId && (args.purpose !== "page_form" || !args.campaignId || !args.pageId)) {
     throw new Error("An exact route package requires a campaign page form.");
   }
-  const routePage = args.purpose === "page_form";
+  const routePage = args.purpose === "page_form" && !!args.campaignId;
   if (routePage && !args.routePackageId) throw new Error("Select an exact route package for this page form.");
   const { data, error } = routePage ? await supabase.rpc("create_route_lead_capture_endpoint_v9", {
     p_client_id: args.clientId,
