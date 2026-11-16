@@ -91,13 +91,13 @@ describe("Google review reply provider transport", () => {
   });
 
   it("reconciles a reply with two GETs and records its moderation state", async () => {
-    const fetchImpl = vi.fn(async (url: string) => json(url === accountUrl
+    const fetchImpl = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => json(String(url) === accountUrl
       ? { name: "accounts/a1" }
       : { name, reviewReply: { comment: body, reviewReplyState: "PENDING",
-        updateTime: "2026-11-15T01:00:00Z" } })) as unknown as typeof fetch;
+        updateTime: "2026-11-15T01:00:00Z" } }));
     const observation = await readApprovedReviewReply({
       accessToken: "fixture-token", locationRef: base.locationRef,
-      reviewRef: base.reviewRef, fetchImpl,
+      reviewRef: base.reviewRef, fetchImpl: fetchImpl as typeof fetch,
     });
     expect(observation).toMatchObject({ reviewRef: name, providerState: "PENDING" });
     expect(observation.bodySha256).toMatch(/^[0-9a-f]{64}$/);

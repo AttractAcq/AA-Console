@@ -87,7 +87,7 @@ describe("reading a frozen page file", () => {
     expect(result).toEqual({ sha256: "1b38a67c92e7991e6d18caf73bdc8f5abdea31a932e24441f71b7c966b7989bd",
       blobSha: "blob-sha" });
     expect(calls).toHaveLength(1);
-    expect(calls[0].method).toBe("GET");
+    expect(calls[0]!.method).toBe("GET");
   });
 
   it("distinguishes a missing file from unreadable or unsafe targets", async () => {

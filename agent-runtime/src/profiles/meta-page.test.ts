@@ -16,8 +16,8 @@ describe("isolated Facebook Page field transport", () => {
       if (init?.method === "POST") return json({ success: true });
       pageReads += 1;
       return json({ id: "123456", about: pageReads === 1 ? "Before" : "After" });
-    }) as unknown as typeof fetch;
-    await expect(updateMetaPageField({ ...request, assertPrewrite, fetchImpl }))
+    });
+    await expect(updateMetaPageField({ ...request, assertPrewrite, fetchImpl: fetchImpl as typeof fetch }))
       .resolves.toEqual({ providerRef: "facebook_page:123456#about", readbackValue: "After" });
     expect(fetchImpl).toHaveBeenCalledTimes(4);
     expect(assertPrewrite).toHaveBeenCalledTimes(1);
