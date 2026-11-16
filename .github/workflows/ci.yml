@@ -82,6 +82,12 @@ jobs:
       # Vitest transforms ESM modules and missed a real production import
       # cycle. Import the compiled module under Node 22 as Railway does.
       - run: node --input-type=module -e "await import('./dist/campaigns/actions/executor.js')"
+      # With credentials deliberately absent, the complete server module graph
+      # must reach config validation before it could start a worker or HTTP port.
+      - run: >-
+          ANTHROPIC_API_KEY= node --input-type=module -e
+          "try { await import('./dist/server.js'); throw new Error('Server unexpectedly started'); }
+          catch (error) { if (error?.message !== 'Missing required environment variable: ANTHROPIC_API_KEY') throw error; }"
 
   aa-mcp-gateway:
     name: MCP gateway (typecheck, test, build)
