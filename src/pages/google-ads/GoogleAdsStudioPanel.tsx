@@ -8,6 +8,7 @@ import { dayOrDash } from "../../lib/contentRecords";
 import { enqueueAgentJob, supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
 import { GoogleOperatorBundlePanel } from "./GoogleOperatorBundlePanel";
+import { GoogleAdsReadPanel } from "./GoogleAdsReadPanel";
 
 type SheetDue = Database["public"]["Views"]["google_ads_sheet_due"]["Row"];
 type Sheet = Database["public"]["Tables"]["google_ads_build_sheets"]["Row"];
@@ -33,8 +34,9 @@ interface Derived {
 /**
  * Google Ads Studio.
  *
- * There is no Google Ads adapter in this repository, and this page does not
- * pretend otherwise. What it does is the half that can be proven without an
+ * There is no Google Ads build adapter in this repository. The read-only
+ * account inventory is separate from the manual build. What this sheet does
+ * is the half that can be proven without an
  * account: every object a paid-Google campaign needs, written out from its own
  * package for somebody with Ads Manager access to build by hand.
  *
@@ -121,7 +123,7 @@ export function GoogleAdsStudioPanel({ tab }: { tab: Tab }) {
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="font-semibold">The build a person does by hand</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              There is no Google Ads adapter in this runtime, so a paid-Google campaign is built in
+              There is no Google Ads build adapter in this runtime, so a paid-Google campaign is built in
               Ads Manager. This writes out every object from the campaign's own package, so a hand
               build and a later automated one cannot disagree about what was intended. It holds no
               credential, which is why it works precisely when the automated path would not.
@@ -263,6 +265,7 @@ export function GoogleAdsStudioPanel({ tab }: { tab: Tab }) {
 
       {tab === "account" && (
         <div className="space-y-4">
+          <GoogleAdsReadPanel clientId={clientId} />
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="font-semibold">Account</h3>
             {due.some((row) => row.google_account) ? (
@@ -272,8 +275,8 @@ export function GoogleAdsStudioPanel({ tab }: { tab: Tab }) {
                   {due.find((row) => row.google_account)?.google_account}
                 </code>
                 <span className="mt-1 block text-xs text-muted-foreground">
-                  Recorded for reference only. Nothing in this runtime calls the Google Ads API, so
-                  this credential is not used to build anything.
+                  A separate read-only account job can use this credential after its access grant.
+                  It is never used to build or activate ads.
                 </span>
               </p>
             ) : (

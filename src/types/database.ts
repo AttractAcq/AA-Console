@@ -14214,6 +14214,53 @@ export type Database = {
           },
         ]
       }
+      google_ads_campaign_reads_v7: {
+        Row: {
+          channel: string
+          clicks: number
+          client_id: string
+          conversions: number
+          cost_micros: number
+          external_campaign_id: string
+          impressions: number
+          name: string
+          run_id: string
+          status: string
+        }
+        Insert: {
+          channel: string
+          clicks: number
+          client_id: string
+          conversions: number
+          cost_micros: number
+          external_campaign_id: string
+          impressions: number
+          name: string
+          run_id: string
+          status: string
+        }
+        Update: {
+          channel?: string
+          clicks?: number
+          client_id?: string
+          conversions?: number
+          cost_micros?: number
+          external_campaign_id?: string
+          impressions?: number
+          name?: string
+          run_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_ads_campaign_reads_v7_run_id_client_id_fkey"
+            columns: ["run_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_read_runs_v7"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
       google_ads_copy: {
         Row: {
           campaign_id: string
@@ -14335,6 +14382,112 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_ads_read_runs_v7: {
+        Row: {
+          client_id: string
+          credential_secret_id: string
+          currency: string
+          customer_id: string
+          fetched_at: string
+          from_date: string
+          id: string
+          integration_id: string
+          job_id: string
+          provider_request_id: string
+          through_date: string
+        }
+        Insert: {
+          client_id: string
+          credential_secret_id: string
+          currency: string
+          customer_id: string
+          fetched_at?: string
+          from_date: string
+          id?: string
+          integration_id: string
+          job_id: string
+          provider_request_id: string
+          through_date: string
+        }
+        Update: {
+          client_id?: string
+          credential_secret_id?: string
+          currency?: string
+          customer_id?: string
+          fetched_at?: string
+          from_date?: string
+          id?: string
+          integration_id?: string
+          job_id?: string
+          provider_request_id?: string
+          through_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_ads_read_runs_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_ads_read_runs_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_ads_read_runs_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_ads_read_runs_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_ads_read_runs_v7_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "client_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_ads_read_runs_v7_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integration_health"
+            referencedColumns: ["integration_id"]
+          },
+          {
+            foreignKeyName: "google_ads_read_runs_v7_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_ads_read_runs_v7_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "google_ads_read_runs_v7_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -14482,6 +14635,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "google_operator_bundles_v7"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_operator_events_v7_bundle_id_fkey"
+            columns: ["bundle_id"]
+            isOneToOne: false
+            referencedRelation: "google_operator_google_match_v7"
+            referencedColumns: ["bundle_id"]
           },
           {
             foreignKeyName: "google_operator_events_v7_recorded_by_fkey"
@@ -31721,6 +31881,80 @@ export type Database = {
           },
         ]
       }
+      google_operator_google_match_v7: {
+        Row: {
+          bundle_id: string | null
+          campaign_id: string | null
+          channel: string | null
+          clicks: number | null
+          client_id: string | null
+          configured_customer_id: string | null
+          conversions: number | null
+          cost_micros: number | null
+          currency: string | null
+          fetched_at: string | null
+          from_date: string | null
+          impressions: number | null
+          match_state: string | null
+          observed_name: string | null
+          observed_status: string | null
+          read_run_id: string | null
+          reported_at: string | null
+          reported_campaign_id: string | null
+          through_date: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+        ]
+      }
       google_profile_due: {
         Row: {
           blocker: string | null
@@ -40717,6 +40951,21 @@ export type Database = {
           p_post_id: string
         }
         Returns: undefined
+      }
+      record_google_ads_read_v7: {
+        Args: {
+          p_campaigns: Json
+          p_client_id: string
+          p_credential_secret_id: string
+          p_currency: string
+          p_customer_id: string
+          p_from_date: string
+          p_integration_id: string
+          p_job_id: string
+          p_request_id: string
+          p_through_date: string
+        }
+        Returns: string
       }
       record_google_ads_sheet_for_manifest_v6: {
         Args: {

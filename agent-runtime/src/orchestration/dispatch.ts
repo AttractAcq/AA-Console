@@ -51,6 +51,7 @@ import { runMetaProfileReconciliationJob } from "../profiles/meta-profile-reconc
 import { runGoogleReplySenderJob } from "../google-profile/reply-job.js";
 import { runGoogleReplyReconciliationJob } from "../google-profile/reply-reconciliation-job.js";
 import { runGoogleAdsSheetJob } from "../agents/google_ads_sheet/index.js";
+import { runGoogleAdsReadJob } from "../agents/google_ads_read/index.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
 import { runClientApprovalDispatchJob } from "../agents/client_approval_dispatch/index.js";
 import { deadlineFromNow } from "./deadline.js";
@@ -207,6 +208,7 @@ const RUNNERS: Record<string, JobRunner> = {
   // object written out for a hand build. Reads only, calls nothing, and holds
   // no credential — so it works precisely when the automated path does not.
   google_ads_sheet: runGoogleAdsSheetJob,
+  google_ads_read: runGoogleAdsReadJob,
   // outcome until that product decision is made.
 };
 

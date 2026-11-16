@@ -74,6 +74,10 @@ export interface RuntimeConfig {
   googleReviewReplyEnabled: boolean;
   /** Separate release for exact Google profile field writes; off by default. */
   googleProfileFieldWriteEnabled: boolean;
+  /** Read-only Google Ads reporting. Missing token keeps the reader unavailable. */
+  googleAdsDeveloperToken?: string | null;
+  /** Manager account only when the OAuth user accesses clients through one. */
+  googleAdsLoginCustomerId?: string | null;
   /** Separate release for exact Facebook Page field writes; off by default. */
   metaProfileFieldWriteEnabled: boolean;
   /**
@@ -330,6 +334,8 @@ export function loadConfig(): RuntimeConfig {
       (optionalEnv("GOOGLE_REVIEW_REPLY_ENABLED") ?? "false").toLowerCase() === "true",
     googleProfileFieldWriteEnabled:
       (optionalEnv("GOOGLE_PROFILE_FIELD_WRITE_ENABLED") ?? "false").toLowerCase() === "true",
+    googleAdsDeveloperToken: optionalEnv("GOOGLE_ADS_DEVELOPER_TOKEN") ?? null,
+    googleAdsLoginCustomerId: optionalEnv("GOOGLE_ADS_LOGIN_CUSTOMER_ID") ?? null,
     metaProfileFieldWriteEnabled:
       (optionalEnv("META_PROFILE_FIELD_WRITE_ENABLED") ?? "false").toLowerCase() === "true",
     campaignActionsEnabled:
