@@ -63,6 +63,7 @@ export async function createEndpoint(args: {
   purpose: "magnet_optin" | "page_form" | "agent_handoff";
   consentWording: string;
   campaignId?: string | null;
+  routePackageId?: string | null;
   pageId?: string | null;
   sourceChannel?: string | null;
   magnetVersionId?: string | null;
@@ -74,7 +75,21 @@ export async function createEndpoint(args: {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
   const hash = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 
-  const { data, error } = await supabase.rpc("create_lead_capture_endpoint_v6", {
+  if (args.routePackageId && (args.purpose !== "page_form" || !args.campaignId || !args.pageId)) {
+    throw new Error("An exact route package requires a campaign page form.");
+  }
+  const routePage = args.purpose === "page_form" && !!args.campaignId;
+  if (routePage && !args.routePackageId) throw new Error("Select an exact route package for this page form.");
+  const { data, error } = routePage ? await supabase.rpc("create_route_lead_capture_endpoint_v9", {
+    p_client_id: args.clientId,
+    p_token_hash: hash,
+    p_consent_wording: args.consentWording.trim(),
+    p_campaign_id: args.campaignId!,
+    p_page_id: args.pageId!,
+    p_source_channel: args.sourceChannel ?? "",
+    p_route_package_id: args.routePackageId!,
+    ...(args.days ? { p_days: args.days } : {}),
+  }) : await supabase.rpc("create_lead_capture_endpoint_v6", {
     p_client_id: args.clientId,
     p_purpose: args.purpose,
     p_token_hash: hash,

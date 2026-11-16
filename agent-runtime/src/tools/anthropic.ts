@@ -14,7 +14,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "../logging/logger.js";
 import { estimateCostUsd, type TokenUsage } from "../usage/cost.js";
 
-import { unsupportedStrictKeywords } from "./schema.js";
+import { missingStrictObjectClosures, unsupportedStrictKeywords } from "./schema.js";
 
 export interface SubmitToolSpec {
   name: string;
@@ -137,6 +137,13 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
   if (unsupported.length > 0) {
     throw new ProviderError(
       `The ${submitTool.name} schema uses ${unsupported.join(", ")}, which the API rejects for strict tools. Enforce the constraint in code after the model answers instead.`,
+      false,
+    );
+  }
+  const openObjects = missingStrictObjectClosures(submitTool.inputSchema);
+  if (openObjects.length > 0) {
+    throw new ProviderError(
+      `The ${submitTool.name} strict schema needs additionalProperties: false at ${openObjects.join(", ")}.`,
       false,
     );
   }

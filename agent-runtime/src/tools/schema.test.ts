@@ -1,9 +1,28 @@
 import { describe, expect, it } from "vitest";
 import {
   unsupportedStrictKeywords,
+  missingStrictObjectClosures,
   missingStrictRequired,
   UNSUPPORTED_STRICT_KEYWORDS,
 } from "./schema.js";
+
+describe("missingStrictObjectClosures", () => {
+  it("finds every object without an explicit closed schema", () => {
+    expect(missingStrictObjectClosures({
+      type: "object", properties: {
+        rows: { type: "array", items: { type: "object", properties: {} } },
+      },
+    })).toEqual(["(root)", "properties.rows.items"]);
+  });
+
+  it("accepts explicitly closed objects", () => {
+    expect(missingStrictObjectClosures({
+      type: "object", additionalProperties: false, properties: {
+        row: { type: "object", additionalProperties: false, properties: {} },
+      },
+    })).toEqual([]);
+  });
+});
 
 describe("unsupportedStrictKeywords", () => {
   it("passes a schema built from the supported subset", () => {

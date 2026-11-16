@@ -65,6 +65,9 @@ type Journey = {
   sale_value: number | null;
   cash_collected: number | null;
   outcome_events: number;
+  route_package_ids: string[];
+  capture_submissions: number;
+  unknown_route_submissions: number;
 };
 
 const WINDOWS = [
@@ -103,7 +106,7 @@ export function AttributionPanel() {
       supabase.rpc("acquisition_funnel", { p_client_id: clientId, p_days: days }),
       supabase.rpc("top_content_by_revenue", { p_client_id: clientId, p_limit: 10 }),
       supabase.rpc("acquisition_coverage_v8", { p_client_id: clientId, p_days: days }),
-      supabase.rpc("lead_journey_trace_v8", { p_client_id: clientId, p_days: days, p_limit: 50 }),
+      supabase.rpc("lead_journey_trace_v9", { p_client_id: clientId, p_days: days, p_limit: 50 }),
     ]);
     if (f.error || t.error || c.error || j.error || !f.data?.[0] || !c.data?.[0]) {
       setError(f.error?.message ?? t.error?.message ?? c.error?.message ?? j.error?.message
@@ -166,12 +169,14 @@ export function AttributionPanel() {
 
       <section>
         <h2 className="mb-2 text-sm font-semibold text-foreground">Recorded lead journeys</h2>
-        <p className="mb-3 text-xs text-muted-foreground">Latest 50 non-test leads in this window. A campaign mode does not prove which route package or provider action caused a lead. Unknown links remain unknown; archived source records remain traceable. Lead sale and cash amounts have no stored currency.</p>
-        <DataTable columns={["Lead", "Source", "Campaign", "Opportunity / offer", "Asset / page / agent", "Outcome", "Recorded sale / cash"]}
+        <p className="mb-3 text-xs text-muted-foreground">Latest 50 non-test leads in this window. Route IDs record capture doors, not which route caused a sale or whether a provider action ran. Unknown links remain unknown; archived source records remain traceable. Lead sale and cash amounts have no stored currency.</p>
+        <DataTable columns={["Lead", "Source / route", "Campaign", "Opportunity / offer", "Asset / page / agent", "Outcome", "Recorded sale / cash"]}
           emptyLabel="No recorded lead journeys in this window."
           rows={journeys.map((j) => [
             <span title={j.lead_id}>{j.lead_id.slice(0, 8)} · {new Date(j.lead_created_at).toLocaleDateString()}</span>,
-            j.source_channel ?? "unknown",
+            <span>{j.source_channel ?? "unknown"}<br />{j.route_package_ids.length
+              ? j.route_package_ids.map((id) => <span key={id} title={id}>route {id.slice(0, 8)}<br /></span>)
+              : "route unknown"}{j.unknown_route_submissions > 0 ? ` · ${j.unknown_route_submissions} unlinked capture${j.unknown_route_submissions === 1 ? "" : "s"}` : ""}</span>,
             j.campaign_id ? <span title={j.campaign_id}>{j.campaign_name ?? j.campaign_id.slice(0, 8)}{j.campaign_mode ? ` · ${j.campaign_mode}` : ""}</span> : "unknown",
             <span>{j.opportunity_ids.length ? `${j.opportunity_ids.length} linked` : "opportunity unknown"}<br />{j.offer_version_id ? <span title={j.offer_version_id}>offer {j.offer_version_id.slice(0, 8)}</span> : "offer unknown"}</span>,
             <span>{j.asset_id ? <span title={j.asset_id}>{j.asset_title ?? `asset ${j.asset_id.slice(0, 8)}`}</span> : "asset unknown"}<br />{j.page_id ? <span title={j.page_id}>{j.page_title ?? `page ${j.page_id.slice(0, 8)}`}</span> : "page unknown"}<br />{j.sales_agent_id ? <span title={j.sales_agent_id}>agent {j.sales_agent_id.slice(0, 8)}</span> : "agent unknown"}</span>,

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "ca51b038e29bbb451704ca38bed8ce0c6950b03f5df5a729c4e3f7a406fb41aa",
-  "generatedTypesSha256": "cfb8ed24dae133cb1dbf069e5077102c3c3554480c00a30d5d4618f96eca887e",
-  "generatedSchemaBodySha256": "63ad8c8d98921c11edcc9fa5f3a7801cee26d32052cea984be38c6a0b0a56da5",
+  "migrationSourceDigest": "f6ce7191c1fd6cc0396efc2541da8aa400b7403bb530072115989656cf1d6f41",
+  "generatedTypesSha256": "1ad74407b29c14f30c6b7d87f0c53a5a5155f30b5c425a7aea726d5fe4b91635",
+  "generatedSchemaBodySha256": "d869783ae25e006d556a0c42e01b05783543683fcac614b23c34f54e1b6f1be6",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2416,8 +2416,8 @@
       "version": "20261124000300",
       "name": "328_service_offer_inbox",
       "filename": "20261124000300_328_service_offer_inbox.sql",
-      "sha256": "e80d664f40543c7ddbaf16de74fc4ff7fef0cd838ddf99d95bc7150d2aa70594",
-      "trimmedMd5": "c15e4996a19dedbaa132d0dd801200bc"
+      "sha256": "c25b2a27dc11ebc717c83ff74334cb64d6b598363296fca85c8f2cb9cb40104b",
+      "trimmedMd5": "bd7e4d79159d14ba40d101e5b9eed18f"
     },
     {
       "version": "20261124000400",
@@ -3965,6 +3965,13 @@
       "filename": "20261124034400_549_caller_security_for_execution_views.sql",
       "sha256": "a3aa2678172d4c9d53750dfbc72f8a7261a45d7de1fc9bddc6923a23489dc474",
       "trimmedMd5": "b0627e06c6f796ab4feff47ce81dd7a8"
+    },
+    {
+      "version": "20261124034500",
+      "name": "550_route_capture_lineage",
+      "filename": "20261124034500_550_route_capture_lineage.sql",
+      "sha256": "4621b74786949bc2f442d247dd4f0901e19b717e7e0a482f1dc20649fe8e7895",
+      "trimmedMd5": "046611b3d38975f6de83203ae5eaf30b"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

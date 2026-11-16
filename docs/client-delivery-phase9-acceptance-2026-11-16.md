@@ -1,6 +1,6 @@
 # Client delivery Phase 9 acceptance and release record
 
-**Status:** prepared for review, not executed on a live client. **Candidate:** draft PR #356, branch `feat/client-delivery-phases3-9`; record the exact head SHA at release. This record follows the [build plan](client-delivery-build-plan-2026-11-14.md) and `AGENTS.md`.
+**Status:** blocked / not accepted after a read-only production inspection on 16 November 2026. **Merged source:** PR #356, merge commit `70c012f0f7205ee3d98a171aaf9c354841edcfc3`. The deployed browser and runtime do not match that commit. The live observations below were supplied by the desktop browser operator; this CLI session did not independently access the Console. This record follows the [build plan](client-delivery-build-plan-2026-11-14.md) and `AGENTS.md`.
 
 ## Evidence rules
 
@@ -8,12 +8,12 @@ Record the test client, operator, time, application SHA, runtime SHA, database m
 
 | Gate | Evidence to attach | Current status |
 | --- | --- | --- |
-| Schema | Clean upgrade replay, schema parity, migration list and generated types | Full-head disposable start and Phase 8 fixtures passed; local CLI reset health failure leaves upgrade equivalence open |
-| Application | Frontend/runtime build and focused page tests at candidate SHA | Passed locally through `1fb71ef` |
+| Schema | Clean upgrade replay, schema parity, migration list and generated types | CI clean and upgrade replay passed at source `49a30e6`; live migration head `20261115190000` and parity report unavailable. Production equivalence unknown. |
+| Application | Frontend/runtime build and focused page tests at candidate SHA | All four CI jobs passed at `49a30e6`; live browser and runtime are behind the merged commit. |
 | Organic journey | Approved exact asset and slot, provider publish receipt and read-back, captured lead with consent, sale and cash | Needs authorized test client and live provider run |
 | Paid operator journey | Approved bundle hash, downloaded bytes, named handoff, external campaign/ad IDs, account read-back and metrics, lead and outcome | Needs authorized operator and live account run |
 | Archive | Each domain archived and restored, historical attribution preserved, rejection reason retained | Six record domains passed disposable rollback fixture; live retrieval check open |
-| Release identity | Deployed frontend/runtime/gateway SHA and database migration head | Pending Alex via Chief of Staff |
+| Release identity | Deployed frontend/runtime/gateway SHA and database migration head | Browser `ca82a3c`, runtime `20c3ec8`, gateway `70c012f`, migration `20261115190000`; mixed release, not accepted. |
 
 ## Journey A — organic and proof
 
@@ -45,10 +45,61 @@ Record the test client, operator, time, application SHA, runtime SHA, database m
 
 ## Release sequence and stop conditions
 
-Alex via Chief of Staff reviews the PR and executes merge, production migrations and Railway deployment under `AGENTS.md`. Before each step, record the source and target SHA, migration list, backup/recovery state, owner and time. Keep outward switches off until provider preflight and approval gates pass. After deployment, verify frontend/runtime/gateway identity, migration head, inbox blockers, error queues, provider read-back and both journeys again. Stop release if a required approval class, credential scope, route receipt, cross-client boundary or migration parity check fails. Reverting a frontend/runtime SHA does not reverse additive database migrations; assess data compatibility before rollback.
+Alex via Chief of Staff reviews the PR and executes merge, production migrations and Railway deployment under `AGENTS.md`. Before each step, record the source and target SHA, migration list, backup/recovery state, owner and time. Apply and verify the route-capture migration before deploying the browser code that calls its new RPC. Keep outward switches off until provider preflight and approval gates pass. After deployment, verify frontend/runtime/gateway identity, migration head, inbox blockers, error queues, provider read-back and both journeys again. Stop release if a required approval class, credential scope, route receipt, cross-client boundary or migration parity check fails. Reverting a frontend/runtime SHA does not reverse additive database migrations; assess data compatibility before rollback.
 
 ## Open work before completion
 
-- The lead record currently stores campaign and source references but no exact route package ID. Add capture of that immutable ID or an equivalent execution receipt before claiming approved-route-to-cash attribution.
-- Run the full schema upgrade replay in CI or a healthy disposable environment; the local CLI reset health failure is environmental evidence, not a passing upgrade test.
+- The draft change records exact route package IDs on new campaign-page submissions, but is not deployed. Existing leads remain route-unknown. After deployment, verify a real consented submission and join its route ID to the lead and outcome records before claiming an approved-route-to-cash trace; provider execution still needs its own receipt.
+- CI clean and upgrade schema replay passed at the merged source. Configure production parity read access and reconcile the live migration head before deployment.
 - Execute the two authorized account journeys, negative cases, provider receipts and post-release identity checks. Record dates, owners, IDs and results here. Until then, Phases 8 and 9 remain incomplete.
+
+## Read-only live inspection — 16 November 2026
+
+**Result: BLOCKED / NOT ACCEPTED.** Operator: Codex acting for Alex through the signed-in desktop Chrome AA Console tab. Client `e4b4b001-81f6-4997-8429-ff21f4ee1fbe` is the in-house Attract Acquisition account. Its use as an isolated disposable test fixture was not established. The production project shown was `bancbdztffokwiifzoiv`. System Readiness displayed a snapshot at 15:50:07, identities through 15:50:08, and a worker heartbeat at 15:50:09; display timezone was not independently verified. No application data, switches, approvals, credentials, migrations or deployments were changed. No publish, ad activation, lead submission, sale or cash event was performed.
+
+| Component | Observed live identity | Assessment |
+| --- | --- | --- |
+| Merged source | `70c012f0f7205ee3d98a171aaf9c354841edcfc3` | GitHub resolved full SHA. |
+| Browser | `ca82a3c605bac1cb5345c96d1811ab7e93b8ba51` | Four commits behind target in GitHub comparison; target absent. |
+| Runtime | `20c3ec8d5b97070f6584ae13ae29254105f869e2` | One commit behind target in GitHub comparison; path-level equivalence unknown. |
+| Gateway | `70c012f0f7205ee3d98a171aaf9c354841edcfc3` | Exact SHA match. |
+| Database | migration head `20261115190000`; 341 tracked entries | Upgrade parity with merged source unknown. |
+| Schema parity | Admin reports “Schema parity read access is not configured.” | No validated production report. |
+
+The merged source's `supabase/verification/browser-release-components.json` pins runtime `97669c6a454d1678fc0c0e6752791dd42862de21`, gateway `e3447aba23b2af6081c526fe5b8fd12225decdc9`, and migration `20261111020000`. These differ from live observations. Different component SHAs alone do not prove incompatible code, but the browser is demonstrably behind the merged source. Cron registry equivalence is also unknown. A fresh worker, `agent-runtime:1:780cb6b1-3be0-4c68-b695-5d9ecde89d89`, reported the runtime SHA above, heartbeat 15:50:07, queued 0 and active 0. Historical stale workers were excluded from the fresh-fleet assessment. Runtime publishing was On; proof publishing, campaign actions, lead magnet delivery and outbound messaging were Off; the global database Engine was Off. Generic campaign action claims and profile PATCH were explicitly held. Stored credentials were not treated as proof of validity.
+
+### Journey A — organic and proof
+
+Campaign `457e0ca8-8af6-4ead-a39d-d5326c729882` (“AA Organic Launch — 14 Day”) was a legacy Planning record dated 24 September–7 October 2026. The inspected view had no established approved opportunity, offer or organic route package version; planner work was awaited, 0/28 content was ready, no HTML page or built live attached sales agent was present, and there was no manifest. It was marked Not live. UI counts showed actions 0/0, posts 0, pages 0/0 and leads 0; spend days were unknown. These are local counters, not provider read-back.
+
+Engine settings were incomplete: no current month cap, empty timezone, zero cadence and no posting windows, with the global Engine off. Client Engine, publishing, proof, campaign actions, outbound and magnet-delivery switches were off; booking was not set up. Dashboard idea/brief policy switches showed On while both Engine settings were unchecked, an unresolved UI/source discrepancy. Facebook was stored as connected without live account/scope diagnostics; Instagram was stored in error. The Meta integration was stored active with Page ID `873864622487705` and a displayed last check of 04:15:03, but exact-account publishing and ads capability were not preflighted. The main-website proof destination was On while runtime proof publishing was Off; rights version, artifact and placement receipt were unknown. Admin showed no lead capture endpoints. A client agent deployment `e70a4062-1e63-4f39-ac3c-b42b681589ab` was On, which does not prove campaign attachment, exact approval or public health. Unified Inbox's default Pending filter loaded 0/0; historical and owning queues were not exhaustively inspected. No provider post ID, URL, timestamp, receipt or read-back was established.
+
+### Journey B — paid operator and outcomes
+
+Meta Ads Studio reported paid distribution unavailable and Schedule Paid disabled. Its November calendar showed no scheduled image assets; Paid Reporting said no paid metrics were ingested for the period. No approved operator bundle, exact hash, verified download, handoff, destination account, campaign/ad ID, activation or provider read-back was established. Spend, currency, metric freshness, impressions, clicks, cost and return remain unknown rather than observed zero.
+
+Attribution OS displayed local totals of 0 leads, conversations, appointments and sales, and R0 cash. Those UI values do not prove external zero outcomes. There was no acceptance lead with consent wording, intake ID, click/UTM/source, exact route identity, conversation, appointment, sale or cash receipt. No synthetic outcomes were entered.
+
+### Existing failures and unexecuted cases
+
+Dashboard displayed 17 failed runs. Observed examples included `opportunity_evaluate` receiving Anthropic HTTP 400 for missing `additionalProperties=false`; `meta_build_sheet` missing template/objective, daily budget, current campaign dates and approved image ad copy; and `video_edit` QA failures for prescribed shots, captions, colours and compositing. These were pre-existing observations. Exact job IDs and retry outcomes were not established. The evaluator's schema defect is being addressed in a follow-up code change; its presence in the live runtime is not proof that the follow-up has deployed.
+
+Controlled invalid-credential/wrong-account, stale-approval, revoked-rights, duplicate-effect, failed-generation/publish-and-retry, cross-client/AAL2, and archive/restore checks were **not executed**, therefore not passed. A disposable approved fixture and restricted identity were unavailable. Missing metrics were recorded as unknown.
+
+**Stop decision:** keep outward switches off. The release owner must reconcile the browser/runtime/schema identities and release pins, configure read-only production parity, establish exact approved organic and paid test versions, complete scoped account preflight, and designate an isolated fixture before either journey can run. Record queue, approval, attempt, provider acknowledgement, read-back, lead, sale and cash as separate evidence. No migration, deployment or ad spend is authorized by this read-only inspection. Phases 8 and 9 remain incomplete.
+
+## Local pre-live follow-up — route capture lineage
+
+The follow-up change on PR #358 adds a route-specific campaign page-form endpoint, snapshots its exact route package on every submission, and displays recorded capture route IDs in Attribution. General Sales OS capture links without a campaign remain supported and have an unknown route; campaign page forms must be created in Website Studio. Existing endpoints and historical submissions remain unknown. The route ID describes the capture door, not provider execution or sale causation. The endpoint starts disabled and still needs the existing activation and exact page approval flow.
+
+The new database guards reject wrong campaign/client routes, stale plan packages, route retargeting and submission source rewrites. A disposable rollback fixture covers route binding, snapshot, client-read authorization and rejection paths. Local verification passed: clean replay, released-to-current upgrade equivalence, catalog contract, generated types, all four Phase 8 rollback fixtures, 35 focused UI tests and a production frontend build. This is local source preparation only; the new migration and browser code have not been deployed, and no live capture has been performed. The live release and provider gates above remain blocked.
+
+All four GitHub CI jobs passed on draft PR #358 at `4f13875ab37b1a677c6c3e0d9604637c505d8859`: frontend, agent runtime, MCP gateway and schema replay. This supersedes the earlier Linux schema-start failure at `777fe52`; the replay preparation now preserves the Linux container configuration while disabling optional analytics only for macOS Colima. CI validates source, not the production release identity or external provider route.
+
+The subsequent disposable Phase 8 fixture now exercises the actual route-specific endpoint creation, AAL1 denial and exact AAL2 activation, consent refusal, public capture RPC, idempotent replay, returning-lead deduplication, source click/UTM preservation, route snapshot immutability, Sales OS stage and cash updates, archive RPC, and client-scoped journey trace. Clean replay, released-to-current upgrade, catalog contract, generated types and all four Phase 8 fixtures passed locally. Optional local Storage and Vector containers were excluded after Colima reported an unrelated Storage health failure; the database checks and fixture ran against the complete migration head. This strengthens local capture-to-cash evidence but does not establish an approved production asset or provider execution receipt.
+
+The shared dialog accessibility review found that keyboard focus could leave an open review form. The change now focuses the dialog on open, traps Tab and Shift-Tab within the topmost dialog, restores focus to the opener on close, and gives field hints an `aria-describedby` link. Focused keyboard, Approval Inbox and page-builder tests (101 total), lint and frontend production build passed locally. VoiceOver, contrast and 200% zoom checks remain for the desktop acceptance pass; this code-level result does not certify the entire Console against WCAG 2.1 AA.
+
+The route-capture activation guard now rechecks the current plan fingerprint, latest route package and page link at the final enable step. It also refuses activation of a route-free campaign page form created through the older generic endpoint API. The exact AAL2 decision transaction rolls back if this guard rejects it; already-live historical endpoints are not retargeted. The expanded disposable fixture passed both negative cases, along with clean replay, upgrade equivalence, generated types and all four Phase 8 rollback fixtures. The frontend CI discovered that an existing form relies on the backdrop's accessible close action; that action remains named but is removed from Tab order. The affected dialog, form and page-builder test group (40 tests), lint and TypeScript pass locally.
+
+All four CI jobs passed at code head `8850bdf1f598efbddfe56fe49390e0e40a680df5` in [run 43922976702](https://github.com/AttractAcq/AA-Console/actions/runs/43922976702): frontend, runtime, gateway and schema replay. The schema job included the Phase 8 rollback fixtures. PR #358 is ready for review. This proves the candidate source checks, not deployment, production parity, provider capability or the live journeys. The release boundary in `AGENTS.md` still assigns merge, production migrations and Railway deployment to Alex via Chief of Staff.

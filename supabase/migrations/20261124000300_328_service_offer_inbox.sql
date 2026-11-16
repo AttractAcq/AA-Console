@@ -58,7 +58,7 @@ create trigger service_offer_inbox_request_v6
 
 -- Existing unsigned latest versions need a visible decision card too. Historical
 -- signoffs remain historical; do not fabricate a retroactive AAL2 decision.
-do $$ declare v record; begin
+do $$ declare v public.service_offer_versions%rowtype; begin
   for v in select ov.* from public.service_offer_versions ov
     where not exists (select 1 from public.service_offer_versions newer
       where newer.offer_id = ov.offer_id and newer.version > ov.version)

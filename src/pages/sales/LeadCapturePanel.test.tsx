@@ -196,6 +196,19 @@ describe("the doors", () => {
     expect(await screen.findByText("Capture link — copy it now")).toBeInTheDocument();
     expect(screen.getByText("f".repeat(64))).toBeInTheDocument();
   });
+
+  it("sends campaign page forms to the route-bound Website Studio flow", async () => {
+    const user = userEvent.setup();
+    render(<LeadCapturePanel />);
+    await user.click(await screen.findByRole("button", { name: "Open a capture link" }));
+    await user.selectOptions(screen.getByLabelText(/What it is for/), "page_form");
+    await user.type(screen.getByLabelText(/What they are agreeing to/),
+      "I agree to being contacted about my enquiry.");
+    await user.selectOptions(screen.getByLabelText(/Attribute to campaign/), "camp-1");
+    await user.click(screen.getByRole("button", { name: "Open it" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Website Studio");
+    expect(createEndpoint).not.toHaveBeenCalled();
+  });
 });
 
 describe("what did not become a lead", () => {
