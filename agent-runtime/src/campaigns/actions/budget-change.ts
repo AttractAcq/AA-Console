@@ -21,7 +21,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { RuntimeConfig } from "../../config.js";
-import { ActionError, assertActionPrewrite, type ActionHandler } from "./executor.js";
+import type { ActionHandler } from "./executor.js";
+import { ActionError, assertActionPrewrite } from "./prewrite.js";
 import { MetaWriteError, readAdSetBudget, updateAdSetDailyBudget } from "../../meta/ads.js";
 import { adAccountFor } from "../../meta/account.js";
 

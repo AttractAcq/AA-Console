@@ -79,6 +79,9 @@ jobs:
       - run: npm test
       - run: node --test ingress/server.node-test.mjs
       - run: npm run build
+      # Vitest transforms ESM modules and missed a real production import
+      # cycle. Import the compiled module under Node 22 as Railway does.
+      - run: node --input-type=module -e "await import('./dist/campaigns/actions/executor.js')"
 
   aa-mcp-gateway:
     name: MCP gateway (typecheck, test, build)

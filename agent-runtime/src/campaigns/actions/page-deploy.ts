@@ -26,7 +26,8 @@ import { createHash, randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { RuntimeConfig } from "../../config.js";
-import { ActionError, assertActionPrewrite, type ActionHandler, type ActionOutcome } from "./executor.js";
+import type { ActionHandler, ActionOutcome } from "./executor.js";
+import { ActionError, assertActionPrewrite } from "./prewrite.js";
 import { publishPage } from "../../sites/provision.js";
 import { supabaseSiteStore } from "../../sites/store.js";
 import { logger } from "../../logging/logger.js";

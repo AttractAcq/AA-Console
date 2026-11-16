@@ -32,6 +32,9 @@ import { changeAdSetBudget } from "./budget-change.js";
 import { GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD } from "./preclaim-hold.js";
 import { ACTION_HANDLER_MODULES } from "./handler-ownership.js";
 import { deployedCommitSha } from "../../readiness/version.js";
+import { ActionError, ownedIdentity } from "./prewrite.js";
+
+export { ActionError, assertActionPrewrite } from "./prewrite.js";
 
 export interface ClaimedAction {
   execution_id: string;
@@ -63,20 +66,6 @@ export interface ActionOutcome {
  * create ad objects and deploy pages; an unknown error retried three times
  * is three chances to do one of those twice.
  */
-export class ActionError extends Error {
-  constructor(
-    message: string,
-    readonly retryable: boolean = false,
-    readonly outcomeUncertain: boolean = false,
-    readonly externalId: string | null = null,
-    readonly externalUrl: string | null = null,
-    readonly result: Record<string, unknown> | null = null,
-  ) {
-    super(message);
-    this.name = "ActionError";
-  }
-}
-
 export type ActionHandler = (
   sb: SupabaseClient,
   config: RuntimeConfig,
@@ -92,30 +81,6 @@ function internalRpcFailure(error: { message: string; code?: string }, action: s
     ? `${action} was refused: ${error.message}`
     : `${action} returned no reliable outcome: ${error.message} Inspect the source records before any new request.`,
   retryable, !rolledBack);
-}
-
-function ownedIdentity(config: RuntimeConfig): { workerId: string; buildSha: string } {
-  const workerId = config.campaignActionWorkerId;
-  const buildSha = deployedCommitSha();
-  if (!config.campaignActionsEnabled || !config.campaignActionOwnedClaimEnabled
-    || !workerId || !buildSha) {
-    throw new ActionError("The campaign action worker is not attested for a prewrite check.");
-  }
-  return { workerId, buildSha };
-}
-
-/** Refuse an outward effect if its exact approval or worker attestation changed after claim. */
-export async function assertActionPrewrite(
-  sb: SupabaseClient, config: RuntimeConfig, action: ClaimedAction,
-): Promise<void> {
-  const { workerId, buildSha } = ownedIdentity(config);
-  const { error } = await sb.rpc("assert_campaign_action_prewrite_v6", {
-    p_execution_id: action.execution_id,
-    p_worker_id: workerId,
-    p_build_sha: buildSha,
-    p_action_key: action.action_key,
-  } as never);
-  if (error) throw new ActionError(`Campaign action prewrite refused: ${error.message}`);
 }
 
 /**
