@@ -38934,6 +38934,10 @@ export type Database = {
         Args: { p_bundle_id: string }
         Returns: boolean
       }
+      google_operator_bundle_export_v7: {
+        Args: { p_bundle_id: string }
+        Returns: string
+      }
       google_operator_review_source_state_v7: {
         Args: { p_request_id: string }
         Returns: string

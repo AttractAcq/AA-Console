@@ -70,7 +70,13 @@ begin
         and preview_blocker is null) then
     raise exception 'Exact Google packet was missing from the unified inbox'; end if;
   begin
-    perform public.record_google_operator_event_v7(bundle.id,'download_reported','browser-1');
+    perform public.google_operator_bundle_export_v7(bundle.id);
+  exception when insufficient_privilege then refused:=true; end;
+  if not refused then raise exception 'Unapproved Google packet was exported'; end if;
+  refused:=false;
+  begin
+    perform public.record_google_operator_event_v7(bundle.id,'verified_download',
+      'sha256:'||bundle.snapshot_hash);
   exception when check_violation then refused:=true; end;
   if not refused then raise exception 'Unapproved Google packet allowed a download report'; end if;
   refused:=false;
@@ -86,12 +92,21 @@ begin
   perform public.decide_google_operator_bundle_v7(bundle.id,request_id,true);
   if not public.google_operator_bundle_approved_v7(bundle.id) then
     raise exception 'Exact Google review was not approved'; end if;
+  if encode(sha256(convert_to(public.google_operator_bundle_export_v7(bundle.id),'UTF8')),'hex')
+    is distinct from bundle.snapshot_hash then
+    raise exception 'Downloaded Google bytes differ from reviewed packet'; end if;
   begin
     perform public.record_google_operator_event_v7(bundle.id,'handoff_reported','ticket-1');
   exception when check_violation then refused:=true; end;
   if not refused then raise exception 'Handoff skipped download report'; end if;
   refused:=false;
-  perform public.record_google_operator_event_v7(bundle.id,'download_reported','browser-1');
+  begin
+    perform public.record_google_operator_event_v7(bundle.id,'verified_download','sha256:wrong');
+  exception when check_violation then refused:=true; end;
+  if not refused then raise exception 'Wrong digest was recorded as a verified download'; end if;
+  refused:=false;
+  perform public.record_google_operator_event_v7(bundle.id,'verified_download',
+    'sha256:'||bundle.snapshot_hash);
   perform public.record_google_operator_event_v7(bundle.id,'handoff_reported','ticket-1');
   perform public.record_google_operator_event_v7(bundle.id,'external_ids_reported',
     'ads-manager-1','123456');

@@ -100,16 +100,37 @@ export function GoogleOperatorBundlePanel({ sheets }: { sheets: Sheet[] }) {
   }
 
   async function download(bundle: Bundle) {
-    if (!approved[bundle.id] || !current[bundle.id]) return;
-    const blob = new Blob([JSON.stringify(bundle.snapshot, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `google-manual-bundle-${bundle.id}.json`;
-    document.body.appendChild(link);
-    link.click(); link.remove(); URL.revokeObjectURL(url);
-    setEventBundleId(bundle.id);
-    await record("download_reported", bundle.id, `browser-download:${bundle.id}`);
+    if (!approved[bundle.id] || !current[bundle.id] || busy) return;
+    setBusy(true); setError(null); setNotice(null);
+    try {
+      const exported = await supabase.rpc("google_operator_bundle_export_v7", {
+        p_bundle_id: bundle.id,
+      });
+      if (exported.error || typeof exported.data !== "string")
+        throw new Error(exported.error?.message ?? "Approved bundle export unavailable.");
+      const bytes = new TextEncoder().encode(exported.data);
+      const digest = await crypto.subtle.digest("SHA-256", bytes);
+      const actual = [...new Uint8Array(digest)]
+        .map((byte) => byte.toString(16).padStart(2, "0")).join("");
+      if (actual !== bundle.snapshot_hash) throw new Error("Export differs from the reviewed Google bundle.");
+      const blob = new Blob([bytes], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `google-manual-bundle-${bundle.id}.json`;
+      document.body.appendChild(link);
+      link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      const recorded = await supabase.rpc("record_google_operator_event_v7", {
+        p_bundle_id: bundle.id, p_event: "verified_download",
+        p_reference: `sha256:${actual}`,
+      });
+      if (recorded.error) throw new Error(recorded.error.message);
+      setEventBundleId(bundle.id);
+      setNotice("Exact reviewed bundle downloaded and verified. Record the operator handoff separately.");
+      await refresh();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setBusy(false); }
   }
 
   return <section className="space-y-4 rounded-lg border border-border bg-card p-4">

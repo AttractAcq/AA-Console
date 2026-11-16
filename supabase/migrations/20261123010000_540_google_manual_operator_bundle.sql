@@ -259,6 +259,22 @@ end $$;
 revoke all on function public.google_operator_bundle_approved_v7(uuid) from public,anon;
 grant execute on function public.google_operator_bundle_approved_v7(uuid)
   to authenticated,service_role;
+
+create function public.google_operator_bundle_export_v7(p_bundle_id uuid)
+returns text language plpgsql stable security definer
+set search_path=pg_catalog,public as $$
+declare b public.google_operator_bundles_v7%rowtype;
+begin
+  select * into b from public.google_operator_bundles_v7 where id=p_bundle_id;
+  if b.id is null or auth.role()<>'authenticated' or auth.uid() is null
+    or not public.can_access_client(b.client_id)
+    or not coalesce(public.google_operator_bundle_approved_v7(b.id),false) then
+    raise exception 'Current approved Google operator bundle required.' using errcode='42501';
+  end if;
+  return b.snapshot::text;
+end $$;
+revoke all on function public.google_operator_bundle_export_v7(uuid) from public,anon,service_role;
+grant execute on function public.google_operator_bundle_export_v7(uuid) to authenticated;
 select public.lock_down_definer_functions();
 
 -- Keep the canonical unified inbox source-aware for this exact packet.
@@ -440,7 +456,7 @@ create table public.google_operator_events_v7 (
   id uuid primary key default gen_random_uuid(),
   bundle_id uuid not null references public.google_operator_bundles_v7(id) on delete restrict,
   client_id uuid not null,
-  event text not null check(event in ('download_reported','handoff_reported',
+  event text not null check(event in ('verified_download','handoff_reported',
     'external_ids_reported','activation_reported','change_reported')),
   reference text not null check(length(btrim(reference)) between 1 and 500),
   external_campaign_id text,
@@ -479,7 +495,7 @@ begin
   if not coalesce(public.google_operator_bundle_approved_v7(b.id),false) then
     raise exception 'The exact Google operator bundle is stale or not approved.' using errcode='23514';
   end if;
-  if p_event is null or p_event not in ('download_reported','handoff_reported',
+  if p_event is null or p_event not in ('verified_download','handoff_reported',
     'external_ids_reported','activation_reported','change_reported')
     or nullif(btrim(p_reference),'') is null then
     raise exception 'Supported event and evidence reference required.' using errcode='23514'; end if;
@@ -492,10 +508,13 @@ begin
       raise exception 'Evidence reference already records different data.' using errcode='23514'; end if;
     return prior;
   end if;
+  if p_event='verified_download' and p_reference is distinct from 'sha256:'||b.snapshot_hash then
+    raise exception 'Verified download must cite the exact packet hash.' using errcode='23514'; end if;
   if p_event='handoff_reported' and not exists(select 1 from public.google_operator_events_v7
-      where bundle_id=b.id and event='download_reported') then
-    raise exception 'Download the exact packet before reporting handoff.' using errcode='23514'; end if;
-  if p_event not in ('download_reported','handoff_reported')
+      where bundle_id=b.id and event='verified_download'
+        and reference='sha256:'||b.snapshot_hash) then
+    raise exception 'Verify the exact packet bytes before reporting handoff.' using errcode='23514'; end if;
+  if p_event not in ('verified_download','handoff_reported')
     and not exists(select 1 from public.google_operator_events_v7
       where bundle_id=b.id and event='handoff_reported') then
     raise exception 'Operator handoff must be recorded first.' using errcode='23514'; end if;

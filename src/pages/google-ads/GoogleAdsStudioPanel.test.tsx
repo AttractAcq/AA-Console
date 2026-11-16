@@ -15,6 +15,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { from, enqueueAgentJob } = vi.hoisted(() => ({ from: vi.fn(), enqueueAgentJob: vi.fn() }));
 vi.mock("../../lib/supabase", () => ({ supabase: { from }, enqueueAgentJob }));
+vi.mock("./GoogleOperatorBundlePanel", () => ({ GoogleOperatorBundlePanel: () => null }));
 vi.mock("react-router-dom", () => ({
   useParams: () => ({ clientId: "client-1" }),
   Link: ({ to, children }: { to: string; children: unknown }) =>
