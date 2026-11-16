@@ -14338,6 +14338,160 @@ export type Database = {
           },
         ]
       }
+      google_operator_bundles_v7: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          created_by: string
+          id: string
+          sheet_id: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          sheet_id: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          sheet_id?: string
+          snapshot?: Json
+          snapshot_hash?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_operator_bundles_v7_sheet_id_campaign_id_client_id_fkey"
+            columns: ["sheet_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_sheets"
+            referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+        ]
+      }
+      google_operator_events_v7: {
+        Row: {
+          bundle_id: string
+          client_id: string
+          detail: string | null
+          event: string
+          external_ad_id: string | null
+          external_campaign_id: string | null
+          id: string
+          recorded_at: string
+          recorded_by: string
+          reference: string
+        }
+        Insert: {
+          bundle_id: string
+          client_id: string
+          detail?: string | null
+          event: string
+          external_ad_id?: string | null
+          external_campaign_id?: string | null
+          id?: string
+          recorded_at?: string
+          recorded_by: string
+          reference: string
+        }
+        Update: {
+          bundle_id?: string
+          client_id?: string
+          detail?: string | null
+          event?: string
+          external_ad_id?: string | null
+          external_campaign_id?: string | null
+          id?: string
+          recorded_at?: string
+          recorded_by?: string
+          reference?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_operator_events_v7_bundle_id_fkey"
+            columns: ["bundle_id"]
+            isOneToOne: false
+            referencedRelation: "google_operator_bundles_v7"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_operator_events_v7_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_profile_changes: {
         Row: {
           applied_at: string | null
@@ -37332,6 +37486,34 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_google_operator_bundle_v7: {
+        Args: {
+          p_budget_instruction: string
+          p_descriptions: string[]
+          p_headlines: string[]
+          p_owner: string
+          p_research_task: string
+          p_sheet_id: string
+          p_tracking_instruction: string
+        }
+        Returns: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          created_by: string
+          id: string
+          sheet_id: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "google_operator_bundles_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_lead_capture_endpoint_v6: {
         Args: {
           p_campaign_id?: string
@@ -37863,6 +38045,15 @@ export type Database = {
           p_reason?: string
           p_request_id: string
           p_review_id: string
+        }
+        Returns: string
+      }
+      decide_google_operator_bundle_v7: {
+        Args: {
+          p_approved: boolean
+          p_bundle_id: string
+          p_reason?: string
+          p_request_id: string
         }
         Returns: string
       }
@@ -38733,6 +38924,22 @@ export type Database = {
           p_copy: Database["public"]["Tables"]["google_ads_copy"]["Row"]
           p_sheet: Database["public"]["Tables"]["google_ads_build_sheets"]["Row"]
         }
+        Returns: Json
+      }
+      google_operator_bundle_approved_v7: {
+        Args: { p_bundle_id: string }
+        Returns: boolean
+      }
+      google_operator_bundle_current_v7: {
+        Args: { p_bundle_id: string }
+        Returns: boolean
+      }
+      google_operator_review_source_state_v7: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      google_operator_sheet_source_v7: {
+        Args: { p_sheet_id: string }
         Returns: Json
       }
       google_profile_prewrite_current_v6: {
@@ -40533,6 +40740,34 @@ export type Database = {
       record_google_build_progress_v6: {
         Args: { p_build_id: string; p_patch: Json }
         Returns: undefined
+      }
+      record_google_operator_event_v7: {
+        Args: {
+          p_bundle_id: string
+          p_detail?: string
+          p_event: string
+          p_external_ad_id?: string
+          p_external_campaign_id?: string
+          p_reference: string
+        }
+        Returns: {
+          bundle_id: string
+          client_id: string
+          detail: string | null
+          event: string
+          external_ad_id: string | null
+          external_campaign_id: string | null
+          id: string
+          recorded_at: string
+          recorded_by: string
+          reference: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "google_operator_events_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       record_google_profile_reconciliation_v6: {
         Args: {

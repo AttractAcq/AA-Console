@@ -167,6 +167,24 @@ const readyPreparation = {
   owning_path: "/clients/client-1/delivery/campaign-factory?campaign=campaign-1",
 };
 
+const googleBundleId = "88888888-8888-4888-8888-888888888888";
+const googleBundleHash = "8".repeat(64);
+const readyGoogleOperator = {
+  ...request, id: "google-operator-inbox-1", source_system: "aa_console",
+  source_kind: "google_operator_bundle", source_id: googleBundleId,
+  source_version: googleBundleHash, artifact_hash: googleBundleHash,
+  title: "Google manual operator bundle v1", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z",
+  destination: "google_ads:manual_operator_handoff", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { source: { campaign_id: "campaign-1", sheet_id: "sheet-1" },
+    owner: "Paid operator", headlines: ["One", "Two", "Three"],
+    descriptions: ["First description", "Second description"] },
+  scope: { client_id: "client-1", campaign_id: "campaign-1", sheet_id: "sheet-1",
+    bundle_id: googleBundleId, snapshot_hash: googleBundleHash, version: 1 },
+  owning_path: "/clients/client-1/delivery/google-ads-studio",
+};
+
 const publicAgentId = "55555555-5555-4555-8555-555555555555";
 const publicAgentToken = "66666666-6666-4666-8666-666666666666";
 const publicAgentHash = "1".repeat(64);
@@ -1068,6 +1086,17 @@ describe("unified approval inbox", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_campaign_preparation_package_v7", {
       p_package_id: packageId, p_request_id: readyPreparation.id, p_approved: true,
+    }));
+  });
+
+  it("reviews the exact Google manual operator bundle through its own decision RPC", async () => {
+    requests = [readyGoogleOperator];
+    show();
+    const card = await screen.findByRole("article", { name: readyGoogleOperator.title });
+    expect(within(card).getByText("Google manual operator bundle decision")).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_google_operator_bundle_v7", {
+      p_bundle_id: googleBundleId, p_request_id: readyGoogleOperator.id, p_approved: true,
     }));
   });
 

@@ -286,6 +286,28 @@ function isCampaignPreparationReady(request: UnifiedApprovalRequest, clientId: s
     && request.owner_role === "admin_or_active_client_manager";
 }
 
+function isGoogleOperatorBundleReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "google_operator_bundle"
+    || request.client_id !== clientId || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || request.source_version !== request.artifact_hash
+    || !request.artifact_hash || !/^[0-9a-f]{64}$/.test(request.artifact_hash)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  const source = preview.source;
+  return scope.bundle_id === request.source_id && scope.client_id === clientId
+    && scope.campaign_id === (source as Record<string, unknown> | undefined)?.campaign_id
+    && scope.sheet_id === (source as Record<string, unknown> | undefined)?.sheet_id
+    && scope.snapshot_hash === request.artifact_hash
+    && typeof preview.owner === "string" && preview.owner.length > 0
+    && Array.isArray(preview.headlines) && preview.headlines.length >= 3
+    && Array.isArray(preview.descriptions) && preview.descriptions.length >= 2
+    && request.destination === "google_ads:manual_operator_handoff"
+    && request.owner_role === "admin_or_active_client_manager";
+}
+
 function isLeadMagnetApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   if (request.source_system !== "aa_console" || request.source_kind !== "lead_magnet"
     || request.client_id !== clientId || request.status !== "pending"
@@ -1028,6 +1050,7 @@ function isEngineSlotReady(request: UnifiedApprovalRequest, clientId: string): b
 
 function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignPreparationReady(request, clientId)
+    || isGoogleOperatorBundleReady(request, clientId)
     || isCampaignRejectionReady(request, clientId)
     || isGoogleReplyRejectionReady(request, clientId)
     || isSalesEntitlementRejectionReady(request, clientId)
@@ -1061,6 +1084,7 @@ function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): bo
 
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignPreparationReady(request, clientId)
+    || isGoogleOperatorBundleReady(request, clientId)
     || isCampaignApprovalReady(request, clientId)
     || isGoogleReplyApprovalReady(request, clientId)
     || isRecruitmentBriefApprovalReady(request, clientId)
@@ -1192,7 +1216,8 @@ function RequestCard({ request, history, gatewayOutcome, executionEvidence, clie
     ? "Google review reply" : request.source_kind === "recruitment_brief"
       ? "Recruitment brief" : request.source_kind === "client_sales_entitlement"
         ? "Sales access" : request.source_kind === "campaign_preparation_package"
-          ? "Campaign preparation package" : request.source_kind === "service_offer"
+          ? "Campaign preparation package" : request.source_kind === "google_operator_bundle"
+          ? "Google manual operator bundle" : request.source_kind === "service_offer"
           ? "Service offer" : request.source_kind === "lead_magnet"
             ? "Lead magnet" : request.source_kind === "sales_agent_public_use"
               ? "Sales agent public use" : request.source_kind === "opportunity_approve"
@@ -1624,6 +1649,12 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
         : request.source_kind === "campaign_preparation_package"
           ? await supabase.rpc("decide_campaign_preparation_package_v7", {
             p_package_id: request.source_id, p_request_id: request.id,
+            p_approved: decision === "approved",
+            ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+          })
+        : request.source_kind === "google_operator_bundle"
+          ? await supabase.rpc("decide_google_operator_bundle_v7", {
+            p_bundle_id: request.source_id, p_request_id: request.id,
             p_approved: decision === "approved",
             ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
           })

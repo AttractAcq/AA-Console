@@ -389,6 +389,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Meta paid metric-match checkpoint, 16 November 2026:** A client-scoped read-only view matches the latest human-reported Meta campaign ID for each bundle to daily paid metric rows, showing day count, date, freshness, spend, impressions, clicks, conversions and currency. Missing rows remain unknown. This is a data match only: the metrics table also accepts authorized administrative writes and has no provider-account observation stamp, so a match cannot prove live account identity or activation. Google has no paid metrics ingester yet.
 
+**Google manual operator checkpoint, 16 November 2026:** Google Ads Studio now freezes a current, manifest-bound manual sheet, signed offer, recorded budget, geography, conversion and destination together with human-written search headlines/descriptions, a keyword research task, tracking instruction and named operator. The canonical Inbox reviews its exact version with AAL2; changed campaign input, offer source, sheet or manifest makes the packet stale. An approved packet can be downloaded as JSON, then the operator can report handoff, external IDs, activation and changes in an append-only log. These are human reports, not Google provider observations or authorization to create/activate ads. The rollback fixture caught and fixed a SQL `NULL` approval bypass. Full disposable schema replay, upgrade equivalence, generated types, three Phase 7 rollback fixtures, 91 focused Inbox tests and frontend build pass. Google inventory/metrics ingestion, observed external handoff, provider read-back and a live Google journey remain open.
+
 ## Phase 8 — Attribution, Master AI feedback and Archive
 
 ### Attribution OS

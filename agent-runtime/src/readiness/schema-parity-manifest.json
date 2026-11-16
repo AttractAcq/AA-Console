@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "fabf211456ad96395cb795916837084b74c800f20f61c34362479508b453845b",
-  "generatedTypesSha256": "e33905894e32ebbc714c2f4562cd59bccb9b4c05d1ef9cf1db82573db2e280a8",
-  "generatedSchemaBodySha256": "7e0e1a82dc410bd09a213b04686df2f0d5c633f9d47e29d71ec0e9112a76e71e",
+  "migrationSourceDigest": "5b4943cd81f662d610d925fdfc4c485abad2705327fa4701f4f29cfb2111f110",
+  "generatedTypesSha256": "8991b6d96a8a1ad783cbaa43069742a003772318daff58b8ce286dd14845be54",
+  "generatedSchemaBodySha256": "5ef5f0a0d273f1ea2fe7ecc9d39af4e2f53206390704bbf9d12674da6c22b535",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3895,6 +3895,13 @@
       "filename": "20261123000000_539_paid_operator_metric_match.sql",
       "sha256": "9a36466a03f15360d52ffdecf761a90061b73bfb04a22bfbf6d7d49f13f46180",
       "trimmedMd5": "786c98a018227bda5df97f6eaae1cc46"
+    },
+    {
+      "version": "20261123010000",
+      "name": "540_google_manual_operator_bundle",
+      "filename": "20261123010000_540_google_manual_operator_bundle.sql",
+      "sha256": "5637c44fa6fe88b97aa6a7f74f9246f5162684bbd4a1925dd3f23d13d05212ba",
+      "trimmedMd5": "060bdc9f40d4afc2d3ddf8f0360b4ae9"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

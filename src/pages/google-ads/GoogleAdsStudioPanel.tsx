@@ -7,6 +7,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { dayOrDash } from "../../lib/contentRecords";
 import { enqueueAgentJob, supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
+import { GoogleOperatorBundlePanel } from "./GoogleOperatorBundlePanel";
 
 type SheetDue = Database["public"]["Views"]["google_ads_sheet_due"]["Row"];
 type Sheet = Database["public"]["Tables"]["google_ads_build_sheets"]["Row"];
@@ -115,7 +116,7 @@ export function GoogleAdsStudioPanel({ tab }: { tab: Tab }) {
       {tab === "sheet" && (
         <div className="space-y-4">
           <p className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
-            The Google operator bundle is awaiting an exact manual-sheet review path. Google search copy cannot enter the campaign sweep yet, so no approved preparation package exists for this route. Use the versioned sheet below as planning evidence; it is not a handoff approval.
+            Google search copy still needs a human writer and keyword research. The exact manual operator bundle below can be reviewed for handoff; the automated Google Ads build remains held.
           </p>
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="font-semibold">The build a person does by hand</h3>
@@ -256,6 +257,7 @@ export function GoogleAdsStudioPanel({ tab }: { tab: Tab }) {
               )}
             </section>
           )}
+          <GoogleOperatorBundlePanel sheets={sheets} />
         </div>
       )}
 
