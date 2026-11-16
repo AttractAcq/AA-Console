@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "35c09c5cc33da21c35f7fb384d240ee1f27a8c7e45cd58510cc19c8a47194deb",
-  "generatedTypesSha256": "82de786362c5e46f2dfe699916632c58480ef622f74ee86c3d93164a340ddfa0",
-  "generatedSchemaBodySha256": "f17fd10669bd5fe82f1f634a628905b8793fa23fe474c5afde3e05fb3ec4f59f",
+  "migrationSourceDigest": "eba3bba661df6daf1199c9177574df76b771abb9709cf1ab6f6b137a869c80ac",
+  "generatedTypesSha256": "fe3f792074f376ba17160b1d5899eafc30310706e279cc64f3312d407d18c089",
+  "generatedSchemaBodySha256": "d98db1dde28ff3c20cc04e083277027cb4219329e7b89edb227e6a4f6f8ecfb7",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3916,6 +3916,13 @@
       "filename": "20261123030000_542_google_ads_ad_inventory.sql",
       "sha256": "d7bf6ea3f8a23faffde79c2aba8db03a8100ddb2bb58ee572b4b4cb31c11cc72",
       "trimmedMd5": "8159d09ca5478b2902d761e63022dd94"
+    },
+    {
+      "version": "20261123040000",
+      "name": "543_meta_ads_readonly_inventory",
+      "filename": "20261123040000_543_meta_ads_readonly_inventory.sql",
+      "sha256": "6b3d91fca105606d352d9309357051510172e6f740b9789671af252022d0ff90",
+      "trimmedMd5": "53b06ef3c9d99cc49e64ee4b3765ed77"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
