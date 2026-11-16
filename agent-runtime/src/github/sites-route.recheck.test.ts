@@ -4,10 +4,10 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, expect, it, vi } from "vitest";
 
-const { requireAdmin, approvedPageCaptureToken, probePageForm } = vi.hoisted(() => ({
-  requireAdmin: vi.fn(), approvedPageCaptureToken: vi.fn(), probePageForm: vi.fn(),
+const { requireHumanAdmin, approvedPageCaptureToken, probePageForm } = vi.hoisted(() => ({
+  requireHumanAdmin: vi.fn(), approvedPageCaptureToken: vi.fn(), probePageForm: vi.fn(),
 }));
-vi.mock("../master/auth.js", () => ({ requireAdmin, AuthError: class AuthError extends Error { status = 401; } }));
+vi.mock("../master/auth.js", () => ({ requireHumanAdmin, BOT_FORBIDDEN_CODE: "bot_forbidden", AuthError: class AuthError extends Error { status = 401; } }));
 vi.mock("../sites/store.js", () => ({ supabaseSiteStore: () => ({}) }));
 vi.mock("../campaigns/actions/page-deploy.js", () => ({ approvedPageCaptureToken, probePageForm }));
 
@@ -47,7 +47,7 @@ function setup(sha = publication.rendered_sha256) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  requireAdmin.mockResolvedValue({});
+  requireHumanAdmin.mockResolvedValue({});
   approvedPageCaptureToken.mockReturnValue("a".repeat(64));
   probePageForm.mockResolvedValue({ passed: true, detail: "Capture endpoint passed.", leadId: "lead-1" });
 });
