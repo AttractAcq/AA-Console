@@ -31,7 +31,7 @@ beforeEach(() => {
     const result = () => ({ data, error: null });
     const chain: Record<string, unknown> = {};
     Object.assign(chain, {
-      select: () => chain, eq: () => chain, order: () => chain,
+      select: () => chain, eq: () => chain, in: () => chain, order: () => chain,
       limit: async () => result(),
       then: (...args: Parameters<Promise<unknown>["then"]>) =>
         Promise.resolve(result()).then(...args),

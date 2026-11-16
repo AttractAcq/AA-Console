@@ -91,7 +91,7 @@ it("exports the same captured facts shown in the admin view on repeated download
   expect(screen.getByText(/Dual mode can still admit legacy environment identities/)).toBeInTheDocument();
   expect(screen.getByText(/live provider health Unknown/)).toBeInTheDocument();
   expect(screen.getByText("Profile field PATCH")).toBeInTheDocument();
-  expect(screen.getByText("Generic campaign action claims")).toBeInTheDocument();
+  expect(screen.getByText("Owned campaign action claims")).toBeInTheDocument();
   expect(screen.getAllByText("Held")).toHaveLength(2);
   expect(screen.getByText("The SQL claim lacks an atomic handler-ownership gate.")).toBeInTheDocument();
   expect(screen.getByText("Exact Inbox gate is not connected.")).toBeInTheDocument();
