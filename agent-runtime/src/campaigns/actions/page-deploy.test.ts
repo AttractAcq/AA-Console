@@ -25,9 +25,9 @@ const config = {
   publicRuntimeBase: "https://runtime.attractacq.com",
 } as RuntimeConfig;
 
-const ARGS = { clientId: "client-1", campaignId: "camp-1", token: "a".repeat(64) };
+const ARGS = { clientId: "client-1", campaignId: "camp-1", pageId: "page-1", token: "a".repeat(64) };
 
-function database(lead: Record<string, unknown> | null, options: { readError?: string } = {}) {
+function database(lead: Record<string, unknown> | null, options: { readError?: string; markError?: string } = {}) {
   const updates: Record<string, unknown>[] = [];
   const from = vi.fn((table: string) => {
     const chain: Record<string, unknown> = {};
@@ -40,7 +40,7 @@ function database(lead: Record<string, unknown> | null, options: { readError?: s
           : { data: lead, error: null },
       update: (values: Record<string, unknown>) => {
         updates.push(values);
-        return { eq: async () => ({ error: null }) };
+        return { eq: async () => ({ error: options.markError ? { message: options.markError } : null }) };
       },
     });
     void table;
@@ -57,6 +57,7 @@ const goodLead = {
   consent_given_at: "2026-10-24T09:00:00Z",
   consent_wording: "I agree to being contacted.",
   source_client_campaign_id: "camp-1",
+  source_page_id: "page-1",
   source_channel: "page_form",
 };
 
@@ -147,6 +148,20 @@ describe("what it will not call a pass", () => {
     expect(result.detail).toContain("the right campaign");
   });
 
+  it("a lead attributed to the wrong page", async () => {
+    const result = await probePageForm(
+      database({ ...goodLead, source_page_id: "another-page" }).sb, config, ARGS, ok(),
+    );
+    expect(result.passed).toBe(false);
+    expect(result.detail).toContain("the right page");
+  });
+
+  it("a lead that cannot be marked as a probe", async () => {
+    const result = await probePageForm(database(goodLead, { markError: "write refused" }).sb, config, ARGS, ok());
+    expect(result.passed).toBe(false);
+    expect(result.detail).toContain("write refused");
+  });
+
   it("a database it could not read the lead back from", async () => {
     const result = await probePageForm(
       database(goodLead, { readError: "permission denied" }).sb,
@@ -163,6 +178,6 @@ describe("what it will", () => {
   it("passes when the lead arrives with campaign, source and consent", async () => {
     const result = await probePageForm(database(goodLead).sb, config, ARGS, ok());
     expect(result).toMatchObject({ passed: true, leadId: "lead-1" });
-    expect(result.detail).toContain("campaign, source and consent");
+    expect(result.detail).toContain("page, campaign, source and consent");
   });
 });

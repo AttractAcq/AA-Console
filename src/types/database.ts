@@ -3942,6 +3942,7 @@ export type Database = {
           id: string
           page_id: string
           probe_detail: string | null
+          probe_kind: string
           probe_lead_id: string | null
           probe_status: string | null
           probed_at: string | null
@@ -3958,6 +3959,7 @@ export type Database = {
           id?: string
           page_id: string
           probe_detail?: string | null
+          probe_kind?: string
           probe_lead_id?: string | null
           probe_status?: string | null
           probed_at?: string | null
@@ -3974,6 +3976,7 @@ export type Database = {
           id?: string
           page_id?: string
           probe_detail?: string | null
+          probe_kind?: string
           probe_lead_id?: string | null
           probe_status?: string | null
           probed_at?: string | null

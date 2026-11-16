@@ -34,6 +34,7 @@ const publication = (over: Record<string, unknown> = {}) => ({
   revision_id: "rev-1", published_url: "https://harbourhome.co.uk/garage-survey",
   commit_sha: "a41f9cdef", rendered_sha256: "7b31c9f0".repeat(8),
   probe_status: "passed", probe_detail: null, probe_lead_id: "lead-1",
+  probe_kind: "browser_form",
   probed_at: "2026-10-24T10:00:00Z", published_at: "2026-10-24T09:55:00Z", ...over,
 });
 
@@ -74,6 +75,17 @@ describe("published is not the same as working", () => {
       await screen.findByText("Published. Nobody has tested the form yet."),
     ).toBeInTheDocument();
     expect(screen.queryByText("Live and tested.")).not.toBeInTheDocument();
+  });
+
+  it("shows an endpoint pass without counting the browser form as tested", async () => {
+    database([
+      row({ blocker: "Published. Capture endpoint passed; browser form unverified." }),
+    ], [publication({ probe_kind: "endpoint" })]);
+    render(<CampaignPagePublishPanel />);
+    expect(await screen.findByText(/0 live and tested/)).toBeInTheDocument();
+    expect(screen.getByText(/1 endpoint checked, browser form unverified/)).toBeInTheDocument();
+    expect(screen.getByText("Published. Capture endpoint passed; browser form unverified.")).toBeInTheDocument();
+    expect(screen.getByText("endpoint passed; browser form unverified")).toBeInTheDocument();
   });
 
   it("shows what the probe found when it failed", async () => {

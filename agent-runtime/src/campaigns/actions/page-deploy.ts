@@ -1,12 +1,10 @@
 /**
- * Putting an approved campaign page live, and then proving its form works.
+ * Putting an approved campaign page live, then checking its capture endpoint.
  *
  * The second half is the point. Publishing is a commit, and a commit is easy
- * to verify; a page whose form posts nowhere looks exactly like one that
- * works, from the outside and from a screenshot. So this does two things in
- * order and records them separately: the commit, and then a real submission
- * made against the live page that has to arrive in Sales OS carrying its
- * campaign, its source and its consent.
+ * to verify; a page whose form posts nowhere can look identical from outside.
+ * This records the commit and a direct endpoint submission separately. A
+ * browser-form submission is still required before calling the page tested.
  *
  * WHY THE PROBE USES THE REAL PATH
  *
@@ -43,7 +41,7 @@ export interface PageDeployScope {
 }
 
 /**
- * The probe's own submission, against the live page's capture endpoint.
+ * The probe's own submission against the public capture endpoint.
  *
  * Returns the lead it produced, or the reason it did not. Never throws: a
  * probe that fails is a recorded outcome rather than a failed publication.
@@ -51,7 +49,7 @@ export interface PageDeployScope {
 export async function probePageForm(
   sb: SupabaseClient,
   config: RuntimeConfig,
-  args: { clientId: string; campaignId: string; token: string },
+  args: { clientId: string; campaignId: string; pageId: string; token: string },
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ passed: boolean; detail: string; leadId: string | null }> {
   const marker = randomUUID();
@@ -93,7 +91,7 @@ export async function probePageForm(
   while (Date.now() < deadline) {
     const { data, error } = await sb
       .from("client_leads")
-      .select("id, consent_given_at, consent_wording, source_client_campaign_id, source_channel")
+      .select("id, consent_given_at, consent_wording, source_client_campaign_id, source_page_id, source_channel")
       .eq("client_id", args.clientId)
       .eq("email", email)
       .maybeSingle();
@@ -106,6 +104,8 @@ export async function probePageForm(
         consent_given_at: string | null;
         consent_wording: string | null;
         source_client_campaign_id: string | null;
+        source_page_id: string | null;
+        source_channel: string | null;
       };
       // Arriving is not enough. The three things the gate asks for are the
       // three things a lead is useless without.
@@ -115,7 +115,12 @@ export async function probePageForm(
       if (lead.source_client_campaign_id && lead.source_client_campaign_id !== args.campaignId) {
         missing.push("the right campaign");
       }
-      await sb.from("client_leads").update({ is_probe: true }).eq("id", lead.id);
+      if (lead.source_page_id !== args.pageId) missing.push("the right page");
+      if (!lead.source_channel) missing.push("source");
+      const { error: markError } = await sb.from("client_leads").update({ is_probe: true }).eq("id", lead.id);
+      if (markError) {
+        return { passed: false, detail: `The probe lead could not be marked as a test: ${markError.message}`, leadId: lead.id };
+      }
 
       if (missing.length > 0) {
         return {
@@ -126,7 +131,7 @@ export async function probePageForm(
       }
       return {
         passed: true,
-        detail: "A test submission reached Sales OS with its campaign, source and consent.",
+        detail: "A capture endpoint submission reached Sales OS with its page, campaign, source and consent. The published browser form is unverified.",
         leadId: lead.id,
       };
     }
@@ -236,6 +241,7 @@ export const deployCampaignPage: ActionHandler = async (sb, config, action) => {
   const probe = await probePageForm(sb, config, {
     clientId: action.client_id,
     campaignId: action.campaign_id,
+    pageId,
     token: scope.probe_endpoint_token,
   });
   const { error: probeError } = await sb.rpc("record_campaign_page_probe_v6", {
@@ -249,13 +255,20 @@ export const deployCampaignPage: ActionHandler = async (sb, config, action) => {
       approvalId: action.approval_id,
       message: probeError.message,
     });
+    return {
+      ...outcome,
+      result: { ...(outcome.result ?? {}), probe_passed: false, probe_recorded: false,
+        probe_detail: `Capture check could not be recorded: ${probeError.message}` },
+      detail: `${outcome.detail} Capture check could not be recorded; the page remains unverified.`,
+    };
   }
 
   // A failed probe does not fail the action: the page is live either way, and
   // saying otherwise would make the record less true rather than more.
   return {
     ...outcome,
-    result: { ...(outcome.result ?? {}), probe_passed: probe.passed, probe_detail: probe.detail },
+    result: { ...(outcome.result ?? {}), probe_passed: probe.passed, probe_recorded: true,
+      probe_kind: "endpoint", probe_detail: probe.detail },
     detail: `${outcome.detail} ${probe.detail}`,
   };
 };
