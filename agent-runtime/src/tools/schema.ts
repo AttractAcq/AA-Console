@@ -42,6 +42,21 @@ export const UNSUPPORTED_STRICT_KEYWORDS = [
 
 const UNSUPPORTED = new Set<string>(UNSUPPORTED_STRICT_KEYWORDS);
 
+/** Every object in an Anthropic strict tool must explicitly close extra keys. */
+export function missingStrictObjectClosures(schema: unknown, path = ""): string[] {
+  if (Array.isArray(schema)) {
+    return schema.flatMap((item, i) => missingStrictObjectClosures(item, `${path}[${i}]`));
+  }
+  if (!schema || typeof schema !== "object") return [];
+  const object = schema as Record<string, unknown>;
+  const found = object.type === "object" && object.additionalProperties !== false
+    ? [path || "(root)"] : [];
+  for (const [key, value] of Object.entries(object)) {
+    found.push(...missingStrictObjectClosures(value, path ? `${path}.${key}` : key));
+  }
+  return found;
+}
+
 /**
  * Every place an unsupported keyword appears, as a dotted path.
  *

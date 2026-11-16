@@ -215,6 +215,7 @@ const submitTool = {
           objections: { type: "array", items: { type: "string" }, description: "What would stop them. At least two." },
         },
         required: ["problems", "outcomes", "motivations", "triggers", "objections"],
+        additionalProperties: false,
       },
       stages: {
         type: "array",
@@ -229,6 +230,7 @@ const submitTool = {
             distribution_note: { type: "string", description: "Where it would reach them. Optional." },
           },
           required: ["stage", "mindset", "message"],
+          additionalProperties: false,
         },
       },
       fields: {
@@ -243,10 +245,12 @@ const submitTool = {
           conversion_action: { type: "string", description: "The specific action to ask for." },
         },
         required: ["core_problem", "desired_outcome", "purchase_trigger", "entry_awareness", "positioning", "conversion_action"],
+        additionalProperties: false,
       },
       rationale: { type: "string", description: "The case for this strategy, in a few sentences." },
     },
     required: ["attributes", "stages", "fields", "rationale"],
+    additionalProperties: false,
   },
 };
 

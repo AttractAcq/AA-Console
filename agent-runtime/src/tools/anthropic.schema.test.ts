@@ -92,11 +92,20 @@ describe("a submit schema within the supported subset", () => {
     const good = submitWith({
       ideas: {
         type: "array",
-        items: { type: "object", properties: { title: { type: "string" } } },
+        items: { type: "object", properties: { title: { type: "string" } }, additionalProperties: false },
       },
     });
     const out = await runAgentLoop({ ...base, submitTool: good });
     expect(streamMock).toHaveBeenCalled();
     expect(out.submitted).toEqual({ ok: true });
+  });
+
+  it("refuses an open nested object before reaching the provider", async () => {
+    const open = submitWith({ ideas: { type: "array", items: { type: "object", properties: {} } } });
+    const err = await runAgentLoop({ ...base, submitTool: open }).catch((e) => e);
+    expect(err).toBeInstanceOf(ProviderError);
+    expect((err as ProviderError).retryable).toBe(false);
+    expect((err as Error).message).toContain("properties.ideas.items");
+    expect(streamMock).not.toHaveBeenCalled();
   });
 });

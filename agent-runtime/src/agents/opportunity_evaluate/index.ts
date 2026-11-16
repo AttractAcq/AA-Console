@@ -213,6 +213,7 @@ export async function runOpportunityEvaluateJob(
               },
             },
             required: ["factor", "score", "reasoning"],
+            additionalProperties: false,
           },
         },
         rationale: {
@@ -221,6 +222,7 @@ export async function runOpportunityEvaluateJob(
         },
       },
       required: ["scores", "rationale"],
+      additionalProperties: false,
     },
   };
 
