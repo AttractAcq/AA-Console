@@ -315,4 +315,12 @@ if [[ "${AA_SCHEMA_PHASE8_SMOKES:-0}" == "1" ]]; then
   echo "$smoke_count Phase 8 rollback fixtures passed."
 fi
 
+if psql_local -qAt -f scripts/phase9-scoped-read-gates-smoke.sql \
+  >"$run_dir/phase9-scoped-read-gates.private.log" 2>&1; then
+  echo 'Phase 9 scoped read gates rollback fixture passed.'
+else
+  grep -E 'ERROR:|psql:' "$run_dir/phase9-scoped-read-gates.private.log" | tail -3 >&2 || true
+  exit 1
+fi
+
 echo "Schema replay, upgrade equivalence, catalog contract and generated types passed."

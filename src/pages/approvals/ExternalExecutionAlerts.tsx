@@ -21,11 +21,10 @@ export function ExternalExecutionAlerts({ clientId }: { clientId?: string }) {
 
   const refresh = useCallback(async () => {
     const sequence = ++refreshSequence.current;
-    let query = supabase.from("client_external_outcomes_v6")
+    const query = supabase.rpc("list_client_external_outcomes_v6", { p_client_id: clientId })
       .select("outcome_id,client_id,source_kind,outcome,occurred_at,owning_path")
       .in("outcome", ["refused", "uncertain", "different", "pending", "rejected",
         "unverified", "unattributed", "failed", "abandoned"]);
-    if (clientId) query = query.eq("client_id", clientId);
     const result = await query.order("occurred_at", { ascending: false }).limit(5);
     if (sequence !== refreshSequence.current) return;
     if (result.error) {

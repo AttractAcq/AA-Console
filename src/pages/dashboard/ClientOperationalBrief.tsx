@@ -41,8 +41,8 @@ export function ClientOperationalBrief({ clientId, spend, failedRuns, activeRuns
       supabase.from("campaign_action_due").select("action_key,blocker,execution_status").eq("client_id", clientId).neq("execution_status", "executed").not("blocker", "is", null).limit(3),
       supabase.from("lead_magnet_deliveries").select("id", { count: "exact", head: true }).eq("client_id", clientId).in("status", ["queued", "sending", "failed", "uncertain"]),
       supabase.from("client_integrations").select("provider,status,last_checked_at").eq("client_id", clientId),
-      supabase.from("client_external_outcomes_v6").select("source_kind,outcome,occurred_at,owning_path,external_ref").eq("client_id", clientId).in("outcome", ["confirmed", "executed"]).order("occurred_at", { ascending: false }).limit(1),
-      supabase.from("client_external_outcomes_v6").select("outcome_id", { count: "exact", head: true }).eq("client_id", clientId).in("outcome", ["refused", "uncertain", "different", "pending", "rejected", "unverified", "unattributed", "failed", "abandoned"]),
+      supabase.rpc("list_client_external_outcomes_v6", { p_client_id: clientId }).select("source_kind,outcome,occurred_at,owning_path,external_ref").in("outcome", ["confirmed", "executed"]).order("occurred_at", { ascending: false }).limit(1),
+      supabase.rpc("list_client_external_outcomes_v6", { p_client_id: clientId }, { count: "exact", head: true }).select("outcome_id").in("outcome", ["refused", "uncertain", "different", "pending", "rejected", "unverified", "unattributed", "failed", "abandoned"]),
     ]);
     const errors = [pending.error, stale.error, sourceHeld.error, sourceHeldItems.error, held.error, failed.error, executed.error, actions.error, deliveries.error, integrations.error, lastOutcome.error, externalProblems.error]
       .filter((error): error is NonNullable<typeof error> => Boolean(error))

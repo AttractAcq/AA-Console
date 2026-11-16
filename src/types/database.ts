@@ -39937,6 +39937,24 @@ export type Database = {
         Args: { p_opportunity_id: string; p_role: string; p_target_id: string }
         Returns: string
       }
+      list_client_external_outcomes_v6: {
+        Args: { p_client_id?: string }
+        Returns: {
+          client_id: string | null
+          external_ref: string | null
+          occurred_at: string | null
+          outcome: string | null
+          outcome_id: string | null
+          owning_path: string | null
+          source_kind: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "client_external_outcomes_v6"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       list_client_lead_owners: {
         Args: { p_client_id: string }
         Returns: {

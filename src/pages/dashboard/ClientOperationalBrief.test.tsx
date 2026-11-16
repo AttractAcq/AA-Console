@@ -5,9 +5,8 @@ import { expect, it, vi } from "vitest";
 import { ClientOperationalBrief } from "./ClientOperationalBrief";
 
 const reads: { table: string; clientId?: string }[] = [];
-vi.mock("../../lib/supabase", () => ({
-  supabase: {
-    from: (table: string) => {
+vi.mock("../../lib/supabase", () => {
+  const makeQuery = (table: string) => {
       let status = "";
       let columns = "";
       const query = {
@@ -45,9 +44,16 @@ vi.mock("../../lib/supabase", () => ({
         },
       };
       return query;
+    };
+  return { supabase: {
+    from: makeQuery,
+    rpc: (name: string, args: { p_client_id: string }) => {
+      if (name !== "list_client_external_outcomes_v6") throw new Error(`Unexpected RPC ${name}`);
+      reads.push({ table: "client_external_outcomes_v6", clientId: args.p_client_id });
+      return makeQuery("client_external_outcomes_v6");
     },
-  },
-}));
+  } };
+});
 
 it("keeps failed source counts unknown and scopes every brief read to its client", async () => {
   reads.length = 0;
