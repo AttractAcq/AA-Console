@@ -11,6 +11,7 @@ select set_config('request.jwt.claims','{"role":"service_role"}',true);
 do $checks$
 declare cid uuid:='b8888888-8888-4888-8888-888888888888';
   campaign_id uuid; page_id uuid; route_id uuid; endpoint_id uuid;
+  stale_endpoint_id uuid; route_free_endpoint_id uuid;
   v_lead_id uuid; request_id uuid; review_id uuid;
   result jsonb; v record; refused boolean;
 begin
@@ -102,10 +103,36 @@ begin
     update public.lead_submissions set route_package_id=null where idempotency_key='route-one';
   exception when check_violation then refused:=true; end;
   if not refused then raise exception 'Submission route rewrite was accepted'; end if;
+
+  -- A route that was current when the endpoint was made must be rechecked
+  -- when a human later approves activation. A generic campaign form cannot
+  -- bypass the exact route by using the old endpoint creator.
+  select id into stale_endpoint_id from public.create_route_lead_capture_endpoint_v9(
+    cid,repeat('c',64),'I agree to be contacted',campaign_id,page_id,
+    'organic',route_id);
+  select id into route_free_endpoint_id from public.create_lead_capture_endpoint_v6(
+    cid,'page_form',repeat('d',64),'I agree to be contacted',campaign_id,page_id,'organic');
+  update public.client_campaigns set core_message='Replanned after form creation' where id=campaign_id;
   perform set_config('request.jwt.claim.role','authenticated',true);
   perform set_config('request.jwt.claim.sub','a8888888-8888-4888-8888-888888888888',true);
   perform set_config('request.jwt.claims',
     '{"sub":"a8888888-8888-4888-8888-888888888888","role":"authenticated","aal":"aal2"}',true);
+  request_id:=public.request_lead_capture_activation_v6(stale_endpoint_id);
+  select id into review_id from public.client_switch_activation_reviews_v6
+    where canonical_request_id=request_id;
+  refused:=false;
+  begin perform public.decide_client_switch_activation_v6(review_id,request_id,true);
+  exception when check_violation then refused:=true; end;
+  if not refused or (select enabled from public.lead_capture_endpoints where id=stale_endpoint_id)
+      then raise exception 'Replanned route endpoint was activated'; end if;
+  request_id:=public.request_lead_capture_activation_v6(route_free_endpoint_id);
+  select id into review_id from public.client_switch_activation_reviews_v6
+    where canonical_request_id=request_id;
+  refused:=false;
+  begin perform public.decide_client_switch_activation_v6(review_id,request_id,true);
+  exception when check_violation then refused:=true; end;
+  if not refused or (select enabled from public.lead_capture_endpoints where id=route_free_endpoint_id)
+      then raise exception 'Route-free campaign endpoint was activated'; end if;
   perform public.advance_lead(v_lead_id,'shown');
   perform public.advance_lead(v_lead_id,'cash');
   perform public.update_lead(v_lead_id,'{"sale_value":12000,"cash_collected":9000}'::jsonb);

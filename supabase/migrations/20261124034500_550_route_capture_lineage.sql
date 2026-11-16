@@ -13,6 +13,8 @@ alter table public.lead_capture_endpoints
 create function public.guard_lead_capture_route_v9()
 returns trigger language plpgsql
 set search_path=pg_catalog,public as $$
+declare v_route public.campaign_route_packages_v6%rowtype;
+  v_campaign public.client_campaigns%rowtype;
 begin
   if tg_op='UPDATE' and (
     new.route_package_id is distinct from old.route_package_id
@@ -28,6 +30,33 @@ begin
        or new.campaign_id is distinct from old.campaign_id
        or new.client_id is distinct from old.client_id then
       raise exception 'Capture endpoint route and ownership are immutable.' using errcode='23514';
+    end if;
+  end if;
+  -- A disabled draft may wait days for a person to approve activation. Check
+  -- the package again at that final gate, after any plan or page-link edits.
+  -- Existing already-live endpoints are not retargeted by this migration.
+  if new.enabled and not old.enabled and new.purpose='page_form'
+     and new.campaign_id is not null then
+    if new.route_package_id is null or new.page_id is null then
+      raise exception 'A campaign page form needs an exact route package before activation.'
+        using errcode='23514';
+    end if;
+    select * into v_route from public.campaign_route_packages_v6
+      where id=new.route_package_id and campaign_id=new.campaign_id
+        and client_id=new.client_id;
+    select * into v_campaign from public.client_campaigns
+      where id=new.campaign_id and client_id=new.client_id;
+    if v_route.id is null or v_campaign.id is null
+       or v_route.version is distinct from (
+         select max(version) from public.campaign_route_packages_v6
+           where campaign_id=new.campaign_id and route=v_route.route)
+       or v_route.plan_fingerprint is distinct from public.campaign_plan_fingerprint(v_campaign)
+       or not exists (
+         select 1 from public.campaign_artifacts
+         where client_id=new.client_id and campaign_id=new.campaign_id
+           and page_id=new.page_id and kind='landing_page') then
+      raise exception 'Campaign page form route or plan is stale; create a new reviewed form.'
+        using errcode='23514';
     end if;
   end if;
   return new;

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { Modal } from "./Modal";
@@ -21,15 +21,17 @@ it("keeps keyboard focus inside a dialog and returns it to the opener", async ()
   render(<Example />);
   const opener = screen.getByRole("button", { name: "Open review" });
   await user.click(opener);
-  expect(screen.getByRole("dialog", { name: "Review exact version" })).toHaveFocus();
+  const dialog = screen.getByRole("dialog", { name: "Review exact version" });
+  const close = within(dialog).getByRole("button", { name: "Close dialog" });
+  expect(dialog).toHaveFocus();
   await user.tab();
-  expect(screen.getByRole("button", { name: "Close dialog" })).toHaveFocus();
+  expect(close).toHaveFocus();
   await user.tab();
   expect(screen.getByRole("textbox", { name: "Review reason" })).toHaveFocus();
   await user.tab();
   expect(screen.getByRole("button", { name: "Approve" })).toHaveFocus();
   await user.tab();
-  expect(screen.getByRole("button", { name: "Close dialog" })).toHaveFocus();
+  expect(close).toHaveFocus();
   await user.tab({ shift: true });
   expect(screen.getByRole("button", { name: "Approve" })).toHaveFocus();
   await user.keyboard("{Escape}");

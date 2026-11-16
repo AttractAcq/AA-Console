@@ -68,7 +68,7 @@ export function Modal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button
         type="button"
-        aria-hidden="true"
+        aria-label="Close dialog"
         tabIndex={-1}
         className="absolute inset-0 bg-foreground/40"
         onClick={onClose}
