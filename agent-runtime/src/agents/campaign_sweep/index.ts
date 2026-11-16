@@ -317,17 +317,25 @@ export async function runCampaignSweepJob(
       if (agentBindError) throw new Error(`Could not bind sales-agent work: ${agentBindError.message}`);
     }
     if (c.needs_lead_magnet) {
-      const { error: magnetError } = await sb.rpc("ensure_campaign_magnet_draft_v7", {
+      const { data: magnetDraft, error: magnetError } = await sb.rpc("ensure_campaign_magnet_draft_v7", {
         p_campaign_id: c.id, p_run_id: runId,
       });
       if (magnetError) throw new Error(`Could not prepare campaign magnet work: ${magnetError.message}`);
+      const m = magnetDraft as { magnet_id?: string; work_item_id?: string } | null;
+      if (!m?.magnet_id || !m.work_item_id) throw new Error("Required magnet draft has no work identity.");
+      const { error: magnetStepError } = await sb.rpc("add_workflow_agent_step", {
+        p_run_id: runId, p_step_key: "conversion_lead_magnet", p_dependencies: [],
+        p_agent_key: "lead_magnet_build", p_input_table: "lead_magnets",
+        p_input_id: m.magnet_id, p_input_params: {}, p_input_from_step_key: null,
+      });
+      if (magnetStepError) throw new Error(`Could not add magnet production step: ${magnetStepError.message}`);
     }
   }
   const { error: sealError } = await sb.rpc("seal_workflow_run", { p_run_id: runId });
   if (sealError) throw new Error(`Could not seal the campaign sweep: ${sealError.message}`);
 
   const totalSteps = steps.length + (c.acquisition_mode !== "legacy"
-    ? Number(c.needs_landing_page) + Number(c.needs_sales_agent) : 0);
+    ? Number(c.needs_landing_page) + Number(c.needs_sales_agent) + Number(c.needs_lead_magnet) : 0);
 
   await appendEvent(
     sb,

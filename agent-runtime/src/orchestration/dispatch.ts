@@ -62,6 +62,7 @@ import { runOpportunityEvaluateJob } from "../agents/opportunity_evaluate/index.
 import { runOpportunityStrategiseJob } from "../agents/opportunity_strategise/index.js";
 import { runOfferCompileJob } from "../agents/offer_compile/index.js";
 import { runCampaignSweepJob } from "../agents/campaign_sweep/index.js";
+import { runLeadMagnetBuildJob } from "../agents/lead_magnet_build/index.js";
 import { runSalesAgentJob } from "../agents/sales_agent/index.js";
 import { runCampaignPlanJob } from "../agents/campaign_plan/index.js";
 import { runPageAuditJob } from "../agents/page_audit/index.js";
@@ -126,6 +127,7 @@ const RUNNERS: Record<string, JobRunner> = {
   // Composes a workflow run for an approved plan. The engine that drives it
   // already existed; this is the composer. Calls no model.
   campaign_sweep: runCampaignSweepJob,
+  lead_magnet_build: runLeadMagnetBuildJob,
   landing_page: runLandingPageJob,
   // The page, and then the thing standing on it.
   sales_agent: runSalesAgentJob,

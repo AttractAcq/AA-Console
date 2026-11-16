@@ -727,9 +727,10 @@ export function CampaignExecutionPanel() {
             {clientId && c.acquisition_mode !== "legacy" &&
               <CampaignSweepWork clientId={clientId} campaignId={c.id} />}
             {clientId && c.acquisition_mode !== "legacy"
-              && (c.needs_landing_page || c.needs_sales_agent) &&
+              && (c.needs_landing_page || c.needs_sales_agent || c.needs_lead_magnet) &&
               <CampaignConversionWork clientId={clientId} campaignId={c.id}
-                needsPage={c.needs_landing_page} needsAgent={c.needs_sales_agent} />}
+                needsPage={c.needs_landing_page} needsAgent={c.needs_sales_agent}
+                needsMagnet={c.needs_lead_magnet} />}
             <div className="relative mt-4">
               <Button onClick={() => setActionsOpen((open) => !open)}>Action buttons</Button>
               {actionsOpen && <CampaignActions campaign={c} checks={reqs} busy={busy} planning={planning.has(c.id)} onChoose={(kind) => setConfirmAction({ campaign: c, kind })} />}
@@ -810,7 +811,7 @@ export function CampaignExecutionPanel() {
                         ? "Approve the plan first. A sweep is the moment a plan becomes work, so it refuses an unreviewed one."
                         : sweeping.has(c.id)
                           ? "A sweep of this campaign is queued. One at a time, so two sweeps cannot compose the same steps twice."
-                          : `Prepares ${c.content_count} ${c.content_count === 1 ? "piece" : "pieces"} of planned content${c.needs_landing_page ? ", a page" : ""}${c.needs_sales_agent ? ", and a sales agent" : ""}. Each output stops for review before public use.${c.needs_lead_magnet ? " The required lead magnet remains a package blocker until its producer is connected." : ""}`}
+                          : `Prepares ${c.content_count} ${c.content_count === 1 ? "piece" : "pieces"} of planned content${c.needs_landing_page ? ", a page" : ""}${c.needs_sales_agent ? ", a sales agent" : ""}${c.needs_lead_magnet ? ", and a lead magnet PDF" : ""}. Each output stops for review before public use.`}
                     </p>
                   </div>
                   <button

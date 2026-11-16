@@ -70,3 +70,30 @@ it("keeps QA-ready drafts at human review", async () => {
   expect(await screen.findByText(/Internal QA passed. Review the exact draft/)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Retry this step" })).not.toBeInTheDocument();
 });
+
+it("shows a blocked magnet producer and retries only its workflow step", async () => {
+  from.mockImplementation((table: string) => {
+    if (table === "campaign_conversion_drafts_v7") return rows([
+      { run_id: "run-1", page_work_item_id: null, sales_work_item_id: null },
+    ]);
+    if (table === "campaign_magnet_drafts_v7") return rows([
+      { run_id: "run-1", work_item_id: "magnet-work" },
+    ]);
+    if (table === "delivery_work_effective_v6") return rows([
+      { id: "magnet-work", item_key: "campaign_lead_magnet", state: "held",
+        blocker: "Magnet producer failed" },
+    ]);
+    if (table === "workflow_steps") return rows([
+      { id: "magnet-step", step_key: "conversion_lead_magnet", status: "blocked",
+        blocker: "Magnet producer failed" },
+    ]);
+    return rows([]);
+  });
+  rpc.mockResolvedValue({ data: { id: "magnet-step" }, error: null });
+  render(<CampaignConversionWork clientId="client-1" campaignId="campaign-1"
+    needsPage={false} needsAgent={false} needsMagnet />);
+  expect(await screen.findByText("Lead magnet")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Retry this step" }));
+  await waitFor(() => expect(rpc).toHaveBeenCalledWith("retry_campaign_magnet_step_v7",
+    { p_step_id: "magnet-step" }));
+});

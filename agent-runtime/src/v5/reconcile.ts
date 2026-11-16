@@ -4,6 +4,7 @@ import type { RuntimeConfig } from "../config.js";
 import { logger } from "../logging/logger.js";
 import { dispatchOneRecoveryAlert } from "./recovery-alerts.js";
 import { attestCampaignCreativeWorkflowOutputs } from "../creative/attest-campaign-workflow.js";
+import { attestCampaignMagnetWorkflowOutputs } from "../lead-magnets/attest-campaign-workflow.js";
 
 const INTERVAL_MS = 15_000;
 
@@ -42,6 +43,8 @@ export function startWorkflowReconciler(sb: SupabaseClient, config: RuntimeConfi
         }
         const attested = await attestCampaignCreativeWorkflowOutputs(sb);
         if (attested > 0) logger.info("campaign_creative_bytes_attested", { count: attested });
+        const magnetAttested = await attestCampaignMagnetWorkflowOutputs(sb);
+        if (magnetAttested > 0) logger.info("campaign_magnet_bytes_attested", { count: magnetAttested });
         const { data: campaignQaData, error: campaignQaError } = await sb.rpc(
           "accept_ready_campaign_workflow_steps_v7", { p_limit: 20 },
         );
@@ -61,6 +64,16 @@ export function startWorkflowReconciler(sb: SupabaseClient, config: RuntimeConfi
         if (conversionQa && (conversionQa.steps_accepted || conversionQa.steps_blocked)) {
           logger.info("campaign_conversion_internal_qa", conversionQa);
         }
+        const { data: magnetQa, error: magnetQaError } = await sb.rpc(
+          "accept_ready_campaign_magnet_steps_v7", { p_limit: 20 },
+        );
+        if (magnetQaError) throw new Error(magnetQaError.message);
+        const magnetCounts = (Array.isArray(magnetQa) ? magnetQa[0] : magnetQa) as {
+          steps_accepted?: number; steps_blocked?: number;
+        } | null;
+        if (magnetCounts && (magnetCounts.steps_accepted || magnetCounts.steps_blocked)) {
+          logger.info("campaign_magnet_internal_qa", magnetCounts);
+        }
         const { data: workSynced, error: workError } = await sb.rpc(
           "sync_campaign_sweep_work_v7", { p_limit: 100 },
         );
@@ -74,6 +87,13 @@ export function startWorkflowReconciler(sb: SupabaseClient, config: RuntimeConfi
         if (conversionWorkError) throw new Error(conversionWorkError.message);
         if (typeof conversionSynced === "number" && conversionSynced > 0) {
           logger.info("campaign_conversion_work_synced", { count: conversionSynced });
+        }
+        const { data: magnetSynced, error: magnetWorkError } = await sb.rpc(
+          "sync_campaign_magnet_work_v7", { p_limit: 100 },
+        );
+        if (magnetWorkError) throw new Error(magnetWorkError.message);
+        if (typeof magnetSynced === "number" && magnetSynced > 0) {
+          logger.info("campaign_magnet_work_synced", { count: magnetSynced });
         }
         const { data: siblings, error: siblingError } = await sb.rpc(
           "settle_completed_blocked_daily_siblings", { p_limit: 5 },
