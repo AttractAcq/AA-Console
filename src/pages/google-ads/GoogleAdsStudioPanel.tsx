@@ -6,7 +6,6 @@ import { DataTable } from "../../components/DataTable";
 import { EmptyState } from "../../components/EmptyState";
 import { dayOrDash } from "../../lib/contentRecords";
 import { enqueueAgentJob, supabase } from "../../lib/supabase";
-import { PaidOperatorBundles } from "../distribution/PaidOperatorBundles";
 import type { Database } from "../../types/database";
 
 type SheetDue = Database["public"]["Views"]["google_ads_sheet_due"]["Row"];
@@ -115,7 +114,9 @@ export function GoogleAdsStudioPanel({ tab }: { tab: Tab }) {
 
       {tab === "sheet" && (
         <div className="space-y-4">
-          <PaidOperatorBundles clientId={clientId} platform="google" />
+          <p className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+            The Google operator bundle is awaiting an exact manual-sheet review path. Google search copy cannot enter the campaign sweep yet, so no approved preparation package exists for this route. Use the versioned sheet below as planning evidence; it is not a handoff approval.
+          </p>
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="font-semibold">The build a person does by hand</h3>
             <p className="mt-1 text-sm text-muted-foreground">

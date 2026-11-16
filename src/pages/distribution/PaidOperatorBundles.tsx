@@ -9,6 +9,11 @@ type Package = Pick<Database["public"]["Tables"]["campaign_preparation_packages_
   "id" | "campaign_id" | "version" | "assembled_at">;
 type Campaign = Pick<Database["public"]["Tables"]["client_campaigns"]["Row"],
   "id" | "name" | "paid_platform">;
+type MetricMatch = { bundle_id: string; match_state: string; external_campaign_id: string | null;
+  latest_metric_date: string | null; latest_fetched_at: string | null; days_with_rows: number;
+  recorded_spend: number | null; recorded_impressions: number | null;
+  recorded_clicks: number | null; recorded_conversions: number | null;
+  currency: string | null; currencies_seen: number };
 
 function sourceOf(bundle: Bundle): Record<string, unknown> {
   const snapshot = bundle.snapshot;
@@ -52,6 +57,7 @@ export function PaidOperatorBundles({ clientId, platform }: {
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [current, setCurrent] = useState<Record<string, boolean>>({});
+  const [matches, setMatches] = useState<Record<string, MetricMatch>>({});
   const [packageId, setPackageId] = useState("");
   const [owner, setOwner] = useState("");
   const [budget, setBudget] = useState("");
@@ -63,7 +69,7 @@ export function PaidOperatorBundles({ clientId, platform }: {
   const refresh = useCallback(async () => {
     if (!clientId) return;
     try {
-      const [c, p, b, e] = await Promise.all([
+      const [c, p, b, e, m] = await Promise.all([
         supabase.from("client_campaigns").select("id,name,paid_platform")
           .eq("client_id", clientId).eq("runs_paid", true).eq("paid_platform", platform),
         supabase.from("campaign_preparation_packages_v7")
@@ -74,8 +80,10 @@ export function PaidOperatorBundles({ clientId, platform }: {
           .order("created_at", { ascending: false }).limit(50),
         supabase.from("paid_operator_events_v7").select("*")
           .eq("client_id", clientId).order("recorded_at", { ascending: false }).limit(100),
+        supabase.from("paid_operator_metric_match_v7").select("*")
+          .eq("client_id", clientId).eq("platform", platform).limit(50),
       ]);
-      for (const result of [c, p, b, e]) if (result.error) throw result.error;
+      for (const result of [c, p, b, e, m]) if (result.error) throw result.error;
       const campaigns = (c.data ?? []) as Campaign[];
       const campaignIds = new Set(campaigns.map((item) => item.id));
       const latest = new Map<string, Package>();
@@ -93,6 +101,8 @@ export function PaidOperatorBundles({ clientId, platform }: {
       setEvents(((e.data ?? []) as Event[]).filter((row) =>
         visibleBundles.some((bundle) => bundle.id === row.bundle_id)));
       setCurrent(Object.fromEntries(checks));
+      setMatches(Object.fromEntries(((m.data ?? []) as MetricMatch[])
+        .map((row) => [row.bundle_id, row])));
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not load operator bundles.");
@@ -211,6 +221,7 @@ export function PaidOperatorBundles({ clientId, platform }: {
     {bundles.map((bundle) => {
       const source = sourceOf(bundle);
       const trail = events.filter((event) => event.bundle_id === bundle.id);
+      const metric = matches[bundle.id];
       return <article key={bundle.id} className="rounded border border-border p-3 text-xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="font-medium">{String(source.campaign_name ?? "Campaign")} · v{bundle.version} · {current[bundle.id] ? "current" : "stale or unverified"}</p>
@@ -238,6 +249,20 @@ export function PaidOperatorBundles({ clientId, platform }: {
           {event.external_campaign_id ? ` · campaign ${event.external_campaign_id}` : ""}
           {event.external_ad_id ? ` · ad ${event.external_ad_id}` : ""}
         </p>)}
+        <p className="mt-2 border-t border-border pt-2 text-muted-foreground">
+          Metrics match: {metric?.match_state === "metric_rows_match_reported_id"
+            ? `${metric.days_with_rows} daily row(s), latest ${metric.latest_metric_date ?? "date unknown"}`
+            : metric?.match_state === "no_matching_metric_rows" ? "No rows match the reported campaign ID."
+              : metric?.match_state === "provider_ingest_unavailable" ? "Provider ingest unavailable."
+                : "Unknown; no external campaign ID has been reported."}
+          {metric?.match_state === "metric_rows_match_reported_id" && <span className="block">
+            Recorded spend {metric.recorded_spend == null ? "unknown" : `${metric.recorded_spend} ${metric.currency ?? "currency unknown"}`}
+            {metric.currencies_seen > 1 ? " · multiple currencies" : ""}
+            {` · impressions ${metric.recorded_impressions ?? "unknown"} · clicks ${metric.recorded_clicks ?? "unknown"} · conversions ${metric.recorded_conversions ?? "unknown"}`}
+            {metric.latest_fetched_at ? ` · fetched ${new Date(metric.latest_fetched_at).toLocaleString()}` : ""}
+          </span>}
+          <span className="block">A matching metrics row does not verify provider account identity or ad activation.</span>
+        </p>
       </article>;
     })}
   </section>;

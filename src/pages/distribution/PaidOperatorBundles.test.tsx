@@ -11,6 +11,7 @@ const rows: Record<string, unknown[]> = {
     version: 1, assembled_at: "2026-11-16T00:00:00Z" }],
   paid_operator_bundles_v7: [],
   paid_operator_events_v7: [],
+  paid_operator_metric_match_v7: [],
 };
 
 vi.mock("../../lib/supabase", () => ({
@@ -31,6 +32,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   rows.paid_operator_bundles_v7 = [];
   rows.paid_operator_events_v7 = [];
+  rows.paid_operator_metric_match_v7 = [];
   rpc.mockResolvedValue({ data: true, error: null });
 });
 
@@ -70,4 +72,20 @@ it("requires a reported verified download before the handoff button is usable", 
   expect(await screen.findByText(/Local offer · v1 · current/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Report handoff" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Download and verify all files" })).toBeEnabled();
+});
+
+it("shows a metric row match without calling it provider verification", async () => {
+  rows.paid_operator_bundles_v7 = [{ id: "bundle-1", client_id: "client-1",
+    campaign_id: "campaign-1", package_id: "package-1", platform: "meta", version: 1,
+    snapshot_hash: "a".repeat(64), snapshot: { source: { campaign_name: "Local offer" } },
+    created_at: "2026-11-16T00:00:00Z", created_by: "user-1" }];
+  rows.paid_operator_metric_match_v7 = [{ bundle_id: "bundle-1",
+    match_state: "metric_rows_match_reported_id", days_with_rows: 2,
+    latest_metric_date: "2026-11-16", latest_fetched_at: "2026-11-16T01:00:00Z",
+    recorded_spend: 20, currency: "USD", currencies_seen: 1,
+    recorded_impressions: 100, recorded_clicks: 5, recorded_conversions: null }];
+  render(<PaidOperatorBundles clientId="client-1" platform="meta" />);
+  expect(await screen.findByText(/2 daily row\(s\)/)).toBeInTheDocument();
+  expect(screen.getByText(/Recorded spend 20 USD/)).toBeInTheDocument();
+  expect(screen.getByText(/does not verify provider account identity/)).toBeInTheDocument();
 });

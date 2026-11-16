@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "bd8a1625fbb336f83b09b8b91212a384c1d134905e5aaa030d92543fe23610b6",
-  "generatedTypesSha256": "f83d4c1977e1b93a0d65ddc144a927cc7713a1d3485264d1cf8d136fe18c2c70",
-  "generatedSchemaBodySha256": "6b562a798d24021ae22a45d8f92d4e3a9e920771b004bacbe0b90e3dc8d594f1",
+  "migrationSourceDigest": "fabf211456ad96395cb795916837084b74c800f20f61c34362479508b453845b",
+  "generatedTypesSha256": "e33905894e32ebbc714c2f4562cd59bccb9b4c05d1ef9cf1db82573db2e280a8",
+  "generatedSchemaBodySha256": "7e0e1a82dc410bd09a213b04686df2f0d5c633f9d47e29d71ec0e9112a76e71e",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3886,8 +3886,15 @@
       "version": "20261122230000",
       "name": "538_paid_operator_bundle",
       "filename": "20261122230000_538_paid_operator_bundle.sql",
-      "sha256": "02e7204709edc8d756a61d59d69fece4fb26b4247715a2c7b9134594e662f5aa",
-      "trimmedMd5": "a0f7d7aee5db19ed9fb35f5a10529235"
+      "sha256": "d6575f7d84dd21d73f82d316289dbafe451cfed229b5b523827761960324bcf6",
+      "trimmedMd5": "89bb92119026fe620c43e71cc28364cf"
+    },
+    {
+      "version": "20261123000000",
+      "name": "539_paid_operator_metric_match",
+      "filename": "20261123000000_539_paid_operator_metric_match.sql",
+      "sha256": "9a36466a03f15360d52ffdecf761a90061b73bfb04a22bfbf6d7d49f13f46180",
+      "trimmedMd5": "786c98a018227bda5df97f6eaae1cc46"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

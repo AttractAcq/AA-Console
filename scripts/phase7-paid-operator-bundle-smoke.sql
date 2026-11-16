@@ -138,6 +138,22 @@ begin
     raise exception 'Handoff retry was not idempotent'; end if;
   perform public.record_paid_operator_event_v7(bundle.id,
     'external_ids_reported','ads-manager-100','123456','7890');
+  if (select match_state from public.paid_operator_metric_match_v7
+      where bundle_id=bundle.id)<>'no_matching_metric_rows' then
+    raise exception 'A reported ID was treated as observed without metrics'; end if;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+  insert into public.metrics_daily(client_id,surface,entity_type,external_id,metric_date,
+    basis,spend,currency,impressions)
+  values(client,'paid','campaign','123456',current_date,'daily',10,'USD',100);
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  perform set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  if not exists(select 1 from public.paid_operator_metric_match_v7
+      where bundle_id=bundle.id and match_state='metric_rows_match_reported_id'
+        and days_with_rows=1 and recorded_spend=10 and currency='USD') then
+    raise exception 'Matching daily paid metrics were not reconciled'; end if;
   update public.client_campaigns set daily_budget=30 where id=cid;
   if public.paid_operator_bundle_current_v7(bundle.id) then
     raise exception 'A changed budget retained a current handoff'; end if;

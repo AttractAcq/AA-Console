@@ -21954,6 +21954,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "paid_operator_events_v7_bundle_id_fkey"
+            columns: ["bundle_id"]
+            isOneToOne: false
+            referencedRelation: "paid_operator_metric_match_v7"
+            referencedColumns: ["bundle_id"]
+          },
+          {
             foreignKeyName: "paid_operator_events_v7_recorded_by_fkey"
             columns: ["recorded_by"]
             isOneToOne: false
@@ -33777,6 +33784,81 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      paid_operator_metric_match_v7: {
+        Row: {
+          bundle_id: string | null
+          campaign_id: string | null
+          client_id: string | null
+          currencies_seen: number | null
+          currency: string | null
+          days_with_rows: number | null
+          external_ad_id: string | null
+          external_campaign_id: string | null
+          latest_fetched_at: string | null
+          latest_metric_date: string | null
+          match_state: string | null
+          platform: string | null
+          recorded_clicks: number | null
+          recorded_conversions: number | null
+          recorded_impressions: number | null
+          recorded_spend: number | null
+          reported_at: string | null
+          reported_event_id: string | null
+          reported_reference: string | null
+          version: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "paid_operator_bundles_v7_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
           },
         ]
       }
