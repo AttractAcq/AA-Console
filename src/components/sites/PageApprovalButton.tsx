@@ -15,7 +15,7 @@ export function PageApprovalButton({ pageId, ready }: { pageId: string; ready: b
     try {
       const result = await callRuntime<{ destination: string; status: string }>(
         "/admin/sites/request-page-approval", { pageId });
-      setNotice(`Review requested for ${result.destination}. Publication remains blocked until the approved-version executor is connected.`);
+      setNotice(`Review requested for ${result.destination}. An approved exact page version can publish when the campaign action worker is released and its prerequisites pass.`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not request page approval.");
     } finally {

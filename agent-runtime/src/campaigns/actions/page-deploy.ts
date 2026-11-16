@@ -40,6 +40,17 @@ export interface PageDeployScope {
   readonly probe_endpoint_token?: string;
 }
 
+/** Read only the token in the reviewed AA form, never a token in arbitrary page copy. */
+export function approvedPageCaptureToken(html: string, runtimeBase: string): string | null {
+  const marker = "<!-- aa-page-capture-form -->";
+  const start = html.indexOf(marker);
+  if (start < 0) return null;
+  const block = html.slice(start + marker.length, start + marker.length + 3000);
+  const base = runtimeBase.replace(/\/+$/, "");
+  const action = new RegExp(`<form\\b[^>]*\\baction="${base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/public/lead/form/([a-f0-9]{64})"`, "i");
+  return action.exec(block)?.[1] ?? null;
+}
+
 /**
  * The probe's own submission against the public capture endpoint.
  *
@@ -231,7 +242,9 @@ export const deployCampaignPage: ActionHandler = async (sb, config, action) => {
 
   // The probe. A page with no capture endpoint in scope cannot be tested,
   // which is recorded as an untested publication rather than as a pass.
-  if (!scope.probe_endpoint_token) {
+  const pageToken = approvedPageCaptureToken(page.html, config.publicRuntimeBase);
+  const probeToken = pageToken ?? scope.probe_endpoint_token;
+  if (!probeToken) {
     return {
       ...outcome,
       detail: `${outcome.detail} No capture token in scope, so the form was not tested.`,
@@ -242,7 +255,7 @@ export const deployCampaignPage: ActionHandler = async (sb, config, action) => {
     clientId: action.client_id,
     campaignId: action.campaign_id,
     pageId,
-    token: scope.probe_endpoint_token,
+    token: probeToken,
   });
   const { error: probeError } = await sb.rpc("record_campaign_page_probe_v6", {
     p_publication_id: publicationId,

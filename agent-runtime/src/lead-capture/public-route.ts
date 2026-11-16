@@ -39,6 +39,31 @@ export const hashCaptureToken = (token: string) =>
 
 /** The one thing every refusal says. */
 const REFUSAL = "This form is not accepting submissions.";
+const FORM_PATH = /^\/public\/lead\/form\/([a-f0-9]{64})$/;
+
+async function readFormBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+  if (!String(req.headers["content-type"] ?? "").toLowerCase().startsWith("application/x-www-form-urlencoded")) {
+    throw new Error("Expected a browser form.");
+  }
+  const chunks: Buffer[] = [];
+  let size = 0;
+  const timeout = setTimeout(() => req.destroy(new Error("Form read timed out.")), 10_000);
+  timeout.unref();
+  try {
+    for await (const chunk of req) {
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      size += bytes.length;
+      if (size > 8192) throw new Error("Form too large.");
+      chunks.push(bytes);
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
+  const params = new URLSearchParams(Buffer.concat(chunks).toString("utf8"));
+  const body: Record<string, unknown> = Object.fromEntries(params);
+  body.consent = params.get("consent") === "yes";
+  return body;
+}
 
 export async function handlePublicLead(
   req: IncomingMessage,
@@ -46,24 +71,53 @@ export async function handlePublicLead(
   sb: SupabaseClient,
   config: RuntimeConfig,
 ): Promise<void> {
+  const formToken = FORM_PATH.exec(req.url ?? "")?.[1] ?? null;
+  const isForm = formToken !== null;
   const json = (status: number, body: unknown) => {
     res.writeHead(status, {
       "Content-Type": "application/json",
       "Cache-Control": "no-store",
       "Referrer-Policy": "no-referrer",
       "X-Content-Type-Options": "nosniff",
+      // A campaign page is hosted on the client's own domain. The token is
+      // already a public form capability; quota and expiry still apply to
+      // every POST, including calls from a different browser origin.
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "authorization, content-type",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
     });
     res.end(JSON.stringify(body));
   };
 
-  if (req.method !== "POST" || req.url !== "/public/lead/submit") {
+  const formResult = (status: number, success: boolean) => {
+    res.writeHead(status, {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Referrer-Policy": "no-referrer",
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'",
+    });
+    res.end(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${success ? "Message received" : "Submission unavailable"}</title><main style="max-width:42rem;margin:4rem auto;padding:1rem;font:1.1rem system-ui"><h1>${success ? "Thank you" : "That did not go through"}</h1><p>${success ? "Your message is with the team." : "Please return to the page and try again, or contact the business directly."}</p></main></html>`);
+  };
+
+  if (req.url !== "/public/lead/submit" && !isForm) {
     json(404, { error: "Not found" });
     return;
   }
+  if (!isForm && req.method === "OPTIONS") {
+    json(204, {});
+    return;
+  }
+  if (req.method !== "POST") {
+    if (isForm) formResult(404, false);
+    else json(404, { error: "Not found" });
+    return;
+  }
 
-  const rawAuthorization = req.headers.authorization ?? "";
+  const rawAuthorization = isForm ? `Bearer ${formToken}` : req.headers.authorization ?? "";
   const admitted = await admitPublicRequest(req, sb, config, "lead_submit", rawAuthorization);
   if (!admitted.allowed) {
+    if (isForm) { formResult(admitted.reason === "quota" ? 429 : 503, false); return; }
     json(admitted.reason === "quota" ? 429 : 503, {
       error: admitted.reason === "quota" ? "Please try again shortly." : "That did not go through. Please try again shortly.",
     });
@@ -71,6 +125,7 @@ export async function handlePublicLead(
   }
   const token = rawAuthorization.replace(/^Bearer /, "");
   if (!/^[a-f0-9]{64}$/.test(token)) {
+    if (isForm) { formResult(404, false); return; }
     json(404, { error: REFUSAL });
     return;
   }
@@ -78,8 +133,9 @@ export async function handlePublicLead(
 
   let body: Record<string, unknown>;
   try {
-    body = await readJsonBody(req, 8192);
+    body = isForm ? await readFormBody(req) : await readJsonBody(req, 8192);
   } catch {
+    if (isForm) { formResult(400, false); return; }
     json(400, { error: "Expected a JSON body." });
     return;
   }
@@ -123,6 +179,7 @@ export async function handlePublicLead(
     // An infrastructure failure is ours, and the caller is told nothing
     // about it beyond that it did not work.
     logger.error("lead_capture_failed", { reason: "database_error" });
+    if (isForm) { formResult(503, false); return; }
     json(503, { error: "That did not go through. Please try again shortly." });
     return;
   }
@@ -134,11 +191,13 @@ export async function handlePublicLead(
     const theirs =
       outcome.reason === "Consent is required." ||
       outcome.reason === "An email address or a phone number is required.";
+    if (isForm) { formResult(theirs ? 400 : 404, false); return; }
     json(theirs ? 400 : 404, { error: theirs ? outcome.reason : REFUSAL });
     return;
   }
 
   logger.info("lead_captured", { leadId: outcome.lead_id });
+  if (isForm) { formResult(200, true); return; }
   // Identical whether a lead was created or merged. Whether an address is
   // already on file is not a public fact.
   json(200, { ok: true, message: "Thanks — that is with us." });

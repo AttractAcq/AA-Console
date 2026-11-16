@@ -2,11 +2,12 @@ import { createElement } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 
-const { from, rpc, useParams, useAgentJobs, inserts, deletes, rows } = vi.hoisted(() => ({
+const { from, rpc, useParams, useAgentJobs, createEndpoint, inserts, deletes, rows } = vi.hoisted(() => ({
   from: vi.fn(),
   rpc: vi.fn(),
   useParams: vi.fn(),
   useAgentJobs: vi.fn(),
+  createEndpoint: vi.fn(),
   inserts: [] as Array<{ table: string; value: unknown }>,
   deletes: [] as Array<{ table: string; filters: Array<[string, unknown]> }>,
   rows: {
@@ -25,6 +26,7 @@ vi.mock("react-router-dom", () => ({
     createElement("a", { href: to, ...rest }, children as never),
 }));
 vi.mock("../../lib/useAgentJobs", () => ({ useAgentJobs }));
+vi.mock("../../lib/leadCapture", () => ({ createEndpoint }));
 vi.mock("../../components/pages/PagePreview", () => ({ PagePreview: () => null }));
 
 import { PageBuilderPanel } from "./PageBuilderPanel";
@@ -40,6 +42,7 @@ beforeEach(() => {
   useParams.mockReturnValue({ clientId: "client-1" });
   useAgentJobs.mockReturnValue({ inFlight: [], recentFailures: [] });
   rpc.mockResolvedValue({ error: null });
+  createEndpoint.mockResolvedValue({ endpointId: "endpoint-1", token: "a".repeat(64) });
   from.mockImplementation((table: string) => {
     let deleting = false;
     const filters: Array<[string, unknown]> = [];
@@ -202,4 +205,28 @@ it("requires a brief when there is no uploaded HTML", async () => {
 
   expect(await screen.findByRole("alert")).toHaveTextContent("required unless you upload a built HTML file");
   expect(inserts).toEqual([]);
+});
+
+it("saves the consented form in a page revision before requesting approval", async () => {
+  vi.stubEnv("VITE_AGENT_RUNTIME_URL", "https://runtime.example.test");
+  try {
+    rows.pages = [{ id: "page-1", title: "Campaign landing", status: "approved",
+      html: "<!doctype html><html><body><h1>Offer</h1></body></html>", published_url: null }];
+    rows.links = [{ id: "link-1", page_id: "page-1", campaign_id: "campaign-1" }];
+    render(<PageBuilderPanel campaignId="campaign-1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add lead form to revision" }));
+    fireEvent.change(screen.getByLabelText(/Consent wording shown/), { target: { value: "I agree to be contacted." } });
+    fireEvent.change(screen.getByLabelText(/Source channel/), { target: { value: "paid_search" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add form" }));
+    await waitFor(() => expect(createEndpoint).toHaveBeenCalledWith(expect.objectContaining({
+      clientId: "client-1", purpose: "page_form", campaignId: "campaign-1", pageId: "page-1",
+      sourceChannel: "paid_search", consentWording: "I agree to be contacted.",
+    })));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("record_page_revision", expect.objectContaining({
+      p_page_id: "page-1", p_source: "manual_edit",
+      p_html: expect.stringContaining(`https://runtime.example.test/public/lead/form/${"a".repeat(64)}`),
+    })));
+  } finally {
+    vi.unstubAllEnvs();
+  }
 });

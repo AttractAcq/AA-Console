@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { RuntimeConfig } from "../../config.js";
-import { probePageForm } from "./page-deploy.js";
+import { approvedPageCaptureToken, probePageForm } from "./page-deploy.js";
 
 /**
  * The probe, which is the half of page deployment that matters.
@@ -63,6 +63,13 @@ const goodLead = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+it("finds only the token in an approved AA page form for this runtime", () => {
+  const html = `<!doctype html><body><!-- aa-page-capture-form --><section><form method="post" action="https://runtime.attractacq.com/public/lead/form/${ARGS.token}"></form></section></body>`;
+  expect(approvedPageCaptureToken(html, config.publicRuntimeBase)).toBe(ARGS.token);
+  expect(approvedPageCaptureToken(html.replace("<!-- aa-page-capture-form -->", ""), config.publicRuntimeBase)).toBeNull();
+  expect(approvedPageCaptureToken(html, "https://another-runtime.example")).toBeNull();
 });
 
 describe("what it posts", () => {

@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -11,8 +11,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * a green row with a footnote.
  */
 
-const { from } = vi.hoisted(() => ({ from: vi.fn() }));
+const { from, callRuntime } = vi.hoisted(() => ({ from: vi.fn(), callRuntime: vi.fn() }));
 vi.mock("../../lib/supabase", () => ({ supabase: { from } }));
+vi.mock("../../lib/callRuntime", () => ({ callRuntime }));
 vi.mock("react-router-dom", () => ({
   useParams: () => ({ clientId: "client-1" }),
   Link: ({ to, children }: { to: string; children: unknown }) =>
@@ -55,6 +56,7 @@ function database(due: unknown[], publications: unknown[] = []) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  callRuntime.mockResolvedValue({ ok: true, passed: true, detail: "Endpoint passed." });
 });
 
 describe("published is not the same as working", () => {
@@ -86,6 +88,16 @@ describe("published is not the same as working", () => {
     expect(screen.getByText(/1 endpoint checked, browser form unverified/)).toBeInTheDocument();
     expect(screen.getByText("Published. Capture endpoint passed; browser form unverified.")).toBeInTheDocument();
     expect(screen.getByText("endpoint passed; browser form unverified")).toBeInTheDocument();
+  });
+
+  it("can recheck a failed capture endpoint without republishing the page", async () => {
+    database([row({ blocker: "Published, but the capture endpoint probe failed: endpoint disabled.", probe_status: "failed" })],
+      [publication({ probe_kind: "endpoint", probe_status: "failed" })]);
+    render(<CampaignPagePublishPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "Recheck capture" }));
+    await waitFor(() => expect(callRuntime).toHaveBeenCalledWith(
+      "/admin/sites/recheck-page-capture", { publicationId: "pub-1" },
+    ));
   });
 
   it("shows what the probe found when it failed", async () => {

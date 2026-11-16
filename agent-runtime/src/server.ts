@@ -360,7 +360,8 @@ function dispatchRequest(req: http.IncomingMessage, res: http.ServerResponse): v
   if (
     req.url === "/admin/sites/provision" ||
     req.url === "/admin/sites/publish" ||
-    req.url === "/admin/sites/request-page-approval"
+    req.url === "/admin/sites/request-page-approval" ||
+    req.url === "/admin/sites/recheck-page-capture"
   ) {
     if (req.method !== "POST") {
       json(405, { ok: false, error: "POST only" });
@@ -370,6 +371,8 @@ function dispatchRequest(req: http.IncomingMessage, res: http.ServerResponse): v
       ? "provision"
       : req.url.endsWith("request-page-approval")
         ? "request-page-approval"
+        : req.url.endsWith("recheck-page-capture")
+          ? "recheck-page-capture"
         : "publish";
     void handleSitesRoute(req, res, sb, config, action);
     return;

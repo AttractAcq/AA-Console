@@ -7,6 +7,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { dayOrDash } from "../../lib/contentRecords";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
+import { callRuntime } from "../../lib/callRuntime";
 
 type PublishDue = Database["public"]["Views"]["campaign_page_publish_due"]["Row"];
 type Publication = Database["public"]["Tables"]["campaign_page_publications"]["Row"];
@@ -29,6 +30,21 @@ export function CampaignPagePublishPanel() {
   const [publications, setPublications] = useState<Publication[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rechecking, setRechecking] = useState<string | null>(null);
+
+  const recheck = async (publicationId: string) => {
+    setRechecking(publicationId);
+    setError(null);
+    try {
+      await callRuntime<{ passed: boolean; detail: string }>(
+        "/admin/sites/recheck-page-capture", { publicationId });
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not recheck the capture endpoint.");
+    } finally {
+      setRechecking(null);
+    }
+  };
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -148,7 +164,7 @@ export function CampaignPagePublishPanel() {
         <section className="space-y-2">
           <h3 className="font-semibold">Every commit, in order</h3>
           <DataTable
-            columns={["When", "URL", "Commit", "Capture check"]}
+            columns={["When", "URL", "Commit", "Capture check", "Action"]}
             emptyLabel="Nothing published yet"
             rows={publications.map((p) => [
               <span key="w">{dayOrDash(p.published_at)}</span>,
@@ -177,6 +193,15 @@ export function CampaignPagePublishPanel() {
                     : p.probe_status ?? "not tested"}
                 {p.probe_detail && (
                   <span className="block text-xs text-muted-foreground">{p.probe_detail}</span>
+                )}
+              </span>,
+              <span key="a">
+                {p.probe_kind !== "browser_form" && p.probe_status !== "passed" && (
+                  <button type="button" disabled={rechecking !== null}
+                    onClick={() => void recheck(p.id)}
+                    className="text-xs text-brand-strong underline disabled:opacity-50">
+                    {rechecking === p.id ? "Checking…" : "Recheck capture"}
+                  </button>
                 )}
               </span>,
             ])}

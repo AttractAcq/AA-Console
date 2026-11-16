@@ -29,10 +29,11 @@ function call(
   options: {
     token?: string; body?: Record<string, unknown>; method?: string; url?: string;
     peer?: string; forwarded?: string; trustedProxies?: RuntimeConfig["trustedProxies"];
+    form?: URLSearchParams;
   } = {},
 ) {
   const req = Readable.from([
-    Buffer.from(JSON.stringify(options.body ?? { email: "jay@example.test", consent: true })),
+    Buffer.from(options.form?.toString() ?? JSON.stringify(options.body ?? { email: "jay@example.test", consent: true })),
   ]) as IncomingMessage;
   req.method = options.method ?? "POST";
   req.url = options.url ?? "/public/lead/submit";
@@ -40,23 +41,28 @@ function call(
     authorization: `Bearer ${options.token ?? freshToken()}`,
     "user-agent": "Mozilla/5.0",
     "x-forwarded-for": options.forwarded ?? "203.0.113.9, 10.0.0.1",
+    ...(options.form ? { "content-type": "application/x-www-form-urlencoded" } : {}),
   };
   Object.defineProperty(req, "socket", { value: { remoteAddress: options.peer ?? "10.0.0.1" } });
 
   let code = 0;
+  let headers: Record<string, string> = {};
   let payload: Record<string, unknown> = {};
+  let html = "";
   const res = {
-    writeHead: (c: number) => {
+    writeHead: (c: number, h: Record<string, string>) => {
       code = c;
+      headers = h;
     },
     end: (text: string) => {
-      payload = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+      if (headers["Content-Type"]?.startsWith("text/html")) html = text;
+      else payload = text ? (JSON.parse(text) as Record<string, unknown>) : {};
     },
   } as unknown as ServerResponse;
 
   return handlePublicLead(req, res, sb, {
     ...config, trustedProxies: options.trustedProxies ?? config.trustedProxies,
-  }).then(() => ({ code, payload }));
+  }).then(() => ({ code, headers, payload, html }));
 }
 
 function database(outcome: Record<string, unknown> | null, error?: string) {
@@ -82,6 +88,43 @@ const argsOf = (
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+it("accepts a browser preflight for the public form without consuming a submission", async () => {
+  const { sb, rpc } = database({ ok: true });
+  const result = await call(sb, { method: "OPTIONS" });
+  expect(result.code).toBe(204);
+  expect(result.headers["Access-Control-Allow-Origin"]).toBe("*");
+  expect(result.headers["Access-Control-Allow-Headers"]).toContain("authorization");
+  expect(result.headers["Access-Control-Allow-Methods"]).toContain("POST");
+  expect(rpc).not.toHaveBeenCalled();
+});
+
+it("accepts a no-script browser form through the same consented capture function", async () => {
+  const token = "d".repeat(64);
+  const { sb, rpc } = database({ ok: true, lead_id: "lead-1" });
+  const result = await call(sb, {
+    method: "POST", url: `/public/lead/form/${token}`,
+    form: new URLSearchParams({ name: "Jay", email: "jay@example.test", consent: "yes", submission_id: "form-1" }),
+  });
+  expect(result.code).toBe(200);
+  expect(result.html).toContain("Thank you");
+  expect(result.html).not.toContain("lead-1");
+  const args = argsOf(rpc);
+  expect(args.p_token_hash).toBe(hashCaptureToken(token));
+  expect(args.p_consented).toBe(true);
+  expect(args.p_idempotency_key).toBe("form-1");
+});
+
+it("refuses a browser form with no checked consent and never exposes capture details", async () => {
+  const { sb, rpc } = database({ ok: false, reason: "Consent is required." });
+  const result = await call(sb, {
+    url: `/public/lead/form/${"e".repeat(64)}`,
+    form: new URLSearchParams({ email: "jay@example.test" }),
+  });
+  expect(result.code).toBe(400);
+  expect(result.html).toContain("That did not go through");
+  expect(argsOf(rpc).p_consented).toBe(false);
 });
 
 describe("what reaches the database", () => {

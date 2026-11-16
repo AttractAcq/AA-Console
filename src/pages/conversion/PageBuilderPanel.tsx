@@ -16,6 +16,8 @@ import { PageApprovalButton } from "../../components/sites/PageApprovalButton";
 import type { SiteRepo } from "../sites/readiness";
 import { PagePreview } from "../../components/pages/PagePreview";
 import { PagePolish } from "./PagePolish";
+import { createEndpoint } from "../../lib/leadCapture";
+import { appendPageCaptureForm } from "../../lib/pageCaptureForm";
 
 type Page = {
   id: string;
@@ -71,6 +73,7 @@ export function PageBuilderPanel({
   const [briefing, setBriefing] = useState(false);
   const [aiBrief, setAiBrief] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [formPageId, setFormPageId] = useState<string | null>(null);
   const { clientId: routeClientId } = useParams<{ clientId: string }>();
   const clientId = clientIdProp ?? routeClientId;
   // A hiring page has no campaign to belong to. AA is not running a campaign
@@ -392,6 +395,16 @@ export function PageBuilderPanel({
                 <p className="mt-1 truncate text-xs text-muted-foreground">{p.published_url}</p>
               )}
               <div className="mt-4 border-t border-border pt-3">
+                {!isRecruitment && p.html && !p.published_url && pageLinks.some((link) => link.page_id === p.id) && (
+                  <button
+                    type="button"
+                    onClick={() => setFormPageId(p.id)}
+                    disabled={p.html.includes("<!-- aa-page-capture-form -->") || busyPageId !== null}
+                    className="mb-3 rounded text-sm font-medium text-brand-strong hover:underline disabled:opacity-50"
+                  >
+                    {p.html.includes("<!-- aa-page-capture-form -->") ? "Lead form added" : "Add lead form to revision"}
+                  </button>
+                )}
                 {pageLinks.some((link) => link.page_id === p.id &&
                   campaigns.some((campaign) => campaign.id === link.campaign_id &&
                     // 'both' is a v6 route like the other two; omitting it hid
@@ -499,6 +512,41 @@ export function PageBuilderPanel({
           ))}
         </div>
       )}
+
+      <FormModal
+        open={formPageId !== null}
+        onClose={() => setFormPageId(null)}
+        title="Add a lead form"
+        intro="This adds a no-script form to a new page revision before approval. The capture endpoint starts disabled; activate it in Sales OS Capture before testing the published page."
+        submitLabel="Add form"
+        fields={[
+          { name: "consent_wording", label: "Consent wording shown beside the checkbox", kind: "textarea", required: true },
+          { name: "source_channel", label: "Source channel", kind: "text", required: true, placeholder: "paid_search" },
+        ]}
+        onSubmit={async (values) => {
+          const page = pages.find((candidate) => candidate.id === formPageId);
+          const linkedCampaigns = pageLinks.filter((link) => link.page_id === formPageId);
+          const campaignId = linkedCampaigns[0]?.campaign_id;
+          const runtimeBase = (import.meta.env.VITE_AGENT_RUNTIME_URL as string | undefined)?.replace(/\/+$/, "");
+          if (!clientId || !page?.html || !campaignId || !runtimeBase) throw new Error("A built campaign page and runtime URL are required.");
+          if (linkedCampaigns.length !== 1) throw new Error("Link this page to exactly one campaign before adding its form.");
+          if (page.published_url) throw new Error("A published page needs a separate republish review.");
+          const consentWording = String(values.consent_wording ?? "").trim();
+          const sourceChannel = String(values.source_channel ?? "").trim();
+          if (!sourceChannel) throw new Error("A source channel is required for attribution.");
+          appendPageCaptureForm(page.html, runtimeBase, "a".repeat(64), consentWording);
+          const endpoint = await createEndpoint({ clientId, purpose: "page_form", consentWording,
+            campaignId, pageId: page.id, sourceChannel });
+          const html = appendPageCaptureForm(page.html, runtimeBase, endpoint.token, consentWording);
+          const { error } = await supabase.rpc("record_page_revision", {
+            p_page_id: page.id, p_html: html, p_source: "manual_edit",
+            p_summary: "Added reviewed lead capture form", p_reason: "Connect the page to consented Sales OS capture",
+          });
+          if (error) throw new Error(`The page revision failed; disable unused capture endpoint ${endpoint.endpointId}. ${error.message}`);
+          setNotice("Lead form saved as a new revision. Activate its endpoint in Sales OS Capture, then request approval of this exact page version.");
+        }}
+        onSaved={() => { setFormPageId(null); void refresh(); }}
+      />
 
       <FormModal
         open={buildOpen}
