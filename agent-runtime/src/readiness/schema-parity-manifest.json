@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "d57e77278be342d616960c827d821e42e4b4bd2789dc6b5425bfdd00e23e4ce3",
+  "migrationSourceDigest": "f6ce7191c1fd6cc0396efc2541da8aa400b7403bb530072115989656cf1d6f41",
   "generatedTypesSha256": "1ad74407b29c14f30c6b7d87f0c53a5a5155f30b5c425a7aea726d5fe4b91635",
   "generatedSchemaBodySha256": "d869783ae25e006d556a0c42e01b05783543683fcac614b23c34f54e1b6f1be6",
   "localMigrations": [
@@ -2416,8 +2416,8 @@
       "version": "20261124000300",
       "name": "328_service_offer_inbox",
       "filename": "20261124000300_328_service_offer_inbox.sql",
-      "sha256": "e80d664f40543c7ddbaf16de74fc4ff7fef0cd838ddf99d95bc7150d2aa70594",
-      "trimmedMd5": "c15e4996a19dedbaa132d0dd801200bc"
+      "sha256": "c25b2a27dc11ebc717c83ff74334cb64d6b598363296fca85c8f2cb9cb40104b",
+      "trimmedMd5": "bd7e4d79159d14ba40d101e5b9eed18f"
     },
     {
       "version": "20261124000400",
