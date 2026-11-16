@@ -33532,6 +33532,69 @@ export type Database = {
           },
         ]
       }
+      production_attempts_v7: {
+        Row: {
+          accepted_workflow_output: boolean | null
+          asset_id: string | null
+          attempt_id: string | null
+          attempt_kind: string | null
+          attempt_status: string | null
+          campaign_id: string | null
+          client_id: string | null
+          content_format: string | null
+          cost_usd: number | null
+          created_at: string | null
+          demand_id: string | null
+          demand_kind: string | null
+          destination: string | null
+          human_review_status: string | null
+          job_id: string | null
+          media_type: string | null
+          piece_key: string | null
+          revised: boolean | null
+          route_package_id: string | null
+          run_id: string | null
+        }
+        Relationships: []
+      }
+      production_demand_counts_v7: {
+        Row: {
+          accepted_asset_id: string | null
+          attempts: number | null
+          campaign_id: string | null
+          client_id: string | null
+          content_format: string | null
+          demand_id: string | null
+          demand_kind: string | null
+          destination: string | null
+          human_approved: number | null
+          media_type: string | null
+          piece_key: string | null
+          produced: number | null
+          rejected: number | null
+          revised: number | null
+          route_package_id: string | null
+          run_id: string | null
+          workflow_accepted: number | null
+        }
+        Relationships: []
+      }
+      production_demand_v7: {
+        Row: {
+          accepted_asset_id: string | null
+          campaign_id: string | null
+          client_id: string | null
+          content_format: string | null
+          demand_id: string | null
+          demand_kind: string | null
+          destination: string | null
+          media_type: string | null
+          piece_key: string | null
+          route_package_id: string | null
+          run_id: string | null
+        }
+        Relationships: []
+      }
       profile_change_due: {
         Row: {
           applied_at: string | null

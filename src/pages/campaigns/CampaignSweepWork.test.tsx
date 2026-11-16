@@ -35,6 +35,10 @@ it("shows current route work and retries only its blocked step", async () => {
         state: "prepared", blocker: null, qa_state: "not_run",
         expected_output: { platform: "facebook", media_type: "image", content_format: "single" } },
     ]);
+    if (table === "production_demand_counts_v7") return rows([
+      { demand_id: "work-1", attempts: 2, produced: 1, rejected: 1, revised: 1,
+        workflow_accepted: 0, human_approved: 0 },
+    ]);
     if (table === "campaign_sweep_work_bindings_v7") return rows([
       { work_item_id: "work-1", run_id: "run-1", piece_key: "piece1" },
       { work_item_id: "work-2", run_id: "run-1", piece_key: "piece2" },
@@ -52,6 +56,8 @@ it("shows current route work and retries only its blocked step", async () => {
   expect(await screen.findByText(/content piece1 · organic v2/i)).toBeInTheDocument();
   expect(screen.getByText(/content piece2 · paid v1/i)).toBeInTheDocument();
   expect(screen.getByText(/Motion failed/)).toBeInTheDocument();
+  expect(screen.getByText(/1 requested · 1 produced · 1 failed or rejected attempts/)).toBeInTheDocument();
+  expect(screen.getByText(/1 revised · 0 passed workflow QA/)).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Retry this step" }));
   await waitFor(() => expect(rpc).toHaveBeenCalledWith("retry_campaign_sweep_step_v7",
     { p_step_id: "step-1" }));

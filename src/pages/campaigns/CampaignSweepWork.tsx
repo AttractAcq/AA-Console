@@ -15,12 +15,17 @@ type Work = {
 };
 type Binding = { work_item_id: string; run_id: string; piece_key: string };
 type Step = { id: string; run_id: string; step_key: string; status: string; blocker: string | null };
+type ProductionCounts = {
+  demand_id: string; attempts: number; produced: number; rejected: number; revised: number;
+  workflow_accepted: number; human_approved: number;
+};
 
 type Piece = {
   work: Work;
   route: string;
   version: number;
   steps: Step[];
+  counts: ProductionCounts | null;
 };
 
 const controlClass = "rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50";
@@ -64,6 +69,14 @@ export function CampaignSweepWork({ clientId, campaignId }: { clientId: string; 
     if (!work.length) {
       setPieces([]); setError(null); setLoading(false); return;
     }
+    const countsResult = await supabase.from("production_demand_counts_v7")
+      .select("demand_id, attempts, produced, rejected, revised, workflow_accepted, human_approved")
+      .eq("client_id", clientId).eq("demand_kind", "campaign")
+      .in("demand_id", work.map((row) => row.id));
+    if (version !== request.current) return;
+    if (countsResult.error) return fail(countsResult.error.message);
+    const countsByWork = new Map(((countsResult.data ?? []) as ProductionCounts[])
+      .map((row) => [row.demand_id, row]));
     const bindingResult = await supabase.from("campaign_sweep_work_bindings_v7")
       .select("work_item_id, run_id, piece_key")
       .in("work_item_id", work.map((row) => row.id));
@@ -88,6 +101,7 @@ export function CampaignSweepWork({ clientId, campaignId }: { clientId: string; 
         version: routePackage?.version ?? 0,
         steps: binding ? steps.filter((step) => step.run_id === binding.run_id
           && step.step_key.startsWith(`${binding.piece_key}_`)) : [],
+        counts: countsByWork.get(row.id) ?? null,
       };
     }).sort((a, b) => Number(a.work.item_key.match(/\d+$/)?.[0] ?? 0)
       - Number(b.work.item_key.match(/\d+$/)?.[0] ?? 0)));
@@ -123,7 +137,7 @@ export function CampaignSweepWork({ clientId, campaignId }: { clientId: string; 
     {notice && <p role="status" className="mt-2 text-xs">{notice}</p>}
     {loading && <p className="mt-2 text-xs text-muted-foreground">Loading work…</p>}
     {!loading && !error && !pieces.length && <p className="mt-2 text-xs text-muted-foreground">No production pieces have been swept into the current route packages.</p>}
-    {pieces.length > 0 && <ol className="mt-3 space-y-3">{pieces.map(({ work, route, version, steps }) => {
+    {pieces.length > 0 && <ol className="mt-3 space-y-3">{pieces.map(({ work, route, version, steps, counts }) => {
       const blocked = steps.filter((step) => step.status === "blocked" || step.status === "failed");
       const shownState = work.effective_state ?? work.state;
       return <li key={work.id} className="rounded-md border border-border p-3 text-sm">
@@ -136,6 +150,9 @@ export function CampaignSweepWork({ clientId, campaignId }: { clientId: string; 
             work.expected_output.content_format].filter(Boolean).join(" · ")}
           {steps.length ? ` · ${steps.filter((step) => step.status === "completed").length}/${steps.length} steps complete` : ""}
         </p>
+        {counts && <p className="mt-1 text-xs text-muted-foreground">
+          1 requested · {counts.produced} produced · {counts.rejected} failed or rejected attempts · {counts.revised} revised · {counts.workflow_accepted} passed workflow QA · {counts.human_approved} human approved
+        </p>}
         {shownState === "ready_for_review" && <p className="mt-2 text-xs">Internal QA passed. Review the exact asset before distribution.</p>}
         {(work.effective_blocker ?? work.blocker) && <p className="mt-2 text-xs text-destructive">{work.effective_blocker ?? work.blocker}</p>}
         {blocked.map((step) => <div key={step.id} className="mt-2 flex flex-wrap items-center gap-2 text-xs">

@@ -255,6 +255,21 @@ if [[ "${AA_SCHEMA_PHASE4_SMOKES:-0}" == "1" ]]; then
   echo "$smoke_count Phase 4 rollback fixtures passed."
 fi
 
+if [[ "${AA_SCHEMA_PHASE5_SMOKES:-0}" == "1" ]]; then
+  smoke_count=0
+  for smoke_file in scripts/phase5-*-smoke.sql; do
+    smoke_name="${smoke_file##*/}"
+    if psql_local -qAt -f "$smoke_file" >"$run_dir/$smoke_name.private.log" 2>&1; then
+      smoke_count=$((smoke_count + 1))
+    else
+      echo "$smoke_name failed; raw fixture output is in the disposable private log." >&2
+      grep -E 'ERROR:|psql:' "$run_dir/$smoke_name.private.log" | tail -3 >&2 || true
+      exit 1
+    fi
+  done
+  echo "$smoke_count Phase 5 rollback fixtures passed."
+fi
+
 if [[ "${AA_SCHEMA_PHASE6_SMOKES:-0}" == "1" ]]; then
   smoke_count=0
   for smoke_file in scripts/phase6-*-smoke.sql; do

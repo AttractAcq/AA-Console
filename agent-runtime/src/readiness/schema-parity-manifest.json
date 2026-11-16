@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "34a7c5e63069f232a27db213049d5b1392c4e2b551dc84a948dd87874b4bd258",
-  "generatedTypesSha256": "a81b8215fe2c99aacf3562a7146c90031780448651ae16d7d12612db85bd6160",
-  "generatedSchemaBodySha256": "a0e8f1778dcc55d2e0f3d20daf506ac1ae9c6336ec30dc3869c695dc16abbbb6",
+  "migrationSourceDigest": "2208ff8e9d5ceaedbeff94aa288168719d59f6706b52d7977df3a6f53e6a7e71",
+  "generatedTypesSha256": "3f4b6c31b3eed2572165d2980bbc132a37331f4a4eca418d1d62f9bf8eb871ed",
+  "generatedSchemaBodySha256": "61e39a35079cd27af4677b55fd92b1a3c4731c4348f2ca6bd8101c9cca3d4dfa",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3844,8 +3844,15 @@
       "version": "20261122170000",
       "name": "532_lead_magnet_operator_handoff",
       "filename": "20261122170000_532_lead_magnet_operator_handoff.sql",
-      "sha256": "0ef0594e360e6c4426f835eab510c31d4f6067c0eeba82b98f8abf045b743cf9",
-      "trimmedMd5": "e76b51488992857df5af6d066dd43d37"
+      "sha256": "e4b1b1ce99938de181713930fac6bd2cb95110470d2e18b7aa72ff90a49f5a71",
+      "trimmedMd5": "6560ce11a86413d700fccaee8cddf404"
+    },
+    {
+      "version": "20261122180000",
+      "name": "533_production_attempt_lineage",
+      "filename": "20261122180000_533_production_attempt_lineage.sql",
+      "sha256": "065ded5991aba39490c2376c91b4810735de69f01f2fa9a2ffa59322314c52d1",
+      "trimmedMd5": "3d2f3d03041025e40c5bdbe6cae544e9"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
