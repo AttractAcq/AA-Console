@@ -13883,6 +13883,75 @@ export type Database = {
           },
         ]
       }
+      google_ads_ad_reads_v7: {
+        Row: {
+          ad_type: string
+          clicks: number
+          client_id: string
+          conversions: number
+          cost_micros: number
+          descriptions: Json
+          external_ad_group_id: string
+          external_ad_id: string
+          external_campaign_id: string
+          final_urls: Json
+          headlines: Json
+          impressions: number
+          resource_name: string
+          run_id: string
+          status: string
+        }
+        Insert: {
+          ad_type: string
+          clicks: number
+          client_id: string
+          conversions: number
+          cost_micros: number
+          descriptions: Json
+          external_ad_group_id: string
+          external_ad_id: string
+          external_campaign_id: string
+          final_urls: Json
+          headlines: Json
+          impressions: number
+          resource_name: string
+          run_id: string
+          status: string
+        }
+        Update: {
+          ad_type?: string
+          clicks?: number
+          client_id?: string
+          conversions?: number
+          cost_micros?: number
+          descriptions?: Json
+          external_ad_group_id?: string
+          external_ad_id?: string
+          external_campaign_id?: string
+          final_urls?: Json
+          headlines?: Json
+          impressions?: number
+          resource_name?: string
+          run_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_ads_ad_reads_v7_run_id_client_id_fkey"
+            columns: ["run_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_read_runs_v7"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_ads_ad_reads_v7_run_id_external_campaign_id_fkey"
+            columns: ["run_id", "external_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_campaign_reads_v7"
+            referencedColumns: ["run_id", "external_campaign_id"]
+          },
+        ]
+      }
       google_ads_build_sheets: {
         Row: {
           campaign_id: string
@@ -40951,6 +41020,22 @@ export type Database = {
           p_post_id: string
         }
         Returns: undefined
+      }
+      record_google_ads_full_read_v7: {
+        Args: {
+          p_ads: Json
+          p_campaigns: Json
+          p_client_id: string
+          p_credential_secret_id: string
+          p_currency: string
+          p_customer_id: string
+          p_from_date: string
+          p_integration_id: string
+          p_job_id: string
+          p_request_id: string
+          p_through_date: string
+        }
+        Returns: string
       }
       record_google_ads_read_v7: {
         Args: {

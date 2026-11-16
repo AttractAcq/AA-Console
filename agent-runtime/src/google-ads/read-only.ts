@@ -2,7 +2,7 @@
 
 const API = "https://googleads.googleapis.com/v25";
 const MAX_PAGES = 20;
-const MAX_CAMPAIGNS = 5000;
+const MAX_ROWS = 5000;
 
 export class GoogleAdsReadError extends Error {
   constructor(message: string, readonly retryable: boolean) { super(message); }
@@ -19,11 +19,28 @@ export interface GoogleCampaignRead {
   conversions: string;
 }
 
+export interface GoogleAdRead {
+  resource_name: string;
+  campaign_id: string;
+  ad_group_id: string;
+  ad_id: string;
+  status: string;
+  ad_type: string;
+  final_urls: string[];
+  headlines: string[];
+  descriptions: string[];
+  impressions: string;
+  clicks: string;
+  cost_micros: string;
+  conversions: string;
+}
+
 export interface GoogleAccountRead {
   customerId: string;
   currency: string;
   requestId: string;
   campaigns: GoogleCampaignRead[];
+  ads: GoogleAdRead[];
 }
 
 type SearchRow = Record<string, unknown>;
@@ -98,13 +115,38 @@ async function search(
       if (!parsed) throw new GoogleAdsReadError("Google Ads returned a malformed row.", false);
       rows.push(parsed);
     }
-    if (rows.length > MAX_CAMPAIGNS) throw new GoogleAdsReadError(
+    if (rows.length > MAX_ROWS) throw new GoogleAdsReadError(
       "Google Ads result exceeds the bounded read limit.", false);
     pageToken = typeof body?.nextPageToken === "string" && body.nextPageToken
       ? body.nextPageToken : undefined;
     if (!pageToken) return { rows, requestId };
   }
   throw new GoogleAdsReadError("Google Ads pagination exceeded the bounded read limit.", false);
+}
+
+function resourceName(value: unknown, customerId: string, adGroupId: string, adId: string): string {
+  const expected = `customers/${customerId}/adGroupAds/${adGroupId}~${adId}`;
+  if (value !== expected) throw new GoogleAdsReadError("Google ad resource identity was malformed.", false);
+  return expected;
+}
+
+function textAssets(value: unknown, label: string): string[] {
+  if (value == null) return [];
+  if (!Array.isArray(value) || value.length > 30) throw new GoogleAdsReadError(`Google ${label} was malformed.`, false);
+  return value.map((item) => {
+    const text = object(item)?.text;
+    if (typeof text !== "string" || !text.trim() || text.length > 1000)
+      throw new GoogleAdsReadError(`Google ${label} was malformed.`, false);
+    return text;
+  });
+}
+
+function urls(value: unknown): string[] {
+  if (value == null) return [];
+  if (!Array.isArray(value) || value.length > 20 || value.some((item) =>
+    typeof item !== "string" || item.length > 2048 || !/^https?:\/\//.test(item)))
+    throw new GoogleAdsReadError("Google ad final URLs were malformed.", false);
+  return value;
 }
 
 export async function readGoogleAdsAccount(
@@ -133,7 +175,17 @@ export async function readGoogleAdsAccount(
   const metrics = await search(credentials,
     "SELECT campaign.id, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions "
       + `FROM campaign WHERE segments.date BETWEEN '${fromDate}' AND '${throughDate}'`, fetchImpl);
-  if (!account.requestId || !inventory.requestId || !metrics.requestId) throw new GoogleAdsReadError(
+  const adInventory = await search(credentials,
+    "SELECT campaign.id, ad_group.id, ad_group_ad.resource_name, ad_group_ad.status, "
+      + "ad_group_ad.ad.id, ad_group_ad.ad.type, ad_group_ad.ad.final_urls, "
+      + "ad_group_ad.ad.responsive_search_ad.headlines, "
+      + "ad_group_ad.ad.responsive_search_ad.descriptions FROM ad_group_ad", fetchImpl);
+  const adMetrics = await search(credentials,
+    "SELECT ad_group_ad.resource_name, metrics.impressions, metrics.clicks, "
+      + "metrics.cost_micros, metrics.conversions FROM ad_group_ad "
+      + `WHERE segments.date BETWEEN '${fromDate}' AND '${throughDate}'`, fetchImpl);
+  if (!account.requestId || !inventory.requestId || !metrics.requestId
+    || !adInventory.requestId || !adMetrics.requestId) throw new GoogleAdsReadError(
     "Google Ads did not return provider request IDs for every read.", false);
 
   const byId = new Map<string, SearchRow>();
@@ -166,7 +218,41 @@ export async function readGoogleAdsAccount(
   });
   if ([...byId.keys()].some((id) => !seen.has(id))) throw new GoogleAdsReadError(
     "Google Ads metrics referenced a campaign absent from inventory.", false);
+  const adMetricByName = new Map<string, SearchRow>();
+  for (const row of adMetrics.rows) {
+    const name = object(row.adGroupAd)?.resourceName;
+    if (typeof name !== "string" || adMetricByName.has(name))
+      throw new GoogleAdsReadError("Google Ads returned malformed or duplicate ad metrics.", false);
+    adMetricByName.set(name, object(row.metrics) ?? {});
+  }
+  const adNames = new Set<string>();
+  const ads = adInventory.rows.map((row): GoogleAdRead => {
+    const campaignId = digits(object(row.campaign)?.id, "ad campaign ID");
+    const adGroupId = digits(object(row.adGroup)?.id, "ad group ID");
+    const groupAd = object(row.adGroupAd);
+    const ad = object(groupAd?.ad);
+    const adId = digits(ad?.id, "ad ID");
+    const name = resourceName(groupAd?.resourceName, credentials.customerId, adGroupId, adId);
+    if (adNames.has(name) || !seen.has(campaignId))
+      throw new GoogleAdsReadError("Google Ads returned a duplicate ad or unknown campaign.", false);
+    adNames.add(name);
+    if (typeof groupAd?.status !== "string" || !groupAd.status.trim()
+      || typeof ad?.type !== "string" || !ad.type.trim())
+      throw new GoogleAdsReadError("Google Ads returned an incomplete ad record.", false);
+    const metric = adMetricByName.get(name) ?? {};
+    const rsa = object(ad.responsiveSearchAd);
+    return { resource_name:name, campaign_id:campaignId, ad_group_id:adGroupId,
+      ad_id:adId, status:groupAd.status, ad_type:ad.type,
+      final_urls:urls(ad.finalUrls), headlines:textAssets(rsa?.headlines,"ad headlines"),
+      descriptions:textAssets(rsa?.descriptions,"ad descriptions"),
+      impressions:nonnegative(metric.impressions,"ad impressions"),
+      clicks:nonnegative(metric.clicks,"ad clicks"),
+      cost_micros:nonnegative(metric.costMicros,"ad cost"),
+      conversions:nonnegative(metric.conversions,"ad conversions",true) };
+  });
+  if ([...adMetricByName.keys()].some((name) => !adNames.has(name)))
+    throw new GoogleAdsReadError("Google Ads metrics referenced an ad absent from inventory.", false);
   return { customerId: credentials.customerId, currency: exact.currencyCode,
-    requestId: `${account.requestId}:${inventory.requestId}:${metrics.requestId}`,
-    campaigns };
+    requestId: [account,inventory,metrics,adInventory,adMetrics].map((read) => read.requestId).join(":"),
+    campaigns, ads };
 }

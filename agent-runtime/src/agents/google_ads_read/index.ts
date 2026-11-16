@@ -40,16 +40,16 @@ export async function runGoogleAdsReadJob(
       developerToken:config.googleAdsDeveloperToken,
       loginCustomerId:config.googleAdsLoginCustomerId,
     },window.from,window.through);
-    const recorded = await sb.rpc("record_google_ads_read_v7", {
+    const recorded = await sb.rpc("record_google_ads_full_read_v7", {
       p_client_id:job.client_id,p_integration_id:integration.data.id,
       p_credential_secret_id:integration.data.credential_secret_id,p_job_id:job.id,
       p_customer_id:read.customerId,p_currency:read.currency,
       p_from_date:window.from,p_through_date:window.through,
-      p_request_id:read.requestId,p_campaigns:read.campaigns,
+      p_request_id:read.requestId,p_campaigns:read.campaigns,p_ads:read.ads,
     });
     if (recorded.error) throw new Error(`Could not record Google Ads read: ${recorded.error.message}`);
     await appendEvent(sb,job.id,
-      `Read ${read.campaigns.length} Google Ads campaigns for customer ${read.customerId}; ${window.from} to ${window.through}.`);
+      `Read ${read.campaigns.length} Google Ads campaigns and ${read.ads.length} ads for customer ${read.customerId}; ${window.from} to ${window.through}.`);
     return { ok:true,retryable:false };
   } catch (cause) {
     if (cause instanceof GoogleAdsReadError) return {

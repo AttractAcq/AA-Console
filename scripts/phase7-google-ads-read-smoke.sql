@@ -21,6 +21,11 @@ declare cid uuid:='b2222222-2222-4222-8222-222222222222';
   campaign_rows jsonb:='[{"id":"42","name":"Lead search","status":"ENABLED",
     "channel":"SEARCH","impressions":"100","clicks":"8",
     "cost_micros":"1230000","conversions":"1.25"}]'::jsonb;
+  ad_rows jsonb:='[{"resource_name":"customers/1234567890/adGroupAds/7~9",
+    "campaign_id":"42","ad_group_id":"7","ad_id":"9","status":"ENABLED",
+    "ad_type":"RESPONSIVE_SEARCH_AD","final_urls":["https://example.com"],
+    "headlines":["A headline"],"descriptions":["A description"],
+    "impressions":"50","clicks":"4","cost_micros":"600000","conversions":"1"}]'::jsonb;
 begin
   integration_id:=public.admin_store_integration_credential(
     cid,'google_ads','Google Ads fixture','fixture-oauth-token','read');
@@ -33,8 +38,8 @@ begin
   insert into public.agent_jobs(agent_key,client_id)
     values('google_ads_read',cid) returning id into job_id;
   begin
-    perform public.record_google_ads_read_v7(cid,integration_id,credential_id,job_id,
-      '1234567890','USD',current_date-29,current_date,'req-a',campaign_rows);
+    perform public.record_google_ads_full_read_v7(cid,integration_id,credential_id,job_id,
+      '1234567890','USD',current_date-29,current_date,'req-a',campaign_rows,ad_rows);
   exception when check_violation then refused:=true; end;
   if not refused then raise exception 'Unapproved Google integration recorded a read'; end if;
   refused:=false;
@@ -49,34 +54,46 @@ begin
   perform set_config('request.jwt.claim.role','service_role',true);
   perform set_config('request.jwt.claims','{"role":"service_role"}',true);
   begin
-    perform public.record_google_ads_read_v7(cid,integration_id,credential_id,job_id,
-      '9999999999','USD',current_date-29,current_date,'req-b',campaign_rows);
+    perform public.record_google_ads_full_read_v7(cid,integration_id,credential_id,job_id,
+      '9999999999','USD',current_date-29,current_date,'req-b',campaign_rows,ad_rows);
   exception when check_violation then refused:=true; end;
   if not refused then raise exception 'Different Google customer was recorded'; end if;
   refused:=false;
   begin
-    perform public.record_google_ads_read_v7(cid,integration_id,
+    perform public.record_google_ads_full_read_v7(cid,integration_id,
       'f2222222-2222-4222-8222-222222222222',job_id,
-      '1234567890','USD',current_date-29,current_date,'req-rotated',campaign_rows);
+      '1234567890','USD',current_date-29,current_date,'req-rotated',campaign_rows,ad_rows);
   exception when check_violation then refused:=true; end;
   if not refused then raise exception 'Wrong credential generation recorded a Google read'; end if;
   refused:=false;
   begin
-    perform public.record_google_ads_read_v7('d2222222-2222-4222-8222-222222222222',
+    perform public.record_google_ads_full_read_v7('d2222222-2222-4222-8222-222222222222',
       integration_id,credential_id,job_id,'1234567890','USD',current_date-29,current_date,
-      'req-c',campaign_rows);
+      'req-c',campaign_rows,ad_rows);
   exception when check_violation then refused:=true; end;
   if not refused then raise exception 'Cross-client Google read was recorded'; end if;
   refused:=false;
-  select public.record_google_ads_read_v7(cid,integration_id,credential_id,job_id,
-    '1234567890','USD',current_date-29,current_date,'req-d',campaign_rows) into v_run_id;
+  begin
+    perform public.record_google_ads_full_read_v7(cid,integration_id,credential_id,job_id,
+      '1234567890','USD',current_date-29,current_date,'req-bad-ad',campaign_rows,
+      jsonb_set(ad_rows,'{0,resource_name}',
+        '"customers/9999999999/adGroupAds/7~9"'::jsonb));
+  exception when check_violation then refused:=true; end;
+  if not refused then raise exception 'Foreign Google ad identity was recorded'; end if;
+  refused:=false;
+  select public.record_google_ads_full_read_v7(cid,integration_id,credential_id,job_id,
+    '1234567890','USD',current_date-29,current_date,'req-d',campaign_rows,ad_rows) into v_run_id;
   if not exists(select 1 from public.google_ads_campaign_reads_v7 r
     where r.run_id=v_run_id and r.client_id=cid and r.external_campaign_id='42'
       and cost_micros=1230000 and conversions=1.25) then
     raise exception 'Google read did not persist exact metrics'; end if;
+  if not exists(select 1 from public.google_ads_ad_reads_v7 a
+    where a.run_id=v_run_id and a.client_id=cid and a.external_ad_id='9'
+      and a.cost_micros=600000 and a.headlines='["A headline"]'::jsonb) then
+    raise exception 'Google read did not persist ad creative and metrics'; end if;
   begin
-    perform public.record_google_ads_read_v7(cid,integration_id,credential_id,job_id,
-      '1234567890','USD',current_date-29,current_date,'req-d',campaign_rows);
+    perform public.record_google_ads_full_read_v7(cid,integration_id,credential_id,job_id,
+      '1234567890','USD',current_date-29,current_date,'req-d',campaign_rows,ad_rows);
   exception when unique_violation then refused:=true; end;
   if not refused then raise exception 'Duplicate job recorded a second Google read'; end if;
 end $checks$;

@@ -5,13 +5,16 @@ import type { Database } from "../../types/database";
 
 type Run = Database["public"]["Tables"]["google_ads_read_runs_v7"]["Row"];
 type Campaign = Database["public"]["Tables"]["google_ads_campaign_reads_v7"]["Row"];
+type Ad = Database["public"]["Tables"]["google_ads_ad_reads_v7"]["Row"];
 type Match = Database["public"]["Views"]["google_operator_google_match_v7"]["Row"];
 
 export function GoogleAdsReadPanel({ clientId }: { clientId: string | undefined }) {
   const [run, setRun] = useState<Run | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [ads, setAds] = useState<Ad[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedAd, setSelectedAd] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -37,12 +40,17 @@ export function GoogleAdsReadPanel({ clientId }: { clientId: string | undefined 
     setAccountChanged(prior!==null && latest===null);
     setRun(latest);
     setMatches(matchRows.data ?? []);
-    if (!latest) { setCampaigns([]); return; }
-    const rows = await supabase.from("google_ads_campaign_reads_v7").select("*")
-      .eq("run_id",latest.id).eq("client_id",clientId)
-      .order("name",{ascending:true}).limit(5000);
-    if (rows.error) throw new Error(rows.error.message);
-    setCampaigns(rows.data ?? []);
+    if (!latest) { setCampaigns([]); setAds([]); setSelected(null); setSelectedAd(null); return; }
+    const [rows,adRows] = await Promise.all([
+      supabase.from("google_ads_campaign_reads_v7").select("*")
+        .eq("run_id",latest.id).eq("client_id",clientId)
+        .order("name",{ascending:true}).limit(5000),
+      supabase.from("google_ads_ad_reads_v7").select("*")
+        .eq("run_id",latest.id).eq("client_id",clientId)
+        .order("external_ad_id",{ascending:true}).limit(5000),
+    ]);
+    if (rows.error || adRows.error) throw new Error(rows.error?.message ?? adRows.error?.message);
+    setCampaigns(rows.data ?? []); setAds(adRows.data ?? []);
   },[clientId]);
 
   useEffect(() => {
@@ -61,6 +69,7 @@ export function GoogleAdsReadPanel({ clientId }: { clientId: string | undefined 
   }
 
   const detail = campaigns.find((campaign) => campaign.external_campaign_id===selected);
+  const adDetail = ads.find((ad) => ad.resource_name===selectedAd);
   return <section className="space-y-3 rounded-lg border border-border bg-card p-4">
     <h3 className="font-semibold">Google Ads account inventory</h3>
     <p className="text-sm text-muted-foreground">This view reads the configured Google Ads customer. It never builds, activates or changes ads. Human-reported IDs only become observed when they appear in an account read.</p>
@@ -95,6 +104,29 @@ export function GoogleAdsReadPanel({ clientId }: { clientId: string | undefined 
         <div><dt className="text-muted-foreground">Spend in period</dt><dd>{(Number(detail.cost_micros)/1_000_000).toFixed(2)} {run.currency}</dd></div>
         <div><dt className="text-muted-foreground">Conversions</dt><dd>{detail.conversions}</dd></div>
       </dl>}
+    </div>}
+    {run && <div className="space-y-2">
+      <h4 className="font-medium">Ads in this account ({ads.length})</h4>
+      {ads.length===0 && <p className="text-sm">The account returned no ads.</p>}
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div className="space-y-1">{ads.map((ad) => <button key={ad.resource_name} type="button"
+          className="block w-full rounded border border-border p-2 text-left text-sm hover:bg-muted"
+          onClick={() => setSelectedAd(ad.resource_name)}>
+          Ad {ad.external_ad_id} · {ad.ad_type} · {ad.status} · campaign {ad.external_campaign_id}
+        </button>)}</div>
+        {adDetail && <dl className="grid content-start gap-2 rounded border border-border p-3 text-sm">
+          <div><dt className="text-muted-foreground">Ad and group</dt><dd>{adDetail.external_ad_id} · {adDetail.external_ad_group_id}</dd></div>
+          <div><dt className="text-muted-foreground">Campaign</dt><dd>{campaigns.find((c) => c.external_campaign_id===adDetail.external_campaign_id)?.name ?? adDetail.external_campaign_id}</dd></div>
+          <div><dt className="text-muted-foreground">Status and type</dt><dd>{adDetail.status} · {adDetail.ad_type}</dd></div>
+          <div><dt className="text-muted-foreground">Headlines</dt><dd>{Array.isArray(adDetail.headlines) && adDetail.headlines.length ? adDetail.headlines.join(" · ") : "No text assets returned"}</dd></div>
+          <div><dt className="text-muted-foreground">Descriptions</dt><dd>{Array.isArray(adDetail.descriptions) && adDetail.descriptions.length ? adDetail.descriptions.join(" · ") : "No text assets returned"}</dd></div>
+          <div><dt className="text-muted-foreground">Final URLs</dt><dd>{Array.isArray(adDetail.final_urls) && adDetail.final_urls.length ? adDetail.final_urls.join(" · ") : "None returned"}</dd></div>
+          <div><dt className="text-muted-foreground">Impressions</dt><dd>{adDetail.impressions}</dd></div>
+          <div><dt className="text-muted-foreground">Clicks</dt><dd>{adDetail.clicks}</dd></div>
+          <div><dt className="text-muted-foreground">Spend in period</dt><dd>{(Number(adDetail.cost_micros)/1_000_000).toFixed(2)} {run.currency}</dd></div>
+          <div><dt className="text-muted-foreground">Conversions</dt><dd>{adDetail.conversions}</dd></div>
+        </dl>}
+      </div>
     </div>}
   </section>;
 }

@@ -9,17 +9,19 @@ import { GoogleAdsReadPanel } from "./GoogleAdsReadPanel";
 
 let runs: unknown[];
 let campaigns: unknown[];
+let ads: unknown[];
 let matches: unknown[];
 let integration: unknown;
 beforeEach(() => {
   vi.clearAllMocks();
-  runs=[]; campaigns=[]; matches=[];
+  runs=[]; campaigns=[]; ads=[]; matches=[];
   integration={id:"integration-1",google_ads_customer_id:"1234567890",
     credential_secret_id:"secret-1"};
   enqueueAgentJob.mockResolvedValue("job-1");
   from.mockImplementation((table:string) => {
     const data = table==="google_ads_read_runs_v7" ? runs
-      : table==="google_ads_campaign_reads_v7" ? campaigns : matches;
+      : table==="google_ads_campaign_reads_v7" ? campaigns
+      : table==="google_ads_ad_reads_v7" ? ads : matches;
     const chain: Record<string,unknown> = {};
     Object.assign(chain, { select:()=>chain,eq:()=>chain,order:()=>chain,
       limit:async()=>({data,error:null}),
@@ -46,6 +48,11 @@ describe("Google Ads read-only account view", () => {
     campaigns=[{run_id:"run-1",client_id:"client-1",external_campaign_id:"42",
       name:"Lead search",status:"ENABLED",channel:"SEARCH",impressions:100,clicks:8,
       cost_micros:1230000,conversions:1.25}];
+    ads=[{run_id:"run-1",client_id:"client-1",resource_name:"customers/1234567890/adGroupAds/7~9",
+      external_campaign_id:"42",external_ad_group_id:"7",external_ad_id:"9",
+      status:"ENABLED",ad_type:"RESPONSIVE_SEARCH_AD",final_urls:["https://example.com"],
+      headlines:["Lead headline"],descriptions:["Lead description"],impressions:50,
+      clicks:4,cost_micros:600000,conversions:1}];
     matches=[{bundle_id:"bundle-1",reported_campaign_id:"99",
       match_state:"reported_id_not_observed"}];
     render(<GoogleAdsReadPanel clientId="client-1" />);
@@ -53,6 +60,9 @@ describe("Google Ads read-only account view", () => {
     await userEvent.click(await screen.findByRole("button",{name:/Lead search · ENABLED · 42/}));
     expect(screen.getByText("1.23 USD")).toBeInTheDocument();
     expect(screen.getByText("1.25")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button",{name:/Ad 9 · RESPONSIVE_SEARCH_AD/}));
+    expect(screen.getByText("Lead headline")).toBeInTheDocument();
+    expect(screen.getByText("0.60 USD")).toBeInTheDocument();
   });
 
   it("hides historical metrics after the configured customer changes", async () => {
