@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../config.js";
-import { AuthError, requireAdmin } from "../master/auth.js";
+import { AuthError, BOT_FORBIDDEN_CODE, refuseBot, requireHumanAdmin } from "../master/auth.js";
 import { readJsonBody, UUID } from "../mcp/http.js";
 
 type InvitationRow = {
@@ -67,7 +67,7 @@ async function adminAal2(
   authorization: string | string[] | undefined,
 ): Promise<{ id: string; email: string }> {
   const verified = await verifiedSession(sb, authorization, true);
-  const admin = await requireAdmin(sb, authorization);
+  const admin = await requireHumanAdmin(sb, authorization);
   if (admin.userId !== verified.id) throw new AuthError("Admin identity changed.", 403);
   return verified;
 }
@@ -138,7 +138,12 @@ async function findRequest(sb: SupabaseClient, id: string): Promise<InvitationRo
 }
 
 function safeError(error: unknown): { status: number; message: string } {
-  if (error instanceof AuthError) return { status: error.status, message: error.message };
+  if (error instanceof AuthError) {
+    return {
+      status: error.status,
+      message: error.code === BOT_FORBIDDEN_CODE ? BOT_FORBIDDEN_CODE : error.message,
+    };
+  }
   return { status: 503, message: "The invitation could not be completed. Check its state before retrying." };
 }
 
@@ -253,7 +258,7 @@ export async function handleInvitationList(
 ): Promise<void> {
   if (req.method !== "POST") return json(res, 405, { ok: false, error: "POST only" });
   try {
-    await requireAdmin(sb, req.headers.authorization);
+    await requireHumanAdmin(sb, req.headers.authorization);
     const { data, error } = await sb.from("console_invitation_requests_v6")
       .select("id,target_member_id,recipient_email,status,expires_at,payload_hash")
       .order("requested_at", { ascending: false }).limit(500);
@@ -276,6 +281,7 @@ export async function handleInvitationInspect(
   if (req.method !== "POST") return json(res, 405, { ok: false, error: "POST only" });
   try {
     const user = await verifiedSession(sb, req.headers.authorization, false);
+    await refuseBot(sb, req.headers.authorization);
     const body = await readJsonBody(req);
     const requestId = String(body.requestId ?? "");
     if (!UUID.test(requestId)) return json(res, 400, { ok: false, error: "Invalid invitation link." });
