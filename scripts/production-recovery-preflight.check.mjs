@@ -23,7 +23,7 @@ test('reads tracked history from a checkout path containing spaces and a URL fra
   }
 })
 
-test('accepts a held post-282 migration file without changing the released recovery baseline', () => {
+test('keeps the historical recovery fixture stable as the released marker advances', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'aa-q019-release-'))
   try {
     const migrationsDir = join(fixtureDir, 'supabase/migrations')
@@ -38,6 +38,8 @@ test('accepts a held post-282 migration file without changing the released recov
     writeFileSync(join(migrationsDir, '20261231000000_999_held_candidate.sql'), '')
     assert.deepEqual(trackedHistory(fixtureDir), expected)
     writeFileSync(join(verificationDir, 'released-migration-version.txt'), '20261231000000\n')
+    assert.deepEqual(trackedHistory(fixtureDir), expected)
+    writeFileSync(join(verificationDir, 'released-migration-version.txt'), '20261110000000\n')
     assert.throws(() => trackedHistory(fixtureDir), /baseline changed/)
   } finally {
     rmSync(fixtureDir, { recursive: true, force: true })

@@ -10,6 +10,8 @@ import { fileURLToPath } from 'node:url'
 
 export const PRODUCTION_REF = 'bancbdztffokwiifzoiv'
 export const CURRENT_CRON_COUNT = 18
+// Historical offline recovery fixture; this is not the current production head.
+export const RECOVERY_BASELINE_VERSION = '20261111020000'
 export const EMPTY_SHA256 = createHash('sha256').update('').digest('hex')
 const sourceRoot = fileURLToPath(new URL('../', import.meta.url))
 const digestPattern = /^[0-9a-f]{64}$/
@@ -44,11 +46,14 @@ function timestamp(value, label, now) {
 }
 
 export function trackedHistory(root = sourceRoot) {
-  const marker = readFileSync(join(root, 'supabase/verification/released-migration-version.txt'), 'utf8').trim()
+  const releasedMarker = readFileSync(join(root, 'supabase/verification/released-migration-version.txt'), 'utf8').trim()
+  if (!/^\d{14}$/.test(releasedMarker) || releasedMarker < RECOVERY_BASELINE_VERSION) {
+    fail('Current production recovery baseline changed; review and repin before use')
+  }
   const migrations = readdirSync(join(root, 'supabase/migrations'))
-    .filter((name) => /^\d{14}_.+\.sql$/.test(name) && name.slice(0, 14) <= marker).sort()
-  if (migrations.length !== 332 || marker !== '20261111020000' ||
-      !migrations.at(-1)?.startsWith(`${marker}_`)) {
+    .filter((name) => /^\d{14}_.+\.sql$/.test(name) && name.slice(0, 14) <= RECOVERY_BASELINE_VERSION).sort()
+  if (migrations.length !== 332 ||
+      !migrations.at(-1)?.startsWith(`${RECOVERY_BASELINE_VERSION}_`)) {
     fail('Current production recovery baseline changed; review and repin before use')
   }
   return migrations.map((name) => ({ version: name.slice(0, 14), name: name.slice(15, -4) }))
