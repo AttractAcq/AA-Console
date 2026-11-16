@@ -414,6 +414,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Exit gate:** a test lead can be traced to an approved route/asset/page and then to a recorded sale and cash event; missing data remains unknown. Every archive category has a tested write and read path, and an archived item remains in historical reporting.
 
+**Attribution coverage checkpoint, 16 November 2026:** A client-authorized coverage read now counts window leads with a recorded source and consent, spend-ledger entries and distinct currencies, days with paid metric rows, and the latest Meta/Google account reads still bound to current integrations and credential generations. Attribution shows these counts and dates before the funnel, displays read errors instead of zero cash, hides cost and return ratios when spend is absent, mixed-currency or not comparable with the recorded ZAR revenue presentation, and labels its asset ranking as all time. Full disposable schema replay, upgrade equivalence, generated types, five Phase 7 rollback fixtures, one Phase 8 permission/currency fixture, 13 focused page tests and both builds pass. This does not yet establish site analytics, provider completeness, a full source-to-cash version chain or a live test sale.
+
 ## Phase 9 — full acceptance and release
 
 1. Run one complete organic journey and one paid-operator journey on an authorized test client. Include a failed credential, stale approval, revoked proof right, duplicate execution, failed media job, failed publish, missing metric and retry. Confirm cross-client isolation and role/AAL2 boundaries.

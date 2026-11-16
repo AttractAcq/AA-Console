@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "eba3bba661df6daf1199c9177574df76b771abb9709cf1ab6f6b137a869c80ac",
-  "generatedTypesSha256": "fe3f792074f376ba17160b1d5899eafc30310706e279cc64f3312d407d18c089",
-  "generatedSchemaBodySha256": "d98db1dde28ff3c20cc04e083277027cb4219329e7b89edb227e6a4f6f8ecfb7",
+  "migrationSourceDigest": "1b4e7cbf891c6645c58feca8a41ccf8d69f1147d9289d28e689213b6e0941e8d",
+  "generatedTypesSha256": "fb4fd700a1c8ee196a7ec3a28704048add49e0044d20b9990e9625907cb79101",
+  "generatedSchemaBodySha256": "01a2122be8a62a84112433436a806bd5ee265643f2c7152c6452f313c7c3b0de",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3923,6 +3923,13 @@
       "filename": "20261123040000_543_meta_ads_readonly_inventory.sql",
       "sha256": "6b3d91fca105606d352d9309357051510172e6f740b9789671af252022d0ff90",
       "trimmedMd5": "53b06ef3c9d99cc49e64ee4b3765ed77"
+    },
+    {
+      "version": "20261123050000",
+      "name": "544_attribution_coverage",
+      "filename": "20261123050000_544_attribution_coverage.sql",
+      "sha256": "385d803e2cef53b91928b0bddf5b65cd732c475b111464b4bf19c5b139617948",
+      "trimmedMd5": "a078fdec32b7da4c6276671207847a63"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

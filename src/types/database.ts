@@ -36071,6 +36071,22 @@ export type Database = {
         }
         Returns: string
       }
+      acquisition_coverage_v8: {
+        Args: { p_client_id: string; p_days?: number }
+        Returns: {
+          consented_leads: number
+          latest_google_read_at: string
+          latest_meta_read_at: string
+          latest_paid_metric_date: string
+          latest_spend_date: string
+          lead_rows: number
+          paid_metric_days: number
+          sourced_leads: number
+          spend_currencies: number
+          spend_currency: string
+          spend_rows: number
+        }[]
+      }
       acquisition_funnel: {
         Args: { p_client_id: string; p_days?: number }
         Returns: {

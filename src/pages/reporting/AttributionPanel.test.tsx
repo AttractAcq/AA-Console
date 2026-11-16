@@ -29,9 +29,19 @@ const content = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-function show(f: Record<string, unknown> | null = funnel(), top: unknown[] = [content()]) {
+const coverage = (over: Record<string, unknown> = {}) => ({
+  lead_rows: 12, sourced_leads: 6, consented_leads: 5,
+  spend_rows: 3, spend_currencies: 1, spend_currency: "ZAR",
+  latest_spend_date: "2026-11-15", paid_metric_days: 4,
+  latest_paid_metric_date: "2026-11-15", latest_meta_read_at: null,
+  latest_google_read_at: null, ...over,
+});
+
+function show(f: Record<string, unknown> | null = funnel(), top: unknown[] = [content()],
+  c: Record<string, unknown> = coverage()) {
   rpc.mockImplementation((name: string) =>
-    Promise.resolve({ data: name === "acquisition_funnel" ? (f ? [f] : []) : top }),
+    Promise.resolve({ data: name === "acquisition_funnel" ? (f ? [f] : [])
+      : name === "acquisition_coverage_v8" ? [c] : top, error: null }),
   );
   return render(<AttributionPanel />);
 }
@@ -70,26 +80,50 @@ describe("ratios that are unknown rather than zero", () => {
   });
 
   it("shows a dash for cost per lead when nothing has been spent", async () => {
-    show(funnel({ spend: 0, cost_per_lead: null, return_on_spend: null }));
+    show(funnel({ spend: 0, cost_per_lead: null, return_on_spend: null }),
+      [content()], coverage({ spend_rows: 0, spend_currencies: 0, spend_currency: null }));
     await screen.findByText("Cost per lead");
     expect(screen.getAllByText("—").length).toBeGreaterThan(0);
   });
 
   // Four dashes with no explanation read as "performed badly".
   it("explains once why the spend half is empty, and that revenue does not depend on it", async () => {
-    show(funnel({ spend: 0, cost_per_lead: null, return_on_spend: null }));
-    expect(await screen.findByText(/Connect Meta under Account/)).toBeInTheDocument();
-    expect(screen.getByText(/revenue half above does not depend on it/i)).toBeInTheDocument();
+    show(funnel({ spend: 0, cost_per_lead: null, return_on_spend: null }),
+      [content()], coverage({ spend_rows: 0, spend_currencies: 0, spend_currency: null }));
+    expect(await screen.findByText(/Connect Meta or Google Ads under Account/)).toBeInTheDocument();
+    expect(screen.getByText(/recorded revenue above does not depend on an ads connection/i)).toBeInTheDocument();
   });
 
   it("does not explain it away when spend does exist", async () => {
     show();
     await screen.findByText("Return on spend");
-    expect(screen.queryByText(/Connect Meta under Account/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Connect Meta or Google Ads under Account/)).not.toBeInTheDocument();
+  });
+
+  it("hides cost and return ratios when spend uses mixed currencies", async () => {
+    show(funnel(), [content()], coverage({ spend_currencies: 2, spend_currency: null }));
+    expect(await screen.findByText(/Spend entries use more than one currency/)).toBeInTheDocument();
+    const cost = screen.getByText("Cost per lead").parentElement as HTMLElement;
+    expect(within(cost).getByText("—")).toBeInTheDocument();
+    const roas = screen.getByText("Return on spend").parentElement as HTMLElement;
+    expect(within(roas).getByText("—")).toBeInTheDocument();
+  });
+
+  it("shows a failed read as an error rather than zero cash", async () => {
+    rpc.mockImplementation((name: string) => Promise.resolve(name === "acquisition_funnel"
+      ? { data: null, error: { message: "Funnel read failed" } }
+      : { data: [], error: null }));
+    render(<AttributionPanel />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Funnel read failed");
+    expect(screen.queryByText("R0")).not.toBeInTheDocument();
   });
 });
 
 describe("what is attributed", () => {
+  it("labels the content ranking as all time while funnel windows change", async () => {
+    show();
+    expect(await screen.findByRole("heading", { name: /What produced the revenue · all time/ })).toBeInTheDocument();
+  });
   // An empty table and a table nobody has sourced look identical otherwise.
   it("says when no lead has recorded where it came from", async () => {
     show(funnel(), [content({ leads: 0, sales: 0, cash_collected: 0 })]);
@@ -98,7 +132,7 @@ describe("what is attributed", () => {
 
   it("counts how many assets have a lead against them", async () => {
     show(funnel(), [content(), content({ asset_ref: "HD-0016", leads: 0 })]);
-    expect(await screen.findByText(/1 of 2 assets have a lead attributed/)).toBeInTheDocument();
+    expect(await screen.findByText(/1 of 2 shown assets have a lead attributed/)).toBeInTheDocument();
   });
 
   it("says plainly when there are no assets at all", async () => {
