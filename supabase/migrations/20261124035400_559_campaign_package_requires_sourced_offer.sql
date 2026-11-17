@@ -20,6 +20,7 @@ declare
   v_opportunity_id uuid;
   v_source_count integer;
   v_source_readiness record;
+  v_claim jsonb;
   v_label text;
   v_id uuid;
 begin
@@ -75,6 +76,24 @@ begin
     elsif not coalesce(public.secondary_offer_source_current_v7(v_offer_id),false) then
       v_blockers:=v_blockers || jsonb_build_array(
         'The selected offer source changed; review a current offer before preparing this package.');
+    end if;
+    if v_offer_id is not null then
+      for v_claim in select value from public.service_offer_versions v,
+          jsonb_array_elements(v.claims)
+          where v.id=c.offer_version_id and v.client_id=c.client_id loop
+        if v_claim->>'kind'='quantified' and
+          (coalesce(v_claim->>'proof_asset_id','') !~*
+            '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+           or not exists(select 1 from public.client_proof_assets proof
+             where proof.id::text=v_claim->>'proof_asset_id'
+               and proof.client_id=c.client_id
+               and proof.usage_rights='approved'
+               and (proof.expires_on is null or proof.expires_on>=current_date))) then
+          v_blockers:=v_blockers || jsonb_build_array(
+            'A quantified offer claim has lost current cleared proof.');
+          exit;
+        end if;
+      end loop;
     end if;
   end if;
   if c.plan_approved_fingerprint is distinct from public.campaign_plan_fingerprint(c)

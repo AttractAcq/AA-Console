@@ -23,11 +23,13 @@ declare o public.market_opportunities%rowtype;
   v public.service_offer_versions%rowtype;
   other_version public.service_offer_versions%rowtype;
   compiled public.service_offer_versions%rowtype;
+  claim_proof public.client_proof_assets%rowtype;
   campaign public.client_campaigns%rowtype;
   manual_campaign public.client_campaigns%rowtype;
   atomic_revision public.client_campaigns%rowtype;
   clone_id uuid; revision_id uuid; legacy_id uuid; unsourced_id uuid;
-  approval_id uuid; request_id uuid; h text; job_id uuid;
+  approval_id uuid; request_id uuid; rights_request uuid; rights_id uuid;
+  h text; job_id uuid;
   mcp_created jsonb;
 begin
   insert into public.market_opportunities(client_id,name,micro_market,buying_situation,
@@ -60,9 +62,19 @@ begin
     or not exists(select 1 from public.opportunity_links l
       where l.opportunity_id=o.id and l.offer_id=offer.id and l.role='offer')
     then raise exception 'Creating the offer broke approved source lineage'; end if;
+  insert into public.client_proof_assets(client_id,media_type,title,body,source,claim,evidence)
+    values(o.client_id,'text','Garage outcome','Completed within the agreed period',
+      'Customer interview','Completed on time','Signed handover note')
+    returning * into claim_proof;
+  rights_request:=public.request_proof_rights_v6(claim_proof.id,'Signed quote release');
+  select id into rights_id from public.proof_rights_requests_v6
+    where canonical_request_id=rights_request;
+  perform public.approve_proof_rights_v6(rights_id,rights_request);
   v := public.create_service_offer_version_v6(o.client_id,'New secondary offer',
     'Homeowners with unused garages','A garage ready for training',
-    array['Insulation'],array['Gym equipment'],null,null,null,'[]'::jsonb,
+    array['Insulation'],array['Gym equipment'],null,null,null,
+    jsonb_build_array(jsonb_build_object('kind','quantified',
+      'text','Completed within the agreed period','proof_asset_id',claim_proof.id)),
     'secondary-offer-version',offer.id);
   select id into request_id from public.approval_requests_v6
     where source_kind='service_offer' and source_id=v.id::text;
@@ -205,6 +217,11 @@ begin
   perform set_config('request.jwt.claim.role','authenticated',true);
   perform set_config('request.jwt.claims',
     '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  update public.client_proof_assets set usage_rights='restricted'
+    where id=claim_proof.id;
+  if not (public.campaign_package_readiness_v7(campaign.id)->'blockers' @>
+      '["A quantified offer claim has lost current cleared proof."]'::jsonb) then
+    raise exception 'Revoked quantified proof left the signed campaign package reviewable'; end if;
   update public.opportunity_awareness_stages set message='A changed buyer message'
     where opportunity_id=o.id;
   if public.opportunity_approval_current_v6(o.id)
