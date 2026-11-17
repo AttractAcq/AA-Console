@@ -21,6 +21,7 @@ declare o public.market_opportunities%rowtype;
   other_version public.service_offer_versions%rowtype;
   compiled public.service_offer_versions%rowtype;
   campaign public.client_campaigns%rowtype;
+  clone_id uuid; revision_id uuid;
   approval_id uuid; request_id uuid; h text; job_id uuid;
 begin
   insert into public.market_opportunities(client_id,name,micro_market,buying_situation,
@@ -84,6 +85,22 @@ begin
     or public.campaign_package_readiness_v7(campaign.id)->'blockers' @>
       '["The selected offer source changed; review a current offer before preparing this package."]'::jsonb
     then raise exception 'A current sourced offer did not bind cleanly to campaign preparation'; end if;
+  clone_id:=public.clone_campaign_for_route(campaign.id,'paid','meta','Paid garage route');
+  insert into public.client_campaigns(client_id,name,brief,acquisition_mode,
+    runs_organic,runs_paid,cloned_from_campaign_id,offer_version_id)
+    values(o.client_id,'Revised garage plan','Updated direction','organic',true,false,
+      campaign.id,v.id) returning id into revision_id;
+  if not exists(select 1 from public.opportunity_links l where l.role='campaign'
+      and l.opportunity_id=o.id and l.campaign_id=clone_id)
+    or not exists(select 1 from public.opportunity_links l where l.role='campaign'
+      and l.opportunity_id=o.id and l.campaign_id=revision_id) then
+    raise exception 'Cloning or revising dropped the approved opportunity lineage'; end if;
+  begin
+    insert into public.client_campaigns(client_id,name,brief,acquisition_mode,
+      runs_organic,runs_paid,cloned_from_campaign_id)
+      values(o.client_id,'Unbound revision','Bad revision','organic',true,false,campaign.id);
+    raise exception 'A sourced revision accepted no signed offer';
+  exception when check_violation then null; end;
   insert into public.agent_jobs(agent_key,client_id,status,completed_at)
     values('offer_strategy',o.client_id,'completed',now());
   job_id := public.request_offer_compile_v6(o.client_id,'secondary','micro_niche',o.id);
@@ -111,6 +128,10 @@ begin
   begin
     perform public.create_campaign_from_opportunity_v7(o.id,v.id,'paid','meta');
     raise exception 'Campaign creator accepted stale opportunity and offer evidence';
+  exception when check_violation then null; end;
+  begin
+    perform public.clone_campaign_for_route(campaign.id,'both','meta','Stale combined clone');
+    raise exception 'Clone accepted stale opportunity evidence';
   exception when check_violation then null; end;
   begin
     perform public.request_offer_compile_v6(o.client_id,'secondary','micro_niche',o.id);
