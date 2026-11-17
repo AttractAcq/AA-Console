@@ -287,7 +287,8 @@ describe("campaign pages", () => {
     expect(insert).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
-      acquisition_mode: "paid", paid_platform: "meta", cloned_from_campaign_id: "camp-1",
+      acquisition_mode: "paid", paid_platform: "meta", runs_organic: false, runs_paid: true,
+      cloned_from_campaign_id: "camp-1",
       brief: "Fill the January consult diary",
     })));
     expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", expect.objectContaining({ p_input_id: "revision-1" }));
@@ -612,7 +613,7 @@ describe("proposing a campaign", () => {
     expect(toggle).toBeChecked();
     await userEvent.click(toggle);
     await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
-    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({ ideate_on_plan: false, acquisition_mode: "organic", paid_platform: null })));
+    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({ ideate_on_plan: false, acquisition_mode: "organic", paid_platform: null, runs_organic: true, runs_paid: false })));
     expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", expect.objectContaining({ p_input_id: "new-1" }));
   });
 
@@ -656,9 +657,28 @@ describe("proposing a campaign", () => {
     await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Book consultations from search");
     await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
     await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
-      acquisition_mode: "paid", paid_platform: "google",
+      acquisition_mode: "paid", paid_platform: "google", runs_organic: false, runs_paid: true,
     })));
     expect(insert.mock.calls[0]?.[0]).not.toHaveProperty("template");
+  });
+
+  it("creates a coordinated organic and Meta paid campaign with both route flags", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
+    const insert = vi.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "new-both" }, error: null }) }) }));
+    from.mockImplementation((table: string) => table === "client_campaigns"
+      ? { ...rows([]), insert } : rows([]));
+    rpc.mockResolvedValue({ data: [], error: null });
+    render(<CampaignExecutionPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await userEvent.type(screen.getByLabelText(/Campaign name/i), "Combined launch");
+    await userEvent.selectOptions(screen.getByLabelText(/Campaign route/i), "both");
+    await userEvent.selectOptions(screen.getByLabelText(/Paid platform/i), "meta");
+    await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Coordinate paid and organic");
+    await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      acquisition_mode: "both", paid_platform: "meta", runs_organic: true, runs_paid: true,
+    })));
+    expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", expect.objectContaining({ p_input_id: "new-both" }));
   });
 
   async function openProposer() {

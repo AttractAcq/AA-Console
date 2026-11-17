@@ -95,10 +95,11 @@ export type Requirement = {
 const FIELDS: FieldDef[] = [
   { name: "name", label: "Campaign name", kind: "text", required: true },
   { name: "acquisition_mode", label: "Campaign route", kind: "select", required: true,
-    options: [{ value: "organic", label: "Organic" }, { value: "paid", label: "Paid" }],
-    hint: "One route per campaign. Clone it to run the same idea through the other route." },
+    options: [{ value: "organic", label: "Organic" }, { value: "paid", label: "Paid" },
+      { value: "both", label: "Organic + paid" }],
+    hint: "Choose either route or coordinate both. Each route has separate assets and approvals." },
   { name: "paid_platform", label: "Paid platform", kind: "select", required: true,
-    showIf: { field: "acquisition_mode", equals: ["paid"] },
+    showIf: { field: "acquisition_mode", equals: ["paid", "both"] },
     options: [{ value: "meta", label: "Meta Ads" }, { value: "google", label: "Google Ads (planned)" }] },
   {
     name: "template",
@@ -585,6 +586,8 @@ export function CampaignExecutionPanel() {
       brief,
       acquisition_mode: campaign.acquisition_mode,
       paid_platform: campaign.paid_platform,
+      runs_organic: campaign.acquisition_mode === "organic" || campaign.acquisition_mode === "both",
+      runs_paid: campaign.acquisition_mode === "paid" || campaign.acquisition_mode === "both",
       cloned_from_campaign_id: campaign.id,
       offer_version_id: changes ? changes.offerVersionId : campaign.offer_version_id,
       ideate_on_plan: campaign.ideate_on_plan,
@@ -918,10 +921,11 @@ export function CampaignExecutionPanel() {
           if (v.offer_version_id && !approvedOfferChoices.some((offer) => offer.id === v.offer_version_id))
             throw new Error("Choose an approved offer belonging to this client.");
           const acquisitionMode = v.acquisition_mode;
-          const paidPlatform = acquisitionMode === "paid" ? v.paid_platform : null;
-          if (acquisitionMode !== "organic" && acquisitionMode !== "paid")
-            throw new Error("Choose an organic or paid route.");
-          if (acquisitionMode === "paid" && paidPlatform !== "meta" && paidPlatform !== "google")
+          const paid = acquisitionMode === "paid" || acquisitionMode === "both";
+          const paidPlatform = paid ? v.paid_platform : null;
+          if (acquisitionMode !== "organic" && acquisitionMode !== "paid" && acquisitionMode !== "both")
+            throw new Error("Choose an organic, paid, or combined route.");
+          if (paid && paidPlatform !== "meta" && paidPlatform !== "google")
             throw new Error("Choose Meta Ads or Google Ads for this paid campaign.");
           const { data, error } = await supabase
             .from("client_campaigns")
@@ -931,12 +935,14 @@ export function CampaignExecutionPanel() {
               brief: (v.brief as string).trim(),
               acquisition_mode: acquisitionMode,
               paid_platform: paidPlatform as "meta" | "google" | null,
+              runs_organic: acquisitionMode === "organic" || acquisitionMode === "both",
+              runs_paid: paid,
               offer_version_id: (v.offer_version_id as string) || null,
               ideate_on_plan: v.ideate_on_plan !== false,
               // Spread only when a template was picked. The columns arrive in
               // migration 96, and a campaign planned without a template must
               // keep working on a database that does not have them yet.
-              ...(acquisitionMode === "paid" && paidPlatform === "meta"
+              ...(paidPlatform === "meta"
                 ? templateColumns(v.template as string) ?? {} : {}),
             })
             .select("id")
