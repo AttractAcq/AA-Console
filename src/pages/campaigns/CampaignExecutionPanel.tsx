@@ -15,7 +15,6 @@ import { supabase } from "../../lib/supabase";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 import {
   NO_TEMPLATE,
-  templateColumns,
   templateFor,
   templateOptions,
   templateSummary,
@@ -616,41 +615,22 @@ export function CampaignExecutionPanel() {
    * Regeneration therefore makes a linked revision and preserves the source. */
   const createPlanRevision = async (campaign: Campaign, brief: string, changes?: { template: string; offerVersionId: string | null }) => {
     if (!clientId) throw new Error("No client selected.");
-    if (changes && offersFailed) throw new Error("Approved offers could not be loaded.");
-    if (changes?.offerVersionId && !approvedOfferChoices.some((offer) => offer.id === changes.offerVersionId))
+    if (changes && changes.offerVersionId !== campaign.offer_version_id && offersFailed)
+      throw new Error("Approved offers could not be loaded.");
+    if (changes?.offerVersionId && changes.offerVersionId !== campaign.offer_version_id
+      && !approvedOfferChoices.some((offer) => offer.id === changes.offerVersionId))
       throw new Error("Choose an approved offer belonging to this client.");
+    const offerVersionId = changes ? changes.offerVersionId : campaign.offer_version_id;
+    if (!offerVersionId) throw new Error("This campaign has no signed secondary offer. Link an approved opportunity and offer before revising it.");
     const nextTemplate = changes?.template ?? campaign.template;
     if (nextTemplate && !templateFor(nextTemplate)) throw new Error("Choose a valid campaign template.");
-    const { data, error } = await supabase.from("client_campaigns").insert({
-      client_id: clientId,
-      name: `${campaign.name.slice(0, 165)} · Plan revision ${new Date().toISOString().slice(0, 10)}`,
-      brief,
-      acquisition_mode: campaign.acquisition_mode,
-      paid_platform: campaign.paid_platform,
-      runs_organic: campaign.acquisition_mode === "organic" || campaign.acquisition_mode === "both",
-      runs_paid: campaign.acquisition_mode === "paid" || campaign.acquisition_mode === "both",
-      cloned_from_campaign_id: campaign.id,
-      offer_version_id: changes ? changes.offerVersionId : campaign.offer_version_id,
-      ideate_on_plan: campaign.ideate_on_plan,
-      ...(nextTemplate ? templateColumns(nextTemplate) ?? {} : {}),
-    }).select("id").single();
-    if (error) throw error;
-    // A revision must carry the same selected pillars into its new plan.
-    // Otherwise the planner silently changes the creative scope.
-    const selected = await supabase.from("campaign_content_pillars")
-      .select("pillar_id").eq("campaign_id", campaign.id);
-    if (selected.error) throw selected.error;
-    if (selected.data?.length) {
-      const copied = await supabase.from("campaign_content_pillars").insert(
-        selected.data.map(({ pillar_id }) => ({ campaign_id: data.id, pillar_id })),
-      );
-      if (copied.error) throw copied.error;
-    }
-    const queued = await supabase.rpc("enqueue_agent_job", {
-      p_agent_key: "campaign_plan", p_client_id: clientId,
-      p_input_table: "client_campaigns", p_input_id: data.id,
+    const { data, error } = await supabase.rpc("create_sourced_campaign_revision_v7", {
+      p_campaign_id: campaign.id,
+      p_brief: brief,
+      p_offer_version_id: offerVersionId,
+      p_template: nextTemplate || undefined,
     });
-    if (queued.error) throw queued.error;
+    if (error) throw error;
     navigate(`/clients/${clientId}/delivery/campaign-factory/${data.id}`);
   };
 

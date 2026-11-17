@@ -25,7 +25,8 @@ declare o public.market_opportunities%rowtype;
   compiled public.service_offer_versions%rowtype;
   campaign public.client_campaigns%rowtype;
   manual_campaign public.client_campaigns%rowtype;
-  clone_id uuid; revision_id uuid;
+  atomic_revision public.client_campaigns%rowtype;
+  clone_id uuid; revision_id uuid; legacy_id uuid;
   approval_id uuid; request_id uuid; h text; job_id uuid;
   mcp_created jsonb;
 begin
@@ -119,6 +120,23 @@ begin
     or not exists(select 1 from public.agent_jobs j
       where j.agent_key='campaign_plan' and j.input_id=manual_campaign.id) then
     raise exception 'Atomic sourced creation lost its inputs, lineage or planner job'; end if;
+  atomic_revision:=public.create_sourced_campaign_revision_v7(
+    campaign.id,'Revised winter direction',v.id);
+  if atomic_revision.cloned_from_campaign_id is distinct from campaign.id
+    or not exists(select 1 from public.opportunity_links l
+      where l.campaign_id=atomic_revision.id and l.opportunity_id=o.id and l.role='campaign')
+    or not exists(select 1 from public.agent_jobs j
+      where j.agent_key='campaign_plan' and j.input_id=atomic_revision.id) then
+    raise exception 'Atomic plan revision lost source lineage or planner job'; end if;
+  if has_table_privilege('authenticated','public.client_campaigns','INSERT') then
+    raise exception 'Authenticated callers can still bypass sourced campaign insertion'; end if;
+  insert into public.client_campaigns(client_id,name,brief)
+    values(o.client_id,'Historical unsourced campaign','For history only')
+    returning id into legacy_id;
+  begin
+    perform public.clone_campaign_for_route(legacy_id,'paid','google','Unsourced clone');
+    raise exception 'A historical unsourced campaign was cloned into new work';
+  exception when check_violation then null; end;
   begin
     perform public.create_sourced_campaign_plan_v7(o.client_id,o.id,v.id,
       'Duplicate combined launch','Duplicate','both',true,'meta');

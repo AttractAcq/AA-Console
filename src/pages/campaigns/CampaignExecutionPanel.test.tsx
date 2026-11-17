@@ -298,36 +298,34 @@ describe("campaign pages", () => {
   it("regenerates a built plan as a linked revision instead of replacing its assets", async () => {
     const navigate = vi.fn();
     useNavigate.mockReturnValue(navigate);
-    show([planned({ acquisition_mode: "paid", paid_platform: "meta" })], READY);
-    const insert = vi.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "revision-1" }, error: null }) }) }));
-    const originalFrom = from.getMockImplementation()!;
-    from.mockImplementation((table: string) => table === "client_campaigns" ? { ...originalFrom(table), insert } : originalFrom(table));
+    show([planned({ acquisition_mode: "paid", paid_platform: "meta", offer_version_id: "offer-v1" })], READY);
+    rpc.mockImplementation((name: string) => name === "create_sourced_campaign_revision_v7"
+      ? Promise.resolve({ data: { id: "revision-1" }, error: null })
+      : Promise.resolve({ data: READY, error: null }));
     await screen.findByRole("heading", { name: "Winter full-arch push" });
     await userEvent.click(screen.getByRole("button", { name: "Regenerate plan" }));
-    expect(insert).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalledWith("create_sourced_campaign_revision_v7", expect.anything());
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
-      acquisition_mode: "paid", paid_platform: "meta", runs_organic: false, runs_paid: true,
-      cloned_from_campaign_id: "camp-1",
-      brief: "Fill the January consult diary",
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_sourced_campaign_revision_v7", expect.objectContaining({
+      p_campaign_id: "camp-1", p_offer_version_id: "offer-v1", p_brief: "Fill the January consult diary",
     })));
-    expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", expect.objectContaining({ p_input_id: "revision-1" }));
+    expect(rpc).not.toHaveBeenCalledWith("enqueue_agent_job", expect.anything());
     expect(navigate).toHaveBeenCalledWith("/clients/client-1/delivery/campaign-factory/revision-1");
   });
 
   it("passes edited plan details to the planner of a new revision", async () => {
-    show([planned({ acquisition_mode: "paid", paid_platform: "meta" })], READY);
-    const insert = vi.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "revision-2" }, error: null }) }) }));
-    const originalFrom = from.getMockImplementation()!;
-    from.mockImplementation((table: string) => table === "client_campaigns" ? { ...originalFrom(table), insert } : originalFrom(table));
+    show([planned({ acquisition_mode: "paid", paid_platform: "meta", offer_version_id: "offer-v1" })], READY);
+    rpc.mockImplementation((name: string) => name === "create_sourced_campaign_revision_v7"
+      ? Promise.resolve({ data: { id: "revision-2" }, error: null })
+      : Promise.resolve({ data: READY, error: null }));
     await screen.findByRole("heading", { name: "Winter full-arch push" });
     await userEvent.click(screen.getByRole("button", { name: "Edit plan" }));
     const dialog = within(screen.getByRole("dialog", { name: "Edit and regenerate plan" }));
     await userEvent.clear(dialog.getByRole("textbox", { name: "Objective" }));
     await userEvent.type(dialog.getByRole("textbox", { name: "Objective" }), "Book 60 consultations");
     await userEvent.click(dialog.getByRole("button", { name: "Save and regenerate" }));
-    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
-      brief: expect.stringContaining("Objective: Book 60 consultations"),
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_sourced_campaign_revision_v7", expect.objectContaining({
+      p_brief: expect.stringContaining("Objective: Book 60 consultations"),
     })));
   });
 
