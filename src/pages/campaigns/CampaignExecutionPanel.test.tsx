@@ -467,6 +467,22 @@ describe("launching", () => {
 });
 
 describe("campaign visibility", () => {
+  it("labels an unlinked historical campaign without hiding its record", async () => {
+    fetchCampaignOrigins.mockResolvedValue(new Map());
+    show([planned()]);
+    await open();
+    expect(await screen.findByText(/No opportunity source is recorded/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Winter full-arch push" })).toBeInTheDocument();
+  });
+
+  it("marks a failed source read as unavailable rather than missing", async () => {
+    fetchCampaignOrigins.mockRejectedValue(new Error("source read denied"));
+    useParams.mockReturnValue({ clientId: "client-1" });
+    show([planned()]);
+    expect(await screen.findByText("Unavailable")).toBeInTheDocument();
+    expect(screen.queryByText("No link recorded")).not.toBeInTheDocument();
+  });
+
   it("renders all 15 planning campaigns for Attract Acquisition", async () => {
     useParams.mockReturnValue({ clientId: "e4b4b001-81f6-4997-8429-ff21f4ee1fbe" });
     show(Array.from({ length: 15 }, (_, i) => planned({ id: `camp-${i}`, name: `Planning ${i}` })));

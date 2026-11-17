@@ -208,6 +208,7 @@ export function CampaignExecutionPanel() {
   const [readiness, setReadiness] = useState<Record<string, Requirement[]>>({});
   /** Why each campaign exists, where an opportunity says so. */
   const [origins, setOrigins] = useState<ReadonlyMap<string, CampaignOrigin>>(new Map());
+  const [originsState, setOriginsState] = useState<"loading" | "ready" | "error">("loading");
   const [newOpen, setNewOpen] = useState(false);
   const [newOpportunityChoices, setNewOpportunityChoices] = useState<Array<{ id: string; label: string }>>([]);
   const [newOpportunityId, setNewOpportunityId] = useState("");
@@ -263,6 +264,7 @@ export function CampaignExecutionPanel() {
     setReadinessError(null);
     setLoading(true);
     setReadiness({});
+    setOriginsState("loading");
     setContentSpec(null);
     setContentSpecError(null);
     setPlannedIdeas(null);
@@ -314,10 +316,16 @@ export function CampaignExecutionPanel() {
       // line absent rather than failing the load.
       void fetchCampaignOrigins(clientId)
         .then((found) => {
-          if (version === request.current) setOrigins(found);
+          if (version === request.current) {
+            setOrigins(found);
+            setOriginsState("ready");
+          }
         })
         .catch(() => {
-          if (version === request.current) setOrigins(new Map());
+          if (version === request.current) {
+            setOrigins(new Map());
+            setOriginsState("error");
+          }
         });
       // A failed lineage read must not suppress the independent launch verdict.
       void fetchLaunchDue(clientId)
@@ -725,6 +733,16 @@ export function CampaignExecutionPanel() {
                   </div>
                 );
               })()}
+              {originsState === "ready" && !origins.has(c.id) && (
+                <p className="mt-3 rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+                  No opportunity source is recorded for this campaign. It remains readable, but a new plan revision or route clone needs an approved opportunity and signed secondary offer.
+                </p>
+              )}
+              {originsState === "error" && (
+                <p role="alert" className="mt-3 text-xs text-destructive">
+                  Campaign opportunity sources could not be read. Source-dependent actions remain unverified.
+                </p>
+              )}
               <dl className="mt-4 grid gap-4 border-t border-border pt-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
                 <div><dt className="text-muted-foreground">Brief</dt><dd className="whitespace-pre-wrap">{c.brief}</dd></div>
                 <div><dt className="text-muted-foreground">Objective</dt><dd>{c.objective ?? "Awaiting plan"}</dd></div>
@@ -857,7 +875,7 @@ export function CampaignExecutionPanel() {
             {paid && v2Tab === "sales-agent" && <SalesOverviewPanel key={c.id} campaignId={c.id} campaignName={c.name} />}
             {paid && c.paid_platform === "meta" && v2Tab === "meta-ads" && clientId && <section className="py-4"><div className="rounded-lg border border-border bg-card p-4 text-sm"><h3 className="font-semibold">Meta activation</h3><p className="mt-2 text-xs text-muted-foreground">{packageState.manifest ? `Current package v${packageState.manifest.version}. ` : "A planned package is required. "}{packageState.approvals.filter((approval) => approval.action_key === "meta_ad_build").map((approval) => `Meta ad build approval: ${approval.status}. `).join("") || "No Meta build approval is recorded for this package. "}Prepare the build sheet and approved creative here. Creating Meta objects still awaits the exact-version approval executor.</p><Link className="mt-2 inline-block text-xs text-brand-strong underline" to={`/clients/${clientId}/delivery/approval-inbox?tab=campaign-actions`}>Open Approval Inbox</Link>{c.meta_campaign_id && <p className="mt-2 text-xs">Meta campaign {c.meta_campaign_id}{c.meta_ad_set_id ? ` · ad set ${c.meta_ad_set_id}` : " · ad set pending"}{c.meta_built_at ? ` · recorded ${new Date(c.meta_built_at).toLocaleString()}` : ""}</p>}</div><div className="mt-3 flex justify-end"><Button onClick={() => setMetaToolsOpenFor((open) => open === c.id ? null : c.id)}>Build functionality</Button></div>{metaToolsOpen && <MetaBuildSection clientId={clientId} campaign={c} building={inFlight.some((job) => job.agent_key === "meta_build" && job.input_id === c.id)} onChanged={() => { void refresh(); void packageState.refresh(); }} externalActionsAvailable={false} handBuildAvailable showSheetInline />}</section>}
           </div>;
-        }) : <div className="overflow-x-auto rounded-lg border border-border bg-card"><table className="w-full text-left text-sm"><thead className="border-b border-border bg-muted/40"><tr><th className="p-3">Campaign</th><th className="p-3">Route</th><th className="p-3">Type</th><th className="p-3">Date</th><th className="p-3">Status</th><th className="p-3">Production stage</th><th className="p-3">Actions</th></tr></thead><tbody>{visibleCampaigns.map((c) => <tr key={c.id} className="border-b border-border last:border-0"><td className="p-3"><Link className="font-medium text-brand-strong hover:underline" to={`/clients/${clientId}/delivery/campaign-factory/${c.id}`}>{c.name}</Link>{c.cloned_from_campaign_id && <span className="block text-xs text-muted-foreground">Revised or cloned from another campaign</span>}</td><td className="p-3">{campaignRouteLabel(c)}</td><td className="p-3">{c.acquisition_mode === "both" ? "Both" : c.acquisition_mode === "legacy" ? "Not specified" : c.acquisition_mode === "organic" ? "Organic" : "Paid"}</td><td className="p-3">{new Date(c.created_at).toLocaleDateString()}</td><td className="p-3 capitalize">{c.status}</td><td className="p-3">{productionStage(c, readiness[c.id] ?? [], planning.has(c.id))}</td><td className="p-3"><button type="button" className={buttonClass} aria-expanded={rowActions === c.id} onClick={() => setRowActions(rowActions === c.id ? null : c.id)}>Actions</button>{rowActions === c.id && <CampaignActions campaign={c} checks={readiness[c.id] ?? []} busy={busy} planning={planning.has(c.id)} onChoose={(kind) => setConfirmAction({ campaign: c, kind })} />}</td></tr>)}</tbody></table></div>
+        }) : <div className="overflow-x-auto rounded-lg border border-border bg-card"><table className="w-full text-left text-sm"><thead className="border-b border-border bg-muted/40"><tr><th className="p-3">Campaign</th><th className="p-3">Route</th><th className="p-3">Source</th><th className="p-3">Type</th><th className="p-3">Date</th><th className="p-3">Status</th><th className="p-3">Production stage</th><th className="p-3">Actions</th></tr></thead><tbody>{visibleCampaigns.map((c) => <tr key={c.id} className="border-b border-border last:border-0"><td className="p-3"><Link className="font-medium text-brand-strong hover:underline" to={`/clients/${clientId}/delivery/campaign-factory/${c.id}`}>{c.name}</Link>{c.cloned_from_campaign_id && <span className="block text-xs text-muted-foreground">Revised or cloned from another campaign</span>}</td><td className="p-3">{campaignRouteLabel(c)}</td><td className="p-3">{originsState === "loading" ? "Checking…" : originsState === "error" ? "Unavailable" : origins.has(c.id) ? "Opportunity linked" : "No link recorded"}</td><td className="p-3">{c.acquisition_mode === "both" ? "Both" : c.acquisition_mode === "legacy" ? "Not specified" : c.acquisition_mode === "organic" ? "Organic" : "Paid"}</td><td className="p-3">{new Date(c.created_at).toLocaleDateString()}</td><td className="p-3 capitalize">{c.status}</td><td className="p-3">{productionStage(c, readiness[c.id] ?? [], planning.has(c.id))}</td><td className="p-3"><button type="button" className={buttonClass} aria-expanded={rowActions === c.id} onClick={() => setRowActions(rowActions === c.id ? null : c.id)}>Actions</button>{rowActions === c.id && <CampaignActions campaign={c} checks={readiness[c.id] ?? []} busy={busy} planning={planning.has(c.id)} onChoose={(kind) => setConfirmAction({ campaign: c, kind })} />}</td></tr>)}</tbody></table></div>
       )}
 
       <FormModal
