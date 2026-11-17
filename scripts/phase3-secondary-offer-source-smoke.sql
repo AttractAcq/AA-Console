@@ -26,7 +26,7 @@ declare o public.market_opportunities%rowtype;
   campaign public.client_campaigns%rowtype;
   manual_campaign public.client_campaigns%rowtype;
   atomic_revision public.client_campaigns%rowtype;
-  clone_id uuid; revision_id uuid; legacy_id uuid;
+  clone_id uuid; revision_id uuid; legacy_id uuid; unsourced_id uuid;
   approval_id uuid; request_id uuid; h text; job_id uuid;
   mcp_created jsonb;
 begin
@@ -139,6 +139,13 @@ begin
   insert into public.client_campaigns(client_id,name,brief)
     values(o.client_id,'Historical unsourced campaign','For history only')
     returning id into legacy_id;
+  insert into public.client_campaigns(client_id,name,brief,acquisition_mode,
+    paid_platform,runs_organic,runs_paid)
+    values(o.client_id,'Historical paid campaign without source','For history only',
+      'paid','meta',false,true) returning id into unsourced_id;
+  if not (public.campaign_package_readiness_v7(unsourced_id)->'blockers' @>
+      '["Link one approved market opportunity before reviewing this campaign package.","Choose an exact signed secondary offer version for this opportunity."]'::jsonb)
+    then raise exception 'Historical unsourced paid campaign remained package-reviewable'; end if;
   begin
     perform public.clone_campaign_for_route(legacy_id,'paid','google','Unsourced clone');
     raise exception 'A historical unsourced campaign was cloned into new work';

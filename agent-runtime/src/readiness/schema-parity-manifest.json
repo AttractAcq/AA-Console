@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "13bc09f2b5dbbcf9b1be65217d18d820aa62c7413a9aeae8e997f105ae931a6c",
+  "migrationSourceDigest": "013816cbc1a64274fdbb2ee07f10dc8b0bd21f7e35925ed5e5fbc11120aa36d3",
   "generatedTypesSha256": "adb7e587a3d6b22846da52874ede752b18aaa2b72135e91db013cac7e0272c9d",
   "generatedSchemaBodySha256": "a6546bcd60501ac32aa3215444eb8d00ad6268ab26dea9d8381ff1f476f69a5a",
   "localMigrations": [
@@ -4028,6 +4028,13 @@
       "filename": "20261124035300_558_retire_unsourced_opportunity_creator.sql",
       "sha256": "8d41552aec44828dedd0560c8b23d494ae17190d1ba45c32c6337cdf8d3621de",
       "trimmedMd5": "dcd6afb3122e4d16bcaf0340544c5542"
+    },
+    {
+      "version": "20261124035400",
+      "name": "559_campaign_package_requires_sourced_offer",
+      "filename": "20261124035400_559_campaign_package_requires_sourced_offer.sql",
+      "sha256": "bfdc07d0a1c634f11ae7b29f7cdd6edca312a6c7a9f5a7aa9522af1d4829ed3c",
+      "trimmedMd5": "975820d344b13ad18ca8c50ebb946f21"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
