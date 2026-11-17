@@ -86,7 +86,13 @@ begin
       o.id,'ffffffff-ffff-4fff-8fff-ffffffffffff','organic');
     raise exception 'Campaign creator accepted an unlinked offer version';
   exception when check_violation then null; end;
+  begin
+    perform public.create_campaign_from_opportunity_v6(o.id,'both','google');
+    raise exception 'Legacy opportunity creator opened a new campaign without an exact offer';
+  exception when check_violation then null; end;
   campaign := public.create_campaign_from_opportunity_v7(o.id,v.id,'organic');
+  if (public.create_campaign_from_opportunity_v6(o.id,'organic')).id<>campaign.id then
+    raise exception 'Legacy opportunity creator did not return the existing route'; end if;
   if campaign.offer_version_id is distinct from v.id
     or public.campaign_package_readiness_v7(campaign.id)->'blockers' @>
       '["The selected offer source changed; review a current offer before preparing this package."]'::jsonb
