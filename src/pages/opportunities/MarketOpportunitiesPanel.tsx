@@ -31,7 +31,7 @@ import {
  * where those reasons are found, compared, worked up and approved — the layer
  * between knowing a market and running campaigns at it.
  *
- * Four views, and they are four questions rather than four screens:
+ * The overview and its selected record answer four questions:
  *
  *   Discover   what buying situations might be worth pursuing
  *   Evaluate   which of them are worth spending against
@@ -46,10 +46,15 @@ import {
 
 type View = "discover" | "evaluate" | "strategize" | "activate";
 
-export function MarketOpportunitiesPanel({ view }: { view: View }) {
+export function MarketOpportunitiesPanel({ view }: { view?: View }) {
   const { clientId } = useParams<{ clientId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedId = searchParams.get("opportunity");
+  const legacyStage = searchParams.get("tab") ?? searchParams.get("view");
+  const requestedStage = searchParams.get("stage") ?? legacyStage;
+  const detailStage: Exclude<View, "discover"> =
+    requestedStage === "strategize" || requestedStage === "activate" ? requestedStage : "evaluate";
+  const unified = view === undefined;
 
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [readiness, setReadiness] = useState<ReadonlyMap<string, Readiness>>(new Map());
@@ -106,6 +111,15 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
       else next.delete("opportunity");
       return next;
     });
+  const showStage = (stage: Exclude<View, "discover">) =>
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("tab");
+      next.delete("view");
+      if (stage === "evaluate") next.delete("stage");
+      else next.set("stage", stage);
+      return next;
+    });
 
   async function act(id: string, work: () => Promise<void>, said: string) {
     if (busy) return;
@@ -138,7 +152,7 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
       {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
-      {view === "discover" && (
+      {(unified || view === "discover") && (
         <DiscoverView
           clientId={clientId}
           opportunities={opportunities}
@@ -154,12 +168,71 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
           onBuild={setBuilding}
         />
       )}
-      {view !== "discover" && (
+      {!unified && view !== "discover" && (
         <OpportunityPicker
           opportunities={opportunities}
           selectedId={selectedId}
           onSelect={select}
         />
+      )}
+      {unified && selected && (
+        <section aria-label={`${selected.name} details`} className="space-y-4 rounded-xl border border-border bg-card p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">{selected.name}</h2>
+              <p className="text-sm text-muted-foreground">{selected.micro_market} · {selected.status}</p>
+            </div>
+            <Button onClick={() => select(null)}>Close details</Button>
+          </div>
+          <div className="flex flex-wrap gap-2" aria-label="Opportunity stages">
+            {(["evaluate", "strategize", "activate"] as const).map((stage) => (
+              <button
+                key={stage}
+                type="button"
+                aria-current={detailStage === stage ? "step" : undefined}
+                onClick={() => showStage(stage)}
+                className={`rounded-lg border px-3 py-2 text-sm capitalize ${
+                  detailStage === stage ? "border-primary bg-primary/10 font-semibold" : "border-border"
+                }`}
+              >
+                {stage}
+              </button>
+            ))}
+          </div>
+          {detailStage === "activate" && (
+            <ActivationDetail
+              opportunity={selected}
+              readiness={readiness.get(selected.id)}
+              approvalState={approvalStates.get(selected.id)}
+              activationState={activationStates.get(selected.id)}
+              clientId={clientId}
+              busy={busy === selected.id}
+              onSelect={select}
+              onAct={act}
+              onBuild={setBuilding}
+            />
+          )}
+          {detailStage === "evaluate" && (
+            <>
+              <ProposalsPanel
+                proposals={proposals.filter((proposal) => proposal.opportunity_id === selected.id)}
+                factors={factors}
+                busy={busy}
+                onAct={act}
+              />
+              <EvaluateView
+                opportunity={selected}
+                readiness={readiness.get(selected.id)}
+                factors={factors}
+                busy={busy === selected.id}
+                onAct={act}
+              />
+            </>
+          )}
+          {detailStage === "strategize" && (
+            <StrategizeView opportunity={selected} busy={busy === selected.id} onAct={act} />
+          )}
+        </section>
       )}
       {view === "evaluate" && selected && (
         <ProposalsPanel
@@ -194,7 +267,7 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
           onBuild={setBuilding}
         />
       )}
-      {view !== "discover" && view !== "activate" && !selected && (
+      {!unified && view !== "discover" && view !== "activate" && !selected && (
         <p className="text-sm text-muted-foreground">Choose an opportunity above.</p>
       )}
 
@@ -234,16 +307,15 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
         onSaved={refresh}
       />
 
-      {/* Creating the campaign is where the opportunity work either reaches
-          the rest of the system or stops being used. The route is the one
-          question a person has to answer, because 203 makes it immutable:
-          the other route is a second campaign, not an edit. */}
+      {/* Creating the campaign is where the opportunity reaches production.
+          The chosen route is immutable; "both" creates linked paid and
+          organic route packages under one commercial campaign. */}
       <FormModal
         open={building !== null}
         onClose={() => setBuilding(null)}
         title={building ? `Create a campaign for ${building.name}` : "Create a campaign"}
         submitLabel="Create and plan"
-        intro="The campaign takes this opportunity's problem, outcome, trigger, positioning and objections as its brief, and binds the approved offer it is linked to. The route cannot be changed afterwards — a different route is a second campaign with its own lineage. Planning runs straight after, and costs what a plan costs."
+        intro="The campaign takes this opportunity's problem, outcome, trigger, positioning and objections as its brief, and binds the approved offer it is linked to. Choose organic, paid or both routes; the choice is fixed after creation. Planning runs straight after."
         fields={[
           {
             name: "acquisition_mode", label: "Route", kind: "select", required: true,
@@ -1078,6 +1150,50 @@ function ActivateView({
               })}
             />,
           ];
+        })}
+      />
+    </div>
+  );
+}
+
+function ActivationDetail({
+  opportunity, readiness, approvalState, activationState, clientId, busy, onSelect, onAct, onBuild,
+}: {
+  opportunity: Opportunity;
+  readiness: Readiness | undefined;
+  approvalState: string | undefined;
+  activationState: string | undefined;
+  clientId: string | undefined;
+  busy: boolean;
+  onSelect: (id: string) => void;
+  onAct: (id: string, work: () => Promise<void>, said: string) => Promise<void>;
+  onBuild: (opportunity: Opportunity) => void;
+}) {
+  const blocker = readiness?.blocker
+    ?? (approvalState === "legacy" ? "Pre-Inbox approval needs exact review."
+      : approvalState === "stale" ? "The approved opportunity changed; request a new review."
+        : activationState === "legacy" ? "Pre-Inbox activation needs exact review."
+          : activationState === "stale" ? "Activation evidence changed; review it again."
+            : null);
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        Approval and activation are separate decisions. A current decision applies only to the reviewed state.
+      </p>
+      <dl className="grid gap-3 text-sm sm:grid-cols-3">
+        <div><dt className="text-muted-foreground">Score</dt><dd>{readiness?.score ?? "Not scored"}</dd></div>
+        <div><dt className="text-muted-foreground">Open proof gaps</dt><dd>{readiness?.open_proof_gaps ?? "Unknown"}</dd></div>
+        <div><dt className="text-muted-foreground">Readiness</dt>
+          <dd className={blocker ? "text-destructive" : "text-brand-strong"}>
+            {blocker ?? (approvalState === "current" ? "Approved for campaign planning" : "Ready to request review")}
+          </dd>
+        </div>
+      </dl>
+      <ActionMenu
+        name={opportunity.name}
+        busy={busy}
+        items={opportunityActions({
+          opportunity, readiness, approvalState, activationState, clientId, onSelect, onAct, onBuild,
         })}
       />
     </div>

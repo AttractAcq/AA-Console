@@ -110,12 +110,6 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     "offer-strategy": () => <OfferStrategyPanel />,
     "money-model-strategy": () => <MoneyModelStrategyPanel />,
   },
-  "market-opportunities": {
-    discover: () => <MarketOpportunitiesPanel view="discover" />,
-    evaluate: () => <MarketOpportunitiesPanel view="evaluate" />,
-    strategize: () => <MarketOpportunitiesPanel view="strategize" />,
-    activate: () => <MarketOpportunitiesPanel view="activate" />,
-  },
   "proof-distribution": {
     destinations: () => <ProofDistributionPanel tab="destinations" />,
     placements: () => <ProofDistributionPanel tab="placements" />,
@@ -260,6 +254,7 @@ const nodePanels: Record<string, () => ReactNode> = {
   // called "dashboard" but they are different pages
   "delivery-dashboard": () => <ClientDashboardPanel />,
   "campaign-factory": () => <CampaignExecutionPanel />,
+  "market-opportunities": () => <MarketOpportunitiesPanel />,
   onboarding: () => <OnboardingPanel />,
   contact: () => <ContactPanel />,
   brand: () => <BrandPanel />,

@@ -119,6 +119,7 @@ const readiness = (over: Record<string, unknown> = {}) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  search.value = "";
   fetchOpportunities.mockResolvedValue([opportunity()]);
   fetchReadiness.mockResolvedValue(readiness());
   fetchOpportunityApprovalStates.mockResolvedValue(new Map([["opp-1", "current"]]));
@@ -130,6 +131,32 @@ beforeEach(() => {
   requestEvaluation.mockResolvedValue(undefined);
   requestStrategy.mockResolvedValue(undefined);
   rpc.mockResolvedValue({ data: "approval-1", error: null });
+});
+
+describe("single-page opportunity flow", () => {
+  it("shows the overview and the selected record together", async () => {
+    search.value = "opportunity=opp-1";
+    render(<MarketOpportunitiesPanel />);
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Garage-to-Gym Conversion details" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /evaluate/i })).toHaveAttribute("aria-current", "step");
+    expect(screen.getByText("Latest score")).toBeInTheDocument();
+  });
+
+  it("opens the selected activation record from an old tab link", async () => {
+    search.value = "tab=activate&opportunity=opp-1";
+    render(<MarketOpportunitiesPanel />);
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /activate/i })).toHaveAttribute("aria-current", "step");
+    expect(screen.getByText("Open proof gaps")).toBeInTheDocument();
+  });
+
+  it("opens evaluation from a campaign link", async () => {
+    search.value = "view=evaluate&opportunity=opp-1";
+    render(<MarketOpportunitiesPanel />);
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /evaluate/i })).toHaveAttribute("aria-current", "step");
+  });
 });
 
 /** What the Evaluate agent writes: factors, their reasoning, and the case. */

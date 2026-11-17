@@ -426,10 +426,7 @@ export const v6ModuleNodes: NavNode[] = [
   // other order is how a business ends up with attractive campaigns that are
   // not rooted in anything somebody would actually buy.
   { id: "market-opportunities", label: "Market Opportunities", path: "market-opportunities",
-    icon: Compass, capability: "expanding", tabs: [
-      { id: "discover", label: "Discover" }, { id: "evaluate", label: "Evaluate" },
-      { id: "strategize", label: "Strategize" }, { id: "activate", label: "Activate" },
-    ] },
+    icon: Compass, capability: "expanding" },
   // No tabs on purpose: the page is one table of campaigns.
   { id: "campaign-factory", label: "Campaign Factory", path: "campaign-factory", icon: Megaphone,
     capability: "expanding" },

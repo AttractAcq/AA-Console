@@ -74,7 +74,7 @@ describe("client delivery navigation", () => {
     // render a bar with nothing in it.
     expect(v6ModuleNodes.filter((node) => node.tabs?.length === 0)).toEqual([]);
     expect(v6ModuleNodes.filter((node) => !node.tabs).map((node) => node.id))
-      .toEqual(["campaign-factory"]);
+      .toEqual(["market-opportunities", "campaign-factory"]);
     // Three tabs are archived rather than deleted, per Alex on 31 October:
     // the notes call Placements and Rights "not as important ... both need to
     // be discontinued", and Opt-ins "isnt necissary to track". Their panels
