@@ -1,5 +1,7 @@
 # Staging reconciliation to reviewed migration 551
 
+> **17 November follow-up:** The disposable restore and full-head replay described below have now been completed. The parity token is configured. The current classification, correction rehearsal and conditional hosted procedure are in [staging-reconciliation-classification-and-hosted-runbook-2026-11-17.md](staging-reconciliation-classification-and-hosted-runbook-2026-11-17.md). This document retains the earlier pre-rehearsal plan as historical context; its “not yet verified” and token-status statements are superseded. Hosted staging remains unchanged, and hosted recovery remains unverified.
+
 **Prepared:** 17 November 2026. **Status:** source workspace prepared; live data-preserving restore and full-head replay **not yet verified**. Staging and production were not modified. Phases 8 and 9 remain unaccepted, with outward switches off.
 
 ## Identity and current evidence
