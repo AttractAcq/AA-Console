@@ -214,7 +214,7 @@ describe("campaign pages", () => {
     expect(rpc).not.toHaveBeenCalledWith("launch_campaign", expect.anything());
   });
 
-  it("shows all v2 build tabs only for paid campaigns", async () => {
+  it("shows paid build tabs for paid campaigns", async () => {
     show([planned({ acquisition_mode: "paid", paid_platform: "meta" })], READY);
     expect(await screen.findByRole("heading", { name: "Winter full-arch push" })).toBeInTheDocument();
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Plan", "Content", "Landing Page", "Sales Agent", "Meta Ads", "Launch state"]);
@@ -225,6 +225,26 @@ describe("campaign pages", () => {
     expect(screen.getByRole("button", { name: "Budget and countries" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Write build sheet" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Record a hand build" })).toBeEnabled();
+  });
+
+  it("shows both route packages and paid build sections for a combined campaign", async () => {
+    show([planned({ acquisition_mode: "both", paid_platform: "meta" })], READY);
+    expect(await screen.findByRole("heading", { name: "Winter full-arch push" })).toBeInTheDocument();
+    expect(screen.getByText("Organic + Paid · Meta Ads")).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Plan", "Content", "Landing Page", "Sales Agent", "Meta Ads", "Launch state",
+    ]);
+    await userEvent.click(screen.getByRole("tab", { name: "Meta Ads" }));
+    expect(screen.getByRole("heading", { name: "Meta activation" })).toBeInTheDocument();
+  });
+
+  it("labels a combined campaign correctly in the overview table", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
+    show([planned({ acquisition_mode: "both", paid_platform: "google" })], READY);
+    const row = (await screen.findByRole("link", { name: "Winter full-arch push" })).closest("tr");
+    expect(row).toHaveTextContent("Organic + Paid · Google Ads");
+    expect(row).toHaveTextContent("Both");
+    expect(row).not.toHaveTextContent("Legacy");
   });
 
   it("shows route and artifact blockers while keeping a planned campaign's edit form to its name", async () => {

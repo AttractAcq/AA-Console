@@ -75,6 +75,15 @@ type Campaign = {
   offer_version_id: string | null;
 };
 
+function campaignRouteLabel(campaign: Campaign): string {
+  if (campaign.acquisition_mode === "legacy") return "Legacy campaign";
+  if (campaign.acquisition_mode === "organic") return "Organic";
+  const paidChannel = campaign.paid_platform === "meta" ? "Meta Ads"
+    : campaign.paid_platform === "google" ? "Google Ads" : "Paid platform unknown";
+  return campaign.acquisition_mode === "both"
+    ? `Organic + Paid · ${paidChannel}` : `Paid · ${paidChannel}`;
+}
+
 export type Requirement = {
   requirement: string;
   required: number;
@@ -660,13 +669,13 @@ export function CampaignExecutionPanel() {
       ) : (
         campaignId ? visibleCampaigns.map((c) => {
           const reqs = readiness[c.id] ?? [];
-          const paid = c.acquisition_mode === "paid";
+          const paid = c.acquisition_mode === "paid" || c.acquisition_mode === "both";
           const tabs = paid ? [ ["plan", "Plan"], ["content", "Content"], ["landing-page", "Landing Page"], ["sales-agent", "Sales Agent"], ...(c.paid_platform === "meta" ? [["meta-ads", "Meta Ads"]] as const : []), ["launch", "Launch state"] ] as const : [ ["plan", "Plan"], ["content", "Content"], ["launch", "Launch state"] ] as const;
           return <div key={c.id}>
             <section className="rounded-lg border border-border bg-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div><div className="flex items-center gap-3"><h2 className="text-lg font-semibold">{c.name}</h2><span className={cn("rounded-full px-2 py-0.5 text-xs font-medium capitalize", STATUS_TONE[c.status] ?? "bg-muted text-muted-foreground")}>{c.status}</span></div>
-                  <p className="mt-1 text-xs text-muted-foreground">{c.acquisition_mode === "paid" ? `Paid · ${c.paid_platform === "meta" ? "Meta Ads" : "Google Ads"}` : c.acquisition_mode === "organic" ? "Organic" : "Legacy campaign"}
+                  <p className="mt-1 text-xs text-muted-foreground">{campaignRouteLabel(c)}
                     {c.cloned_from_campaign_id && <>{" · "}<Link className="text-brand-strong underline" to={`/clients/${clientId}/delivery/campaign-factory/${c.cloned_from_campaign_id}`}>Source campaign</Link></>}
                   </p></div>
                 <button type="button" className={buttonClass} onClick={() => setEditing(c)}>Edit campaign</button>
@@ -835,7 +844,7 @@ export function CampaignExecutionPanel() {
             {paid && v2Tab === "sales-agent" && <SalesOverviewPanel key={c.id} campaignId={c.id} campaignName={c.name} />}
             {paid && c.paid_platform === "meta" && v2Tab === "meta-ads" && clientId && <section className="py-4"><div className="rounded-lg border border-border bg-card p-4 text-sm"><h3 className="font-semibold">Meta activation</h3><p className="mt-2 text-xs text-muted-foreground">{packageState.manifest ? `Current package v${packageState.manifest.version}. ` : "A planned package is required. "}{packageState.approvals.filter((approval) => approval.action_key === "meta_ad_build").map((approval) => `Meta ad build approval: ${approval.status}. `).join("") || "No Meta build approval is recorded for this package. "}Prepare the build sheet and approved creative here. Creating Meta objects still awaits the exact-version approval executor.</p><Link className="mt-2 inline-block text-xs text-brand-strong underline" to={`/clients/${clientId}/delivery/approval-inbox?tab=campaign-actions`}>Open Approval Inbox</Link>{c.meta_campaign_id && <p className="mt-2 text-xs">Meta campaign {c.meta_campaign_id}{c.meta_ad_set_id ? ` · ad set ${c.meta_ad_set_id}` : " · ad set pending"}{c.meta_built_at ? ` · recorded ${new Date(c.meta_built_at).toLocaleString()}` : ""}</p>}</div><div className="mt-3 flex justify-end"><Button onClick={() => setMetaToolsOpenFor((open) => open === c.id ? null : c.id)}>Build functionality</Button></div>{metaToolsOpen && <MetaBuildSection clientId={clientId} campaign={c} building={inFlight.some((job) => job.agent_key === "meta_build" && job.input_id === c.id)} onChanged={() => { void refresh(); void packageState.refresh(); }} externalActionsAvailable={false} handBuildAvailable showSheetInline />}</section>}
           </div>;
-        }) : <div className="overflow-x-auto rounded-lg border border-border bg-card"><table className="w-full text-left text-sm"><thead className="border-b border-border bg-muted/40"><tr><th className="p-3">Campaign</th><th className="p-3">Route</th><th className="p-3">Type</th><th className="p-3">Date</th><th className="p-3">Status</th><th className="p-3">Production stage</th><th className="p-3">Actions</th></tr></thead><tbody>{visibleCampaigns.map((c) => <tr key={c.id} className="border-b border-border last:border-0"><td className="p-3"><Link className="font-medium text-brand-strong hover:underline" to={`/clients/${clientId}/delivery/campaign-factory/${c.id}`}>{c.name}</Link>{c.cloned_from_campaign_id && <span className="block text-xs text-muted-foreground">Revised or cloned from another campaign</span>}</td><td className="p-3">{c.acquisition_mode === "paid" ? `Paid · ${c.paid_platform === "meta" ? "Meta" : "Google"}` : c.acquisition_mode === "organic" ? "Organic" : "Legacy"}</td><td className="p-3">{c.acquisition_mode === "organic" ? "Organic" : c.acquisition_mode === "paid" ? "Paid" : "Not specified"}</td><td className="p-3">{new Date(c.created_at).toLocaleDateString()}</td><td className="p-3 capitalize">{c.status}</td><td className="p-3">{productionStage(c, readiness[c.id] ?? [], planning.has(c.id))}</td><td className="p-3"><button type="button" className={buttonClass} aria-expanded={rowActions === c.id} onClick={() => setRowActions(rowActions === c.id ? null : c.id)}>Actions</button>{rowActions === c.id && <CampaignActions campaign={c} checks={readiness[c.id] ?? []} busy={busy} planning={planning.has(c.id)} onChoose={(kind) => setConfirmAction({ campaign: c, kind })} />}</td></tr>)}</tbody></table></div>
+        }) : <div className="overflow-x-auto rounded-lg border border-border bg-card"><table className="w-full text-left text-sm"><thead className="border-b border-border bg-muted/40"><tr><th className="p-3">Campaign</th><th className="p-3">Route</th><th className="p-3">Type</th><th className="p-3">Date</th><th className="p-3">Status</th><th className="p-3">Production stage</th><th className="p-3">Actions</th></tr></thead><tbody>{visibleCampaigns.map((c) => <tr key={c.id} className="border-b border-border last:border-0"><td className="p-3"><Link className="font-medium text-brand-strong hover:underline" to={`/clients/${clientId}/delivery/campaign-factory/${c.id}`}>{c.name}</Link>{c.cloned_from_campaign_id && <span className="block text-xs text-muted-foreground">Revised or cloned from another campaign</span>}</td><td className="p-3">{campaignRouteLabel(c)}</td><td className="p-3">{c.acquisition_mode === "both" ? "Both" : c.acquisition_mode === "legacy" ? "Not specified" : c.acquisition_mode === "organic" ? "Organic" : "Paid"}</td><td className="p-3">{new Date(c.created_at).toLocaleDateString()}</td><td className="p-3 capitalize">{c.status}</td><td className="p-3">{productionStage(c, readiness[c.id] ?? [], planning.has(c.id))}</td><td className="p-3"><button type="button" className={buttonClass} aria-expanded={rowActions === c.id} onClick={() => setRowActions(rowActions === c.id ? null : c.id)}>Actions</button>{rowActions === c.id && <CampaignActions campaign={c} checks={readiness[c.id] ?? []} busy={busy} planning={planning.has(c.id)} onChoose={(kind) => setConfirmAction({ campaign: c, kind })} />}</td></tr>)}</tbody></table></div>
       )}
 
       <FormModal
