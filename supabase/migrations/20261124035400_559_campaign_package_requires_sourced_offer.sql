@@ -88,6 +88,13 @@ begin
              where proof.id::text=v_claim->>'proof_asset_id'
                and proof.client_id=c.client_id
                and proof.usage_rights='approved'
+               and proof.approved_rights_request_id is not null
+               and proof.approved_rights_content_hash is not null
+               and not exists(select 1 from public.proof_rights_revocations_v6 revoked
+                 where revoked.canonical_request_id=proof.approved_rights_request_id)
+               and exists(select 1 from public.approval_inbox_v6 inbox
+                 where inbox.id=proof.approved_rights_request_id
+                   and inbox.status='approved')
                and (proof.expires_on is null or proof.expires_on>=current_date))) then
           v_blockers:=v_blockers || jsonb_build_array(
             'A quantified offer claim has lost current cleared proof.');
