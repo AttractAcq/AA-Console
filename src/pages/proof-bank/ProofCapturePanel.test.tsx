@@ -1,17 +1,24 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 
-const { from, readConfigs, readPages } = vi.hoisted(() => ({
-  from: vi.fn(), readConfigs: vi.fn(), readPages: vi.fn(),
+const { from, readConfigs, readPages, route } = vi.hoisted(() => ({
+  from: vi.fn(), readConfigs: vi.fn(), readPages: vi.fn(), route: { capture: "automated_requests" },
 }));
 vi.mock("../../lib/supabase", () => ({ supabase: { from } }));
 vi.mock("react-router-dom", () => ({
-  useSearchParams: () => [new URLSearchParams("capture=automated_requests"), vi.fn()],
+  useSearchParams: () => [new URLSearchParams(`capture=${route.capture}`), vi.fn()],
   Link: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
 }));
 vi.mock("./ProofCaptureDelivery", () => ({ ProofCaptureDelivery: () => null }));
 vi.mock("./ProofIntegrationCapture", () => ({ ProofIntegrationCapture: () => null }));
-vi.mock("./ProofOutcomeConsentPanel", () => ({ ProofOutcomeConsentPanel: () => null }));
+vi.mock("./ProofOutcomeConsentPanel", () => ({
+  ProofOutcomeConsentPanel: ({ clientId }: { clientId: string }) => {
+    const [open, setOpen] = useState(false);
+    return <div><button onClick={() => setOpen(true)}>Show consent detail</button>
+      {open && <span>Consent detail for {clientId}</span>}</div>;
+  },
+}));
 vi.mock("./ProofServiceOutcomePanel", () => ({ ProofServiceOutcomePanel: () => null }));
 vi.mock("../../components/proof/AddProofModal", () => ({ AddProofModal: () => null }));
 vi.mock("../../components/forms/FormModal", () => ({
@@ -29,6 +36,7 @@ function deferred<T>() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  route.capture = "automated_requests";
   from.mockImplementation((table: string) => ({
     select: () => ({
       eq: (_field: string, clientId: string) => table === "proof_capture_configs"
@@ -37,6 +45,16 @@ beforeEach(() => {
     }),
   }));
   readPages.mockResolvedValue({ data: [], error: null });
+});
+
+it("resets client-specific outcome child state on client navigation", async () => {
+  route.capture = "outcome_followup";
+  readConfigs.mockResolvedValue({ data: [], error: null });
+  const view = render(<ProofCapturePanel clientId="client-a" />);
+  fireEvent.click(screen.getByRole("button", { name: "Show consent detail" }));
+  expect(screen.getByText("Consent detail for client-a")).toBeInTheDocument();
+  view.rerender(<ProofCapturePanel clientId="client-b" />);
+  expect(screen.queryByText("Consent detail for client-a")).not.toBeInTheDocument();
 });
 
 it("hides previous-client setups and closes their edit form before a new read completes", async () => {

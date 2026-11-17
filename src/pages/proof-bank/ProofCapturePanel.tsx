@@ -85,10 +85,10 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
         Back to capture
       </button>
       <h2 className="text-xl font-semibold">{method.label}</h2>
-      {method.id === "integration" && <ProofIntegrationCapture clientId={clientId} />}
+      {method.id === "integration" && <ProofIntegrationCapture key={clientId} clientId={clientId} />}
       {method.id === "outcome_followup" && <>
-        <ProofServiceOutcomePanel clientId={clientId} onChange={() => setRevision((n) => n + 1)} />
-        <ProofOutcomeConsentPanel clientId={clientId} onChange={() => setRevision((n) => n + 1)} />
+        <ProofServiceOutcomePanel key={clientId} clientId={clientId} onChange={() => setRevision((n) => n + 1)} />
+        <ProofOutcomeConsentPanel key={clientId} clientId={clientId} onChange={() => setRevision((n) => n + 1)} />
       </>}
       {method.id !== "integration" && (
         <>
@@ -161,7 +161,7 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
                       "Unavailable"}
                   </p>
                 )}
-                <ProofCaptureDelivery clientId={clientId} setup={c} />
+                <ProofCaptureDelivery key={`${clientId}:${c.id}`} clientId={clientId} setup={c} />
               </article>
             ))}
           <FormModal
