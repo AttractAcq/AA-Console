@@ -672,6 +672,18 @@ function DiscoverView({
   onAct: (id: string, work: () => Promise<void>, said: string) => Promise<void>;
   onBuild: (opportunity: Opportunity) => void;
 }) {
+  const [query, setQuery] = useState("");
+  const [status, setStatusFilter] = useState("all");
+  const statuses = [...new Set(opportunities.map((opportunity) => opportunity.status))].sort();
+  const normalizedQuery = query.trim().toLowerCase();
+  const visible = opportunities.filter((opportunity) => {
+    if (status !== "all" && opportunity.status !== status) return false;
+    if (!normalizedQuery) return true;
+    return [
+      opportunity.name, opportunity.micro_market, opportunity.buying_situation,
+      opportunity.purchase_trigger, opportunity.status,
+    ].some((value) => value?.toLowerCase().includes(normalizedQuery));
+  });
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -685,13 +697,42 @@ function DiscoverView({
         </Button>
       </div>
 
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="min-w-64 flex-1 text-sm">
+          <span className="block text-muted-foreground">Search opportunities</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Name, micro-market or buying situation"
+            className="mt-1 w-full rounded-lg border border-border bg-background p-2"
+          />
+        </label>
+        <label className="text-sm">
+          <span className="block text-muted-foreground">Status</span>
+          <select
+            value={status}
+            onChange={(event) => setStatusFilter(event.target.value)}
+            className="mt-1 rounded-lg border border-border bg-background p-2"
+          >
+            <option value="all">All statuses</option>
+            {statuses.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
+        <p className="text-sm text-muted-foreground" role="status">
+          {visible.length} of {opportunities.length} opportunities
+        </p>
+      </div>
+
       <DataTable
         // Status is its own column rather than a subtitle under the name: the
         // notes ask that it be easy "to see what market opportunities are
         // active", and a caption under a button is not that.
         columns={["Opportunity", "Status", "Micro-market", "Trigger", "Confidence", "Proposed", "Found", "Actions"]}
-        emptyLabel={loading ? "Loading opportunities…" : "No opportunities yet — run a discovery pass"}
-        rows={opportunities.map((o) => [
+        emptyLabel={loading ? "Loading opportunities…"
+          : opportunities.length === 0 ? "No opportunities yet — run a discovery pass"
+            : "No opportunities match these filters"}
+        rows={visible.map((o) => [
           <button
             key="n"
             type="button"

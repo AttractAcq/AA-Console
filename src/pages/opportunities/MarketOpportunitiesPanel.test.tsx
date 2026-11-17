@@ -134,6 +134,26 @@ beforeEach(() => {
 });
 
 describe("single-page opportunity flow", () => {
+  it("searches buying situations and filters opportunity status", async () => {
+    fetchOpportunities.mockResolvedValue([
+      opportunity(),
+      opportunity({
+        id: "opp-2", name: "Clinic Relaunch", status: "active",
+        micro_market: "Patients returning to a new clinic",
+        buying_situation: "They need a local appointment",
+      }),
+    ]);
+    render(<MarketOpportunitiesPanel />);
+    const table = await screen.findByRole("table");
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search opportunities" }), "local appointment");
+    expect(within(table).getByRole("button", { name: "Clinic Relaunch" })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Garage-to-Gym Conversion" })).not.toBeInTheDocument();
+    await userEvent.clear(screen.getByRole("searchbox", { name: "Search opportunities" }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Status" }), "active");
+    expect(within(table).getByRole("button", { name: "Clinic Relaunch" })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Garage-to-Gym Conversion" })).not.toBeInTheDocument();
+  });
+
   it("shows the overview and the selected record together", async () => {
     search.value = "opportunity=opp-1";
     render(<MarketOpportunitiesPanel />);
@@ -255,7 +275,7 @@ describe("creating the campaign", () => {
     await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
 
     expect(
-      await screen.findByText(/cannot be changed afterwards/),
+      await screen.findByText(/choice is fixed after creation/),
     ).toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText(/Route/), "paid");
     await user.selectOptions(screen.getByLabelText(/Paid platform/), "meta");
@@ -527,7 +547,7 @@ describe("the Discover table carries the whole progression", () => {
     fetchOpportunities.mockResolvedValue([opportunity({ status: "active" })]);
     render(<MarketOpportunitiesPanel view="discover" />);
     expect(await screen.findByRole("columnheader", { name: "Status" })).toBeInTheDocument();
-    expect(screen.getByText("active")).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "active" })).toBeInTheDocument();
   });
 });
 
