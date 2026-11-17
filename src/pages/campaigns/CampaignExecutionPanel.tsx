@@ -315,15 +315,14 @@ export function CampaignExecutionPanel() {
       void fetchCampaignOrigins(clientId)
         .then((found) => {
           if (version === request.current) setOrigins(found);
-      // The launch verdict is read for the whole client at once: the campaigns
-      // list wants a live marker per row, not one request per campaign.
-      void fetchLaunchDue(clientId)
-        .then(setLaunchDue)
-        .catch(() => setLaunchDue(new Map()));
         })
         .catch(() => {
           if (version === request.current) setOrigins(new Map());
         });
+      // A failed lineage read must not suppress the independent launch verdict.
+      void fetchLaunchDue(clientId)
+        .then((found) => { if (version === request.current) setLaunchDue(found); })
+        .catch(() => { if (version === request.current) setLaunchDue(new Map()); });
 
       // Readiness is computed in the database from the real artifacts, never
       // stored — so it is fetched per campaign rather than read off a column.
@@ -426,28 +425,18 @@ export function CampaignExecutionPanel() {
   useEffect(() => {
     if (!editingPlan || !clientId) return;
     let cancelled = false;
-    setOffersFailed(false);
-    void (async () => {
-      const [offers, versions, signoffs] = await Promise.all([
-        supabase.from("service_offers").select("id, service_name").eq("client_id", clientId),
-        supabase.from("service_offer_versions").select("id, offer_id, version, promise").eq("client_id", clientId),
-        supabase.from("service_offer_signoffs").select("offer_version_id").eq("client_id", clientId),
-      ]);
-      if (cancelled) return;
-      if (offers.error || versions.error || signoffs.error) {
-        setOffersFailed(true);
-        setApprovedOfferChoices([]);
-        return;
-      }
-      const signed = new Set((signoffs.data ?? []).map((row) => row.offer_version_id));
-      const names = new Map((offers.data ?? []).map((row) => [row.id, row.service_name]));
-      setApprovedOfferChoices((versions.data ?? [])
-        .filter((row) => signed.has(row.id))
-        .map((row) => ({ id: row.id,
-          label: `${names.get(row.offer_id) ?? "Service"} v${row.version} · ${row.promise.slice(0, 90)}` })));
-    })().catch(() => { if (!cancelled) setOffersFailed(true); });
+    const origin = origins.get(editingPlan.id);
+    setApprovedOfferChoices([]);
+    setOffersFailed(!origin);
+    if (origin) void fetchOpportunityOfferVersions(clientId, origin.opportunity_id)
+      .then((choices) => {
+        if (!cancelled) {
+          setApprovedOfferChoices(choices);
+          setOffersFailed(false);
+        }
+      }).catch(() => { if (!cancelled) setOffersFailed(true); });
     return () => { cancelled = true; };
-  }, [editingPlan, clientId]);
+  }, [editingPlan, clientId, origins]);
 
   const { inFlight, recentFailures } = useAgentJobs(clientId, () => {
     void refresh();
@@ -616,10 +605,10 @@ export function CampaignExecutionPanel() {
   const createPlanRevision = async (campaign: Campaign, brief: string, changes?: { template: string; offerVersionId: string | null }) => {
     if (!clientId) throw new Error("No client selected.");
     if (changes && changes.offerVersionId !== campaign.offer_version_id && offersFailed)
-      throw new Error("Approved offers could not be loaded.");
+      throw new Error("Signed secondary offers for this opportunity could not be loaded.");
     if (changes?.offerVersionId && changes.offerVersionId !== campaign.offer_version_id
       && !approvedOfferChoices.some((offer) => offer.id === changes.offerVersionId))
-      throw new Error("Choose an approved offer belonging to this client.");
+      throw new Error("Choose a current signed secondary offer from this campaign's approved opportunity.");
     const offerVersionId = changes ? changes.offerVersionId : campaign.offer_version_id;
     if (!offerVersionId) throw new Error("This campaign has no signed secondary offer. Link an approved opportunity and offer before revising it.");
     const nextTemplate = changes?.template ?? campaign.template;
@@ -1043,7 +1032,7 @@ export function CampaignExecutionPanel() {
         fields={[
           { name: "brief", label: "Campaign brief", kind: "textarea", rows: 4, required: true },
           ...(editingPlan?.acquisition_mode === "paid" && editingPlan.paid_platform === "meta" ? [{ name: "template", label: "Meta template", kind: "select", options: templateOptions() } as FieldDef] : []),
-          { name: "offer_version_id", label: "Approved service offer", kind: "select", options: approvedOfferChoices.map((offer) => ({ value: offer.id, label: offer.label })) },
+          { name: "offer_version_id", label: "Signed secondary offer for this opportunity", kind: "select", options: approvedOfferChoices.map((offer) => ({ value: offer.id, label: offer.label })) },
           { name: "objective", label: "Objective", kind: "textarea", rows: 2 },
           { name: "audience", label: "Audience", kind: "textarea", rows: 2 },
           { name: "offer_summary", label: "Offer", kind: "textarea", rows: 2 },

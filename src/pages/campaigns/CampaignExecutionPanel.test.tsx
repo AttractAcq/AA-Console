@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { from, rpc, useParams, useNavigate, useAgentJobs, callRuntime, useSearchParams,
-  fetchOpportunities, fetchOpportunityApprovalStates, fetchReadiness, fetchOpportunityOfferVersions } = vi.hoisted(() => ({
+  fetchCampaignOrigins, fetchOpportunities, fetchOpportunityApprovalStates, fetchReadiness, fetchOpportunityOfferVersions } = vi.hoisted(() => ({
   callRuntime: vi.fn(),
   from: vi.fn(),
   rpc: vi.fn(),
@@ -13,13 +13,14 @@ const { from, rpc, useParams, useNavigate, useAgentJobs, callRuntime, useSearchP
   useSearchParams: vi.fn(() => [new URLSearchParams()]),
   useAgentJobs: vi.fn(),
   fetchOpportunities: vi.fn(),
+  fetchCampaignOrigins: vi.fn(),
   fetchOpportunityApprovalStates: vi.fn(),
   fetchReadiness: vi.fn(),
   fetchOpportunityOfferVersions: vi.fn(),
 }));
 vi.mock("../../lib/opportunities", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../lib/opportunities")>()),
-  fetchOpportunities, fetchOpportunityApprovalStates, fetchReadiness, fetchOpportunityOfferVersions,
+  fetchCampaignOrigins, fetchOpportunities, fetchOpportunityApprovalStates, fetchReadiness, fetchOpportunityOfferVersions,
 }));
 vi.mock("../../lib/supabase", () => ({
   supabase: {
@@ -179,6 +180,11 @@ beforeEach(() => {
   fetchOpportunityApprovalStates.mockResolvedValue(new Map([["opp-1", "current"]]));
   fetchReadiness.mockResolvedValue(new Map([["opp-1", { blocker: null }]]));
   fetchOpportunityOfferVersions.mockResolvedValue([{ id: "version-1", label: "Niche offer v1" }]);
+  fetchCampaignOrigins.mockResolvedValue(new Map([["camp-1", {
+    campaign_id: "camp-1", opportunity_id: "opp-1", opportunity_name: "Approved niche",
+    micro_market: "Winter", opportunity_status: "approved", confidence: "observed",
+    score: 80, classification: "high", open_proof_gaps: 0, opportunity_blocker: null,
+  }]]));
 });
 
 async function chooseCampaignSources() {
@@ -298,6 +304,7 @@ describe("campaign pages", () => {
   it("regenerates a built plan as a linked revision instead of replacing its assets", async () => {
     const navigate = vi.fn();
     useNavigate.mockReturnValue(navigate);
+    fetchOpportunityOfferVersions.mockResolvedValue([{ id: "offer-v1", label: "Winter offer v1" }]);
     show([planned({ acquisition_mode: "paid", paid_platform: "meta", offer_version_id: "offer-v1" })], READY);
     rpc.mockImplementation((name: string) => name === "create_sourced_campaign_revision_v7"
       ? Promise.resolve({ data: { id: "revision-1" }, error: null })
@@ -314,6 +321,7 @@ describe("campaign pages", () => {
   });
 
   it("passes edited plan details to the planner of a new revision", async () => {
+    fetchOpportunityOfferVersions.mockResolvedValue([{ id: "offer-v1", label: "Winter offer v1" }]);
     show([planned({ acquisition_mode: "paid", paid_platform: "meta", offer_version_id: "offer-v1" })], READY);
     rpc.mockImplementation((name: string) => name === "create_sourced_campaign_revision_v7"
       ? Promise.resolve({ data: { id: "revision-2" }, error: null })
@@ -321,6 +329,8 @@ describe("campaign pages", () => {
     await screen.findByRole("heading", { name: "Winter full-arch push" });
     await userEvent.click(screen.getByRole("button", { name: "Edit plan" }));
     const dialog = within(screen.getByRole("dialog", { name: "Edit and regenerate plan" }));
+    await waitFor(() => expect(fetchOpportunityOfferVersions).toHaveBeenCalledWith("client-1", "opp-1"));
+    expect(dialog.getByRole("option", { name: "Winter offer v1" })).toBeInTheDocument();
     await userEvent.clear(dialog.getByRole("textbox", { name: "Objective" }));
     await userEvent.type(dialog.getByRole("textbox", { name: "Objective" }), "Book 60 consultations");
     await userEvent.click(dialog.getByRole("button", { name: "Save and regenerate" }));
