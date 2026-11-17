@@ -42,7 +42,7 @@ begin
   approval_id:=public.request_opportunity_approval_v6(o.id);
   perform public.approve_opportunity_v6(o.id,approval_id);
   offer:=public.create_secondary_offer_v7(o.id);
-  v:=public.create_service_offer_version_v6(o.client_id,'Snapshot offer',
+  v:=public.create_service_offer_version_v6(o.client_id,'New secondary offer',
     'Homeowners with unused garages','A garage ready for training',
     array['Insulation'],array['Gym equipment'],null,null,null,'[]'::jsonb,
     'snapshot-offer-version',offer.id);
