@@ -8,10 +8,10 @@ insert into public.profiles(id,role,email) values
 insert into public.clients(id,name,initials) values
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Snapshot fixture','SF');
 insert into public.client_campaigns(id,client_id,name,brief,acquisition_mode,runs_organic,runs_paid,
-  content_count,organic_content_count,paid_content_count,built_at)
+  content_count,organic_content_count,paid_content_count)
 values ('cccccccc-cccc-4ccc-8ccc-cccccccccccc',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Snapshot campaign','Fixture',
-  'organic',true,false,1,1,0,now());
+  'organic',true,false,1,1,0);
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
 select set_config('request.jwt.claims',
@@ -49,7 +49,7 @@ begin
   perform public.approve_service_offer_version_v6(v.id);
   insert into public.opportunity_links(opportunity_id,client_id,role,campaign_id)
     values(o.id,o.client_id,'campaign','cccccccc-cccc-4ccc-8ccc-cccccccccccc');
-  update public.client_campaigns set offer_version_id=v.id
+  update public.client_campaigns set offer_version_id=v.id,built_at=now()
     where id='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 end $source$;
 select public.set_campaign_content_spec_v7('cccccccc-cccc-4ccc-8ccc-cccccccccccc',
