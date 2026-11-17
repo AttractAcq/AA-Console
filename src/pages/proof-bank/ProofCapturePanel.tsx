@@ -16,14 +16,19 @@ const button =
 export function ProofCapturePanel({ clientId }: { clientId: string }) {
   const [params, setParams] = useSearchParams();
   const method = CAPTURE_METHODS.find((m) => m.id === params.get("capture"));
-  const [configs, setConfigs] = useState<Config[]>([]);
-  const [pages, setPages] = useState<{ id: string; title: string }[]>([]);
-  const [editing, setEditing] = useState<Partial<Config> | null>(null);
-  const [upload, setUpload] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState<{
+    clientId: string; configs: Config[]; pages: { id: string; title: string }[];
+    error: string | null; loading: boolean;
+  }>({ clientId, configs: [], pages: [], error: null, loading: true });
+  const current = snapshot.clientId === clientId ? snapshot
+    : { clientId, configs: [] as Config[], pages: [] as { id: string; title: string }[],
+      error: null, loading: true };
+  const [editing, setEditing] = useState<{ clientId: string; config: Partial<Config> } | null>(null);
+  const [uploadClient, setUploadClient] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   useEffect(() => {
     let active = true;
+    setSnapshot({ clientId, configs: [], pages: [], error: null, loading: true });
     void Promise.all([
       supabase
         .from("proof_capture_configs")
@@ -36,9 +41,13 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
         .eq("client_id", clientId),
     ]).then(([c, p]) => {
       if (!active) return;
-      setError(c.error?.message ?? p.error?.message ?? null);
-      setConfigs(c.data ?? []);
-      setPages(p.data ?? []);
+      setSnapshot({ clientId, configs: c.error ? [] : c.data ?? [],
+        pages: p.error ? [] : p.data ?? [],
+        error: c.error?.message ?? p.error?.message ?? null, loading: false });
+    }).catch((cause) => {
+      if (active) setSnapshot({ clientId, configs: [], pages: [],
+        error: cause instanceof Error ? cause.message : "Capture setups could not be loaded.",
+        loading: false });
     });
     return () => {
       active = false;
@@ -84,22 +93,23 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
       {method.id !== "integration" && (
         <>
           <p className="text-sm text-muted-foreground">{method.description}</p>
-          {error && (
+          {current.error && (
             <p role="alert" className="text-destructive">
-              {error}
+              {current.error}
             </p>
           )}
+          {current.loading && <p className="text-sm text-muted-foreground">Loading capture setups…</p>}
           <div className="flex flex-wrap gap-2">
             <button
               className={button}
-              onClick={() => setEditing({ method: method.id })}
+              onClick={() => setEditing({ clientId, config: { method: method.id } })}
             >
               {method.id === "guided_interview"
                 ? "New interview script"
                 : "New capture setup"}
             </button>
             {method.id === "manual_import" && (
-              <button className={button} onClick={() => setUpload(true)}>
+              <button className={button} onClick={() => setUploadClient(clientId)}>
                 Upload proof
               </button>
             )}
@@ -120,7 +130,7 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
                 ? "Verify the service result and record specific customer consent above, then prepare a bound request. Every request needs exact Inbox approval before delivery."
               : "Create a private capture link for this setup. Submissions enter Raw for review and permission clearance. A website can link to the capture portal."}
           </p>
-          {configs
+          {current.configs
             .filter((c) => c.method === method.id)
             .map((c) => (
               <article
@@ -129,7 +139,7 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
               >
                 <div className="flex justify-between gap-3">
                   <h3 className="font-semibold">{c.name}</h3>
-                  <button className={button} onClick={() => setEditing(c)}>
+                  <button className={button} onClick={() => setEditing({ clientId, config: c })}>
                     Edit
                   </button>
                 </div>
@@ -147,7 +157,7 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
                 {c.page_id && (
                   <p className="mt-2 text-sm">
                     Page:{" "}
-                    {pages.find((p) => p.id === c.page_id)?.title ??
+                    {current.pages.find((p) => p.id === c.page_id)?.title ??
                       "Unavailable"}
                   </p>
                 )}
@@ -155,7 +165,7 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
               </article>
             ))}
           <FormModal
-            open={editing !== null}
+            open={editing?.clientId === clientId}
             onClose={() => setEditing(null)}
             title={method.label}
             fields={[
@@ -196,7 +206,7 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
                       name: "page_id",
                       label: "Linked page",
                       kind: "select" as const,
-                      options: pages.map((p) => ({
+                      options: current.pages.map((p) => ({
                         value: p.id,
                         label: p.title,
                       })),
@@ -205,13 +215,14 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
                 : []),
             ]}
             initialValues={{
-              name: editing?.name ?? "",
-              instructions: editing?.instructions ?? "",
-              trigger_event: editing?.trigger_event ?? "",
-              message_template: editing?.message_template ?? "",
-              page_id: editing?.page_id ?? "",
+              name: editing?.clientId === clientId ? editing.config.name ?? "" : "",
+              instructions: editing?.clientId === clientId ? editing.config.instructions ?? "" : "",
+              trigger_event: editing?.clientId === clientId ? editing.config.trigger_event ?? "" : "",
+              message_template: editing?.clientId === clientId ? editing.config.message_template ?? "" : "",
+              page_id: editing?.clientId === clientId ? editing.config.page_id ?? "" : "",
             }}
             onSubmit={async (v) => {
+              if (editing?.clientId !== clientId) throw new Error("Capture setup belongs to another client.");
               const values = {
                 client_id: clientId,
                 method: method.id,
@@ -222,11 +233,11 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
                   String(v.message_template ?? "").trim() || null,
                 page_id: String(v.page_id ?? "") || null,
               };
-              const result = editing?.id
+              const result = editing.config.id
                 ? await supabase
                     .from("proof_capture_configs")
                     .update(values)
-                    .eq("id", editing.id)
+                    .eq("id", editing.config.id)
                     .eq("client_id", clientId)
                 : await supabase.from("proof_capture_configs").insert(values);
               if (result.error) throw result.error;
@@ -234,8 +245,8 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
             onSaved={() => setRevision((n) => n + 1)}
           />
           <AddProofModal
-            open={upload}
-            onClose={() => setUpload(false)}
+            open={uploadClient === clientId}
+            onClose={() => setUploadClient(null)}
             clientId={clientId}
             classify
           />

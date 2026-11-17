@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
@@ -8,33 +8,45 @@ type Review = Pick<Database["public"]["Tables"]["google_reviews"]["Row"],
   "star_rating" | "gone_at" | "captured_proof_id">;
 
 export function ProofIntegrationCapture({ clientId }: { clientId: string }) {
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
+  const request = useRef(0);
+  const [result, setResult] = useState<{
+    clientId: string; reviews: Review[]; loading: boolean; error: string | null;
+  }>({ clientId, reviews: [], loading: true, error: null });
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ clientId: string; text: string } | null>(null);
+  const visible = result.clientId === clientId
+    ? result : { clientId, reviews: [] as Review[], loading: true, error: null };
 
   const refresh = useCallback(async () => {
+    const version = ++request.current;
+    setResult({ clientId, reviews: [], loading: true, error: null });
     const { data, error: queryError } = await supabase.from("google_reviews")
       .select("id,author_name,comment,review_url,reviewed_at,star_rating,gone_at,captured_proof_id")
       .eq("client_id", clientId).order("reviewed_at", { ascending: false }).limit(100);
-    setLoading(false);
-    if (queryError) { setError(queryError.message); return; }
-    setReviews(data ?? []);
-    setError(null);
+    if (version !== request.current) return;
+    setResult({ clientId, reviews: queryError ? [] : data ?? [], loading: false,
+      error: queryError?.message ?? null });
   }, [clientId]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    void refresh();
+    return () => { request.current++; };
+  }, [refresh]);
 
   async function capture(reviewId: string) {
     setBusy(reviewId);
-    setError(null);
+    setResult((current) => current.clientId === clientId
+      ? { ...current, error: null } : current);
     const { error: captureError } = await supabase.rpc("capture_google_review_as_proof_v6", {
       p_review_id: reviewId,
     });
     setBusy(null);
-    if (captureError) { setError(captureError.message); return; }
-    setNotice("Review captured as raw proof. Clear its rights before using it.");
+    if (captureError) {
+      setResult((current) => current.clientId === clientId
+        ? { ...current, error: captureError.message } : current);
+      return;
+    }
+    setNotice({ clientId, text: "Review captured as raw proof. Clear its rights before using it." });
     await refresh();
   }
 
@@ -48,12 +60,12 @@ export function ProofIntegrationCapture({ clientId }: { clientId: string }) {
       to={`/clients/${clientId}/delivery/google-profile?tab=reviews`}>
       Check Google profile connection and reviews
     </Link>
-    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
-    {loading ? <p className="text-sm text-muted-foreground">Loading reviews…</p>
-      : reviews.length === 0 ? <p className="text-sm text-muted-foreground">
+    {visible.error && <p role="alert" className="text-sm text-destructive">{visible.error}</p>}
+    {notice?.clientId === clientId && <p role="status" className="text-sm text-brand-strong">{notice.text}</p>}
+    {visible.loading ? <p className="text-sm text-muted-foreground">Loading reviews…</p>
+      : visible.reviews.length === 0 ? <p className="text-sm text-muted-foreground">
         No ingested Google reviews are available. Verify the location and review ingest in Google Studio.
-      </p> : <div className="space-y-3">{reviews.map((review) => {
+      </p> : <div className="space-y-3">{visible.reviews.map((review) => {
         const blocker = review.captured_proof_id && review.gone_at
           ? "Captured; source removed — rights held"
           : review.captured_proof_id ? "Already captured"
