@@ -21,6 +21,7 @@ declare o public.market_opportunities%rowtype;
   other_version public.service_offer_versions%rowtype;
   compiled public.service_offer_versions%rowtype;
   campaign public.client_campaigns%rowtype;
+  manual_campaign public.client_campaigns%rowtype;
   clone_id uuid; revision_id uuid;
   approval_id uuid; request_id uuid; h text; job_id uuid;
 begin
@@ -101,6 +102,34 @@ begin
       values(o.client_id,'Unbound revision','Bad revision','organic',true,false,campaign.id);
     raise exception 'A sourced revision accepted no signed offer';
   exception when check_violation then null; end;
+  manual_campaign:=public.create_sourced_campaign_plan_v7(
+    o.client_id,o.id,v.id,'Combined garage launch','Focus on winter appointments',
+    'both',false,'meta','P3','{}'::uuid[]);
+  if manual_campaign.offer_version_id is distinct from v.id
+    or manual_campaign.acquisition_mode<>'both'
+    or manual_campaign.template::text<>'P3'
+    or manual_campaign.ideate_on_plan
+    or position('Operator direction:' in manual_campaign.brief)=0
+    or not exists(select 1 from public.opportunity_links l
+      where l.opportunity_id=o.id and l.campaign_id=manual_campaign.id and l.role='campaign')
+    or not exists(select 1 from public.agent_jobs j
+      where j.agent_key='campaign_plan' and j.input_id=manual_campaign.id) then
+    raise exception 'Atomic sourced creation lost its inputs, lineage or planner job'; end if;
+  begin
+    perform public.create_sourced_campaign_plan_v7(o.client_id,o.id,v.id,
+      'Duplicate combined launch','Duplicate','both',true,'meta');
+    raise exception 'A second campaign reused the same opportunity route';
+  exception when check_violation then null; end;
+  begin
+    perform public.create_sourced_campaign_plan_v7(o.client_id,o.id,v.id,
+      'Invalid pillar campaign','Bad pillar','paid',true,'google',null,
+      array['ffffffff-ffff-4fff-8fff-ffffffffffff'::uuid]);
+    raise exception 'A foreign or missing pillar entered the campaign transaction';
+  exception when check_violation then null; end;
+  if exists(select 1 from public.client_campaigns c
+    join public.opportunity_links l on l.campaign_id=c.id and l.role='campaign'
+    where l.opportunity_id=o.id and c.acquisition_mode='paid' and c.paid_platform='google') then
+    raise exception 'The failed pillar transaction left a campaign behind'; end if;
   insert into public.agent_jobs(agent_key,client_id,status,completed_at)
     values('offer_strategy',o.client_id,'completed',now());
   job_id := public.request_offer_compile_v6(o.client_id,'secondary','micro_niche',o.id);
@@ -132,6 +161,11 @@ begin
   begin
     perform public.clone_campaign_for_route(campaign.id,'both','meta','Stale combined clone');
     raise exception 'Clone accepted stale opportunity evidence';
+  exception when check_violation then null; end;
+  begin
+    perform public.create_sourced_campaign_plan_v7(o.client_id,o.id,v.id,
+      'Stale Google launch','Stale','paid',true,'google');
+    raise exception 'Campaign Factory accepted stale approved evidence';
   exception when check_violation then null; end;
   begin
     perform public.request_offer_compile_v6(o.client_id,'secondary','micro_niche',o.id);

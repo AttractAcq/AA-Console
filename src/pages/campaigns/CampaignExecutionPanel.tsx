@@ -3,7 +3,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
-import { fetchCampaignOrigins, type CampaignOrigin } from "../../lib/opportunities";
+import { fetchCampaignOrigins, fetchOpportunities, fetchOpportunityApprovalStates,
+  fetchOpportunityOfferVersions, fetchReadiness, type CampaignOrigin } from "../../lib/opportunities";
 import { fetchLaunchDue, type LaunchDue } from "../../lib/campaignLaunch";
 import { CampaignLaunchGate } from "./CampaignLaunchGate";
 import { FormModal } from "../../components/forms/FormModal";
@@ -209,6 +210,12 @@ export function CampaignExecutionPanel() {
   /** Why each campaign exists, where an opportunity says so. */
   const [origins, setOrigins] = useState<ReadonlyMap<string, CampaignOrigin>>(new Map());
   const [newOpen, setNewOpen] = useState(false);
+  const [newOpportunityChoices, setNewOpportunityChoices] = useState<Array<{ id: string; label: string }>>([]);
+  const [newOpportunityId, setNewOpportunityId] = useState("");
+  const [newOpportunityError, setNewOpportunityError] = useState<string | null>(null);
+  const [newOfferChoices, setNewOfferChoices] = useState<Array<{ id: string; label: string }>>([]);
+  const [newOfferVersionId, setNewOfferVersionId] = useState("");
+  const [newOfferError, setNewOfferError] = useState<string | null>(null);
   const [cloneSource, setCloneSource] = useState<Campaign | null>(null);
   const [proposing, setProposing] = useState(false);
   // The dialog's own pick, kept here so the generated draft can carry it into
@@ -384,7 +391,41 @@ export function CampaignExecutionPanel() {
   }, [newOpen, clientId]);
 
   useEffect(() => {
-    if ((!newOpen && !editingPlan) || !clientId) return;
+    if (!newOpen || !clientId) return;
+    let cancelled = false;
+    setNewOpportunityChoices([]);
+    setNewOpportunityError(null);
+    void Promise.all([
+      fetchOpportunities(clientId), fetchOpportunityApprovalStates(clientId), fetchReadiness(clientId),
+    ]).then(([opportunities, approvals, readinessById]) => {
+      if (cancelled) return;
+      setNewOpportunityChoices(opportunities
+        .filter((opportunity) => ["approved", "active", "learning", "scaling"].includes(opportunity.status)
+          && approvals.get(opportunity.id) === "current"
+          && readinessById.get(opportunity.id)?.blocker === null)
+        .map((opportunity) => ({ id: opportunity.id, label: opportunity.name })));
+    }).catch((cause) => {
+      if (!cancelled) setNewOpportunityError(cause instanceof Error ? cause.message : "Opportunities could not be loaded.");
+    });
+    return () => { cancelled = true; };
+  }, [newOpen, clientId]);
+
+  useEffect(() => {
+    if (!newOpen || !clientId || !newOpportunityId) return;
+    let cancelled = false;
+    setNewOfferChoices([]);
+    setNewOfferVersionId("");
+    setNewOfferError(null);
+    void fetchOpportunityOfferVersions(clientId, newOpportunityId).then((choices) => {
+      if (!cancelled) setNewOfferChoices(choices);
+    }).catch((cause) => {
+      if (!cancelled) setNewOfferError(cause instanceof Error ? cause.message : "Offer versions could not be loaded.");
+    });
+    return () => { cancelled = true; };
+  }, [newOpen, clientId, newOpportunityId]);
+
+  useEffect(() => {
+    if (!editingPlan || !clientId) return;
     let cancelled = false;
     setOffersFailed(false);
     void (async () => {
@@ -407,7 +448,7 @@ export function CampaignExecutionPanel() {
           label: `${names.get(row.offer_id) ?? "Service"} v${row.version} · ${row.promise.slice(0, 90)}` })));
     })().catch(() => { if (!cancelled) setOffersFailed(true); });
     return () => { cancelled = true; };
-  }, [newOpen, editingPlan, clientId]);
+  }, [editingPlan, clientId]);
 
   const { inFlight, recentFailures } = useAgentJobs(clientId, () => {
     void refresh();
@@ -855,20 +896,47 @@ export function CampaignExecutionPanel() {
         onClose={() => {
           setNewOpen(false);
           setAiDraft(null);
+          setNewOpportunityId("");
+          setNewOfferVersionId("");
+          setChosenPillars([]);
         }}
         title="New Campaign"
         draftKey={`campaign:${clientId}`}
-        intro="Queues the Campaign Planner. Select an approved service offer to bind its exact version to the plan and package. The planner needs the ICP and uses the client-wide offer strategy when no offer is selected."
-        fields={[...FIELDS, { name: "offer_version_id", label: "Approved service offer (optional)",
-          kind: "select", options: approvedOfferChoices.map((offer) => ({ value: offer.id, label: offer.label })),
-          hint: "The selected version is fixed for this campaign. Leave empty to use the client-wide offer strategy." } as FieldDef]}
+        intro="Choose an approved market opportunity and its signed secondary offer. The campaign keeps that exact source, your planning direction and any selected template or pillars. The planner is queued after all inputs are saved."
+        fields={FIELDS}
         extra={
-          offersFailed ? <p role="alert" className="text-sm text-destructive">
-            Approved offers could not be loaded. Try again before planning this campaign.
-          </p> : pillarsFailed ? (
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-foreground">
+              Approved market opportunity
+              <select className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2"
+                value={newOpportunityId} onChange={(event) => {
+                  setNewOpportunityId(event.target.value);
+                  setNewOfferVersionId("");
+                  setNewOfferChoices([]);
+                }}>
+                <option value="">Select…</option>
+                {newOpportunityChoices.map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}
+              </select>
+            </label>
+            {newOpportunityError && <p role="alert" className="text-sm text-destructive">Opportunities unavailable: {newOpportunityError}</p>}
+            {!newOpportunityError && newOpportunityChoices.length === 0 &&
+              <p className="text-xs text-muted-foreground">No approved, ready opportunities are available for this client.</p>}
+            <label className="block text-sm font-medium text-foreground">
+              Signed secondary offer version
+              <select className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2"
+                value={newOfferVersionId} disabled={!newOpportunityId}
+                onChange={(event) => setNewOfferVersionId(event.target.value)}>
+                <option value="">Select…</option>
+                {newOfferChoices.map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}
+              </select>
+            </label>
+            {newOfferError && <p role="alert" className="text-sm text-destructive">Offer versions unavailable: {newOfferError}</p>}
+            {newOpportunityId && !newOfferError && newOfferChoices.length === 0 &&
+              <p className="text-xs text-muted-foreground">No signed secondary offer version is linked to this opportunity yet.</p>}
+            {pillarsFailed ? (
             <p role="alert" className="rounded-md border border-border p-3 text-sm text-destructive">
               Could not load this client&apos;s content pillars, so none can be picked. The campaign can
-              still be planned without them.
+              still be planned without pillars.
             </p>
           ) : pillars.length > 0 ? (
             <fieldset className="rounded-md border border-border p-3">
@@ -901,7 +969,8 @@ export function CampaignExecutionPanel() {
                 ))}
               </div>
             </fieldset>
-          ) : null
+          ) : null}
+          </div>
         }
         submitLabel="Plan it"
         initialValues={newCampaignValues}
@@ -917,9 +986,14 @@ export function CampaignExecutionPanel() {
         }
         onSubmit={async (v) => {
           if (!clientId) throw new Error("No client selected.");
-          if (offersFailed) throw new Error("Approved offers could not be loaded.");
-          if (v.offer_version_id && !approvedOfferChoices.some((offer) => offer.id === v.offer_version_id))
-            throw new Error("Choose an approved offer belonging to this client.");
+          if (newOpportunityError) throw new Error("Approved opportunities could not be loaded.");
+          if (!newOpportunityChoices.some((choice) => choice.id === newOpportunityId))
+            throw new Error("Choose a currently approved and ready market opportunity.");
+          if (newOfferError) throw new Error("Signed secondary offers could not be loaded.");
+          if (!newOfferChoices.some((choice) => choice.id === newOfferVersionId))
+            throw new Error("Choose a signed secondary offer version linked to that opportunity.");
+          if (pillarsFailed && chosenPillars.length > 0)
+            throw new Error("Content pillars could not be checked.");
           const acquisitionMode = v.acquisition_mode;
           const paid = acquisitionMode === "paid" || acquisitionMode === "both";
           const paidPlatform = paid ? v.paid_platform : null;
@@ -927,49 +1001,29 @@ export function CampaignExecutionPanel() {
             throw new Error("Choose an organic, paid, or combined route.");
           if (paid && paidPlatform !== "meta" && paidPlatform !== "google")
             throw new Error("Choose Meta Ads or Google Ads for this paid campaign.");
-          const { data, error } = await supabase
-            .from("client_campaigns")
-            .insert({
-              client_id: clientId,
-              name: (v.name as string).trim(),
-              brief: (v.brief as string).trim(),
-              acquisition_mode: acquisitionMode,
-              paid_platform: paidPlatform as "meta" | "google" | null,
-              runs_organic: acquisitionMode === "organic" || acquisitionMode === "both",
-              runs_paid: paid,
-              offer_version_id: (v.offer_version_id as string) || null,
-              ideate_on_plan: v.ideate_on_plan !== false,
-              // Spread only when a template was picked. The columns arrive in
-              // migration 96, and a campaign planned without a template must
-              // keep working on a database that does not have them yet.
-              ...(paidPlatform === "meta"
-                ? templateColumns(v.template as string) ?? {} : {}),
-            })
-            .select("id")
-            .single();
-          if (error) throw error;
-
-          if (chosenPillars.length > 0) {
-            const { error: pillarError } = await supabase.from("campaign_content_pillars").insert(
-              chosenPillars.map((pillar_id) => ({ campaign_id: data.id, pillar_id })),
-            );
-            // Fail before queueing. A campaign planned without the pillars
-            // somebody chose would generate the wrong content and look right.
-            if (pillarError) throw new Error(pillarError.message);
-          }
-
-          const { error: jobError } = await supabase.rpc("enqueue_agent_job", {
-            p_agent_key: "campaign_plan",
+          const chosenTemplate = paidPlatform === "meta" ? (v.template as string) : "";
+          if (chosenTemplate && !templateFor(chosenTemplate))
+            throw new Error("Choose a known campaign template.");
+          const { error } = await supabase.rpc("create_sourced_campaign_plan_v7", {
             p_client_id: clientId,
-            p_input_table: "client_campaigns",
-            p_input_id: data.id,
+            p_opportunity_id: newOpportunityId,
+            p_offer_version_id: newOfferVersionId,
+            p_name: (v.name as string).trim(),
+            p_direction: (v.brief as string).trim(),
+            p_acquisition_mode: acquisitionMode,
+            p_ideate_on_plan: v.ideate_on_plan !== false,
+            ...(paid ? { p_paid_platform: paidPlatform as string } : {}),
+            ...(chosenTemplate ? { p_template: chosenTemplate } : {}),
+            p_pillar_ids: chosenPillars,
           });
-          if (jobError) throw new Error(jobError.message);
+          if (error) throw new Error(error.message);
           setNotice("Queued. The planner is writing the campaign now.");
         }}
         onSaved={() => {
           setAiDraft(null);
           setChosenPillars([]);
+          setNewOpportunityId("");
+          setNewOfferVersionId("");
           void refresh();
         }}
       />
