@@ -2,6 +2,8 @@
 
 **Prepared:** 17 November 2026. **Status:** review candidate only. No hosted staging or production SQL was changed. Outward switches remain untouched; Phases 8 and 9 remain unaccepted.
 
+This runbook's recovery gate assumes an **isolated hosted restore**. The later [no-cost in-place staging proposal](pr-362-no-cost-staging-change-proposal-2026-11-17.md) presents a separate, risk-accepted route using the existing staging project. It does not satisfy the isolated hosted restore gate below and has not been applied.
+
 ## Scope and evidence
 
 Production ref `bancbdztffokwiifzoiv`; staging ref `vmmertwoboqiazcsougw`. Reviewed PR #362 source `d9656e7456680d920cceab9ceabb554060799619`; 568 source migration files through `20261124034600` (551). The pre-correction [265-finding local rehearsal report](/Users/alex/.aa-console-evidence/schema-parity-rehearsal-2026-11-17.json) is classified **one finding at a time** in [staging-rehearsal-finding-classification-2026-11-17.json](staging-rehearsal-finding-classification-2026-11-17.json). It uses the private property comparison and read-only hosted platform probe. The live hosted report had 4,505 findings before a staging replay; it is [saved in full](/Users/alex/.aa-console-evidence/schema-parity-full-2026-11-17.json). See the [current PR review and hosted preparation packet](pr-362-hosted-rehearsal-preparation-2026-11-17.md) for the later exact-combined rehearsal and cost gate.
