@@ -11,6 +11,7 @@ export function assertMarketingDiscovery(actual: Iterable<string>) {
 export type MarketingFixtures = {
   approved_safe_fixtures: true;
   client_id: string; campaign_id: string; ad_campaign_id: string;
+  approved_opportunity_id: string; signed_secondary_offer_version_id: string;
   generation_idea_id: string;
   revision_brief_id: string; pending_asset_id: string; approved_asset_id: string;
   page_id: string; finding_ids: string[]; revision_number: number;
@@ -26,6 +27,8 @@ export async function runMarketingGate(invoke: Invoke, f: MarketingFixtures) {
     approved_safe_fixtures: z.literal(true),
     client_id: z.string().uuid(),
     campaign_id: z.string().uuid(),
+    approved_opportunity_id: z.string().uuid(),
+    signed_secondary_offer_version_id: z.string().uuid(),
     ad_campaign_id: z.string().uuid(),
     generation_idea_id: z.string().uuid(),
     revision_brief_id: z.string().uuid(),
@@ -124,6 +127,8 @@ export async function runMarketingGate(invoke: Invoke, f: MarketingFixtures) {
     name: `Gate 16 campaign ${randomUUID().slice(0, 8)}`,
     brief: "Gate 16 disposable campaign brief",
     acquisition_mode: "organic",
+    opportunity_id: f.approved_opportunity_id,
+    offer_version_id: f.signed_secondary_offer_version_id,
   }, "accepted");
   assert.ok(campaign.data.job_id, "Missing durable campaign_plan job");
   const campaign_id = campaign.data.campaign?.id ?? f.campaign_id;

@@ -7,6 +7,9 @@ insert into public.profiles(id,role,email)
 values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','admin','secondary-offer-admin@example.invalid');
 insert into public.clients(id,name,initials)
 values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Secondary offer fixture','SO');
+-- This rollback fixture exercises campaign source binding, not the separate
+-- intelligence prerequisite gate. Allow its planner job to be queued here.
+update public.agents set requires_upstream='{}' where agent_key='campaign_plan';
 select set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claims',
@@ -24,6 +27,7 @@ declare o public.market_opportunities%rowtype;
   manual_campaign public.client_campaigns%rowtype;
   clone_id uuid; revision_id uuid;
   approval_id uuid; request_id uuid; h text; job_id uuid;
+  mcp_created jsonb;
 begin
   insert into public.market_opportunities(client_id,name,micro_market,buying_situation,
     core_problem,desired_outcome,idempotency_key,confidence)
@@ -142,6 +146,31 @@ begin
     'Winter conversion','Homeowners with unused garages','A warmer garage',
     array['Insulation'],array['Gym equipment'],job_id::text||':1')).id<>compiled.id
     then raise exception 'Compiler retry created a duplicate offer'; end if;
+  insert into public.mcp_bot_clients(bot_id,client_id)
+    values('bot_marketing',o.client_id);
+  mcp_created:=public.mcp_campaign_create_v7('bot_marketing',o.client_id,o.id,v.id,
+    'Google garage campaign','Focus on winter leads','paid','google',
+    'source-request-1','source-execution-1');
+  if (mcp_created->'campaign'->>'opportunity_id')::uuid is distinct from o.id
+    or (mcp_created->'campaign'->>'offer_version_id')::uuid is distinct from v.id
+    or not exists(select 1 from public.agent_jobs j
+      where j.id=(mcp_created->>'job_id')::uuid and j.agent_key='campaign_plan') then
+    raise exception 'MCP sourced creation lost its source or planner job'; end if;
+  if coalesce((public.mcp_campaign_create_v7('bot_marketing',o.client_id,o.id,v.id,
+    'Google garage campaign','Focus on winter leads','paid','google',
+    'source-request-1','source-execution-1')->>'replayed')::boolean,false) is not true then
+    raise exception 'MCP source request replay was not idempotent'; end if;
+  begin
+    perform public.mcp_campaign_create_v6('bot_marketing',o.client_id,'Legacy bypass',
+      'No source','paid','google','legacy-request-1','legacy-execution-1',v.id);
+    raise exception 'Legacy MCP function created a new unsourced campaign';
+  exception when check_violation then null; end;
+  begin
+    perform public.mcp_campaign_execution('bot_marketing',o.client_id,'create',
+      p_name=>'Legacy bypass',p_brief=>'No source',
+      p_request_id=>'legacy-request-2',p_execution_id=>'legacy-execution-2');
+    raise exception 'Unversioned MCP function created a new unsourced campaign';
+  exception when check_violation then null; end;
   perform set_config('request.jwt.claim.role','authenticated',true);
   perform set_config('request.jwt.claims',
     '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);

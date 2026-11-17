@@ -144,6 +144,41 @@ routes["/internal/mcp/campaign/create-v6"] = {
   },
 };
 
+routes["/internal/mcp/campaign/create-v7"] = {
+  rpc: "mcp_campaign_create_v7",
+  kind: "queue",
+  parse(body) {
+    const client_id = uuidOf(body, "client_id");
+    const opportunity_id = uuidOf(body, "opportunity_id");
+    const offer_version_id = uuidOf(body, "offer_version_id");
+    const name = textOf(body, "name", 1, 200);
+    const direction = textOf(body, "brief", 1, 4000);
+    const acquisition_mode = body.acquisition_mode;
+    const paid_platform = body.paid_platform;
+    if (client_id === undefined || client_id === false
+      || opportunity_id === undefined || opportunity_id === false
+      || offer_version_id === undefined || offer_version_id === false
+      || name === undefined || name === false
+      || direction === undefined || direction === false
+      || (acquisition_mode !== "organic" && acquisition_mode !== "paid" && acquisition_mode !== "both")
+      || ((acquisition_mode === "paid" || acquisition_mode === "both")
+        && paid_platform !== "meta" && paid_platform !== "google")
+      || (acquisition_mode === "organic" && paid_platform !== undefined)
+      || !subset(body, ["client_id", "opportunity_id", "offer_version_id", "name",
+        "brief", "acquisition_mode", "paid_platform"])) return;
+    return {
+      p_bot_id: null,
+      p_client_id: client_id,
+      p_opportunity_id: opportunity_id,
+      p_offer_version_id: offer_version_id,
+      p_name: name,
+      p_direction: direction,
+      p_acquisition_mode: acquisition_mode,
+      p_paid_platform: acquisition_mode === "organic" ? null : paid_platform,
+    };
+  },
+};
+
 routes["/internal/mcp/campaign/list-v6"] = {
   rpc: "mcp_campaign_list_v6",
   kind: "read",

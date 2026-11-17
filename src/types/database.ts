@@ -40351,6 +40351,21 @@ export type Database = {
             }
             Returns: Json
           }
+      mcp_campaign_create_v7: {
+        Args: {
+          p_acquisition_mode: string
+          p_bot_id: string
+          p_client_id: string
+          p_direction: string
+          p_execution_id: string
+          p_name: string
+          p_offer_version_id: string
+          p_opportunity_id: string
+          p_paid_platform: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
       mcp_campaign_execution: {
         Args: {
           p_action: string

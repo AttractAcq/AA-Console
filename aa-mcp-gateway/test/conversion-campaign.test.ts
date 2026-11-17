@@ -186,6 +186,8 @@ test("campaign adapter routes Execution OS writes and readiness", async (t) => {
       brief: "New season",
       acquisition_mode: "paid",
       paid_platform: "meta",
+      opportunity_id: pageId,
+      offer_version_id: jobId,
       idempotency_key: "camp-create",
     })).status,
     "accepted",
@@ -205,7 +207,7 @@ test("campaign adapter routes Execution OS writes and readiness", async (t) => {
     })).status,
     "completed",
   );
-  assert.ok(seen.some((x) => x.path === "/internal/mcp/campaign/create-v6"));
+  assert.ok(seen.some((x) => x.path === "/internal/mcp/campaign/create-v7"));
   assert.ok(seen.some((x) => x.path === "/internal/mcp/campaign/list-v6"));
   assert.ok(seen.some((x) => x.path === "/internal/mcp/campaign/get-readiness"));
   assert.ok(seen.some((x) => x.path === "/internal/mcp/campaign/launch"));

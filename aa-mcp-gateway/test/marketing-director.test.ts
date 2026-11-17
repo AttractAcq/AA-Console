@@ -9,6 +9,7 @@ import { assertMarketingDiscovery, runMarketingGate, type MarketingFixtures } fr
 const id = (n: number) => `${String(n).padStart(8, "0")}-1111-4111-8111-111111111111`;
 const f: MarketingFixtures = {
   approved_safe_fixtures: true, client_id: id(1), campaign_id: id(2), ad_campaign_id: id(15),
+  approved_opportunity_id: id(19), signed_secondary_offer_version_id: id(20),
   generation_idea_id: id(3), revision_brief_id: id(4), pending_asset_id: id(5), approved_asset_id: id(6),
   page_id: id(16), finding_ids: [id(17)], revision_number: 1,
   denied_client_id: id(7), denied_task_id: id(8), denied_campaign_id: id(9), denied_asset_id: id(10),
