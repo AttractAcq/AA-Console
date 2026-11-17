@@ -16,6 +16,42 @@ select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
 select set_config('request.jwt.claims',
   '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+-- A reviewable package now requires the same signed opportunity and secondary
+-- offer lineage as a new commercial campaign. Keep this fixture on that path.
+do $source$
+declare o public.market_opportunities%rowtype;
+  offer public.service_offers%rowtype;
+  v public.service_offer_versions%rowtype;
+  main_offer_id uuid; approval_id uuid;
+begin
+  insert into public.market_opportunities(client_id,name,micro_market,buying_situation,
+    core_problem,desired_outcome,idempotency_key,confidence)
+  values('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Snapshot buyer',
+    'Homeowners with unused garages','Preparing for winter fitness',
+    'Their garage cannot be used for training','A private gym at home',
+    'snapshot-opportunity','conversation') returning * into o;
+  update public.market_opportunities set status='validated' where id=o.id;
+  insert into public.service_offers(client_id,kind,service_name)
+    values(o.client_id,'main','Garage conversion') returning id into main_offer_id;
+  insert into public.opportunity_links(opportunity_id,client_id,role,offer_id)
+    values(o.id,o.client_id,'offer',main_offer_id);
+  insert into public.opportunity_scores(opportunity_id,client_id,factors,total,classification)
+    values(o.id,o.client_id,'{}'::jsonb,72,'test');
+  insert into public.opportunity_awareness_stages(opportunity_id,client_id,stage,mindset,message)
+    values(o.id,o.client_id,'problem_aware','Winter is coming','Convert the garage');
+  approval_id:=public.request_opportunity_approval_v6(o.id);
+  perform public.approve_opportunity_v6(o.id,approval_id);
+  offer:=public.create_secondary_offer_v7(o.id);
+  v:=public.create_service_offer_version_v6(o.client_id,'Snapshot offer',
+    'Homeowners with unused garages','A garage ready for training',
+    array['Insulation'],array['Gym equipment'],null,null,null,'[]'::jsonb,
+    'snapshot-offer-version',offer.id);
+  perform public.approve_service_offer_version_v6(v.id);
+  insert into public.opportunity_links(opportunity_id,client_id,role,campaign_id)
+    values(o.id,o.client_id,'campaign','cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+  update public.client_campaigns set offer_version_id=v.id
+    where id='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+end $source$;
 select public.set_campaign_content_spec_v7('cccccccc-cccc-4ccc-8ccc-cccccccccccc',
   '[{"route":"organic","platform":"instagram","media_type":"image","content_format":"single"}]'::jsonb);
 select public.approve_campaign_plan_v6('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
