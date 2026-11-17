@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Search } from "lucide-react";
 
 import { Button } from "../../components/Button";
@@ -15,11 +15,11 @@ import {
   createCampaignFromOpportunity,
   acceptScoreProposal, fetchOpenProposals, rejectProposal,
   requestEvaluation, requestStrategy,
-  fetchOpportunities, fetchOpportunityApprovalStates, fetchOpportunityActivationStates,
+  fetchOpportunities, fetchOpportunityOutputs, fetchOpportunityApprovalStates, fetchOpportunityActivationStates,
   fetchReadiness, fetchScoreFactors, requireProof, scoreOpportunity,
   fetchStageTemplates, setStageTemplate, requestOpportunityApproval, requestOpportunityActivation,
   setAttributes, setAwarenessStage, setConfidence, setFields, setStatus,
-  type Opportunity, type OpportunityConfidence, type OpportunityProposal,
+  type Opportunity, type OpportunityConfidence, type OpportunityOutputs, type OpportunityProposal,
   type Readiness, type ScoreFactor,
   type StageTemplateCandidate,
 } from "../../lib/opportunities";
@@ -62,6 +62,8 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
   const [activationStates, setActivationStates] = useState<ReadonlyMap<string, string>>(new Map());
   const [factors, setFactors] = useState<ScoreFactor[]>([]);
   const [proposals, setProposals] = useState<OpportunityProposal[]>([]);
+  const [outputs, setOutputs] = useState<ReadonlyMap<string, OpportunityOutputs>>(new Map());
+  const [outputsError, setOutputsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +77,13 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
       setLoading(false);
       return;
     }
+    const outputsPromise = fetchOpportunityOutputs(clientId).then(
+      (value) => ({ value, error: null }),
+      (cause) => ({
+        value: new Map<string, OpportunityOutputs>(),
+        error: cause instanceof Error ? cause.message : "Linked work could not be loaded.",
+      }),
+    );
     try {
       const [list, approvals, activations, ready, scoring, open] = await Promise.all([
         fetchOpportunities(clientId), fetchOpportunityApprovalStates(clientId),
@@ -87,6 +96,9 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
       setReadiness(ready);
       setFactors(scoring);
       setProposals(open);
+      const linked = await outputsPromise;
+      setOutputs(linked.value);
+      setOutputsError(linked.error);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not load opportunities.");
@@ -199,6 +211,14 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
               </button>
             ))}
           </div>
+          {clientId && (
+            <LinkedWork
+              clientId={clientId}
+              outputs={outputs.get(selected.id)}
+              error={outputsError}
+              loading={loading}
+            />
+          )}
           {detailStage === "activate" && (
             <ActivationDetail
               opportunity={selected}
@@ -379,6 +399,65 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
         }}
       />
     </div>
+  );
+}
+
+function LinkedWork({
+  clientId, outputs, error, loading,
+}: {
+  clientId: string;
+  outputs: OpportunityOutputs | undefined;
+  error: string | null;
+  loading: boolean;
+}) {
+  return (
+    <section aria-label="Linked work" className="rounded-lg border border-border p-4">
+      <h3 className="font-semibold">Linked work</h3>
+      {error ? (
+        <p role="alert" className="mt-2 text-sm text-destructive">Links unavailable: {error}</p>
+      ) : loading ? (
+        <p className="mt-2 text-sm text-muted-foreground">Loading linked work…</p>
+      ) : !outputs || (outputs.offers.length === 0 && outputs.campaigns.length === 0) ? (
+        <p className="mt-2 text-sm text-muted-foreground">No linked offers or campaigns yet.</p>
+      ) : (
+        <div className="mt-2 grid gap-3 text-sm sm:grid-cols-2">
+          <div>
+            <h4 className="text-muted-foreground">Offers</h4>
+            {outputs.offers.length === 0 ? <p>None linked</p> : (
+              <ul className="space-y-1">
+                {outputs.offers.map((offer) => (
+                  <li key={offer.id}>
+                    <Link className="text-brand-strong underline" to={`/clients/${clientId}/delivery/offer-studio?offer=${offer.id}`}>
+                      {offer.name}
+                    </Link>
+                    <span className="ml-2 text-muted-foreground">{offer.kind}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h4 className="text-muted-foreground">Campaigns</h4>
+            {outputs.campaigns.length === 0 ? <p>None linked</p> : (
+              <ul className="space-y-1">
+                {outputs.campaigns.map((campaign) => (
+                  <li key={campaign.id}>
+                    {campaign.archived ? campaign.name : (
+                      <Link className="text-brand-strong underline" to={`/clients/${clientId}/delivery/campaign-factory/${campaign.id}`}>
+                        {campaign.name}
+                      </Link>
+                    )}
+                    <span className="ml-2 text-muted-foreground">
+                      {campaign.archived ? "archived" : campaign.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

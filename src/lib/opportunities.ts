@@ -101,6 +101,47 @@ export async function fetchOpportunities(clientId: string): Promise<Opportunity[
   return (data ?? []) as unknown as Opportunity[];
 }
 
+export interface OpportunityOutputs {
+  offers: Array<{ id: string; name: string; kind: string }>;
+  campaigns: Array<{ id: string; name: string; status: string; archived: boolean }>;
+}
+
+/** Client-scoped references made from an opportunity, including archived campaigns. */
+export async function fetchOpportunityOutputs(clientId: string): Promise<Map<string, OpportunityOutputs>> {
+  const [linksResult, offersResult, campaignsResult] = await Promise.all([
+    supabase.from("opportunity_links")
+      .select("opportunity_id,role,offer_id,campaign_id").eq("client_id", clientId),
+    supabase.from("service_offers")
+      .select("id,service_name,kind").eq("client_id", clientId),
+    supabase.from("client_campaigns")
+      .select("id,name,status,archived_at").eq("client_id", clientId),
+  ]);
+  const error = linksResult.error ?? offersResult.error ?? campaignsResult.error;
+  if (error) throw new Error(error.message);
+
+  const offers = new Map((offersResult.data ?? []).map((offer) => [offer.id, offer]));
+  const campaigns = new Map((campaignsResult.data ?? []).map((campaign) => [campaign.id, campaign]));
+  const outputs = new Map<string, OpportunityOutputs>();
+  for (const link of linksResult.data ?? []) {
+    if (link.role !== "offer" && link.role !== "campaign") continue;
+    const current = outputs.get(link.opportunity_id) ?? { offers: [], campaigns: [] };
+    if (link.role === "offer" && link.offer_id) {
+      const offer = offers.get(link.offer_id);
+      if (!offer) throw new Error("A linked offer could not be read.");
+      current.offers.push({ id: offer.id, name: offer.service_name, kind: offer.kind });
+    } else if (link.role === "campaign" && link.campaign_id) {
+      const campaign = campaigns.get(link.campaign_id);
+      if (!campaign) throw new Error("A linked campaign could not be read.");
+      current.campaigns.push({
+        id: campaign.id, name: campaign.name, status: campaign.status,
+        archived: campaign.archived_at !== null,
+      });
+    }
+    outputs.set(link.opportunity_id, current);
+  }
+  return outputs;
+}
+
 export async function fetchOpportunityApprovalStates(clientId: string): Promise<Map<string, string>> {
   const { data, error } = await supabase.from("opportunity_approval_state_v6")
     .select("opportunity_id,approval_state")

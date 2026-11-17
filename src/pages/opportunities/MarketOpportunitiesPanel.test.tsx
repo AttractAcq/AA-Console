@@ -20,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const {
   createCampaignFromOpportunity,
   fetchOpportunities,
+  fetchOpportunityOutputs,
   fetchReadiness,
   fetchOpportunityApprovalStates,
   fetchOpportunityActivationStates,
@@ -35,6 +36,7 @@ const {
 } = vi.hoisted(() => ({
   createCampaignFromOpportunity: vi.fn(),
   fetchOpportunities: vi.fn(),
+  fetchOpportunityOutputs: vi.fn(),
   fetchReadiness: vi.fn(),
   fetchOpportunityApprovalStates: vi.fn(),
   fetchOpportunityActivationStates: vi.fn(),
@@ -58,6 +60,7 @@ vi.mock("../../lib/opportunities", async () => {
     ...actual,
     createCampaignFromOpportunity,
     fetchOpportunities,
+    fetchOpportunityOutputs,
     fetchReadiness,
     fetchOpportunityApprovalStates,
     fetchOpportunityActivationStates,
@@ -121,6 +124,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   search.value = "";
   fetchOpportunities.mockResolvedValue([opportunity()]);
+  fetchOpportunityOutputs.mockResolvedValue(new Map());
   fetchReadiness.mockResolvedValue(readiness());
   fetchOpportunityApprovalStates.mockResolvedValue(new Map([["opp-1", "current"]]));
   fetchOpportunityActivationStates.mockResolvedValue(new Map([["opp-1", "current"]]));
@@ -134,6 +138,28 @@ beforeEach(() => {
 });
 
 describe("single-page opportunity flow", () => {
+  it("shows linked offers and campaigns on the selected record", async () => {
+    search.value = "opportunity=opp-1";
+    fetchOpportunityOutputs.mockResolvedValue(new Map([["opp-1", {
+      offers: [{ id: "offer-1", name: "Garage Refit", kind: "secondary" }],
+      campaigns: [{ id: "campaign-1", name: "Winter Refit", status: "planning", archived: false }],
+    }]]));
+    render(<MarketOpportunitiesPanel />);
+    const linked = await screen.findByRole("region", { name: "Linked work" });
+    expect(within(linked).getByRole("link", { name: "Garage Refit" }))
+      .toHaveAttribute("href", "/clients/client-1/delivery/offer-studio?offer=offer-1");
+    expect(within(linked).getByRole("link", { name: "Winter Refit" }))
+      .toHaveAttribute("href", "/clients/client-1/delivery/campaign-factory/campaign-1");
+  });
+
+  it("shows an unavailable state when linked work cannot be read", async () => {
+    search.value = "opportunity=opp-1";
+    fetchOpportunityOutputs.mockRejectedValue(new Error("permission denied"));
+    render(<MarketOpportunitiesPanel />);
+    expect(await screen.findByRole("alert", { name: "" })).toHaveTextContent("Links unavailable: permission denied");
+    expect(screen.queryByText("No linked offers or campaigns yet.")).not.toBeInTheDocument();
+  });
+
   it("searches buying situations and filters opportunity status", async () => {
     fetchOpportunities.mockResolvedValue([
       opportunity(),
