@@ -3,7 +3,7 @@
  * catalog configuration only. A matching row says nothing about whether the
  * job ran, succeeded, found work, or respected an external-action gate.
  */
-export const CRON_REGISTRY_HEAD = "20261030160000";
+export const CRON_REGISTRY_HEAD = "20261124034600";
 
 export const EXPECTED_CRON_SCHEDULES: Readonly<Record<string, string>> = Object.freeze({
   "metrics-ingest-daily": "15 3 * * *",
@@ -24,6 +24,10 @@ export const EXPECTED_CRON_SCHEDULES: Readonly<Record<string, string>> = Object.
   "nurture-sequence-sweep": "*/15 * * * *",
   "profile-update-sweep": "5,35 * * * *",
   "prune-runtime-heartbeats": "*/15 * * * *",
+  "prune-public-route-quota": "17 * * * *",
+  "prune-public-ingress-nonces": "* * * * *",
+  "mark-stale-sales-runtime-reservations": "*/5 * * * *",
+  "organic-package-sweep-v6": "*/10 * * * *",
 });
 
 export type CronCatalogJob = { name: string; schedule: string; active: boolean };

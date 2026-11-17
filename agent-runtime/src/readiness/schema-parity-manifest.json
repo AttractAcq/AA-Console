@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "f6ce7191c1fd6cc0396efc2541da8aa400b7403bb530072115989656cf1d6f41",
-  "generatedTypesSha256": "1ad74407b29c14f30c6b7d87f0c53a5a5155f30b5c425a7aea726d5fe4b91635",
-  "generatedSchemaBodySha256": "d869783ae25e006d556a0c42e01b05783543683fcac614b23c34f54e1b6f1be6",
+  "migrationSourceDigest": "df15e77ee8e5a07861c76eb610c1937794fac822f5e5e363bfa2e85afdc5b32b",
+  "generatedTypesSha256": "6e2a64d2039ad487dead532cf66a55213f8b611b9894eef9c41623bfd2a11d19",
+  "generatedSchemaBodySha256": "240935ccb040138f2b1e007627938957367c7691778b65defc4653cb75cf5425",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3972,6 +3972,13 @@
       "filename": "20261124034500_550_route_capture_lineage.sql",
       "sha256": "4621b74786949bc2f442d247dd4f0901e19b717e7e0a482f1dc20649fe8e7895",
       "trimmedMd5": "046611b3d38975f6de83203ae5eaf30b"
+    },
+    {
+      "version": "20261124034600",
+      "name": "551_scoped_delivery_read_paths",
+      "filename": "20261124034600_551_scoped_delivery_read_paths.sql",
+      "sha256": "8392de5f68f9dc14c1aa902c88b9c78fcc0b3a8f2ad1c4a6124039eed4d240d5",
+      "trimmedMd5": "2a5c2fa9bdf6e50a4cdbddc1c4663a1a"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

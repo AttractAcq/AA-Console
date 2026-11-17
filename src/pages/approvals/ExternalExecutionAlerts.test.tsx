@@ -8,15 +8,12 @@ const clientFilters: string[] = [];
 let failRead = false;
 vi.mock("../../lib/supabase", () => ({
   supabase: {
-    from: (table: string) => {
-      if (table !== "client_external_outcomes_v6") throw new Error(`Unexpected source ${table}`);
+    rpc: (name: string, args: { p_client_id: string | null }) => {
+      if (name !== "list_client_external_outcomes_v6") throw new Error(`Unexpected source ${name}`);
+      if (args.p_client_id) clientFilters.push(args.p_client_id);
       const query = {
         select: () => query,
         in: () => query,
-        eq: (column: string, value: string) => {
-          if (column === "client_id") clientFilters.push(value);
-          return query;
-        },
         order: () => query,
         limit: async () => failRead ? { data: null, error: { message: "read denied" } } : ({ data: [
           { outcome_id: "a", client_id: "client-1", source_kind: "google_review_reply",
