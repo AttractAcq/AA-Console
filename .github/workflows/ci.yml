@@ -30,6 +30,8 @@ jobs:
         env:
           AA_SCHEMA_EVIDENCE_DIR: schema-replay-evidence
           AA_SCHEMA_REPLAY_RAW_SOURCE: '1'
+          AA_SCHEMA_PHASE3_SMOKES: '1'
+          AA_SCHEMA_PHASE4_SMOKES: '1'
           AA_SCHEMA_PHASE8_SMOKES: '1'
         run: bash scripts/schema-replay-ci.sh
       - uses: actions/upload-artifact@v4

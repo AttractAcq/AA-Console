@@ -18,6 +18,7 @@ declare o public.market_opportunities%rowtype;
   main_offer_id uuid;
   v public.service_offer_versions%rowtype;
   compiled public.service_offer_versions%rowtype;
+  campaign public.client_campaigns%rowtype;
   approval_id uuid; request_id uuid; h text; job_id uuid;
 begin
   insert into public.market_opportunities(client_id,name,micro_market,buying_situation,
@@ -61,6 +62,11 @@ begin
   perform public.approve_service_offer_version_v6(v.id);
   if not exists(select 1 from public.service_offer_signoffs where offer_version_id=v.id)
     then raise exception 'Offer approval did not sign off exact version'; end if;
+  campaign := public.create_campaign_from_opportunity_v6(o.id,'organic');
+  if campaign.offer_version_id is distinct from v.id
+    or public.campaign_package_readiness_v7(campaign.id)->'blockers' @>
+      '["The selected offer source changed; review a current offer before preparing this package."]'::jsonb
+    then raise exception 'A current sourced offer did not bind cleanly to campaign preparation'; end if;
   insert into public.agent_jobs(agent_key,client_id,status,completed_at)
     values('offer_strategy',o.client_id,'completed',now());
   job_id := public.request_offer_compile_v6(o.client_id,'secondary','micro_niche',o.id);
@@ -82,6 +88,9 @@ begin
     or public.secondary_offer_source_current_v7(offer.id)
     or public.service_offer_source_state_v6(request_id)<>'source_held' then
     raise exception 'Changed evidence did not hold the secondary offer'; end if;
+  if not (public.campaign_package_readiness_v7(campaign.id)->'blockers' @>
+      '["The selected offer source changed; review a current offer before preparing this package."]'::jsonb)
+    then raise exception 'Changed opportunity evidence left campaign package reviewable'; end if;
   begin
     perform public.request_offer_compile_v6(o.client_id,'secondary','micro_niche',o.id);
     raise exception 'Stale opportunity queued an offer compiler';
