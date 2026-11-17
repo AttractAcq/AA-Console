@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   createCampaignFromOpportunity,
+  fetchOpportunityOfferVersions,
   fetchOpportunities,
   fetchOpportunityOutputs,
   fetchReadiness,
@@ -35,6 +36,7 @@ const {
   rpc,
 } = vi.hoisted(() => ({
   createCampaignFromOpportunity: vi.fn(),
+  fetchOpportunityOfferVersions: vi.fn(),
   fetchOpportunities: vi.fn(),
   fetchOpportunityOutputs: vi.fn(),
   fetchReadiness: vi.fn(),
@@ -59,6 +61,7 @@ vi.mock("../../lib/opportunities", async () => {
   return {
     ...actual,
     createCampaignFromOpportunity,
+    fetchOpportunityOfferVersions,
     fetchOpportunities,
     fetchOpportunityOutputs,
     fetchReadiness,
@@ -129,6 +132,7 @@ beforeEach(() => {
   fetchOpportunityApprovalStates.mockResolvedValue(new Map([["opp-1", "current"]]));
   fetchOpportunityActivationStates.mockResolvedValue(new Map([["opp-1", "current"]]));
   createCampaignFromOpportunity.mockResolvedValue({ id: "camp-1", name: "Garage-to-Gym Conversion" });
+  fetchOpportunityOfferVersions.mockResolvedValue([{ id: "version-1", label: "Garage v1" }]);
   fetchOpenProposals.mockResolvedValue([]);
   acceptScoreProposal.mockResolvedValue(undefined);
   rejectProposal.mockResolvedValue(undefined);
@@ -304,12 +308,14 @@ describe("creating the campaign", () => {
       await screen.findByText(/choice is fixed after creation/),
     ).toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText(/Route/), "paid");
+    await user.selectOptions(await screen.findByLabelText(/Approved secondary offer version/), "version-1");
     await user.selectOptions(screen.getByLabelText(/Paid platform/), "meta");
     await user.click(screen.getByRole("button", { name: "Create and plan" }));
 
     await waitFor(() =>
       expect(createCampaignFromOpportunity).toHaveBeenCalledWith({
         opportunityId: "opp-1",
+        offerVersionId: "version-1",
         acquisitionMode: "paid",
         paidPlatform: "meta",
         name: "",
@@ -338,12 +344,14 @@ describe("creating the campaign", () => {
     await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
 
     await user.selectOptions(screen.getByLabelText(/Route/), "both");
+    await user.selectOptions(await screen.findByLabelText(/Approved secondary offer version/), "version-1");
     await user.selectOptions(screen.getByLabelText(/Paid platform/), "google");
     await user.click(screen.getByRole("button", { name: "Create and plan" }));
 
     await waitFor(() =>
       expect(createCampaignFromOpportunity).toHaveBeenCalledWith({
         opportunityId: "opp-1",
+        offerVersionId: "version-1",
         acquisitionMode: "both",
         paidPlatform: "google",
         name: "",
@@ -357,6 +365,7 @@ describe("creating the campaign", () => {
     const user = userEvent.setup();
     await openActions();
     await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
+    await user.selectOptions(await screen.findByLabelText(/Approved secondary offer version/), "version-1");
     await user.selectOptions(screen.getByLabelText(/Route/), "both");
     await user.click(screen.getByRole("button", { name: "Create and plan" }));
 
@@ -364,10 +373,23 @@ describe("creating the campaign", () => {
     expect(createCampaignFromOpportunity).not.toHaveBeenCalled();
   });
 
+  it("holds campaign creation when this opportunity has no signed secondary offer", async () => {
+    fetchOpportunityOfferVersions.mockResolvedValue([]);
+    const user = userEvent.setup();
+    await openActions();
+    await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
+    await user.selectOptions(screen.getByLabelText(/Route/), "organic");
+    await user.click(screen.getByRole("button", { name: "Create and plan" }));
+    expect(await screen.findByText(/No signed secondary offer version/)).toBeInTheDocument();
+    expect(createCampaignFromOpportunity).not.toHaveBeenCalled();
+    expect(enqueueAgentJob).not.toHaveBeenCalled();
+  });
+
   it("asks for a platform before letting a paid campaign through", async () => {
     const user = userEvent.setup();
     await openActions();
     await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
+    await user.selectOptions(await screen.findByLabelText(/Approved secondary offer version/), "version-1");
     await user.selectOptions(screen.getByLabelText(/Route/), "paid");
     await user.click(screen.getByRole("button", { name: "Create and plan" }));
 
@@ -382,6 +404,7 @@ describe("creating the campaign", () => {
     );
     await openActions();
     await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
+    await user.selectOptions(await screen.findByLabelText(/Approved secondary offer version/), "version-1");
     await user.selectOptions(screen.getByLabelText(/Route/), "organic");
     await user.click(screen.getByRole("button", { name: "Create and plan" }));
 

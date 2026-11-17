@@ -13,6 +13,7 @@ import { dayOrDash } from "../../lib/contentRecords";
 import {
   ATTRIBUTE_KINDS, AWARENESS_STAGES, CLASSIFICATION_HINT, CONFIDENCE_LEVELS,
   createCampaignFromOpportunity,
+  fetchOpportunityOfferVersions,
   acceptScoreProposal, fetchOpenProposals, rejectProposal,
   requestEvaluation, requestStrategy,
   fetchOpportunities, fetchOpportunityOutputs, fetchOpportunityApprovalStates, fetchOpportunityActivationStates,
@@ -71,6 +72,21 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
   const [discovering, setDiscovering] = useState(false);
   /** The opportunity a campaign is being created from, if any. */
   const [building, setBuilding] = useState<Opportunity | null>(null);
+  const [campaignOffers, setCampaignOffers] = useState<Array<{ id: string; label: string }>>([]);
+  const [campaignOffersError, setCampaignOffersError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!clientId || !building) return;
+    let cancelled = false;
+    setCampaignOffers([]);
+    setCampaignOffersError(null);
+    void fetchOpportunityOfferVersions(clientId, building.id).then((choices) => {
+      if (!cancelled) setCampaignOffers(choices);
+    }).catch((cause) => {
+      if (!cancelled) setCampaignOffersError(cause instanceof Error ? cause.message : "Offer versions could not be loaded.");
+    });
+    return () => { cancelled = true; };
+  }, [clientId, building]);
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -335,8 +351,13 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
         onClose={() => setBuilding(null)}
         title={building ? `Create a campaign for ${building.name}` : "Create a campaign"}
         submitLabel="Create and plan"
-        intro="The campaign takes this opportunity's problem, outcome, trigger, positioning and objections as its brief, and binds the approved offer it is linked to. Choose organic, paid or both routes; the choice is fixed after creation. Planning runs straight after."
+        intro="The campaign takes this opportunity's problem, outcome, trigger, positioning and objections as its brief. Select its signed secondary offer version and choose organic, paid or both routes; the choice is fixed after creation. Planning runs after creation."
         fields={[
+          {
+            name: "offer_version_id", label: "Approved secondary offer version", kind: "select", required: true,
+            options: campaignOffers.map((offer) => ({ value: offer.id, label: offer.label })),
+            hint: "Create and approve a secondary offer from this opportunity before planning a campaign.",
+          },
           {
             name: "acquisition_mode", label: "Route", kind: "select", required: true,
             options: [
@@ -363,8 +384,13 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
             hint: "Left blank, it takes the opportunity's name.",
           },
         ]}
+        extra={campaignOffersError ? <p role="alert">Offer versions unavailable: {campaignOffersError}</p>
+          : campaignOffers.length === 0 ? <p>No signed secondary offer version is linked to this opportunity yet.</p> : null}
         onSubmit={async (values) => {
           if (!building) throw new Error("No opportunity selected.");
+          if (campaignOffersError) throw new Error("Offer versions could not be loaded.");
+          if (!campaignOffers.some((offer) => offer.id === values.offer_version_id))
+            throw new Error("Choose a signed secondary offer version linked to this opportunity.");
           // Read the choice rather than collapsing anything that is not "paid"
           // into "organic". That collapse predates 'both' and would have
           // silently created an organic campaign for someone who asked for
@@ -379,6 +405,7 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
           }
           const campaign = await createCampaignFromOpportunity({
             opportunityId: building.id,
+            offerVersionId: values.offer_version_id as string,
             acquisitionMode: mode,
             paidPlatform: needsPlatform ? platform : null,
             name: typeof values.name === "string" ? values.name : null,

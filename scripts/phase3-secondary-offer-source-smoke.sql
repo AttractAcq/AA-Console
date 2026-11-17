@@ -15,8 +15,10 @@ select set_config('request.jwt.claims',
 do $checks$
 declare o public.market_opportunities%rowtype;
   offer public.service_offers%rowtype;
+  other_offer public.service_offers%rowtype;
   main_offer_id uuid;
   v public.service_offer_versions%rowtype;
+  other_version public.service_offer_versions%rowtype;
   compiled public.service_offer_versions%rowtype;
   campaign public.client_campaigns%rowtype;
   approval_id uuid; request_id uuid; h text; job_id uuid;
@@ -62,7 +64,22 @@ begin
   perform public.approve_service_offer_version_v6(v.id);
   if not exists(select 1 from public.service_offer_signoffs where offer_version_id=v.id)
     then raise exception 'Offer approval did not sign off exact version'; end if;
-  campaign := public.create_campaign_from_opportunity_v6(o.id,'organic');
+  other_offer := public.create_secondary_offer_v7(o.id);
+  other_version := public.create_service_offer_version_v6(o.client_id,'New secondary offer',
+    'Homeowners with unused garages','A second garage offer',
+    array['Insulation'],array['Gym equipment'],null,null,null,'[]'::jsonb,
+    'secondary-offer-other-version',other_offer.id);
+  perform public.approve_service_offer_version_v6(other_version.id);
+  begin
+    perform public.create_campaign_from_opportunity_v7(o.id,null,'organic');
+    raise exception 'Campaign creator accepted a missing exact offer version';
+  exception when check_violation then null; end;
+  begin
+    perform public.create_campaign_from_opportunity_v7(
+      o.id,'ffffffff-ffff-4fff-8fff-ffffffffffff','organic');
+    raise exception 'Campaign creator accepted an unlinked offer version';
+  exception when check_violation then null; end;
+  campaign := public.create_campaign_from_opportunity_v7(o.id,v.id,'organic');
   if campaign.offer_version_id is distinct from v.id
     or public.campaign_package_readiness_v7(campaign.id)->'blockers' @>
       '["The selected offer source changed; review a current offer before preparing this package."]'::jsonb
@@ -91,6 +108,10 @@ begin
   if not (public.campaign_package_readiness_v7(campaign.id)->'blockers' @>
       '["The selected offer source changed; review a current offer before preparing this package."]'::jsonb)
     then raise exception 'Changed opportunity evidence left campaign package reviewable'; end if;
+  begin
+    perform public.create_campaign_from_opportunity_v7(o.id,v.id,'paid','meta');
+    raise exception 'Campaign creator accepted stale opportunity and offer evidence';
+  exception when check_violation then null; end;
   begin
     perform public.request_offer_compile_v6(o.client_id,'secondary','micro_niche',o.id);
     raise exception 'Stale opportunity queued an offer compiler';

@@ -106,6 +106,34 @@ export interface OpportunityOutputs {
   campaigns: Array<{ id: string; name: string; status: string; archived: boolean }>;
 }
 
+/** Candidate signed secondary versions; the creation RPC rechecks source currency. */
+export async function fetchOpportunityOfferVersions(clientId: string, opportunityId: string): Promise<Array<{ id: string; label: string }>> {
+  const [links, offers, versions, signoffs] = await Promise.all([
+    supabase.from("opportunity_links").select("offer_id")
+      .eq("client_id", clientId).eq("opportunity_id", opportunityId).eq("role", "offer"),
+    supabase.from("service_offers").select("id,service_name,kind").eq("client_id", clientId),
+    supabase.from("service_offer_versions").select("id,offer_id,version,promise").eq("client_id", clientId),
+    supabase.from("service_offer_signoffs").select("offer_version_id").eq("client_id", clientId),
+  ]);
+  const error = links.error ?? offers.error ?? versions.error ?? signoffs.error;
+  if (error) throw new Error(error.message);
+  const linked = new Set((links.data ?? []).map((row) => row.offer_id));
+  const names = new Map((offers.data ?? [])
+    .filter((offer) => offer.kind === "secondary" && linked.has(offer.id))
+    .map((offer) => [offer.id, offer.service_name]));
+  const latest = new Map<string, number>();
+  for (const version of versions.data ?? []) {
+    if (names.has(version.offer_id)) latest.set(version.offer_id,
+      Math.max(latest.get(version.offer_id) ?? 0, version.version));
+  }
+  const signed = new Set((signoffs.data ?? []).map((row) => row.offer_version_id));
+  return (versions.data ?? [])
+    .filter((version) => names.has(version.offer_id) && signed.has(version.id)
+      && version.version === latest.get(version.offer_id))
+    .map((version) => ({ id: version.id,
+      label: `${names.get(version.offer_id)} v${version.version} · ${version.promise.slice(0, 90)}` }));
+}
+
 /** Client-scoped references made from an opportunity, including archived campaigns. */
 export async function fetchOpportunityOutputs(clientId: string): Promise<Map<string, OpportunityOutputs>> {
   const [linksResult, offersResult, campaignsResult] = await Promise.all([
@@ -284,11 +312,10 @@ export const CLASSIFICATION_HINT: Record<string, string> = {
 /**
  * Create one campaign from this opportunity, on one route.
  *
- * The reasoning, the linked offer version and the link back are the
- * database's to assemble: migration 232 composes the brief from the
- * opportunity's own fields so that every caller gets the same brief from the
- * same opportunity, and re-reads readiness rather than trusting the approval
- * that happened weeks ago.
+ * The reasoning and link back are the database's to assemble. The v7 writer
+ * binds the selected, signed secondary offer version and composes the brief
+ * from the opportunity's current fields. It re-reads approval and readiness
+ * rather than trusting an earlier screen load.
  *
  * It deliberately does not plan the campaign. Planning is a job with a cost,
  * and the caller queues it in the same breath it would for a hand-made
@@ -296,12 +323,14 @@ export const CLASSIFICATION_HINT: Record<string, string> = {
  */
 export async function createCampaignFromOpportunity(args: {
   opportunityId: string;
+  offerVersionId: string;
   acquisitionMode: "organic" | "paid" | "both";
   paidPlatform?: "meta" | "google" | null;
   name?: string | null;
 }): Promise<{ id: string; name: string }> {
-  const { data, error } = await supabase.rpc("create_campaign_from_opportunity_v6", {
+  const { data, error } = await supabase.rpc("create_campaign_from_opportunity_v7", {
     p_opportunity_id: args.opportunityId,
+    p_offer_version_id: args.offerVersionId,
     p_acquisition_mode: args.acquisitionMode,
     // Both optional arguments are left out rather than passed as null. They
     // default to null in SQL, and the generated type says optional rather
