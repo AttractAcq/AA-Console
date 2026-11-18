@@ -72,7 +72,7 @@ export async function handlePublicProof(
     }
     const { data: config, error: ce } = await sb
       .from("proof_capture_configs")
-      .select("name,instructions")
+      .select("id")
       .eq("id", link.config_id)
       .eq("client_id", link.client_id)
       .maybeSingle();
@@ -81,12 +81,21 @@ export async function handlePublicProof(
       json(404, { error: "Capture link unavailable." });
       return;
     }
+    const snapshot = link.config_snapshot as { name?: unknown; instructions?: unknown } | null;
+    if (!snapshot || typeof snapshot.name !== "string" || !snapshot.name.trim()
+      || typeof snapshot.instructions !== "string"
+      || (link.config_snapshot_origin !== "created_with_link"
+        && link.config_snapshot_origin !== "backfilled_current_config")) {
+      json(404, { error: "Capture link unavailable." });
+      return;
+    }
     if (req.url === "/public/proof/config") {
       if (link.submissions >= link.max_submissions) {
         json(410, { error: "This capture link has already been completed." });
         return;
       }
-      json(200, { ok: true, ...config, categories: PROOF_CATEGORIES });
+      json(200, { ok: true, name: snapshot.name,
+        instructions: snapshot.instructions, categories: PROOF_CATEGORIES });
       return;
     }
     const body = await readJsonBody(req, 36 * 1024 * 1024);

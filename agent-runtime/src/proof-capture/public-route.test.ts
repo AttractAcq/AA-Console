@@ -34,7 +34,7 @@ async function run(
   await handlePublicProof(req, res, sb, config);
   return result;
 }
-function database(revoked = false) {
+function database(revoked = false, origin = "created_with_link") {
   const lookup = vi.fn();
   const rpc = vi.fn(async (name: string) => ({ data: name === "admit_public_route_v6" ? true : "proof", error: null }));
   return {
@@ -60,9 +60,11 @@ function database(revoked = false) {
                     revoked_at: revoked ? "now" : null,
                     submissions: 0,
                     max_submissions: 1,
+                    config_snapshot: { name: "Shared instructions", instructions: "Original evidence only" },
+                    config_snapshot_origin: origin,
                   }
                 : table === "proof_capture_configs"
-                  ? { name: "Evidence", instructions: "Actual results only" }
+                  ? { id: "config", name: "Changed later", instructions: "Changed instructions" }
                   : null,
           }),
         };
@@ -101,7 +103,11 @@ it("checks the shared quota before link lookup or large body parsing", async () 
 });
 it("looks up hash and scopes setup to link client", async () => {
   const { sb, lookup } = database();
-  expect((await run("/public/proof/config", {}, sb)).status).toBe(200);
+  const response = await run("/public/proof/config", {}, sb);
+  expect(response.status).toBe(200);
+  expect(JSON.parse(response.body)).toEqual(expect.objectContaining({
+    name: "Shared instructions", instructions: "Original evidence only",
+  }));
   expect(lookup).toHaveBeenCalledWith(
     "proof_capture_links",
     "token_hash",
@@ -112,6 +118,17 @@ it("looks up hash and scopes setup to link client", async () => {
     "client_id",
     "client",
   );
+});
+it("serves the frozen setup for a historically backfilled link", async () => {
+  const { sb } = database(false, "backfilled_current_config");
+  const response = await run("/public/proof/config", {}, sb);
+  expect(response.status).toBe(200);
+  expect(JSON.parse(response.body).instructions).toBe("Original evidence only");
+});
+it("holds a link without a recognized source snapshot", async () => {
+  const { sb } = database(false, "unknown");
+  const response = await run("/public/proof/config", {}, sb);
+  expect(response.status).toBe(404);
 });
 it("requires consent then persists through atomic RPC", async () => {
   const { sb, rpc } = database();

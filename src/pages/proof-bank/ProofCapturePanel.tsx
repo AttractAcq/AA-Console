@@ -130,6 +130,7 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
                 ? "Verify the service result and record specific customer consent above, then prepare a bound request. Every request needs exact Inbox approval before delivery."
               : "Create a private capture link for this setup. Submissions enter Raw for review and permission clearance. A website can link to the capture portal."}
           </p>
+          <p className="text-xs text-muted-foreground">Editing a setup changes future links. Existing links keep the method and instructions recorded when they were created.</p>
           {current.configs
             .filter((c) => c.method === method.id)
             .map((c) => (

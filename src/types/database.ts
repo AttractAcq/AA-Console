@@ -24215,6 +24215,9 @@ export type Database = {
         Row: {
           client_id: string
           config_id: string
+          config_snapshot: Json
+          config_snapshot_hash: string
+          config_snapshot_origin: string
           created_at: string
           created_by: string | null
           expires_at: string
@@ -24227,6 +24230,9 @@ export type Database = {
         Insert: {
           client_id: string
           config_id: string
+          config_snapshot?: Json
+          config_snapshot_hash?: string
+          config_snapshot_origin?: string
           created_at?: string
           created_by?: string | null
           expires_at: string
@@ -24239,6 +24245,9 @@ export type Database = {
         Update: {
           client_id?: string
           config_id?: string
+          config_snapshot?: Json
+          config_snapshot_hash?: string
+          config_snapshot_origin?: string
           created_at?: string
           created_by?: string | null
           expires_at?: string
