@@ -285,6 +285,14 @@ export async function runOpportunityStrategiseJob(
     return { ok: false, retryable: false, failureMessage: "That opportunity belongs to another client." };
   }
 
+  const { data: inputHash, error: inputHashError } = await sb.rpc(
+    "opportunity_strategy_input_hash_v7", { p_opportunity_id: job.input_id },
+  );
+  if (inputHashError) throw new Error(`Strategy input snapshot failed: ${inputHashError.message}`);
+  if (typeof inputHash !== "string" || !/^[0-9a-f]{64}$/.test(inputHash)) {
+    return { ok: false, retryable: false, failureMessage: "Strategy inputs could not be fingerprinted." };
+  }
+
   const { data: records, error: recordsError } = await sb
     .from("client_agent_records")
     .select("domain, title, body")
@@ -369,52 +377,24 @@ ${evidence.length > 0 ? `INTELLIGENCE RECORDS\n${evidence.join("\n\n")}` : "Ther
     return { ok: false, retryable: false, failureMessage: `${checked.error} Nothing was saved.`, usage };
   }
 
-  // The working-out, through the paths that already permit a service-role
-  // caller. Written before the proposal so a failure at the last step still
-  // leaves a person something useful rather than nothing.
-  for (const kind of ATTRIBUTE_KINDS) {
-    const values = checked.attributes[kind];
-    if (values.length === 0) continue;
-    const { error } = await sb.rpc("set_opportunity_attributes_v6", {
-      p_opportunity_id: job.input_id,
-      p_kind: kind,
-      p_values: values,
-    });
-    if (error) throw new Error(`Could not save the ${kind} list: ${error.message}`);
-  }
-
-  for (const stage of checked.stages) {
-    const { error } = await sb.rpc("set_opportunity_awareness_v6", {
-      p_opportunity_id: job.input_id,
-      p_stage: stage.stage,
-      p_mindset: stage.mindset,
-      p_message: stage.message,
-      ...(stage.assetDirection ? { p_asset_direction: stage.assetDirection } : {}),
-      ...(stage.distributionNote ? { p_distribution_note: stage.distributionNote } : {}),
-    });
-    if (error) throw new Error(`Could not save the ${stage.stage} message: ${error.message}`);
-  }
-
-  // One open strategy proposal per opportunity, for the same reason as the
-  // score: two drafts a person cannot tell apart is not a choice.
-  const { error: supersedeError } = await sb
-    .from("opportunity_proposals")
-    .update({ resolution: "superseded", resolved_at: new Date().toISOString() })
-    .eq("opportunity_id", job.input_id)
-    .eq("kind", "strategy")
-    .eq("resolution", "open");
-  if (supersedeError) throw new Error(`Could not supersede the previous proposal: ${supersedeError.message}`);
-
-  const { error: insertError } = await sb.from("opportunity_proposals").insert({
-    opportunity_id: job.input_id,
-    client_id: job.client_id,
-    kind: "strategy",
-    payload: { fields: checked.fields },
-    rationale: checked.rationale,
-    proposed_by: agent.agent_key,
-    proposed_by_job_id: job.id,
+  const { error: saveError } = await sb.rpc("save_opportunity_strategy_draft_v7", {
+    p_opportunity_id: job.input_id,
+    p_client_id: job.client_id,
+    p_job_id: job.id,
+    p_input_hash: inputHash,
+    p_attributes: checked.attributes,
+    p_stages: checked.stages.map((stage) => ({
+      stage: stage.stage,
+      mindset: stage.mindset,
+      message: stage.message,
+      asset_direction: stage.assetDirection,
+      distribution_note: stage.distributionNote,
+    })),
+    p_fields: checked.fields,
+    p_rationale: checked.rationale,
+    p_proposed_by: agent.agent_key,
   });
-  if (insertError) throw new Error(`Could not save the proposal: ${insertError.message}`);
+  if (saveError) throw new Error(`Could not save the strategy draft: ${saveError.message}`);
 
   await appendEvent(
     sb,

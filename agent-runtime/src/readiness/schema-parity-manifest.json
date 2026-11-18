@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "28d508405102a388ac93eba14801cccc0dd5e9c72eaff70d1ad3aae1054b3e4c",
-  "generatedTypesSha256": "0421a64787474094ee3ce536855e74575f11b94fd1be2bcb40c13276f3ea196d",
-  "generatedSchemaBodySha256": "fa4c18fbacddddcc2d6344b86cd08a2c887fcff7a0de87cbd2be924c88be6cca",
+  "migrationSourceDigest": "d9d57e1bc51160da5e8502fa9af8f52a6f1bde9990e5ac0e6cf3a1d53cc23911",
+  "generatedTypesSha256": "5ba5986f3d4cea3cd8ce92d14a0ea1327b0a86e1b50a44eda04d1cd889b0a325",
+  "generatedSchemaBodySha256": "b3c262af0bd52ae4398db601b045ef0d244b608ff060267e050933dfcfefc479",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4049,6 +4049,13 @@
       "filename": "20261124035600_561_opportunity_score_proposal_input_snapshot.sql",
       "sha256": "a8e16eb71aa226029f60fb4d92f8be6a0a71eee73f838c143246e23e653827ee",
       "trimmedMd5": "098d57ff8dfc230bc6a24ab386eeffac"
+    },
+    {
+      "version": "20261124035700",
+      "name": "562_atomic_opportunity_strategy_draft",
+      "filename": "20261124035700_562_atomic_opportunity_strategy_draft.sql",
+      "sha256": "6cfacc2f9136d615810b1ad9c48d487b2f72aff1c0040d9e6ae1e472cd9adbc7",
+      "trimmedMd5": "67114237415bdc9e686a2efebac55057"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

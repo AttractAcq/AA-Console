@@ -41268,6 +41268,10 @@ export type Database = {
         Returns: string
       }
       opportunity_proof_ready_v6: { Args: { p_id: string }; Returns: boolean }
+      opportunity_strategy_input_hash_v7: {
+        Args: { p_opportunity_id: string }
+        Returns: string
+      }
       ordinary_media_review_hash_v6: {
         Args: {
           p_review: Database["public"]["Tables"]["ordinary_media_review_requests_v6"]["Row"]
@@ -43483,6 +43487,20 @@ export type Database = {
           p_payload: Json
           p_proposed_by: string
           p_rationale: string
+        }
+        Returns: string
+      }
+      save_opportunity_strategy_draft_v7: {
+        Args: {
+          p_attributes: Json
+          p_client_id: string
+          p_fields: Json
+          p_input_hash: string
+          p_job_id: string
+          p_opportunity_id: string
+          p_proposed_by: string
+          p_rationale: string
+          p_stages: Json
         }
         Returns: string
       }
