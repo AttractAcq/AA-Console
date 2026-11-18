@@ -53,8 +53,8 @@ async function refusal(q: string, p: unknown[] = []): Promise<string> {
 /** A placement at a given status, for a given destination. */
 async function placement(destination: string, status = "approved"): Promise<string> {
   const { id } = await one<{ id: string }>(
-    `insert into proof_placements (client_id, destination_key, source_proof_id, proof_id, status, payload_hash)
-     values ($1,$2,$3,$3,'drafted',$4) returning id`,
+    `insert into proof_placements (client_id, destination_key, source_proof_id, proof_id, status, payload_hash, idempotency_key)
+     values ($1,$2,$3,$3,'drafted',$4,gen_random_uuid()::text) returning id`,
     [CLIENT, destination, PROOF, `hash-${destination}-${Math.random()}`]);
   // Walk it up through the real transition table rather than inserting at the
   // target status, so the guard is exercised.
@@ -137,14 +137,18 @@ beforeEach(async () => {
    placed_by uuid, attempts integer not null default 0,
    claimed_at timestamptz, lease_until timestamptz, placed_at timestamptz,
    verified_at timestamptz, retracted_at timestamptz, last_error text,
-   idempotency_key text, created_by uuid,
+   idempotency_key text not null, created_by uuid,
    created_at timestamptz not null default now(),
-   updated_at timestamptz not null default now());
+   updated_at timestamptz not null default now(),
+   unique(client_id,idempotency_key));
 
  create table proof_placement_events(
    id uuid primary key default gen_random_uuid(), placement_id uuid not null,
-   client_id uuid not null, kind text not null, detail text,
-   created_at timestamptz not null default now());
+   client_id uuid not null, event text not null, actor text not null,
+   detail text, external_ref text,
+   constraint proof_placement_events_event_check check(event in (
+     'drafted','requested','approved','rejected','queued','claimed','placed',
+     'verified','cited','failed','retraction_required','retracted')));
 
  create table proof_placement_transitions(from_status text not null, to_status text not null,
    primary key (from_status, to_status));
@@ -184,12 +188,15 @@ beforeEach(async () => {
    rendered_sha256 text not null, probe_status text,
    published_at timestamptz not null default now());
 
- create table client_ideas(id uuid primary key default gen_random_uuid(), campaign_id uuid);
+ create table client_ideas(id uuid primary key default gen_random_uuid(),
+   client_id uuid not null default '${CLIENT}', campaign_id uuid);
  create table client_briefs(id uuid primary key default gen_random_uuid(),
-   source_idea_id uuid, proof_asset_id uuid);
- create table client_media_assets(id uuid primary key default gen_random_uuid(), brief_id uuid);
+   client_id uuid not null default '${CLIENT}', source_idea_id uuid, proof_asset_id uuid);
+ create table client_media_assets(id uuid primary key default gen_random_uuid(),
+   client_id uuid not null default '${CLIENT}', brief_id uuid);
  create table scheduled_posts(id uuid primary key default gen_random_uuid(),
-   client_id uuid not null, asset_id uuid, published_at timestamptz, external_url text);
+   client_id uuid not null, asset_id uuid, published_at timestamptz,
+   publication_status text not null default 'draft', external_id text, external_url text);
  create table campaign_artifacts(id uuid primary key default gen_random_uuid(),
    campaign_id uuid, asset_id uuid, kind text);
  create table client_campaigns(id uuid primary key, client_id uuid not null);
@@ -204,6 +211,7 @@ beforeEach(async () => {
 
   await db.exec(await sql("20261025110000_246_proof_reaches_the_surfaces_it_was_made_for.sql"));
   await db.exec(await sql("20261124041700_582_hold_paid_proof_placement_until_provider_live.sql"));
+  await db.exec(await sql("20261124041800_583_proof_surface_event_contract.sql"));
 });
 
 afterAll(async () => { await db?.close(); });
@@ -241,7 +249,7 @@ describe("G09 — proof on the client's own pages", () => {
     const second = await page("<h1>Other</h1>");
     const message = await refusal(
       `select bind_proof_placement_to_page_v6($1,$2,$3)`, [p, first.pageId, second.revisionId]);
-    expect(message).toContain("does not belong to that page");
+    expect(message).toContain("does not belong to this client page");
   });
 
   it("places it when that revision publishes, with the published URL", async () => {
@@ -294,8 +302,8 @@ describe("G10 — recording where proof already went", () => {
     const { id: asset } = await one<{ id: string }>(
       `insert into client_media_assets (brief_id) values ($1) returning id`, [brief]);
     const { id: post } = await one<{ id: string }>(
-      `insert into scheduled_posts (client_id, asset_id, published_at, external_url)
-       values ($1,$2,now(),'https://instagram.com/p/abc') returning id`, [CLIENT, asset]);
+      `insert into scheduled_posts (client_id, asset_id, publication_status, published_at, external_id, external_url)
+       values ($1,$2,'published',now(),'provider-post-abc','https://instagram.com/p/abc') returning id`, [CLIENT, asset]);
     return post;
   }
 
@@ -309,7 +317,7 @@ describe("G10 — recording where proof already went", () => {
     expect(row.status).toBe("placed");
     expect(row.destination_key).toBe("organic_social");
     expect(row.external_url).toBe("https://instagram.com/p/abc");
-    expect(row.external_id).toBe(post);
+    expect(row.external_id).toBe("provider-post-abc");
   });
 
   it("is idempotent, so a re-run of the publisher does not double-count", async () => {
@@ -331,6 +339,26 @@ describe("G10 — recording where proof already went", () => {
     expect(await rows(`select 1 from proof_placements`)).toHaveLength(0);
   });
 
+  it("refuses to claim distribution without a provider post ID", async () => {
+    await asService();
+    const post = await postWithProof();
+    await db.query(`update scheduled_posts set external_id=null where id=$1`, [post]);
+    expect(await refusal(`select record_proof_placement_for_post_v6($1)`, [post]))
+      .toContain("published post with a provider ID");
+    expect(await rows(`select 1 from proof_placements where destination_key='organic_social'`))
+      .toHaveLength(0);
+  });
+
+  it("refuses a proof source that belongs to another client", async () => {
+    await asService();
+    const post = await postWithProof();
+    await db.query(`update client_proof_assets set client_id=$1 where id=$2`, [OTHER, PROOF]);
+    expect(await refusal(`select record_proof_placement_for_post_v6($1)`, [post]))
+      .toContain("belongs to another client");
+    expect(await rows(`select 1 from proof_placements where destination_key='organic_social'`))
+      .toHaveLength(0);
+  });
+
   it("refuses a post that has not published", async () => {
     await asService();
     const { id: asset } = await one<{ id: string }>(
@@ -339,7 +367,7 @@ describe("G10 — recording where proof already went", () => {
       `insert into scheduled_posts (client_id, asset_id, published_at) values ($1,$2,null) returning id`,
       [CLIENT, asset]);
     expect(await refusal(`select record_proof_placement_for_post_v6($1)`, [post]))
-      .toContain("has not published");
+      .toContain("published post with a provider ID");
   });
 
   it("refuses a browser: recording is the transport's job, not a person's", async () => {
@@ -377,7 +405,7 @@ describe("G10 — recording where proof already went", () => {
       `insert into client_sales_agent_deployments (client_id, enabled) values ($1,false) returning id`,
       [CLIENT]);
     expect(await refusal(`select release_proof_to_sales_agent_v6($1,$2)`, [p, dep]))
-      .toContain("disabled");
+      .toContain("enabled same-client sales agent deployment");
   });
 
   it("releases approved proof to an enabled deployment", async () => {
@@ -399,8 +427,8 @@ describe("the question on the day rights lapse", () => {
     const { id: asset } = await one<{ id: string }>(
       `insert into client_media_assets (brief_id) values ($1) returning id`, [brief]);
     const { id: post } = await one<{ id: string }>(
-      `insert into scheduled_posts (client_id, asset_id, published_at, external_url)
-       values ($1,$2,now(),'https://instagram.com/p/x') returning id`, [CLIENT, asset]);
+      `insert into scheduled_posts (client_id, asset_id, publication_status, published_at, external_id, external_url)
+       values ($1,$2,'published',now(),'provider-post-x','https://instagram.com/p/x') returning id`, [CLIENT, asset]);
     await db.query(`select record_proof_placement_for_post_v6($1)`, [post]);
 
     // The customer withdraws permission.
