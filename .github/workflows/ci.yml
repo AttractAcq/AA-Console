@@ -67,22 +67,23 @@ jobs:
         working-directory: agent-runtime
     steps:
       - uses: actions/checkout@v4
-      # Render tests must have ffmpeg. Use the runner copy when present;
-      # package-index refresh has stalled runtime CI for over an hour.
-      - name: Ensure ffmpeg for render tests
-        run: |
-          if ! command -v ffmpeg >/dev/null 2>&1; then
-            sudo timeout 180s apt-get update -o Acquire::Retries=2 -o Acquire::http::Timeout=30
-            sudo timeout 180s apt-get install -y --no-install-recommends ffmpeg
-          fi
-          ffmpeg -version | head -n 1
-        working-directory: .
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: agent-runtime/package-lock.json
       - run: npm ci
+      - name: Use locked media binaries for render tests
+        run: |
+          media_bin="$RUNNER_TEMP/aa-media-bin"
+          mkdir -p "$media_bin"
+          ln -s "$(node -p "require('ffmpeg-static')")" "$media_bin/ffmpeg"
+          ln -s "$(node -p "require('ffprobe-static').path")" "$media_bin/ffprobe"
+          "$media_bin/ffmpeg" -hide_banner -filters > "$RUNNER_TEMP/aa-ffmpeg-filters.txt"
+          grep -q 'xfade' "$RUNNER_TEMP/aa-ffmpeg-filters.txt"
+          grep -q 'drawtext' "$RUNNER_TEMP/aa-ffmpeg-filters.txt"
+          "$media_bin/ffprobe" -version > /dev/null
+          echo "$media_bin" >> "$GITHUB_PATH"
       - run: npm run typecheck
       - run: npm test
       - run: node --test ingress/server.node-test.mjs
