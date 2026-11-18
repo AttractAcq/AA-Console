@@ -43090,6 +43090,39 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      record_post_publish_uncertain_v7: {
+        Args: { p_post_id: string; p_reason: string }
+        Returns: {
+          asset_id: string | null
+          channel: Database["public"]["Enums"]["post_channel"]
+          client_id: string | null
+          created_at: string
+          created_by: string | null
+          created_by_bot: string | null
+          external_id: string | null
+          external_url: string | null
+          failure_reason: string | null
+          id: string
+          media_type: Database["public"]["Enums"]["media_type"]
+          notes: string | null
+          platform: Database["public"]["Enums"]["post_platform"] | null
+          publication_status: string
+          publish_attempts: number
+          publish_claimed_at: string | null
+          published_at: string | null
+          published_by_bot: string | null
+          ref_number: string | null
+          scheduled_at: string
+          scheduled_for: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "scheduled_posts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       record_post_published: {
         Args: {
           p_bot?: string
