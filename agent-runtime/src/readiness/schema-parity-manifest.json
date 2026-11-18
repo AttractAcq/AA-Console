@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "faa1f080cdde93d1dd7e0a4784e96454f7be96f18e0a95e1f7e97890e91ed1c2",
-  "generatedTypesSha256": "aa8490da1f5a01fedecff3c5fa5242c177443618d3f2d02d65427b1fb51f7ffb",
-  "generatedSchemaBodySha256": "bbad90b0fd7077512ce6a923bf2ebde3c8a05166289b69f4a7c39108a7b20dec",
+  "migrationSourceDigest": "5f3a93cb6ab2d6cbec9afefd838a738d5935cb8a99df37c5b9cc668183359592",
+  "generatedTypesSha256": "e4b5581253553aaca42ecc2341aa7f5a2dca9ea951904e819b8598ef44af6316",
+  "generatedSchemaBodySha256": "63b2437c5ae634efecd8dc3fa61409944c6bdd0de15bd37becf5c6f83b3c0749",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4084,6 +4084,13 @@
       "filename": "20261124040100_566_human_assignment_brief_client_guard.sql",
       "sha256": "6d87c1e58d87c4afbe33c6001cd9b1c48a34c91448abeb7f060861375b8ba07c",
       "trimmedMd5": "5268f070b6899e5df5c5e89bfd0d734e"
+    },
+    {
+      "version": "20261124040200",
+      "name": "567_ads_metric_observation",
+      "filename": "20261124040200_567_ads_metric_observation.sql",
+      "sha256": "0ae837603ec0785fc9850337c7c3c4836661fcbf0482700cc7816810bf104140",
+      "trimmedMd5": "d5c55fdaf057ef59d26598332b15baec"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
