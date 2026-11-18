@@ -13,6 +13,7 @@ const rows: Record<string, unknown[]> = {
   paid_operator_events_v7: [],
   paid_operator_metric_match_v7: [],
   paid_google_operator_account_match_v7: [],
+  meta_operator_account_match_v7: [],
 };
 
 vi.mock("../../lib/supabase", () => ({
@@ -36,6 +37,7 @@ beforeEach(() => {
   rows.paid_operator_events_v7 = [];
   rows.paid_operator_metric_match_v7 = [];
   rows.paid_google_operator_account_match_v7 = [];
+  rows.meta_operator_account_match_v7 = [];
   rpc.mockResolvedValue({ data: true, error: null });
 });
 
@@ -147,4 +149,22 @@ it("shows a metric row match without calling it provider verification", async ()
   expect(await screen.findByText(/2 daily row\(s\)/)).toBeInTheDocument();
   expect(screen.getByText(/Recorded spend 20 USD/)).toBeInTheDocument();
   expect(screen.getByText(/does not verify provider account identity/)).toBeInTheDocument();
+  expect(screen.getByText(/Configured Meta account read: Unknown/)).toBeInTheDocument();
+});
+
+it("separates a Meta account observation from the generic metric rows", async () => {
+  rows.paid_operator_bundles_v7 = [{ id: "bundle-1", client_id: "client-1",
+    campaign_id: "campaign-1", package_id: "package-1", platform: "meta", version: 1,
+    snapshot_hash: "a".repeat(64), snapshot: { source: { campaign_name: "Local offer" } },
+    created_at: "2026-11-16T00:00:00Z", created_by: "user-1" }];
+  rows.meta_operator_account_match_v7 = [{ bundle_id: "bundle-1",
+    match_state: "observed_in_meta_account", reported_campaign_id: "campaign-meta-1",
+    reported_ad_id: "ad-meta-1", configured_account_id: "act_123", read_run_id: "read-1",
+    fetched_at: "2026-11-16T01:00:00Z", observed_campaign_status: "ACTIVE",
+    observed_ad_status: "ACTIVE" }];
+  render(<PaidOperatorBundles clientId="client-1" platform="meta" />);
+  expect(await screen.findByText(/Reported campaign and ad observed in the configured account/)).toBeInTheDocument();
+  expect(screen.getByText(/Account act_123 · read read-1/)).toBeInTheDocument();
+  expect(screen.getByText(/does not prove who activated the ad/)).toBeInTheDocument();
+  expect(screen.getByText(/Metrics match: Unknown/)).toBeInTheDocument();
 });

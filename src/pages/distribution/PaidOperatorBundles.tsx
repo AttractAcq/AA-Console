@@ -9,6 +9,7 @@ type Package = Pick<Database["public"]["Tables"]["campaign_preparation_packages_
   "id" | "campaign_id" | "version" | "assembled_at">;
 type Campaign = Pick<Database["public"]["Tables"]["client_campaigns"]["Row"],
   "id" | "name" | "paid_platform">;
+type MetaAccountMatch = Database["public"]["Views"]["meta_operator_account_match_v7"]["Row"];
 type MetricMatch = { bundle_id: string; match_state: string; external_campaign_id: string | null;
   latest_metric_date: string | null; latest_fetched_at: string | null; days_with_rows: number;
   recorded_spend: number | null; recorded_impressions: number | null;
@@ -54,6 +55,13 @@ async function downloadCreative(file: CreativeFile): Promise<void> {
 export function PaidOperatorBundles({ clientId, platform }: {
   clientId: string | undefined; platform: "meta" | "google";
 }) {
+  return <PaidOperatorBundlesForClient key={`${clientId ?? "no-client"}:${platform}`}
+    clientId={clientId} platform={platform} />;
+}
+
+function PaidOperatorBundlesForClient({ clientId, platform }: {
+  clientId: string | undefined; platform: "meta" | "google";
+}) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [bundles, setBundles] = useState<Bundle[]>([]);
@@ -61,6 +69,7 @@ export function PaidOperatorBundles({ clientId, platform }: {
   const [current, setCurrent] = useState<Record<string, boolean>>({});
   const [approved, setApproved] = useState<Record<string, boolean>>({});
   const [matches, setMatches] = useState<Record<string, MetricMatch>>({});
+  const [metaAccountMatches, setMetaAccountMatches] = useState<Record<string, MetaAccountMatch>>({});
   const [packageId, setPackageId] = useState("");
   const [owner, setOwner] = useState("");
   const [budget, setBudget] = useState("");
@@ -73,7 +82,7 @@ export function PaidOperatorBundles({ clientId, platform }: {
   const refresh = useCallback(async () => {
     if (!clientId) return;
     try {
-      const [c, p, b, e, m] = await Promise.all([
+      const [c, p, b, e, m, metaAccount] = await Promise.all([
         supabase.from("client_campaigns").select("id,name,paid_platform")
           .eq("client_id", clientId).eq("runs_paid", true).eq("paid_platform", platform),
         supabase.from("campaign_preparation_packages_v7")
@@ -86,8 +95,10 @@ export function PaidOperatorBundles({ clientId, platform }: {
           .eq("client_id", clientId).order("recorded_at", { ascending: false }).limit(100),
         supabase.from(platform === "google" ? "paid_google_operator_account_match_v7" : "paid_operator_metric_match_v7").select("*")
           .eq("client_id", clientId).eq("platform", platform).limit(50),
+        platform === "meta" ? supabase.from("meta_operator_account_match_v7").select("*")
+          .eq("client_id", clientId).limit(50) : Promise.resolve({ data: [], error: null }),
       ]);
-      for (const result of [c, p, b, e, m]) if (result.error) throw result.error;
+      for (const result of [c, p, b, e, m, metaAccount]) if (result.error) throw result.error;
       const campaigns = (c.data ?? []) as Campaign[];
       const campaignIds = new Set(campaigns.map((item) => item.id));
       const latest = new Map<string, Package>();
@@ -112,6 +123,8 @@ export function PaidOperatorBundles({ clientId, platform }: {
       setApproved(Object.fromEntries(checks.map(([id, , isApproved]) => [id, isApproved])));
       setMatches(Object.fromEntries(((m.data ?? []) as MetricMatch[])
         .map((row) => [row.bundle_id, row])));
+      setMetaAccountMatches(Object.fromEntries(((metaAccount.data ?? []) as MetaAccountMatch[])
+        .filter((row) => row.bundle_id !== null).map((row) => [row.bundle_id!, row])));
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not load operator bundles.");
@@ -263,6 +276,7 @@ export function PaidOperatorBundles({ clientId, platform }: {
       const source = sourceOf(bundle);
       const trail = events.filter((event) => event.bundle_id === bundle.id);
       const metric = matches[bundle.id];
+      const metaAccount = metaAccountMatches[bundle.id];
       return <article key={bundle.id} className="rounded border border-border p-3 text-xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="font-medium">{String(source.campaign_name ?? "Campaign")} · v{bundle.version} · {current[bundle.id] ? approved[bundle.id] ? "approved and current" : "not approved" : "stale or unverified"}</p>
@@ -294,6 +308,26 @@ export function PaidOperatorBundles({ clientId, platform }: {
           {event.external_campaign_id ? ` · campaign ${event.external_campaign_id}` : ""}
           {event.external_ad_id ? ` · ad ${event.external_ad_id}` : ""}
         </p>)}
+        {platform === "meta" && <p className="mt-2 border-t border-border pt-2 text-muted-foreground">
+          Configured Meta account read: {metaAccount?.match_state === "observed_in_meta_account"
+            ? `Reported campaign${metaAccount.reported_ad_id ? " and ad" : ""} observed in the configured account.`
+            : metaAccount?.match_state === "reported_ad_not_observed"
+              ? "Reported campaign observed, but reported ad absent from the latest account read."
+            : metaAccount?.match_state === "reported_campaign_not_observed"
+              ? "Reported campaign absent from the latest configured account read."
+            : metaAccount?.match_state === "no_current_account_read"
+              ? "No current read of the configured Meta account and credential."
+            : metaAccount?.match_state === "no_meta_account_configured"
+              ? "No Meta ad account configured."
+              : "Unknown; no external campaign ID has been reported."}
+          {metaAccount?.read_run_id && <span className="block">
+            Account {metaAccount.configured_account_id ?? "unknown"} · read {metaAccount.read_run_id}
+            {metaAccount.fetched_at ? ` · fetched ${new Date(metaAccount.fetched_at).toLocaleString()}` : ""}
+            {metaAccount.observed_campaign_status ? ` · campaign ${metaAccount.observed_campaign_status}` : ""}
+            {metaAccount.observed_ad_status ? ` · ad ${metaAccount.observed_ad_status}` : ""}
+          </span>}
+          <span className="block">An account read records observed IDs and status; it does not prove who activated the ad or that it caused a sale.</span>
+        </p>}
         <p className="mt-2 border-t border-border pt-2 text-muted-foreground">
           Metrics match: {metric?.match_state === "metric_rows_match_reported_id"
             ? platform === "google"
