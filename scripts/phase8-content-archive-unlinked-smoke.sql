@@ -62,4 +62,31 @@ begin
     raise exception 'Restored content remained archived';
   end if;
 end $checks$;
+insert into public.clients(id,name,initials) values
+  ('ab000000-0000-4000-8000-000000000003','Other archive loose fixture','OL');
+insert into auth.users(id,instance_id,aud,role,email,encrypted_password,created_at,updated_at)
+values ('ab000000-0000-4000-8000-000000000004','00000000-0000-0000-0000-000000000000',
+  'authenticated','authenticated','archive-loose-client@example.invalid','',now(),now());
+insert into public.profiles(id,role,email)
+values ('ab000000-0000-4000-8000-000000000004','client','archive-loose-client@example.invalid');
+insert into public.client_users(client_id,user_id) values
+  ('ab000000-0000-4000-8000-000000000001','ab000000-0000-4000-8000-000000000004');
+insert into public.client_ideas(client_id,title,source,archived_at) values
+  ('ab000000-0000-4000-8000-000000000001','Visible to assigned client','manual',now()),
+  ('ab000000-0000-4000-8000-000000000003','Hidden from assigned client','manual',now());
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','ab000000-0000-4000-8000-000000000004',true);
+select set_config('request.jwt.claims',
+  '{"sub":"ab000000-0000-4000-8000-000000000004","role":"authenticated"}',true);
+set local role authenticated;
+do $scope$
+begin
+  if (select count(*) from public.content_archive_unlinked) <> 1
+     or not exists(select 1 from public.content_archive_unlinked
+                   where title='Visible to assigned client')
+     or exists(select 1 from public.content_archive_unlinked
+               where title='Hidden from assigned client') then
+    raise exception 'Unlinked archive leaked another client or hid own records';
+  end if;
+end $scope$;
 rollback;
