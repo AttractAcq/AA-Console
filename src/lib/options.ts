@@ -68,11 +68,13 @@ export async function loadBriefs(clientId: string): Promise<Option[]> {
 
 /** Exact workflow requests that a human assignment may fulfill. The server
  * verifies the selected brief belongs to the run and piece before binding. */
-export async function loadProductionDemands(clientId: string, briefId: string): Promise<Option[]> {
-  const { data, error } = await supabase.from("assignable_production_demands_v7")
+export async function loadProductionDemands(clientId: string, briefId: string, search = ""): Promise<Option[]> {
+  let query = supabase.from("assignable_production_demands_v7")
     .select("demand_kind, demand_id, piece_key, destination, requested_at")
-    .eq("client_id", clientId).eq("brief_id", briefId)
-    .order("requested_at", { ascending: false }).limit(200);
+    .eq("client_id", clientId).eq("brief_id", briefId);
+  const term = search.trim().slice(0, 80).replaceAll("%", "\\%").replaceAll("_", "\\_");
+  if (term) query = query.ilike("piece_key", `%${term}%`);
+  const { data, error } = await query.order("requested_at", { ascending: false }).limit(200);
   if (error) throw error;
   return (data ?? []).filter((d) => d.demand_id).map((d) => ({
     value: `${d.demand_kind}:${d.demand_id}`,

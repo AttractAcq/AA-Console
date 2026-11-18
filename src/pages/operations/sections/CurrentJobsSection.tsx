@@ -26,7 +26,7 @@ export function CurrentJobsSection() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const clientOptions = useOptions(loadClients, assignOpen);
-  const [selection, setSelection] = useState({ clientId: "", briefId: "" });
+  const [selection, setSelection] = useState({ clientId: "", briefId: "", demandSearch: "" });
   const [briefLookup, setBriefLookup] = useState<{
     key: string; options: Option[]; error: string | null; loading: boolean;
   }>({ key: "", options: [], error: null, loading: false });
@@ -34,7 +34,7 @@ export function CurrentJobsSection() {
   const [demandLookup, setDemandLookup] = useState<{
     key: string; options: Option[]; error: string | null; loading: boolean;
   }>({ key: "", options: [], error: null, loading: false });
-  const demandKey = `${selection.clientId}:${selection.briefId}`;
+  const demandKey = `${selection.clientId}:${selection.briefId}:${selection.demandSearch.trim()}`;
   const demandOptions = demandLookup.key === demandKey ? demandLookup.options : [];
 
   useEffect(() => {
@@ -54,14 +54,16 @@ export function CurrentJobsSection() {
     if (!assignOpen || !selection.clientId || !UUID_PATTERN.test(selection.briefId)) return;
     let active = true;
     setDemandLookup({ key: demandKey, options: [], error: null, loading: true });
-    void loadProductionDemands(selection.clientId, selection.briefId).then((options) => {
-      if (active) setDemandLookup({ key: demandKey, options, error: null, loading: false });
-    }).catch((error: unknown) => {
-      if (active) setDemandLookup({ key: demandKey, options: [],
-        error: error instanceof Error ? error.message : "Could not find matching requests.", loading: false });
-    });
-    return () => { active = false; };
-  }, [assignOpen, selection.clientId, selection.briefId, demandKey]);
+    const timer = window.setTimeout(() => {
+      void loadProductionDemands(selection.clientId, selection.briefId, selection.demandSearch).then((options) => {
+        if (active) setDemandLookup({ key: demandKey, options, error: null, loading: false });
+      }).catch((error: unknown) => {
+        if (active) setDemandLookup({ key: demandKey, options: [],
+          error: error instanceof Error ? error.message : "Could not find matching requests.", loading: false });
+      });
+    }, selection.demandSearch ? 300 : 0);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [assignOpen, selection.clientId, selection.briefId, selection.demandSearch, demandKey]);
 
   const refresh = useCallback(async () => {
     if (!memberId) return;
@@ -111,6 +113,8 @@ export function CurrentJobsSection() {
     },
     { name: "manual_brief_id", label: "Exact brief ID", kind: "text", required: true,
       showIf: { field: "brief_id", equals: ["manual"] } },
+    { name: "demand_search", label: "Find request by piece key", kind: "text",
+      hint: "Search this brief's requests, including older work beyond the first 200 results." },
     {
       name: "production_demand",
       label: "Campaign or daily request",
@@ -179,15 +183,17 @@ export function CurrentJobsSection() {
                 && <p role="alert">{demandLookup.error}</p>}
               {selection.briefId && demandLookup.key === demandKey && !demandLookup.loading
                 && !demandLookup.error && demandOptions.length === 0
-                && <p>No matching requests found. Use the exact ID if this is an older request.</p>}</>
+                && <p>No matching requests found. Try a piece-key search or enter the exact request ID.</p>}</>
           : undefined}
         onValuesChange={(values) => {
           const clientId = typeof values.client_id === "string" ? values.client_id : "";
           const chosenBrief = typeof values.brief_id === "string" ? values.brief_id : "";
           const briefId = chosenBrief === "manual" && typeof values.manual_brief_id === "string"
             ? values.manual_brief_id.trim() : chosenBrief;
+          const demandSearch = typeof values.demand_search === "string" ? values.demand_search : "";
           setSelection((previous) => previous.clientId === clientId && previous.briefId === briefId
-            ? previous : { clientId, briefId });
+            && previous.demandSearch === demandSearch
+            ? previous : { clientId, briefId, demandSearch });
         }}
         submitLabel="Assign"
         onSubmit={async (v) => {

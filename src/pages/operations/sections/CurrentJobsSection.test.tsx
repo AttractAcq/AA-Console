@@ -18,6 +18,9 @@ vi.mock("../../../components/forms/FormModal", () => ({
   }) => open ? <>
     <button onClick={() => onValuesChange({ client_id: "client-1",
       brief_id: "11111111-1111-4111-8111-111111111111" })}>Choose scope</button>
+    <button onClick={() => onValuesChange({ client_id: "client-1",
+      brief_id: "11111111-1111-4111-8111-111111111111",
+      demand_search: "older_piece" })}>Find older request</button>
     {fields.find((field) => field.name === "brief_id")?.options?.map((option) =>
       <span key={option.label}>{option.label}</span>)}
     {fields.find((field) => field.name === "production_demand")?.options?.map((option) =>
@@ -67,8 +70,16 @@ it("binds a selected human job to the exact production demand", async () => {
     p_due_date: undefined, p_compensation: undefined,
   }));
   expect(loadBriefs).toHaveBeenCalledWith("client-1");
-  expect(loadDemands).toHaveBeenCalledWith("client-1", "11111111-1111-4111-8111-111111111111");
+  expect(loadDemands).toHaveBeenCalledWith("client-1", "11111111-1111-4111-8111-111111111111", "");
   expect(from.mock.results.some((call) => call.value.insert?.mock.calls.length)).toBe(false);
+});
+
+it("searches older requests within the selected client and brief", async () => {
+  render(<CurrentJobsSection />);
+  await userEvent.click(await screen.findByRole("button", { name: "Assign Job" }));
+  await userEvent.click(screen.getByRole("button", { name: "Find older request" }));
+  await waitFor(() => expect(loadDemands).toHaveBeenCalledWith("client-1",
+    "11111111-1111-4111-8111-111111111111", "older_piece"));
 });
 
 it("accepts an exact campaign request ID outside the loaded choices", async () => {
