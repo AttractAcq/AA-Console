@@ -217,12 +217,13 @@ async function loadStage(stage: ChainStage, row: ArchiveRow): Promise<Record<str
   }
 
   if (stage === "reporting") {
-    // content_attribution is already keyed on brief_ref, which is the whole
-    // reason the archive is too.
+    // brief_ref is unique only within a client. Agency admins can read more
+    // than one client, so constrain both parts of the archive identity.
     const { data, error } = await supabase
       .from("content_attribution")
       .select("asset_ref, posts, channels, first_published, impressions, reach, clicks, spend, leads, conversations, appointments, sales, opportunity_value, sale_value, cash_collected")
-      .eq("brief_ref", row.brief_ref);
+      .eq("brief_ref", row.brief_ref)
+      .eq("client_id", row.client_id);
     if (error) throw new Error(error.message);
     return (data ?? []) as Record<string, unknown>[];
   }
