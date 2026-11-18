@@ -69,7 +69,7 @@ export function CampaignSweepWork({ clientId, campaignId }: { clientId: string; 
     if (!work.length) {
       setPieces([]); setError(null); setLoading(false); return;
     }
-    const countsResult = await supabase.from("production_demand_counts_v7")
+    const countsResult = await supabase.from("production_demand_counts_v8")
       .select("demand_id, attempts, produced, rejected, revised, workflow_accepted, human_approved")
       .eq("client_id", clientId).eq("demand_kind", "campaign")
       .in("demand_id", work.map((row) => row.id));

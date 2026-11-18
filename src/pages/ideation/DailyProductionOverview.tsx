@@ -28,7 +28,7 @@ export function DailyProductionOverview() {
       if (recent.error) { setError(recent.error.message); return; }
       const rows = (recent.data ?? []) as Package[];
       if (!rows.length) { setPackages([]); setCounts([]); setError(null); return; }
-      const result = await supabase.from("production_demand_counts_v7")
+      const result = await supabase.from("production_demand_counts_v8")
         .select("demand_id, run_id, piece_key, destination, media_type, content_format, produced, rejected, revised, workflow_accepted, human_approved")
         .eq("client_id", clientId).eq("demand_kind", "daily")
         .in("run_id", rows.map((row) => row.run_id));

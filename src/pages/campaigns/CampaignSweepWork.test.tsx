@@ -35,7 +35,7 @@ it("shows current route work and retries only its blocked step", async () => {
         state: "prepared", blocker: null, qa_state: "not_run",
         expected_output: { platform: "facebook", media_type: "image", content_format: "single" } },
     ]);
-    if (table === "production_demand_counts_v7") return rows([
+    if (table === "production_demand_counts_v8") return rows([
       { demand_id: "work-1", attempts: 2, produced: 1, rejected: 1, revised: 1,
         workflow_accepted: 0, human_approved: 0 },
     ]);

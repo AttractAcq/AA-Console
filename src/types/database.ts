@@ -861,6 +861,107 @@ export type Database = {
           },
         ]
       }
+      assignment_demand_bindings_v7: {
+        Row: {
+          assignment_id: string
+          bound_at: string
+          brief_id: string
+          client_id: string
+          demand_id: string
+          demand_kind: string
+          run_id: string
+        }
+        Insert: {
+          assignment_id: string
+          bound_at?: string
+          brief_id: string
+          client_id: string
+          demand_id: string
+          demand_kind: string
+          run_id: string
+        }
+        Update: {
+          assignment_id?: string
+          bound_at?: string
+          brief_id?: string
+          client_id?: string
+          demand_id?: string
+          demand_kind?: string
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignment_demand_bindings_v7_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: true
+            referencedRelation: "assignment_board"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "assignment_demand_bindings_v7_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: true
+            referencedRelation: "job_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_demand_bindings_v7_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "client_briefs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_demand_bindings_v7_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive"
+            referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "assignment_demand_bindings_v7_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "assignment_demand_bindings_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "assignment_demand_bindings_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "assignment_demand_bindings_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_demand_bindings_v7_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "assignment_demand_bindings_v7_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assignment_events: {
         Row: {
           actor: string
@@ -34861,7 +34962,54 @@ export type Database = {
         }
         Relationships: []
       }
+      production_attempts_v8: {
+        Row: {
+          accepted_workflow_output: boolean | null
+          asset_id: string | null
+          attempt_id: string | null
+          attempt_kind: string | null
+          attempt_status: string | null
+          campaign_id: string | null
+          client_id: string | null
+          content_format: string | null
+          cost_usd: number | null
+          created_at: string | null
+          demand_id: string | null
+          demand_kind: string | null
+          destination: string | null
+          human_review_status: string | null
+          job_id: string | null
+          media_type: string | null
+          piece_key: string | null
+          revised: boolean | null
+          route_package_id: string | null
+          run_id: string | null
+        }
+        Relationships: []
+      }
       production_demand_counts_v7: {
+        Row: {
+          accepted_asset_id: string | null
+          attempts: number | null
+          campaign_id: string | null
+          client_id: string | null
+          content_format: string | null
+          demand_id: string | null
+          demand_kind: string | null
+          destination: string | null
+          human_approved: number | null
+          media_type: string | null
+          piece_key: string | null
+          produced: number | null
+          rejected: number | null
+          revised: number | null
+          route_package_id: string | null
+          run_id: string | null
+          workflow_accepted: number | null
+        }
+        Relationships: []
+      }
+      production_demand_counts_v8: {
         Row: {
           accepted_asset_id: string | null
           attempts: number | null
@@ -38275,6 +38423,42 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "delivery_work_items_v6"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_demand_assignment_v7: {
+        Args: {
+          p_brief_id: string
+          p_client_id: string
+          p_compensation?: number
+          p_demand_id: string
+          p_demand_kind: string
+          p_due_date?: string
+          p_member_id: string
+          p_title: string
+        }
+        Returns: {
+          accepted_at: string | null
+          asset_id: string | null
+          brief_id: string | null
+          client_id: string | null
+          compensation: number | null
+          completed_at: string | null
+          created_at: string
+          delivered_at: string | null
+          due_date: string | null
+          id: string
+          member_id: string
+          source_asset_id: string | null
+          stage: Database["public"]["Enums"]["assignment_stage"]
+          stage_reason: string | null
+          title: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "job_assignments"
           isOneToOne: true
           isSetofReturn: false
         }

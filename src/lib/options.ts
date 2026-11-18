@@ -67,6 +67,18 @@ export async function loadBriefs(): Promise<Option[]> {
   });
 }
 
+/** Exact workflow requests that a human assignment may fulfill. The server
+ * verifies the selected brief belongs to the run and piece before binding. */
+export async function loadProductionDemands(): Promise<Option[]> {
+  const { data } = await supabase.from("production_demand_v7")
+    .select("client_id, demand_kind, demand_id, piece_key, destination")
+    .limit(500);
+  return (data ?? []).filter((d) => d.client_id && d.demand_id).map((d) => ({
+    value: `${d.demand_kind}:${d.demand_id}`,
+    label: `${d.demand_kind} · ${d.piece_key} · ${d.destination ?? "unspecified"} · client ${d.client_id!.slice(0, 8)} · ${d.demand_id!.slice(0, 8)}`,
+  }));
+}
+
 export async function loadAgents(): Promise<Option[]> {
   const { data } = await supabase.from("agents").select("agent_key, name").order("name");
   return (data ?? []).map((a) => ({ value: a.agent_key, label: a.name }));

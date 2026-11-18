@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "cd092a60bef5103bc0a4e9f9ec919730214188ae5bc6438684974a3ab18df9e6",
-  "generatedTypesSha256": "1eef83d79bd7d1de66315501f7aa9a98cef5c1da389b4981cc32e5525a7566bd",
-  "generatedSchemaBodySha256": "7128c2d29ac759d69cff771410e1068f8f92c6e58632be68034235183fa4a828",
+  "migrationSourceDigest": "69d9f982a87b776fcb0328e29c50ffc9abbc89e787ebba97012d06f6c28ba8d2",
+  "generatedTypesSha256": "824a8a8350185c279b8e15ce372e7934f98952e21646f6135693543475170286",
+  "generatedSchemaBodySha256": "e389c934344cef708db94f776752a2113b1549a1bd22a6eb823c7e88db9e8102",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4056,6 +4056,13 @@
       "filename": "20261124035700_562_atomic_opportunity_strategy_draft.sql",
       "sha256": "fb7c9a596d24991c825b9dc66eb4cdaea1dd7ca2b43deb60eccacf57cf20ec92",
       "trimmedMd5": "b4dd91f2e2a3b83e250403f008a38518"
+    },
+    {
+      "version": "20261124035800",
+      "name": "563_human_production_demand_lineage",
+      "filename": "20261124035800_563_human_production_demand_lineage.sql",
+      "sha256": "c17e106d2e50231f8a0ab8e3885e7ed96fb592a613669c816b3257b61ac82da1",
+      "trimmedMd5": "d42b68225d89664c005ef16b66a5deeb"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

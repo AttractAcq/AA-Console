@@ -6,7 +6,7 @@ import { Panel } from "../../../components/Panel";
 import { DataTable } from "../../../components/DataTable";
 import { FormModal } from "../../../components/forms/FormModal";
 import type { FieldDef } from "../../../components/forms/fields";
-import { loadBriefs, loadClients, useOptions } from "../../../lib/options";
+import { loadBriefs, loadClients, loadProductionDemands, useOptions } from "../../../lib/options";
 import { supabase } from "../../../lib/supabase";
 
 type Job = {
@@ -24,6 +24,7 @@ export function CurrentJobsSection() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const clientOptions = useOptions(loadClients, assignOpen);
   const briefOptions = useOptions(loadBriefs, assignOpen);
+  const demandOptions = useOptions(loadProductionDemands, assignOpen);
 
   const refresh = useCallback(async () => {
     if (!memberId) return;
@@ -61,6 +62,13 @@ export function CurrentJobsSection() {
       kind: "select",
       options: briefOptions,
       hint: "The assignee opens this from the Brief button on their job.",
+    },
+    {
+      name: "production_demand",
+      label: "Campaign or daily request",
+      kind: "select",
+      options: demandOptions,
+      hint: "Select the exact request when this job fulfills campaign or daily production. The brief must belong to that request.",
     },
     { name: "due_date", label: "Due date", kind: "date" },
     { name: "compensation", label: "Compensation", kind: "number" },
@@ -104,6 +112,25 @@ export function CurrentJobsSection() {
         submitLabel="Assign"
         onSubmit={async (v) => {
           if (!memberId) throw new Error("No team member selected.");
+          const selectedDemand = String(v.production_demand ?? "");
+          if (selectedDemand) {
+            const [kind, demandId] = selectedDemand.split(":");
+            if (!v.brief_id || !demandId || (kind !== "daily" && kind !== "campaign")) {
+              throw new Error("Select a brief and exact production request.");
+            }
+            const { error } = await supabase.rpc("create_demand_assignment_v7", {
+              p_member_id: memberId,
+              p_client_id: v.client_id as string,
+              p_brief_id: v.brief_id as string,
+              p_demand_kind: kind,
+              p_demand_id: demandId,
+              p_title: (v.title as string).trim(),
+              p_due_date: (v.due_date as string) || undefined,
+              p_compensation: v.compensation ? Number(v.compensation) : undefined,
+            });
+            if (error) throw error;
+            return;
+          }
           const { error } = await supabase.from("job_assignments").insert({
             member_id: memberId,
             client_id: v.client_id as string,
