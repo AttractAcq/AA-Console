@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "abdfd79cfb0990e64fbd7d0f7ed19268f3cc3c9e9e2688db8d556ffec2e87b63",
+  "migrationSourceDigest": "15eba96d53ed9121795824d5ceaa1ca03fde75b8f8d3e373de33852db01203e3",
   "generatedTypesSha256": "adb7e587a3d6b22846da52874ede752b18aaa2b72135e91db013cac7e0272c9d",
   "generatedSchemaBodySha256": "a6546bcd60501ac32aa3215444eb8d00ad6268ab26dea9d8381ff1f476f69a5a",
   "localMigrations": [
@@ -4033,8 +4033,8 @@
       "version": "20261124035400",
       "name": "559_campaign_package_requires_sourced_offer",
       "filename": "20261124035400_559_campaign_package_requires_sourced_offer.sql",
-      "sha256": "307233d226d6591497e9b4280130ee172e2d76645c8f6b065b7f774f1c6baa3d",
-      "trimmedMd5": "fc261f63e112c86a8c291bf87d9d8dd7"
+      "sha256": "62203168ac854999a654d4701d7369c9e42d9cfbe6b85b0917ecc0409dfddbcf",
+      "trimmedMd5": "f4f76e247155697621223012e4875697"
     },
     {
       "version": "20261124035500",

@@ -83,7 +83,7 @@ begin
           where v.id=c.offer_version_id and v.client_id=c.client_id loop
         if v_claim->>'kind'='quantified' and
           (coalesce(v_claim->>'proof_asset_id','') !~*
-            '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
            or not exists(select 1 from public.client_proof_assets proof
              where proof.id::text=v_claim->>'proof_asset_id'
                and proof.client_id=c.client_id
