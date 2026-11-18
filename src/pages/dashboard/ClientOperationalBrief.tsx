@@ -19,6 +19,7 @@ type Brief = {
   lastExternalOutcome: { source_kind: string; outcome: string; occurred_at: string; owning_path: string; external_ref: string | null } | null | undefined;
   externalProblems: number | null;
   measurement: { leads: number; sales: number; sourcedLeads: number; consentedLeads: number; latestMetaRead: string | null; latestGoogleRead: string | null } | null;
+  linkedAsset: { title: string; leads: number; sales: number } | null | undefined;
   errors: string[];
 };
 
@@ -31,7 +32,7 @@ export function ClientOperationalBrief({ clientId, spend, failedRuns, activeRuns
 }) {
   const [brief, setBrief] = useState<Brief | null>(null);
   const refresh = useCallback(async () => {
-    const [pending, stale, sourceHeld, sourceHeldItems, held, failed, executed, actions, deliveries, integrations, lastOutcome, externalProblems, funnel, coverage] = await Promise.all([
+    const [pending, stale, sourceHeld, sourceHeldItems, held, failed, executed, actions, deliveries, integrations, lastOutcome, externalProblems, funnel, coverage, linkedAssets] = await Promise.all([
       supabase.from("approval_inbox_v6").select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("status", "pending"),
       supabase.from("approval_inbox_v6").select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("status", "stale"),
       supabase.from("approval_inbox_v6").select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("status", "source_held"),
@@ -46,8 +47,9 @@ export function ClientOperationalBrief({ clientId, spend, failedRuns, activeRuns
       supabase.rpc("list_client_external_outcomes_v6", { p_client_id: clientId }, { count: "exact", head: true }).select("outcome_id").in("outcome", ["refused", "uncertain", "different", "pending", "rejected", "unverified", "unattributed", "failed", "abandoned"]),
       supabase.rpc("acquisition_funnel", { p_client_id: clientId, p_days: 30 }),
       supabase.rpc("acquisition_coverage_v8", { p_client_id: clientId, p_days: 30 }),
+      supabase.rpc("top_content_by_revenue", { p_client_id: clientId, p_limit: 10 }),
     ]);
-    const errors = [pending.error, stale.error, sourceHeld.error, sourceHeldItems.error, held.error, failed.error, executed.error, actions.error, deliveries.error, integrations.error, lastOutcome.error, externalProblems.error, funnel.error, coverage.error]
+    const errors = [pending.error, stale.error, sourceHeld.error, sourceHeldItems.error, held.error, failed.error, executed.error, actions.error, deliveries.error, integrations.error, lastOutcome.error, externalProblems.error, funnel.error, coverage.error, linkedAssets.error]
       .filter((error): error is NonNullable<typeof error> => Boolean(error))
       .map((error) => error.message);
     const actionRows = actions.error ? null : actions.data ?? [];
@@ -59,6 +61,7 @@ export function ClientOperationalBrief({ clientId, spend, failedRuns, activeRuns
       : null;
     const recordedFunnel = funnel.data?.[0];
     const recordedCoverage = coverage.data?.[0];
+    const topLinkedAsset = linkedAssets.data?.find((row) => row.leads > 0);
     setBrief({
       capturedAt: new Date().toISOString(),
       staleApprovals: stale.error ? null : stale.count,
@@ -83,6 +86,10 @@ export function ClientOperationalBrief({ clientId, spend, failedRuns, activeRuns
         latestMetaRead: recordedCoverage.latest_meta_read_at,
         latestGoogleRead: recordedCoverage.latest_google_read_at,
       },
+      linkedAsset: linkedAssets.error ? undefined : topLinkedAsset
+        ? { title: topLinkedAsset.asset_title ?? topLinkedAsset.asset_ref ?? "Untitled asset",
+            leads: topLinkedAsset.leads, sales: topLinkedAsset.sales }
+        : null,
       errors,
     });
   }, [clientId]);
@@ -122,7 +129,12 @@ export function ClientOperationalBrief({ clientId, spend, failedRuns, activeRuns
         <div><dt className="text-muted-foreground">Latest paid account inventory read</dt><dd>
           {brief?.measurement ? `Meta: ${brief.measurement.latestMetaRead ? new Date(brief.measurement.latestMetaRead).toLocaleString() : "unknown"} · Google: ${brief.measurement.latestGoogleRead ? new Date(brief.measurement.latestGoogleRead).toLocaleString() : "unknown"}` : "unknown"}
         </dd></div>
+        <div><dt className="text-muted-foreground">Content with recorded lead links · all time</dt><dd>
+          {brief?.linkedAsset === undefined ? "unknown" : brief.linkedAsset === null ? "none recorded" : `${brief.linkedAsset.title}: ${brief.linkedAsset.leads} linked leads, ${brief.linkedAsset.sales} recorded sales`}
+          {" "}<Link className="text-primary underline" to={`${base}/delivery/attribution-os`}>Review evidence</Link>
+        </dd></div>
       </dl>
+      <p className="mt-3 text-xs text-muted-foreground">Lead links are recorded associations, with limited confidence until source and provider coverage are verified. They do not prove that content caused a sale.</p>
       {brief?.heldApprovalItems && brief.heldApprovalItems.length > 0 && (
         <div className="mt-3 text-xs text-muted-foreground">
           <p className="font-semibold">Approvals needing source attention</p>
