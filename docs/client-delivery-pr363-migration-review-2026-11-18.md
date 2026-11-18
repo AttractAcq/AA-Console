@@ -1,6 +1,6 @@
 # PR #363 migration review manifest — 18 November 2026
 
-**Candidate source:** `cf16cc6d95c12a103726d9dd6be810d755cac4aa` on draft [PR #363](https://github.com/AttractAcq/AA-Console/pull/363). This pins the SQL files below, not a hosted release. A later source edit invalidates the hashes.
+**Candidate source:** draft [PR #363](https://github.com/AttractAcq/AA-Console/pull/363). The full SHA-256 values below pin the SQL files, not a hosted release. Recheck the PR head and each hash before any apply.
 **Observed hosted baseline:** Production and staging last reported head `20261124034600` (migration 551). Staging has one extra historical correction row. Refresh both heads, cron state, parity and deployment identity before any apply. The eight staging migration-history findings are unresolved.
 
 ## Ordered candidate
@@ -22,14 +22,15 @@
 | 564 | `20261124035900_564_production_attempt_timing.sql` | `640eaaed81e00bb99bbb6942a01f1f6efbaed1c366bd03a44a83a89c98355695` | Production attempt timing and terminal render timestamp |
 | 565 | `20261124040000_565_assignable_production_demand_search.sql` | `dac831bdd301d6cc3efa2fc6bcf60a00779cc9d191b2b4d66d3f50720a3c7229` | Brief-filtered request discovery view |
 | 566 | `20261124040100_566_human_assignment_brief_client_guard.sql` | `6d87c1e58d87c4afbe33c6001cd9b1c48a34c91448abeb7f060861375b8ba07c` | Brief/client guard for human assignments |
+| 567 | `20261124040200_567_ads_metric_observation.sql` | `0ae837603ec0785fc9850337c7c3c4836661fcbf0482700cc7816810bf104140` | Distinguish absent provider metrics rows from observed zero activity in Meta and Google reads |
 
 ## Review and stop gates
 
 1. Confirm PR head and all four CI jobs at the exact candidate commit. Local disposable replay passed clean and released-to-current equivalence, catalog, generated types, four Phase 5 fixtures and the signed-in read gate; this is not hosted parity.
 2. Refresh production and staging migration heads and validated schema parity. Disposition the eight unresolved staging history findings with evidence; do not rewrite migration records to hide them. Keep outward switches off.
 3. Run [`phase5-assignment-brief-client-drift.sql`](/Users/alex/aa-console-client-delivery-completion/supabase/verification/phase5-assignment-brief-client-drift.sql) under a genuinely cross-client read role and record the aggregate. A scoped user returning zero is not an audit. Migration 566 preserves historical rows and guards new/retargeted writes.
-4. Review replacement function signatures, grants and invoker/definer rights. Migrations 561–564 alter tables or create new state. Migrate the database before deploying browser/runtime code that calls new RPCs or views, particularly migrations 563 and 565.
-5. Rehearse the exact ordered SQL and application build on an isolated or recoverable staging copy, with data/Auth preservation, tenant/RLS tests and rollback/forward-repair evidence. The earlier hosted staging rehearsal covers only its pinned manifest through migration 551; it does not cover these 15 files.
+4. Review replacement function signatures, grants and invoker/definer rights. Migrations 561–564 alter tables or create new state; migration 567 adds four metric-observation columns and replaces two service-only read-recording functions. Migrate the database before deploying browser/runtime code that calls new RPCs or views, particularly migrations 563 and 565. A partial deployment could leave old readers presenting zero placeholders as observed metrics.
+5. Rehearse the exact ordered SQL and application build on an isolated or recoverable staging copy, with data/Auth preservation, tenant/RLS tests and rollback/forward-repair evidence. The earlier hosted staging rehearsal covers only its pinned manifest through migration 551; it does not cover these 16 files.
 6. Alex via Chief of Staff owns merge, production migrations and Railway deployment under `AGENTS.md`. Stop at the first failed guard, failed migration or parity mismatch. A code rollback does not undo database changes.
 
 ## Acceptance remains open

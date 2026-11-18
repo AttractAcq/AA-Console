@@ -107,10 +107,12 @@ function MetaAdsReadPanelForClient({ clientId }: { clientId: string | undefined 
         </button>)}
         {campaign && <dl className="grid gap-1 rounded border border-border p-3 text-sm">
           <div><dt>Status</dt><dd>{campaign.status} · effective {campaign.effective_status}</dd></div>
-          <div><dt>Impressions</dt><dd>{campaign.impressions}</dd></div>
-          <div><dt>Clicks</dt><dd>{campaign.clicks}</dd></div>
-          <div><dt>Spend in period</dt><dd>{Number(campaign.spend).toFixed(2)} {run.currency}</dd></div>
-          <div><dt>Actions by type</dt><dd>{actionLabels(campaign.actions)}</dd></div>
+          {campaign.metrics_observed ? <>
+            <div><dt>Impressions</dt><dd>{campaign.impressions}</dd></div>
+            <div><dt>Clicks</dt><dd>{campaign.clicks}</dd></div>
+            <div><dt>Spend in period</dt><dd>{Number(campaign.spend).toFixed(2)} {run.currency}</dd></div>
+            <div><dt>Actions by type</dt><dd>{actionLabels(campaign.actions)}</dd></div>
+          </> : <div><dt>Period metrics</dt><dd>Unknown — no provider metrics row returned.</dd></div>}
         </dl>}
       </div>
       <div className="space-y-1"><h4 className="font-medium">Ads ({ads.length})</h4>
@@ -124,10 +126,12 @@ function MetaAdsReadPanelForClient({ clientId }: { clientId: string | undefined 
           <div><dt>Campaign / ad set</dt><dd>{ad.external_campaign_id} / {ad.external_adset_id}</dd></div>
           <div><dt>Status</dt><dd>{ad.status} · effective {ad.effective_status}</dd></div>
           <div><dt>Creative</dt><dd>{ad.creative_name ?? "None returned"} {ad.creative_id ?? ""}</dd></div>
-          <div><dt>Impressions</dt><dd>{ad.impressions}</dd></div>
-          <div><dt>Clicks</dt><dd>{ad.clicks}</dd></div>
-          <div><dt>Spend in period</dt><dd>{Number(ad.spend).toFixed(2)} {run.currency}</dd></div>
-          <div><dt>Actions by type</dt><dd>{actionLabels(ad.actions)}</dd></div>
+          {ad.metrics_observed ? <>
+            <div><dt>Impressions</dt><dd>{ad.impressions}</dd></div>
+            <div><dt>Clicks</dt><dd>{ad.clicks}</dd></div>
+            <div><dt>Spend in period</dt><dd>{Number(ad.spend).toFixed(2)} {run.currency}</dd></div>
+            <div><dt>Actions by type</dt><dd>{actionLabels(ad.actions)}</dd></div>
+          </> : <div><dt>Period metrics</dt><dd>Unknown — no provider metrics row returned.</dd></div>}
         </dl>}
       </div>
     </div>}

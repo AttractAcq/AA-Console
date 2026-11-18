@@ -31,12 +31,12 @@ describe("Google Ads read-only inventory", () => {
     const read = await readGoogleAdsAccount(credentials,"2026-11-01","2026-11-16",fetchImpl);
     expect(read).toEqual({customerId:"1234567890",currency:"USD",
       requestId:"account-req:inventory-req:metrics-req:ad-inventory:ad-metrics",campaigns:[{
-        id:"42",name:"Local leads",status:"ENABLED",channel:"SEARCH",
+        id:"42",name:"Local leads",status:"ENABLED",channel:"SEARCH",metrics_observed:true,
         impressions:"100",clicks:"8",cost_micros:"1230000",conversions:"1.25",
       }],ads:[{resource_name:"customers/1234567890/adGroupAds/7~9",
         campaign_id:"42",ad_group_id:"7",ad_id:"9",status:"ENABLED",
         ad_type:"RESPONSIVE_SEARCH_AD",final_urls:["https://example.com"],
-        headlines:["Lead headline"],descriptions:["Lead description"],
+        headlines:["Lead headline"],descriptions:["Lead description"],metrics_observed:true,
         impressions:"50",clicks:"4",cost_micros:"600000",conversions:"1"}]});
     expect(fetchImpl).toHaveBeenCalledTimes(5);
     for (const [url, options] of fetchImpl.mock.calls) {
@@ -82,6 +82,7 @@ describe("Google Ads read-only inventory", () => {
     expect(read.campaigns).toHaveLength(2);
     expect(JSON.parse(String(fetchImpl.mock.calls[2]?.[1]?.body)).pageToken).toBe("next");
     expect(read.campaigns[0]?.cost_micros).toBe("0");
+    expect(read.campaigns.every((campaign) => campaign.metrics_observed === false)).toBe(true);
   });
 
   it("rejects an ad whose resource identity does not match the exact customer and ad group", async () => {

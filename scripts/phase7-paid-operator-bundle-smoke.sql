@@ -15,16 +15,39 @@ insert into public.clients(id,name,initials) values
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Paid operator fixture','PO');
 insert into public.client_users(client_id,user_id) values
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','99999999-9999-4999-8999-999999999999');
-insert into public.service_offers(id,client_id,service_name) values
-  ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Fixture service');
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
 select set_config('request.jwt.claims',
   '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+do $source$
+declare oid uuid; main_offer uuid; approval_id uuid;
+begin
+  insert into public.market_opportunities(client_id,name,micro_market,buying_situation,
+    core_problem,desired_outcome,idempotency_key,confidence)
+  values('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Paid local buyers',
+    'Local service buyers','Need service this month','Cannot find a provider',
+    'A booked consultation','paid-operator-opportunity','conversation') returning id into oid;
+  update public.market_opportunities set status='validated' where id=oid;
+  insert into public.service_offers(client_id,kind,service_name)
+    values('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','main','Fixture service')
+    returning id into main_offer;
+  insert into public.opportunity_links(opportunity_id,client_id,role,offer_id)
+    values(oid,'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','offer',main_offer);
+  insert into public.opportunity_scores(opportunity_id,client_id,factors,total,classification)
+    values(oid,'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','{}'::jsonb,72,'test');
+  insert into public.opportunity_awareness_stages(opportunity_id,client_id,stage,mindset,message)
+    values(oid,'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','problem_aware',
+      'Need a provider','Book a consultation');
+  approval_id:=public.request_opportunity_approval_v6(oid);
+  perform public.approve_opportunity_v6(oid,approval_id);
+  perform public.create_secondary_offer_v7(oid);
+end $source$;
 select public.create_service_offer_version_v6(
-  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Fixture service','Local buyers',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','New secondary offer','Local buyers',
   'Fixture promise',array[]::text[],array[]::text[],null,null,null,'[]'::jsonb,
-  'paid-fixture','eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
+  'paid-fixture',(select id from public.service_offers
+    where client_id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' and kind='secondary'
+    order by created_at desc limit 1));
 select public.approve_service_offer_version_v6(id)
   from public.service_offer_versions where idempotency_key='paid-fixture';
 insert into public.client_campaigns(id,client_id,name,brief,acquisition_mode,runs_organic,runs_paid,
@@ -35,6 +58,9 @@ values ('cccccccc-cccc-4ccc-8ccc-cccccccccccc',
   'paid',false,true,'meta',1,0,1,now(),
   (select id from public.service_offer_versions where idempotency_key='paid-fixture'),
   'Local buyers',array['US'],25);
+insert into public.opportunity_links(opportunity_id,client_id,role,campaign_id)
+select o.id,o.client_id,'campaign','cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+  from public.market_opportunities o where o.idempotency_key='paid-operator-opportunity';
 select public.set_campaign_content_spec_v7('cccccccc-cccc-4ccc-8ccc-cccccccccccc',
   '[{"route":"paid","platform":"facebook","media_type":"image","content_format":"single"}]'::jsonb);
 select public.approve_campaign_plan_v6('cccccccc-cccc-4ccc-8ccc-cccccccccccc');

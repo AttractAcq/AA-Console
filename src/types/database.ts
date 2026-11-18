@@ -14073,6 +14073,7 @@ export type Database = {
           final_urls: Json
           headlines: Json
           impressions: number
+          metrics_observed: boolean
           resource_name: string
           run_id: string
           status: string
@@ -14090,6 +14091,7 @@ export type Database = {
           final_urls: Json
           headlines: Json
           impressions: number
+          metrics_observed?: boolean
           resource_name: string
           run_id: string
           status: string
@@ -14107,6 +14109,7 @@ export type Database = {
           final_urls?: Json
           headlines?: Json
           impressions?: number
+          metrics_observed?: boolean
           resource_name?: string
           run_id?: string
           status?: string
@@ -14468,6 +14471,7 @@ export type Database = {
           cost_micros: number
           external_campaign_id: string
           impressions: number
+          metrics_observed: boolean
           name: string
           run_id: string
           status: string
@@ -14480,6 +14484,7 @@ export type Database = {
           cost_micros: number
           external_campaign_id: string
           impressions: number
+          metrics_observed?: boolean
           name: string
           run_id: string
           status: string
@@ -14492,6 +14497,7 @@ export type Database = {
           cost_micros?: number
           external_campaign_id?: string
           impressions?: number
+          metrics_observed?: boolean
           name?: string
           run_id?: string
           status?: string
@@ -18787,6 +18793,7 @@ export type Database = {
           external_adset_id: string
           external_campaign_id: string
           impressions: number
+          metrics_observed: boolean
           name: string
           run_id: string
           spend: number
@@ -18803,6 +18810,7 @@ export type Database = {
           external_adset_id: string
           external_campaign_id: string
           impressions: number
+          metrics_observed?: boolean
           name: string
           run_id: string
           spend: number
@@ -18819,6 +18827,7 @@ export type Database = {
           external_adset_id?: string
           external_campaign_id?: string
           impressions?: number
+          metrics_observed?: boolean
           name?: string
           run_id?: string
           spend?: number
@@ -18849,6 +18858,7 @@ export type Database = {
           effective_status: string
           external_campaign_id: string
           impressions: number
+          metrics_observed: boolean
           name: string
           run_id: string
           spend: number
@@ -18861,6 +18871,7 @@ export type Database = {
           effective_status: string
           external_campaign_id: string
           impressions: number
+          metrics_observed?: boolean
           name: string
           run_id: string
           spend: number
@@ -18873,6 +18884,7 @@ export type Database = {
           effective_status?: string
           external_campaign_id?: string
           impressions?: number
+          metrics_observed?: boolean
           name?: string
           run_id?: string
           spend?: number

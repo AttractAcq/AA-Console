@@ -46,11 +46,11 @@ describe("Google Ads read-only account view", () => {
       from_date:"2026-11-01",through_date:"2026-11-16",fetched_at:"2026-11-16T12:00:00Z",
       provider_request_id:"request-1"}];
     campaigns=[{run_id:"run-1",client_id:"client-1",external_campaign_id:"42",
-      name:"Lead search",status:"ENABLED",channel:"SEARCH",impressions:100,clicks:8,
+      name:"Lead search",status:"ENABLED",channel:"SEARCH",metrics_observed:true,impressions:100,clicks:8,
       cost_micros:1230000,conversions:1.25}];
     ads=[{run_id:"run-1",client_id:"client-1",resource_name:"customers/1234567890/adGroupAds/7~9",
       external_campaign_id:"42",external_ad_group_id:"7",external_ad_id:"9",
-      status:"ENABLED",ad_type:"RESPONSIVE_SEARCH_AD",final_urls:["https://example.com"],
+      status:"ENABLED",ad_type:"RESPONSIVE_SEARCH_AD",metrics_observed:true,final_urls:["https://example.com"],
       headlines:["Lead headline"],descriptions:["Lead description"],impressions:50,
       clicks:4,cost_micros:600000,conversions:1}];
     matches=[{bundle_id:"bundle-1",reported_campaign_id:"99",
@@ -84,7 +84,7 @@ describe("Google Ads read-only account view", () => {
       from_date:"2026-11-01",through_date:"2026-11-16",fetched_at:"2026-11-16T12:00:00Z",
       provider_request_id:"request-1"}];
     campaigns=[{run_id:"run-1",client_id:"client-1",external_campaign_id:"42",
-      name:"Lead search",status:"ENABLED",channel:"SEARCH",impressions:100,clicks:8,
+      name:"Lead search",status:"ENABLED",channel:"SEARCH",metrics_observed:true,impressions:100,clicks:8,
       cost_micros:1230000,conversions:1.25}];
     const view=render(<GoogleAdsReadPanel clientId="client-1" />);
     await userEvent.click(await screen.findByRole("button",{name:/Lead search · ENABLED · 42/}));
@@ -94,5 +94,19 @@ describe("Google Ads read-only account view", () => {
     expect(screen.queryByText(/Customer 1234567890/)).not.toBeInTheDocument();
     expect(screen.queryByText("1.23 USD")).not.toBeInTheDocument();
     expect(await screen.findByText(/Inventory and metrics are unknown/)).toBeInTheDocument();
+  });
+
+  it("shows missing provider metrics as unknown instead of stored zero placeholders", async () => {
+    runs=[{id:"run-1",client_id:"client-1",integration_id:"integration-1",
+      credential_secret_id:"secret-1",customer_id:"1234567890",currency:"USD",
+      from_date:"2026-11-01",through_date:"2026-11-16",fetched_at:"2026-11-16T12:00:00Z",
+      provider_request_id:"request-1"}];
+    campaigns=[{run_id:"run-1",client_id:"client-1",external_campaign_id:"42",
+      name:"Lead search",status:"ENABLED",channel:"SEARCH",metrics_observed:false,
+      impressions:0,clicks:0,cost_micros:0,conversions:0}];
+    render(<GoogleAdsReadPanel clientId="client-1" />);
+    await userEvent.click(await screen.findByRole("button",{name:/Lead search · ENABLED · 42/}));
+    expect(screen.getByText(/Unknown — no provider metrics row returned/)).toBeInTheDocument();
+    expect(screen.queryByText("0.00 USD")).not.toBeInTheDocument();
   });
 });

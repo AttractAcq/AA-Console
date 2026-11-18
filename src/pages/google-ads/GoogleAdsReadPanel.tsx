@@ -103,10 +103,12 @@ function GoogleAdsReadPanelForClient({ clientId }: { clientId: string | undefine
       {detail && <dl className="grid content-start gap-2 rounded border border-border p-3 text-sm">
         <div><dt className="text-muted-foreground">Campaign</dt><dd>{detail.name} · {detail.channel}</dd></div>
         <div><dt className="text-muted-foreground">Status</dt><dd>{detail.status}</dd></div>
-        <div><dt className="text-muted-foreground">Impressions</dt><dd>{detail.impressions}</dd></div>
-        <div><dt className="text-muted-foreground">Clicks</dt><dd>{detail.clicks}</dd></div>
-        <div><dt className="text-muted-foreground">Spend in period</dt><dd>{(Number(detail.cost_micros)/1_000_000).toFixed(2)} {run.currency}</dd></div>
-        <div><dt className="text-muted-foreground">Conversions</dt><dd>{detail.conversions}</dd></div>
+        {detail.metrics_observed ? <>
+          <div><dt className="text-muted-foreground">Impressions</dt><dd>{detail.impressions}</dd></div>
+          <div><dt className="text-muted-foreground">Clicks</dt><dd>{detail.clicks}</dd></div>
+          <div><dt className="text-muted-foreground">Spend in period</dt><dd>{(Number(detail.cost_micros)/1_000_000).toFixed(2)} {run.currency}</dd></div>
+          <div><dt className="text-muted-foreground">Conversions</dt><dd>{detail.conversions}</dd></div>
+        </> : <div><dt className="text-muted-foreground">Period metrics</dt><dd>Unknown — no provider metrics row returned.</dd></div>}
       </dl>}
     </div>}
     {run && <div className="space-y-2">
@@ -125,10 +127,12 @@ function GoogleAdsReadPanelForClient({ clientId }: { clientId: string | undefine
           <div><dt className="text-muted-foreground">Headlines</dt><dd>{Array.isArray(adDetail.headlines) && adDetail.headlines.length ? adDetail.headlines.join(" · ") : "No text assets returned"}</dd></div>
           <div><dt className="text-muted-foreground">Descriptions</dt><dd>{Array.isArray(adDetail.descriptions) && adDetail.descriptions.length ? adDetail.descriptions.join(" · ") : "No text assets returned"}</dd></div>
           <div><dt className="text-muted-foreground">Final URLs</dt><dd>{Array.isArray(adDetail.final_urls) && adDetail.final_urls.length ? adDetail.final_urls.join(" · ") : "None returned"}</dd></div>
-          <div><dt className="text-muted-foreground">Impressions</dt><dd>{adDetail.impressions}</dd></div>
-          <div><dt className="text-muted-foreground">Clicks</dt><dd>{adDetail.clicks}</dd></div>
-          <div><dt className="text-muted-foreground">Spend in period</dt><dd>{(Number(adDetail.cost_micros)/1_000_000).toFixed(2)} {run.currency}</dd></div>
-          <div><dt className="text-muted-foreground">Conversions</dt><dd>{adDetail.conversions}</dd></div>
+          {adDetail.metrics_observed ? <>
+            <div><dt className="text-muted-foreground">Impressions</dt><dd>{adDetail.impressions}</dd></div>
+            <div><dt className="text-muted-foreground">Clicks</dt><dd>{adDetail.clicks}</dd></div>
+            <div><dt className="text-muted-foreground">Spend in period</dt><dd>{(Number(adDetail.cost_micros)/1_000_000).toFixed(2)} {run.currency}</dd></div>
+            <div><dt className="text-muted-foreground">Conversions</dt><dd>{adDetail.conversions}</dd></div>
+          </> : <div><dt className="text-muted-foreground">Period metrics</dt><dd>Unknown — no provider metrics row returned.</dd></div>}
         </dl>}
       </div>
     </div>}
