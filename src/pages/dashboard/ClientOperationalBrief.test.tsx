@@ -47,9 +47,11 @@ vi.mock("../../lib/supabase", () => {
     };
   return { supabase: {
     from: makeQuery,
-    rpc: (name: string, args: { p_client_id: string }) => {
-      if (name !== "list_client_external_outcomes_v6") throw new Error(`Unexpected RPC ${name}`);
+    rpc: (name: string, args: { p_client_id: string; p_days?: number }) => {
       reads.push({ table: "client_external_outcomes_v6", clientId: args.p_client_id });
+      if (name === "acquisition_funnel") return Promise.resolve({ data: [{ leads: 4, sales: 1 }], error: null });
+      if (name === "acquisition_coverage_v8") return Promise.resolve({ data: [{ sourced_leads: 3, consented_leads: 2, latest_meta_read_at: null, latest_google_read_at: null }], error: null });
+      if (name !== "list_client_external_outcomes_v6") throw new Error(`Unexpected RPC ${name}`);
       return makeQuery("client_external_outcomes_v6");
     },
   } };
@@ -66,7 +68,9 @@ it("keeps failed source counts unknown and scopes every brief read to its client
   expect(screen.getByText(/meta: connected/)).toHaveTextContent("no check recorded");
   expect(screen.getByText("External execution").parentElement).toHaveTextContent("2 requiring reconciliation");
   expect(screen.getByRole("link", { name: /google review reply/ })).toHaveAttribute("href", "/clients/client-1/google-profile?tab=reviews");
-  expect(reads).toHaveLength(12);
+  expect(screen.getByText("Recorded acquisition · 30 days").parentElement).toHaveTextContent("4 leads · 1 sales; 3/4 leads with source; 2/4 with recorded consent");
+  expect(screen.getByText("Paid account read-back · 30 days").parentElement).toHaveTextContent("Meta: unknown · Google: unknown");
+  expect(reads).toHaveLength(14);
   expect(reads.every((read) => read.clientId === "client-1")).toBe(true);
 });
 
