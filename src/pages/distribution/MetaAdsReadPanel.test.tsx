@@ -64,4 +64,20 @@ describe("Meta Ads account view", () => {
     expect(await screen.findByText(/account or credential changed after the last read/)).toBeInTheDocument();
     expect(screen.queryByText(/Account act_123/)).not.toBeInTheDocument();
   });
+
+  it("clears the previous client's account read and selection when the client changes", async () => {
+    runs = [{ id: "run-1", integration_id: "integration-1", credential_secret_id: "secret-1",
+      account_id: "act_123", currency: "USD", from_date: "2026-11-01",
+      through_date: "2026-11-16", fetched_at: "2026-11-16T12:00:00Z" }];
+    campaigns = [{ external_campaign_id: "42", name: "Leads", status: "ACTIVE",
+      effective_status: "ACTIVE", impressions: 100, clicks: 8, spend: 12.3, actions: [] }];
+    const view = render(<MetaAdsReadPanel clientId="client-1" />);
+    await userEvent.click(await screen.findByRole("button", { name: /Leads · ACTIVE · 42/ }));
+    expect(screen.getByText("12.30 USD")).toBeInTheDocument();
+    runs = []; campaigns = [];
+    view.rerender(<MetaAdsReadPanel clientId="client-2" />);
+    expect(screen.queryByText(/Account act_123/)).not.toBeInTheDocument();
+    expect(screen.queryByText("12.30 USD")).not.toBeInTheDocument();
+    expect(await screen.findByText(/Inventory and metrics are unknown/)).toBeInTheDocument();
+  });
 });

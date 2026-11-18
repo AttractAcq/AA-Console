@@ -9,6 +9,10 @@ type Ad = Database["public"]["Tables"]["google_ads_ad_reads_v7"]["Row"];
 type Match = Database["public"]["Views"]["google_operator_google_match_v7"]["Row"];
 
 export function GoogleAdsReadPanel({ clientId }: { clientId: string | undefined }) {
+  return <GoogleAdsReadPanelForClient key={clientId ?? "no-client"} clientId={clientId} />;
+}
+
+function GoogleAdsReadPanelForClient({ clientId }: { clientId: string | undefined }) {
   const [run, setRun] = useState<Run | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [ads, setAds] = useState<Ad[]>([]);

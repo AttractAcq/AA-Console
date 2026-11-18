@@ -18,6 +18,10 @@ function actionLabels(value: unknown): string {
 }
 
 export function MetaAdsReadPanel({ clientId }: { clientId: string | undefined }) {
+  return <MetaAdsReadPanelForClient key={clientId ?? "no-client"} clientId={clientId} />;
+}
+
+function MetaAdsReadPanelForClient({ clientId }: { clientId: string | undefined }) {
   const [run, setRun] = useState<Run | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [ads, setAds] = useState<Ad[]>([]);

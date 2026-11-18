@@ -77,4 +77,22 @@ describe("Google Ads read-only account view", () => {
     expect(await screen.findByText(/account or credential changed after the last read/)).toBeInTheDocument();
     expect(screen.queryByText(/Customer 1234567890/)).not.toBeInTheDocument();
   });
+
+  it("clears the previous client's account read and selection when the client changes", async () => {
+    runs=[{id:"run-1",client_id:"client-1",integration_id:"integration-1",
+      credential_secret_id:"secret-1",customer_id:"1234567890",currency:"USD",
+      from_date:"2026-11-01",through_date:"2026-11-16",fetched_at:"2026-11-16T12:00:00Z",
+      provider_request_id:"request-1"}];
+    campaigns=[{run_id:"run-1",client_id:"client-1",external_campaign_id:"42",
+      name:"Lead search",status:"ENABLED",channel:"SEARCH",impressions:100,clicks:8,
+      cost_micros:1230000,conversions:1.25}];
+    const view=render(<GoogleAdsReadPanel clientId="client-1" />);
+    await userEvent.click(await screen.findByRole("button",{name:/Lead search · ENABLED · 42/}));
+    expect(screen.getByText("1.23 USD")).toBeInTheDocument();
+    runs=[]; campaigns=[];
+    view.rerender(<GoogleAdsReadPanel clientId="client-2" />);
+    expect(screen.queryByText(/Customer 1234567890/)).not.toBeInTheDocument();
+    expect(screen.queryByText("1.23 USD")).not.toBeInTheDocument();
+    expect(await screen.findByText(/Inventory and metrics are unknown/)).toBeInTheDocument();
+  });
 });
