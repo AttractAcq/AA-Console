@@ -32,6 +32,8 @@ The intended journey is **onboard → intelligence → opportunity → approved 
 
 The phases express dependencies, not dates. A page may receive early scaffolding and close only when its phase exit evidence exists.
 
+**Fresh live checkpoint, 18 November 2026:** A signed-in, read-only [production inspection](client-delivery-live-readonly-checkpoint-2026-11-18.md) recorded browser `61b2166`, runtime `1429143`, gateway `70c012f` and production migration head `20261124034600` (551). The exported staging/production parity report has 21 findings under the deployed runtime's source digest, including eight unresolved history entries; it does not prove source equivalence for draft PR #363. The in-house client has eight discovered opportunity hypotheses, no currently approved opportunity or signed-off visible offer, and only legacy campaigns in the inspected Campaign Factory list. Agency Inbox reads loaded, but coverage reports 1 of 34 classes operational and the pending offer decision is held for AAL2. Runtime Resend credential presence is Missing. These are current live prerequisites and blockers, not an accepted journey or provider receipt. Production, staging and outward switches were unchanged by the inspection; all phase exit gates remain open.
+
 ## Phase 0 — reconcile the baseline and settle two product decisions
 
 1. Refresh a clean development checkout from GitHub `main`. Compare its SHA, migrations, runtime and frontend with the deployed versions. Reproduce the current client navigation, switches, approval coverage, provider connections, and held routes in a read-only test account. Record discrepancies against the 12 November review; do not turn an old counter into a current claim.
