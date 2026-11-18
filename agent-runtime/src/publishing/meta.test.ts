@@ -187,6 +187,18 @@ describe("whether another attempt could work", () => {
     await expect(instagramAdapter.publish(BASE)).rejects.toMatchObject({ retryable: true });
   });
 
+  it("holds an ambiguous public publish response for account inspection", async () => {
+    graph([
+      [/\/media_publish/, { status: 503, body: {} }],
+      [/\/media$/, { body: { id: "container-uncertain" } }],
+    ]);
+    await expect(instagramAdapter.publish(BASE)).rejects.toMatchObject({
+      retryable: false,
+      uncertain: true,
+      message: expect.stringContaining("inspect the account"),
+    });
+  });
+
   it("does not retry something it does not recognise", async () => {
     // The default has to be "do not", because an unknown error could mean
     // the post went out and the response was lost.

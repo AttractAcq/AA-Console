@@ -86,6 +86,8 @@ export class PublishError extends Error {
   constructor(
     message: string,
     readonly retryable: boolean = false,
+    /** A public write may have landed; inspect the provider before retry. */
+    readonly uncertain: boolean = false,
   ) {
     super(message);
     this.name = "PublishError";

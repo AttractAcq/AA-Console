@@ -218,6 +218,18 @@ describe("the switch", () => {
 });
 
 describe("the sweep", () => {
+  it("records an ambiguous provider write as uncertain without queueing a retry", async () => {
+    publish.mockRejectedValueOnce(new PublishError("Public write outcome uncertain", false, true));
+    const { sb, rpc, events } = database();
+    await runPublisherJob(sb, on, agent, job);
+    expect(argsOf(rpc, "record_post_publish_uncertain_v7")).toMatchObject({
+      p_post_id: POST.post_id,
+      p_reason: expect.stringContaining("uncertain"),
+    });
+    expect(failureFor(rpc, POST.post_id)).toBeUndefined();
+    expect(events.some((e) => String(e.description).includes("Inspect the account"))).toBe(true);
+  });
+
   it("stops a legacy claimed Engine post before integration, token, media URL or provider write", async () => {
     const { sb, rpc, signCalls } = database({ prewriteDenied: true });
     const result = await runPublisherJob(sb, on, agent, job);

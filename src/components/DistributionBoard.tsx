@@ -228,6 +228,7 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
             p.media_type,
             platformLabel(p.platform),
             p.publication_status === "published" ? "Published (recorded)"
+              : p.publication_status === "uncertain" ? `Provider outcome uncertain: ${p.failure_reason ?? "inspect the account before retry"}`
               : p.publication_status === "failed" ? `Failed: ${p.failure_reason ?? "reason not recorded"}`
                 : p.publication_status === "publishing" ? "Publishing attempt in progress"
                   : (statusFor(p.id) ?? "Scheduled"),

@@ -95,6 +95,16 @@ async function openScheduler() {
 }
 
 describe("the board", () => {
+  it("shows an uncertain provider result as held for inspection", async () => {
+    from.mockImplementation(byTable([post({
+      publication_status: "uncertain", publish_attempts: 1,
+      failure_reason: "Public write response timed out; inspect the account.",
+    })]));
+    render(<DistributionBoard channel="organic" />);
+    expect(await screen.findByText(/Provider outcome uncertain: Public write response timed out/))
+      .toBeInTheDocument();
+  });
+
   it("shows recorded attempts, retries and provider IDs without claiming read-back", async () => {
     const events = [
       { id: "e3", post_id: "p1", ref_number: "AA-014", platform: "instagram", event: "published",

@@ -385,6 +385,21 @@ export async function runPublisherJob(
       failed += 1;
       const retryable = thrown instanceof PublishError ? thrown.retryable : false;
       const reason = safeProviderErrorMessage(thrown instanceof Error ? thrown.message : String(thrown));
+      if (thrown instanceof PublishError && thrown.uncertain) {
+        const { error: uncertainError } = await sb.rpc("record_post_publish_uncertain_v7", {
+          p_post_id: post.post_id,
+          p_reason: reason,
+        } as never);
+        if (uncertainError) {
+          logger.error("post_publish_uncertain_unrecorded", {
+            jobId: job.id, postId: post.post_id, message: uncertainError.message,
+          });
+        }
+        await appendEvent(sb, job.id,
+          `${post.platform}: provider outcome uncertain. Inspect the account before another attempt.`,
+          "warn", { post_id: post.post_id });
+        continue;
+      }
       const { error: failError } = await sb.rpc("record_post_publish_failure", {
         p_post_id: post.post_id,
         p_reason: reason,

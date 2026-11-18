@@ -41,7 +41,7 @@ const CONTAINER_POLL_MS = 6_000;
  * usually wants. Here an unknown error could mean the post went out and the
  * response was lost, and retrying that posts twice.
  */
-function classify(status: number, body: unknown): PublishError {
+function classify(status: number, body: unknown, publicEffect = false): PublishError {
   const error = (body as { error?: { message?: string; code?: number; error_subcode?: number } })?.error;
   const code = error?.code;
   const message = error?.message ?? `Graph API returned ${status}`;
@@ -50,20 +50,31 @@ function classify(status: number, body: unknown): PublishError {
     return new PublishError(`${message} (the client's Meta credential needs reconnecting)`, false);
   }
   // 4 app / 17 user / 32 page / 613 custom rate limits, 1 and 2 transient.
-  if (code === 4 || code === 17 || code === 32 || code === 613 || code === 1 || code === 2) {
+  if (code === 4 || code === 17 || code === 32 || code === 613) {
     return new PublishError(`${message} (rate limited)`, true);
+  }
+  if (code === 1 || code === 2) {
+    return publicEffect
+      ? new PublishError(`${message} (public write outcome uncertain; inspect the account)`, false, true)
+      : new PublishError(`${message} (transient error)`, true);
   }
   // 9007 is Instagram saying the container is not ready to be published. The
   // post has definitely not gone out when this comes back, so another attempt
   // builds a fresh container rather than risking a second post.
   if (code === 9007) return new PublishError(`${message} (the media was not ready yet)`, true);
-  if (status === 429 || status >= 500) return new PublishError(message, true);
-  return new PublishError(message, false);
+  if (status === 429) return new PublishError(message, true);
+  if (status >= 500) return publicEffect
+    ? new PublishError(`${message} (public write outcome uncertain; inspect the account)`, false, true)
+    : new PublishError(message, true);
+  return publicEffect
+    ? new PublishError(`${message} (public write outcome uncertain; inspect the account)`, false, true)
+    : new PublishError(message, false);
 }
 
 async function graph(
   path: string,
-  init: { method: "GET" | "POST"; token: string; body?: Record<string, string> },
+  init: { method: "GET" | "POST"; token: string; body?: Record<string, string>;
+    publicEffect?: boolean },
 ): Promise<Record<string, unknown>> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -77,20 +88,21 @@ async function graph(
         ? await fetch(url, { method: "POST", body: form, signal: controller.signal })
         : await fetch(`${url}?${form.toString()}`, { signal: controller.signal });
     const payload = (await response.json().catch(() => null)) as Record<string, unknown> | null;
-    if (!response.ok) throw classify(response.status, payload);
+    if (!response.ok) throw classify(response.status, payload, init.publicEffect);
     // Graph returns 200 with an error body often enough that only checking
     // the status is how you ship a publisher that reports success on
     // failure. The metrics ingest learned this the same way.
-    if (payload && "error" in payload) throw classify(200, payload);
+    if (payload && "error" in payload) throw classify(200, payload, init.publicEffect);
     return payload ?? {};
   } catch (error) {
     if (error instanceof PublishError) throw error;
     const message = error instanceof Error ? error.message : String(error);
-    // A timeout is the one case worth another attempt, and the one most
-    // likely to have landed. Retryable, because the alternative is a post
-    // that never goes out because a socket hiccupped — and a double post is
-    // caught by the duplicate check below.
-    throw new PublishError(`Could not reach the Graph API: ${message}`, true);
+    // The provider may have performed a public write before the connection
+    // failed. There is no provider idempotency key on these endpoints, so a
+    // blind retry could publish twice.
+    throw init.publicEffect
+      ? new PublishError(`Public write outcome uncertain: ${message}. Inspect the account.`, false, true)
+      : new PublishError(`Could not reach the Graph API: ${message}`, true);
   } finally {
     clearTimeout(timer);
   }
@@ -181,12 +193,13 @@ async function publishInstagramCarousel(request: PublishRequest): Promise<Publis
 
   const published = await graph(`${request.accountId}/media_publish`, {
     method: "POST",
+    publicEffect: true,
     token: request.accessToken,
     body: { creation_id: parentId },
   });
   const id = String(published.id ?? "");
   if (!id) {
-    throw new PublishError("Instagram published the carousel but returned no post id.", false);
+    throw new PublishError("Instagram published the carousel but returned no post id.", false, true);
   }
 
   await postFirstComment(request, id);
@@ -232,11 +245,12 @@ async function publishFacebookCarousel(request: PublishRequest): Promise<Publish
 
   const posted = await graph(`${request.accountId}/feed`, {
     method: "POST",
+    publicEffect: true,
     token: request.accessToken,
     body,
   });
   const id = String(posted.post_id ?? posted.id ?? "");
-  if (!id) throw new PublishError("Facebook returned no post id for the carousel.", false);
+  if (!id) throw new PublishError("Facebook returned no post id for the carousel.", false, true);
 
   await postFirstComment(request, id);
 
@@ -315,6 +329,7 @@ async function uploadFacebookVideo(
 
   const finished = await graph(`${request.accountId}/${surface}`, {
     method: "POST",
+    publicEffect: true,
     token: request.accessToken,
     body: {
       upload_phase: "finish",
@@ -386,11 +401,12 @@ export const instagramAdapter: PublishAdapter = {
 
     const published = await graph(`${request.accountId}/media_publish`, {
       method: "POST",
+      publicEffect: true,
       token: request.accessToken,
       body: { creation_id: containerId },
     });
     const id = String(published.id ?? "");
-    if (!id) throw new PublishError("Instagram published the container but returned no post id.", false);
+    if (!id) throw new PublishError("Instagram published the container but returned no post id.", false, true);
 
     await postFirstComment(request, id);
 
@@ -428,6 +444,7 @@ export const instagramAdapter: PublishAdapter = {
 
     const published = await graph(`${request.accountId}/media_publish`, {
       method: "POST",
+      publicEffect: true,
       token: request.accessToken,
       body: { creation_id: containerId },
     });
@@ -436,6 +453,7 @@ export const instagramAdapter: PublishAdapter = {
       throw new PublishError(
         `Instagram published story frame ${frame.position} but returned no post id.`,
         false,
+        true,
       );
     }
     return {
@@ -480,12 +498,13 @@ export const facebookAdapter: PublishAdapter = {
 
     const posted = await graph(`${request.accountId}/${endpoint}`, {
       method: "POST",
+      publicEffect: true,
       token: request.accessToken,
       body,
     });
     // A photo returns a photo id and a post id; a video returns its own id.
     const id = String(posted.post_id ?? posted.id ?? "");
-    if (!id) throw new PublishError("Facebook returned no post id.", false);
+    if (!id) throw new PublishError("Facebook returned no post id.", false, true);
 
     await postFirstComment(request, id);
 
@@ -525,6 +544,7 @@ export const facebookAdapter: PublishAdapter = {
 
     const story = await graph(`${request.accountId}/photo_stories`, {
       method: "POST",
+      publicEffect: true,
       token: request.accessToken,
       body: { photo_id: photoId },
     });
@@ -533,6 +553,7 @@ export const facebookAdapter: PublishAdapter = {
       throw new PublishError(
         `Facebook made story frame ${frame.position} but returned no post id.`,
         false,
+        true,
       );
     }
     return {
