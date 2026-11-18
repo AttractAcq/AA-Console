@@ -31416,6 +31416,21 @@ export type Database = {
           },
         ]
       }
+      content_archive_unlinked: {
+        Row: {
+          archived_at: string | null
+          brief_id: string | null
+          client_id: string | null
+          detail: string | null
+          id: string | null
+          media_type: string | null
+          record_kind: string | null
+          reference: string | null
+          status: string | null
+          title: string | null
+        }
+        Relationships: []
+      }
       content_attribution: {
         Row: {
           appointments: number | null
