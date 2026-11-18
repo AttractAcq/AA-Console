@@ -52,19 +52,18 @@ export async function loadApprovedAssets(): Promise<Option[]> {
   }));
 }
 
-export async function loadBriefs(): Promise<Option[]> {
-  const { data } = await supabase
+export async function loadBriefs(clientId: string): Promise<Option[]> {
+  const { data, error } = await supabase
     .from("client_briefs")
-    .select("id, brief_ref, title, clients(name)")
+    .select("id, brief_ref, title")
+    .eq("client_id", clientId)
     .order("created_at", { ascending: false })
     .limit(200);
-  return (data ?? []).map((b) => {
-    const client = (b as { clients?: { name: string } | null }).clients;
-    return {
-      value: b.id,
-      label: `${b.brief_ref ?? "—"} · ${b.title}${client ? ` (${client.name})` : ""}`,
-    };
-  });
+  if (error) throw error;
+  return (data ?? []).map((b) => ({
+    value: b.id,
+    label: `${b.brief_ref ?? "—"} · ${b.title}`,
+  }));
 }
 
 /** Exact workflow requests that a human assignment may fulfill. The server

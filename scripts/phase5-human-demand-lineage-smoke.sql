@@ -10,6 +10,7 @@ insert into public.profiles(id,role,email) values
 do $checks$
 declare
   c public.clients%rowtype;
+  other_client public.clients%rowtype;
   campaign public.client_campaigns%rowtype;
   pillar public.client_content_pillars%rowtype;
   brief public.client_briefs%rowtype;
@@ -33,6 +34,8 @@ declare
 begin
   insert into public.clients(id,name,initials)
     values('d9999999-9999-4999-8999-999999999993','Human demand fixture','HD') returning * into c;
+  insert into public.clients(name,initials)
+    values('Other human demand client','OC') returning * into other_client;
   insert into public.client_campaigns(client_id,name,brief,built_at)
     values(c.id,'Human demand campaign','Fixture',now()) returning * into campaign;
   insert into public.client_content_pillars
@@ -45,6 +48,14 @@ begin
     values(c.id,'Wrong brief','image','instagram') returning * into other_brief;
   insert into public.team_members(category,name,initials)
     values('editors','Human fixture editor','HE') returning * into maker;
+  refused:=false;
+  begin
+    insert into public.job_assignments(member_id,client_id,brief_id,title)
+      values(maker.id,other_client.id,brief.id,'Wrong client brief');
+  exception when check_violation then
+    refused:=sqlerrm='Assignment brief must belong to the assignment client.';
+  end;
+  if not refused then raise exception 'General assignment accepted another client brief'; end if;
   insert into public.workflow_runs
     (client_id,campaign_id,kind,workflow_version,idempotency_key,input_snapshot,deadline_at)
     values(c.id,campaign.id,'daily_content_package','fixture','human-one','{}',now()+interval '1 day')
@@ -95,6 +106,13 @@ begin
   if not refused then raise exception 'Wrong brief was bound to demand'; end if;
   select * into assignment from public.create_demand_assignment_v7(
     maker.id,c.id,brief.id,'daily',item_one.id,'Exact human delivery');
+  refused:=false;
+  begin
+    update public.client_briefs set client_id=other_client.id where id=brief.id;
+  exception when check_violation then
+    refused:=sqlerrm='An assigned brief cannot move to another client.';
+  end;
+  if not refused then raise exception 'Assigned brief moved to another client'; end if;
   insert into public.client_media_assets
     (client_id,brief_id,member_id,media_type,storage_path)
     values(c.id,brief.id,maker.id,'image',c.id::text||'/human-one.png')

@@ -9,6 +9,8 @@ import type { FieldDef, Option } from "../../../components/forms/fields";
 import { loadBriefs, loadClients, loadProductionDemands, useOptions } from "../../../lib/options";
 import { supabase } from "../../../lib/supabase";
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 type Job = {
   id: string;
   title: string;
@@ -24,8 +26,11 @@ export function CurrentJobsSection() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const clientOptions = useOptions(loadClients, assignOpen);
-  const briefOptions = useOptions(loadBriefs, assignOpen);
   const [selection, setSelection] = useState({ clientId: "", briefId: "" });
+  const [briefLookup, setBriefLookup] = useState<{
+    key: string; options: Option[]; error: string | null; loading: boolean;
+  }>({ key: "", options: [], error: null, loading: false });
+  const briefOptions = briefLookup.key === selection.clientId ? briefLookup.options : [];
   const [demandLookup, setDemandLookup] = useState<{
     key: string; options: Option[]; error: string | null; loading: boolean;
   }>({ key: "", options: [], error: null, loading: false });
@@ -33,7 +38,20 @@ export function CurrentJobsSection() {
   const demandOptions = demandLookup.key === demandKey ? demandLookup.options : [];
 
   useEffect(() => {
-    if (!assignOpen || !selection.clientId || !selection.briefId) return;
+    if (!assignOpen || !selection.clientId) return;
+    let active = true;
+    setBriefLookup({ key: selection.clientId, options: [], error: null, loading: true });
+    void loadBriefs(selection.clientId).then((options) => {
+      if (active) setBriefLookup({ key: selection.clientId, options, error: null, loading: false });
+    }).catch((error: unknown) => {
+      if (active) setBriefLookup({ key: selection.clientId, options: [],
+        error: error instanceof Error ? error.message : "Could not find client briefs.", loading: false });
+    });
+    return () => { active = false; };
+  }, [assignOpen, selection.clientId]);
+
+  useEffect(() => {
+    if (!assignOpen || !selection.clientId || !UUID_PATTERN.test(selection.briefId)) return;
     let active = true;
     setDemandLookup({ key: demandKey, options: [], error: null, loading: true });
     void loadProductionDemands(selection.clientId, selection.briefId).then((options) => {
@@ -88,9 +106,11 @@ export function CurrentJobsSection() {
       name: "brief_id",
       label: "Brief",
       kind: "select",
-      options: briefOptions,
-      hint: "The assignee opens this from the Brief button on their job.",
+      options: [{ value: "manual", label: "Enter an exact brief ID" }, ...briefOptions],
+      hint: "Choose a brief for this client. The assignee opens it from the Brief button on their job.",
     },
+    { name: "manual_brief_id", label: "Exact brief ID", kind: "text", required: true,
+      showIf: { field: "brief_id", equals: ["manual"] } },
     {
       name: "production_demand",
       label: "Campaign or daily request",
@@ -146,27 +166,48 @@ export function CurrentJobsSection() {
         title="Assign Job"
         draftKey={`assign-job:${memberId}`}
         fields={fields}
-        intro={selection.clientId && selection.briefId && demandLookup.key === demandKey
-          ? <>{demandLookup.loading && <p>Finding requests for this brief…</p>}
-              {demandLookup.error && <p role="alert">{demandLookup.error}</p>}
-              {!demandLookup.loading && !demandLookup.error && demandOptions.length === 0
+        intro={selection.clientId
+          ? <>{briefLookup.key === selection.clientId && briefLookup.loading
+                && <p>Finding this client’s briefs…</p>}
+              {briefLookup.key === selection.clientId && briefLookup.error
+                && <p role="alert">{briefLookup.error}</p>}
+              {briefLookup.key === selection.clientId && !briefLookup.loading && !briefLookup.error
+                && briefOptions.length === 0 && <p>No recent briefs found. Enter an exact brief ID if needed.</p>}
+              {selection.briefId && demandLookup.key === demandKey && demandLookup.loading
+                && <p>Finding requests for this brief…</p>}
+              {selection.briefId && demandLookup.key === demandKey && demandLookup.error
+                && <p role="alert">{demandLookup.error}</p>}
+              {selection.briefId && demandLookup.key === demandKey && !demandLookup.loading
+                && !demandLookup.error && demandOptions.length === 0
                 && <p>No matching requests found. Use the exact ID if this is an older request.</p>}</>
           : undefined}
         onValuesChange={(values) => {
           const clientId = typeof values.client_id === "string" ? values.client_id : "";
-          const briefId = typeof values.brief_id === "string" ? values.brief_id : "";
+          const chosenBrief = typeof values.brief_id === "string" ? values.brief_id : "";
+          const briefId = chosenBrief === "manual" && typeof values.manual_brief_id === "string"
+            ? values.manual_brief_id.trim() : chosenBrief;
           setSelection((previous) => previous.clientId === clientId && previous.briefId === briefId
             ? previous : { clientId, briefId });
         }}
         submitLabel="Assign"
         onSubmit={async (v) => {
           if (!memberId) throw new Error("No team member selected.");
+          const chosenBrief = String(v.brief_id ?? "");
+          const briefId = chosenBrief === "manual"
+            ? String(v.manual_brief_id ?? "").trim() : chosenBrief;
+          if (chosenBrief === "manual" && !UUID_PATTERN.test(briefId)) {
+            throw new Error("Enter the full brief ID.");
+          }
+          if (chosenBrief && chosenBrief !== "manual"
+            && !briefOptions.some((option) => option.value === chosenBrief)) {
+            throw new Error("This brief no longer matches the selected client.");
+          }
           const selectedDemand = String(v.production_demand ?? "");
           if (selectedDemand) {
             const [kind, demandId] = selectedDemand === "manual"
               ? [String(v.manual_demand_kind ?? ""), String(v.manual_demand_id ?? "").trim()]
               : selectedDemand.split(":");
-            if (!v.brief_id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(demandId)
+            if (!UUID_PATTERN.test(briefId) || !UUID_PATTERN.test(demandId)
               || (kind !== "daily" && kind !== "campaign")) {
               throw new Error("Select a brief and exact production request.");
             }
@@ -176,7 +217,7 @@ export function CurrentJobsSection() {
             const { error } = await supabase.rpc("create_demand_assignment_v7", {
               p_member_id: memberId,
               p_client_id: v.client_id as string,
-              p_brief_id: v.brief_id as string,
+              p_brief_id: briefId,
               p_demand_kind: kind,
               p_demand_id: demandId,
               p_title: (v.title as string).trim(),
@@ -190,7 +231,7 @@ export function CurrentJobsSection() {
             member_id: memberId,
             client_id: v.client_id as string,
             title: (v.title as string).trim(),
-            brief_id: (v.brief_id as string) || null,
+            brief_id: briefId || null,
             due_date: (v.due_date as string) || null,
             compensation: v.compensation ? Number(v.compensation) : null,
           });

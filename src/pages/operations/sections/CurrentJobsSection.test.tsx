@@ -2,12 +2,12 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 
-const { from, rpc, loadDemands } = vi.hoisted(() =>
-  ({ from: vi.fn(), rpc: vi.fn(), loadDemands: vi.fn() }));
+const { from, rpc, loadDemands, loadBriefs } = vi.hoisted(() =>
+  ({ from: vi.fn(), rpc: vi.fn(), loadDemands: vi.fn(), loadBriefs: vi.fn() }));
 vi.mock("../../../lib/supabase", () => ({ supabase: { from, rpc } }));
 vi.mock("react-router-dom", () => ({ useParams: () => ({ memberId: "maker-1" }) }));
 vi.mock("../../../lib/options", () => ({
-  useOptions: () => [], loadBriefs: vi.fn(), loadClients: vi.fn(),
+  useOptions: () => [], loadBriefs, loadClients: vi.fn(),
   loadProductionDemands: loadDemands,
 }));
 vi.mock("../../../components/forms/FormModal", () => ({
@@ -16,23 +16,29 @@ vi.mock("../../../components/forms/FormModal", () => ({
     onValuesChange: (values: Record<string, unknown>) => void;
     fields: Array<{ name: string; options?: Array<{ label: string }> }>;
   }) => open ? <>
-    <button onClick={() => onValuesChange({ client_id: "client-1", brief_id: "brief-1" })}>Choose scope</button>
+    <button onClick={() => onValuesChange({ client_id: "client-1",
+      brief_id: "11111111-1111-4111-8111-111111111111" })}>Choose scope</button>
+    {fields.find((field) => field.name === "brief_id")?.options?.map((option) =>
+      <span key={option.label}>{option.label}</span>)}
     {fields.find((field) => field.name === "production_demand")?.options?.map((option) =>
       <span key={option.label}>{option.label}</span>)}
     <button onClick={() => void onSubmit({ title: "Make asset", client_id: "client-1",
-      brief_id: "brief-1", production_demand: "daily:12345678-aaaa-4bbb-8ccc-123456789abc" })}>Assign demand</button>
+      brief_id: "11111111-1111-4111-8111-111111111111",
+      production_demand: "daily:12345678-aaaa-4bbb-8ccc-123456789abc" })}>Assign demand</button>
     <button onClick={() => void onSubmit({ title: "Older campaign asset", client_id: "client-1",
-      brief_id: "brief-1", production_demand: "manual", manual_demand_kind: "campaign",
+      brief_id: "manual", manual_brief_id: "11111111-1111-4111-8111-111111111111",
+      production_demand: "manual", manual_demand_kind: "campaign",
       manual_demand_id: "87654321-bbbb-4ccc-8ddd-123456789abc" })}>Assign exact older</button>
-    <button onClick={() => void onSubmit({ title: "General work", client_id: "client-1",
-      brief_id: "brief-1" })}>Assign general</button>
+    <button onClick={() => void onSubmit({ title: "General work", client_id: "client-1" })}>Assign general</button>
   </> : null,
 }));
 
 import { CurrentJobsSection } from "./CurrentJobsSection";
 
 beforeEach(() => {
-  from.mockReset(); rpc.mockReset(); loadDemands.mockReset();
+  from.mockReset(); rpc.mockReset(); loadDemands.mockReset(); loadBriefs.mockReset();
+  loadBriefs.mockResolvedValue([{ value: "11111111-1111-4111-8111-111111111111",
+    label: "Matching brief" }]);
   loadDemands.mockResolvedValue([{ value: "daily:12345678-aaaa-4bbb-8ccc-123456789abc",
     label: "Matching request" }]);
   from.mockImplementation(() => {
@@ -51,14 +57,17 @@ it("binds a selected human job to the exact production demand", async () => {
   render(<CurrentJobsSection />);
   await userEvent.click(await screen.findByRole("button", { name: "Assign Job" }));
   await userEvent.click(screen.getByRole("button", { name: "Choose scope" }));
+  expect(await screen.findByText("Matching brief")).toBeInTheDocument();
   expect(await screen.findByText("Matching request")).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Assign demand" }));
   await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_demand_assignment_v7", {
-    p_member_id: "maker-1", p_client_id: "client-1", p_brief_id: "brief-1",
+    p_member_id: "maker-1", p_client_id: "client-1",
+    p_brief_id: "11111111-1111-4111-8111-111111111111",
     p_demand_kind: "daily", p_demand_id: "12345678-aaaa-4bbb-8ccc-123456789abc", p_title: "Make asset",
     p_due_date: undefined, p_compensation: undefined,
   }));
-  expect(loadDemands).toHaveBeenCalledWith("client-1", "brief-1");
+  expect(loadBriefs).toHaveBeenCalledWith("client-1");
+  expect(loadDemands).toHaveBeenCalledWith("client-1", "11111111-1111-4111-8111-111111111111");
   expect(from.mock.results.some((call) => call.value.insert?.mock.calls.length)).toBe(false);
 });
 
@@ -68,6 +77,7 @@ it("accepts an exact campaign request ID outside the loaded choices", async () =
   await userEvent.click(screen.getByRole("button", { name: "Assign exact older" }));
   await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_demand_assignment_v7",
     expect.objectContaining({ p_demand_kind: "campaign",
+      p_brief_id: "11111111-1111-4111-8111-111111111111",
       p_demand_id: "87654321-bbbb-4ccc-8ddd-123456789abc" })));
 });
 
