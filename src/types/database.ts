@@ -40170,6 +40170,15 @@ export type Database = {
         }
         Returns: string
       }
+      decide_paid_operator_bundle_v7: {
+        Args: {
+          p_approved: boolean
+          p_bundle_id: string
+          p_reason?: string
+          p_request_id: string
+        }
+        Returns: string
+      }
       decide_production_release_candidate_v6: {
         Args: {
           p_decision: string
@@ -42258,12 +42267,20 @@ export type Database = {
         Args: { p_message_id: string }
         Returns: boolean
       }
+      paid_operator_bundle_approved_v7: {
+        Args: { p_bundle_id: string }
+        Returns: boolean
+      }
       paid_operator_bundle_current_v7: {
         Args: { p_bundle_id: string }
         Returns: boolean
       }
       paid_operator_bundle_export_v7: {
         Args: { p_bundle_id: string }
+        Returns: string
+      }
+      paid_operator_bundle_review_source_state_v7: {
+        Args: { p_request_id: string }
         Returns: string
       }
       paid_operator_source_v7: { Args: { p_package_id: string }; Returns: Json }

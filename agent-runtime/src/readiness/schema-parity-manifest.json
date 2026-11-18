@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "2dc9006064a81e1f846b61cebbf464f8696fc5b1758461733aacb93d9af2d291",
-  "generatedTypesSha256": "6b598d8093e6cfe91ad9b514177c6a7c8d8261834621527a0ebf9ca03bc188c6",
-  "generatedSchemaBodySha256": "9a31902a5d639d7e5f03bfabf522fd7e559526a0439774f3a4558a2ca6c93e40",
+  "migrationSourceDigest": "a1fbcb9cc14d42e5cf2af9c1880e4e31c96321d5eb37cb73ff3336435a062bad",
+  "generatedTypesSha256": "efa6c88beda20e4019eebdc5ad529d67327b69300ed15d2e06b55cf1a126008e",
+  "generatedSchemaBodySha256": "169616629aae9fd3cdb646ebc3f7c2eab01d6a7f951e4c452c4be3dee7ce6fd1",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4154,6 +4154,13 @@
       "filename": "20261124041100_576_paid_google_operator_account_match.sql",
       "sha256": "c10c6712e0bebedac72a3c5dbff658a5814df56d737882951f9ce4486e886f05",
       "trimmedMd5": "38b50f19fb127746af490c6436bbc0d2"
+    },
+    {
+      "version": "20261124041200",
+      "name": "577_paid_operator_bundle_review",
+      "filename": "20261124041200_577_paid_operator_bundle_review.sql",
+      "sha256": "a55fa714c37d91558d957d0f4861399d1c8215ec59077a4008239da9be738af8",
+      "trimmedMd5": "f942911da578e02a44c6b39e5989ad37"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

@@ -72,7 +72,7 @@ it("requires a reported verified download before the handoff button is usable", 
     snapshot_hash: "a".repeat(64), snapshot: { source: { campaign_name: "Local offer" } },
     created_at: "2026-11-16T00:00:00Z", created_by: "user-1" }];
   render(<PaidOperatorBundles clientId="client-1" platform="meta" />);
-  expect(await screen.findByText(/Local offer · v1 · current/)).toBeInTheDocument();
+  expect(await screen.findByText(/Local offer · v1 · approved and current/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Report handoff" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Download and verify all files" })).toBeEnabled();
 });
@@ -90,12 +90,27 @@ it("shows the reviewed Google copy packet without requiring a media file", async
     configured_customer_id: "1234567890", read_run_id: "read-1",
     provider_request_id: "request-1", latest_fetched_at: "2026-11-16T01:00:00Z" }];
   render(<PaidOperatorBundles clientId="client-1" platform="google" />);
-  expect(await screen.findByText(/Local offer · v1 · current/)).toBeInTheDocument();
+  expect(await screen.findByText(/Local offer · v1 · approved and current/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Download and verify Google packet" })).toBeEnabled();
   expect(screen.queryByRole("button", { name: /Download verified/ })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Report handoff" })).toBeDisabled();
   expect(screen.getByText(/period metrics unknown/)).toBeInTheDocument();
   expect(screen.getByText(/Customer 1234567890 · read read-1/)).toBeInTheDocument();
+});
+
+it("holds exact packet download and handoff until the bundle review is approved", async () => {
+  rows.paid_operator_bundles_v7 = [{ id: "bundle-1", client_id: "client-1",
+    campaign_id: "campaign-1", package_id: "package-1", platform: "meta", version: 1,
+    snapshot_hash: "a".repeat(64), snapshot: { source: { campaign_name: "Local offer" } },
+    created_at: "2026-11-16T00:00:00Z", created_by: "user-1" }];
+  rpc.mockImplementation((name: string) => Promise.resolve({
+    data: name === "paid_operator_bundle_approved_v7" ? false : true, error: null,
+  }));
+  render(<PaidOperatorBundles clientId="client-1" platform="meta" />);
+  expect(await screen.findByText(/Local offer · v1 · not approved/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Download exact JSON" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Download and verify all files" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Report handoff" })).toBeDisabled();
 });
 
 it("shows a metric row match without calling it provider verification", async () => {

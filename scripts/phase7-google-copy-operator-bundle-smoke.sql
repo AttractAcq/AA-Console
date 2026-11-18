@@ -152,6 +152,19 @@ begin
     or bundle.snapshot->'source'->'creative'->0->>'copy_hash'<>v_copy_hash
     or bundle.snapshot->'source'->'route'->>'id'<>route_id::text then
     raise exception 'Exact Google bundle lost reviewed copy or route'; end if;
+  select id into request_id from public.approval_requests_v6
+    where source_kind='paid_operator_bundle' and source_id=bundle.id::text;
+  if request_id is null or public.paid_operator_bundle_approved_v7(bundle.id)
+    or public.paid_operator_bundle_review_source_state_v7(request_id)<>'pending' then
+    raise exception 'Frozen Google packet bypassed exact review'; end if;
+  begin
+    perform public.paid_operator_bundle_export_v7(bundle.id);
+  exception when insufficient_privilege then refused:=true; end;
+  if not refused then raise exception 'Unapproved Google packet exported'; end if;
+  refused:=false;
+  perform public.decide_paid_operator_bundle_v7(bundle.id,request_id,true,null);
+  if not public.paid_operator_bundle_approved_v7(bundle.id) then
+    raise exception 'Exact Google packet approval did not bind'; end if;
   begin
     perform public.record_paid_operator_event_v7(bundle.id,'handoff_reported','ticket-100');
   exception when check_violation then refused:=true; end;

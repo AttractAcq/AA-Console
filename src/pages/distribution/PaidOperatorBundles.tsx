@@ -59,6 +59,7 @@ export function PaidOperatorBundles({ clientId, platform }: {
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [current, setCurrent] = useState<Record<string, boolean>>({});
+  const [approved, setApproved] = useState<Record<string, boolean>>({});
   const [matches, setMatches] = useState<Record<string, MetricMatch>>({});
   const [packageId, setPackageId] = useState("");
   const [owner, setOwner] = useState("");
@@ -94,15 +95,20 @@ export function PaidOperatorBundles({ clientId, platform }: {
       }
       const visibleBundles = (b.data ?? []) as Bundle[];
       const checks = await Promise.all(visibleBundles.map(async (row) => {
-        const result = await supabase.rpc("paid_operator_bundle_current_v7", { p_bundle_id: row.id });
-        return [row.id, !result.error && result.data === true] as const;
+        const [source, decision] = await Promise.all([
+          supabase.rpc("paid_operator_bundle_current_v7", { p_bundle_id: row.id }),
+          supabase.rpc("paid_operator_bundle_approved_v7", { p_bundle_id: row.id }),
+        ]);
+        return [row.id, !source.error && source.data === true,
+          !decision.error && decision.data === true] as const;
       }));
       setCampaigns(campaigns);
       setPackages([...latest.values()]);
       setBundles(visibleBundles);
       setEvents(((e.data ?? []) as Event[]).filter((row) =>
         visibleBundles.some((bundle) => bundle.id === row.bundle_id)));
-      setCurrent(Object.fromEntries(checks));
+      setCurrent(Object.fromEntries(checks.map(([id, isCurrent]) => [id, isCurrent])));
+      setApproved(Object.fromEntries(checks.map(([id, , isApproved]) => [id, isApproved])));
       setMatches(Object.fromEntries(((m.data ?? []) as MetricMatch[])
         .map((row) => [row.bundle_id, row])));
       setError(null);
@@ -122,7 +128,7 @@ export function PaidOperatorBundles({ clientId, platform }: {
         p_tracking_instruction: tracking,
       });
       if (result.error) throw result.error;
-      setNotice(`Exact ${platform === "meta" ? "Meta" : "Google"} operator bundle frozen. Review and download it before reporting handoff.`);
+      setNotice(`Exact ${platform === "meta" ? "Meta" : "Google"} operator bundle frozen. Review its exact instructions and source in Approval Inbox before downloading.`);
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not freeze the paid bundle.");
@@ -206,7 +212,7 @@ export function PaidOperatorBundles({ clientId, platform }: {
   return <section className="space-y-4 rounded-lg border border-border bg-card p-4" aria-label={`${platform} paid operator bundles`}>
     <div>
       <h3 className="font-semibold">Human paid operator bundles</h3>
-      <p className="text-xs text-muted-foreground">A current approved campaign preparation package and exact creative signoff are required. Handoff and external IDs are operator reports; no ad is built or activated here.</p>
+      <p className="text-xs text-muted-foreground">A current approved campaign package, exact creative signoff and separate human review of this frozen operator bundle are required. Handoff and external IDs are operator reports; no ad is built or activated here.</p>
     </div>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
@@ -244,8 +250,8 @@ export function PaidOperatorBundles({ clientId, platform }: {
       const metric = matches[bundle.id];
       return <article key={bundle.id} className="rounded border border-border p-3 text-xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="font-medium">{String(source.campaign_name ?? "Campaign")} · v{bundle.version} · {current[bundle.id] ? "current" : "stale or unverified"}</p>
-          <button type="button" className="underline disabled:opacity-50" disabled={busy || !current[bundle.id]}
+          <p className="font-medium">{String(source.campaign_name ?? "Campaign")} · v{bundle.version} · {current[bundle.id] ? approved[bundle.id] ? "approved and current" : "not approved" : "stale or unverified"}</p>
+          <button type="button" className="underline disabled:opacity-50" disabled={busy || !approved[bundle.id]}
             onClick={() => void downloadExactJson(bundle).catch((cause: unknown) => setError(
               cause instanceof Error ? cause.message : "Could not verify operator packet bytes."))}>
             Download exact JSON
@@ -261,11 +267,11 @@ export function PaidOperatorBundles({ clientId, platform }: {
               cause instanceof Error ? cause.message : "Could not verify creative bytes."));
           }}>Download verified {file.title || file.asset_id.slice(0, 8)}</button>)}</div>
         <div className="mt-2 flex flex-wrap gap-3">
-          <button type="button" className="underline disabled:opacity-50" disabled={busy || !current[bundle.id]}
+          <button type="button" className="underline disabled:opacity-50" disabled={busy || !approved[bundle.id]}
             onClick={() => void verifyDownload(bundle)}>{platform === "google" ? "Download and verify Google packet" : "Download and verify all files"}</button>
-          <button type="button" className="underline disabled:opacity-50" disabled={busy || !current[bundle.id] || !trail.some((event) => event.event === "verified_download")}
+          <button type="button" className="underline disabled:opacity-50" disabled={busy || !approved[bundle.id] || !trail.some((event) => event.event === "verified_download")}
             onClick={() => void record(bundle, "handoff_reported")}>Report handoff</button>
-          <button type="button" className="underline disabled:opacity-50" disabled={busy || !current[bundle.id] || !trail.some((event) => event.event === "handoff_reported")}
+          <button type="button" className="underline disabled:opacity-50" disabled={busy || !approved[bundle.id] || !trail.some((event) => event.event === "handoff_reported")}
             onClick={() => void record(bundle, "external_ids_reported")}>Report external IDs</button>
         </div>
         {trail.map((event) => <p key={event.id} className="mt-1 text-muted-foreground">
