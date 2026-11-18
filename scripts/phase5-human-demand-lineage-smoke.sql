@@ -1,5 +1,12 @@
 -- Exact human assignment binding survives rework and refuses a shared-brief guess.
 begin;
+insert into auth.users(id,instance_id,aud,role,email,encrypted_password,created_at,updated_at)
+values
+ ('d9999999-9999-4999-8999-999999999991','00000000-0000-0000-0000-000000000000','authenticated','authenticated','demand-admin@example.invalid','',now(),now()),
+ ('d9999999-9999-4999-8999-999999999992','00000000-0000-0000-0000-000000000000','authenticated','authenticated','demand-outsider@example.invalid','',now(),now());
+insert into public.profiles(id,role,email) values
+ ('d9999999-9999-4999-8999-999999999991','admin','demand-admin@example.invalid'),
+ ('d9999999-9999-4999-8999-999999999992','client','demand-outsider@example.invalid');
 do $checks$
 declare
   c public.clients%rowtype;
@@ -24,8 +31,8 @@ declare
   refused boolean;
   n public.production_demand_counts_v8%rowtype;
 begin
-  insert into public.clients(name,initials)
-    values('Human demand fixture','HD') returning * into c;
+  insert into public.clients(id,name,initials)
+    values('d9999999-9999-4999-8999-999999999993','Human demand fixture','HD') returning * into c;
   insert into public.client_campaigns(client_id,name,brief,built_at)
     values(c.id,'Human demand campaign','Fixture',now()) returning * into campaign;
   insert into public.client_content_pillars
@@ -143,4 +150,20 @@ begin
     raise exception 'Review and workflow QA were conflated: %',row_to_json(n);
   end if;
 end $checks$;
+set local role authenticated;
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','d9999999-9999-4999-8999-999999999991',true);
+do $$ begin
+  if (select count(*) from public.assignable_production_demands_v7
+      where client_id='d9999999-9999-4999-8999-999999999993')<>2 then
+    raise exception 'Signed-in admin cannot discover the exact requests';
+  end if;
+end $$;
+select set_config('request.jwt.claim.sub','d9999999-9999-4999-8999-999999999992',true);
+do $$ begin
+  if exists(select 1 from public.assignable_production_demands_v7
+      where client_id='d9999999-9999-4999-8999-999999999993') then
+    raise exception 'Unrelated client can discover another client demand';
+  end if;
+end $$;
 rollback;
