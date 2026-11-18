@@ -23,6 +23,12 @@ begin
         and config_snapshot->>'name'='Original setup'
         and config_snapshot->>'instructions'='Describe the completed job') then
     raise exception 'New link did not freeze its setup'; end if;
+  begin
+    delete from public.proof_capture_configs
+      where id='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  exception when foreign_key_violation then refused:=true; end;
+  if not refused then raise exception 'Issued link lost its setup to cascade delete'; end if;
+  refused:=false;
   update public.proof_capture_configs
     set method='guided_interview',name='Changed setup',instructions='Changed text'
     where id='cccccccc-cccc-4ccc-8ccc-cccccccccccc';

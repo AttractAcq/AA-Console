@@ -35,6 +35,13 @@ alter table public.proof_capture_links
   add constraint proof_capture_snapshot_origin_v7 check
     (config_snapshot_origin in ('created_with_link','backfilled_current_config'));
 
+-- Do not erase an issued link's source by deleting its setup. Revocation is
+-- the supported way to stop use of a link while keeping its history readable.
+alter table public.proof_capture_links
+  drop constraint proof_capture_links_config_id_fkey,
+  add constraint proof_capture_links_config_id_fkey foreign key (config_id)
+    references public.proof_capture_configs(id) on delete restrict;
+
 create function public.bind_proof_capture_link_setup_v7() returns trigger
 language plpgsql set search_path=pg_catalog,public as $$
 declare c public.proof_capture_configs%rowtype;
