@@ -82,7 +82,8 @@ declare cid uuid:='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
   frozen public.campaign_preparation_packages_v7%rowtype;
   bundle public.paid_operator_bundles_v7%rowtype;
   same_bundle public.paid_operator_bundles_v7%rowtype;
-  request_id uuid; copy_review_id uuid;
+  request_id uuid; copy_review_id uuid; integration_id uuid;
+  credential_id uuid; grant_review_id uuid; read_job_id uuid; read_id uuid;
   event_id uuid; refused boolean:=false;
 begin
   select public.campaign_plan_fingerprint(c),c.content_spec_hash into plan_hash,spec_hash
@@ -171,9 +172,41 @@ begin
     raise exception 'Handoff retry was not idempotent'; end if;
   perform public.record_paid_operator_event_v7(bundle.id,
     'external_ids_reported','ads-manager-100','123456','7890');
-  if (select match_state from public.paid_operator_metric_match_v7
-      where bundle_id=bundle.id)<>'provider_ingest_unavailable' then
-    raise exception 'The Meta-only metric view claimed Google observation'; end if;
+  if (select match_state from public.paid_google_operator_account_match_v7
+      where bundle_id=bundle.id)<>'no_google_account_configured' then
+    raise exception 'A reported Google ID was treated as observed'; end if;
+  integration_id:=public.admin_store_integration_credential(
+    client,'google_ads','Google fixture','fixture-oauth-token','read');
+  update public.client_integrations set google_ads_customer_id='1234567890'
+    where id=integration_id;
+  select credential_secret_id into credential_id from public.client_integrations
+    where id=integration_id;
+  if (select match_state from public.paid_google_operator_account_match_v7
+      where bundle_id=bundle.id)<>'no_current_account_read' then
+    raise exception 'Configured Google ID without a read was treated as observed'; end if;
+  request_id:=public.request_integration_grant_v6(integration_id,false);
+  select id into grant_review_id from public.integration_grant_reviews_v6
+    where canonical_request_id=request_id;
+  perform public.decide_integration_grant_v6(grant_review_id,request_id,true);
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+  insert into public.agent_jobs(agent_key,client_id)
+    values('google_ads_read',client) returning id into read_job_id;
+  select public.record_google_ads_full_read_v7(client,integration_id,credential_id,
+    read_job_id,'1234567890','USD',current_date-29,current_date,'req-google-paid',
+    '[{"id":"123456","name":"Fixture search campaign","status":"ENABLED",
+      "channel":"SEARCH","metrics_observed":true,"impressions":"100",
+      "clicks":"8","cost_micros":"1230000","conversions":"1.25"}]'::jsonb,
+    '[]'::jsonb) into read_id;
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  perform set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  if not exists(select 1 from public.paid_google_operator_account_match_v7
+      where bundle_id=bundle.id and match_state='metric_rows_match_reported_id'
+        and read_run_id=read_id and configured_customer_id='1234567890'
+        and recorded_spend=1.23 and recorded_clicks=8 and currency='USD') then
+    raise exception 'Exact Google account read did not reconcile the reported ID'; end if;
   update public.client_campaigns set daily_budget=30 where id=cid;
   if public.paid_operator_bundle_current_v7(bundle.id) then
     raise exception 'A changed budget retained a current handoff'; end if;

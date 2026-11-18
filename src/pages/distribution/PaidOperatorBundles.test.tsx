@@ -12,6 +12,7 @@ const rows: Record<string, unknown[]> = {
   paid_operator_bundles_v7: [],
   paid_operator_events_v7: [],
   paid_operator_metric_match_v7: [],
+  paid_google_operator_account_match_v7: [],
 };
 
 vi.mock("../../lib/supabase", () => ({
@@ -34,6 +35,7 @@ beforeEach(() => {
   rows.paid_operator_bundles_v7 = [];
   rows.paid_operator_events_v7 = [];
   rows.paid_operator_metric_match_v7 = [];
+  rows.paid_google_operator_account_match_v7 = [];
   rpc.mockResolvedValue({ data: true, error: null });
 });
 
@@ -83,11 +85,17 @@ it("shows the reviewed Google copy packet without requiring a media file", async
       creative: [{ copy_id: "copy-1", copy_hash: "c".repeat(64),
         headlines: ["Book a consultation"], descriptions: ["Speak with our team"] }] } },
     created_at: "2026-11-16T00:00:00Z", created_by: "user-1" }];
+  rows.paid_google_operator_account_match_v7 = [{ bundle_id: "bundle-google",
+    match_state: "provider_campaign_observed_metrics_unknown",
+    configured_customer_id: "1234567890", read_run_id: "read-1",
+    provider_request_id: "request-1", latest_fetched_at: "2026-11-16T01:00:00Z" }];
   render(<PaidOperatorBundles clientId="client-1" platform="google" />);
   expect(await screen.findByText(/Local offer · v1 · current/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Download and verify Google packet" })).toBeEnabled();
   expect(screen.queryByRole("button", { name: /Download verified/ })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Report handoff" })).toBeDisabled();
+  expect(screen.getByText(/period metrics unknown/)).toBeInTheDocument();
+  expect(screen.getByText(/Customer 1234567890 · read read-1/)).toBeInTheDocument();
 });
 
 it("shows a metric row match without calling it provider verification", async () => {

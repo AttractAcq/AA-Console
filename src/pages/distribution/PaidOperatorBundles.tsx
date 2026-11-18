@@ -13,7 +13,9 @@ type MetricMatch = { bundle_id: string; match_state: string; external_campaign_i
   latest_metric_date: string | null; latest_fetched_at: string | null; days_with_rows: number;
   recorded_spend: number | null; recorded_impressions: number | null;
   recorded_clicks: number | null; recorded_conversions: number | null;
-  currency: string | null; currencies_seen: number };
+  currency: string | null; currencies_seen: number;
+  configured_customer_id?: string | null; read_run_id?: string | null;
+  provider_request_id?: string | null; from_date?: string | null; through_date?: string | null };
 
 function sourceOf(bundle: Bundle): Record<string, unknown> {
   const snapshot = bundle.snapshot;
@@ -80,7 +82,7 @@ export function PaidOperatorBundles({ clientId, platform }: {
           .order("created_at", { ascending: false }).limit(50),
         supabase.from("paid_operator_events_v7").select("*")
           .eq("client_id", clientId).order("recorded_at", { ascending: false }).limit(100),
-        supabase.from("paid_operator_metric_match_v7").select("*")
+        supabase.from(platform === "google" ? "paid_google_operator_account_match_v7" : "paid_operator_metric_match_v7").select("*")
           .eq("client_id", clientId).eq("platform", platform).limit(50),
       ]);
       for (const result of [c, p, b, e, m]) if (result.error) throw result.error;
@@ -273,7 +275,19 @@ export function PaidOperatorBundles({ clientId, platform }: {
         </p>)}
         <p className="mt-2 border-t border-border pt-2 text-muted-foreground">
           Metrics match: {metric?.match_state === "metric_rows_match_reported_id"
-            ? `${metric.days_with_rows} daily row(s), latest ${metric.latest_metric_date ?? "date unknown"}`
+            ? platform === "google"
+              ? `Campaign ID observed in the configured Google customer; metrics returned for ${metric.from_date ?? "unknown start"} to ${metric.through_date ?? "unknown end"}`
+              : `${metric.days_with_rows} daily row(s), latest ${metric.latest_metric_date ?? "date unknown"}`
+            : metric?.match_state === "provider_campaign_observed_metrics_unknown"
+              ? "Campaign ID observed in the configured Google customer; period metrics unknown."
+            : metric?.match_state === "reported_id_not_observed"
+              ? "Reported campaign ID absent from the latest configured Google account read."
+            : metric?.match_state === "no_current_account_read"
+              ? "No current read of the configured Google customer and credential."
+            : metric?.match_state === "multiple_google_accounts_configured"
+              ? "Multiple Google account integrations recorded; choose one before reconciliation."
+            : metric?.match_state === "no_google_account_configured"
+              ? "No Google Ads customer configured."
             : metric?.match_state === "no_matching_metric_rows" ? "No rows match the reported campaign ID."
               : metric?.match_state === "provider_ingest_unavailable" ? "Provider ingest unavailable."
                 : "Unknown; no external campaign ID has been reported."}
@@ -283,7 +297,13 @@ export function PaidOperatorBundles({ clientId, platform }: {
             {` · impressions ${metric.recorded_impressions ?? "unknown"} · clicks ${metric.recorded_clicks ?? "unknown"} · conversions ${metric.recorded_conversions ?? "unknown"}`}
             {metric.latest_fetched_at ? ` · fetched ${new Date(metric.latest_fetched_at).toLocaleString()}` : ""}
           </span>}
-          <span className="block">A matching metrics row does not verify provider account identity or ad activation.</span>
+          {platform === "google" && metric?.read_run_id && <span className="block">
+            Customer {metric.configured_customer_id ?? "unknown"} · read {metric.read_run_id} · provider request {metric.provider_request_id ?? "unknown"}
+            {metric.latest_fetched_at ? ` · fetched ${new Date(metric.latest_fetched_at).toLocaleString()}` : ""}
+          </span>}
+          <span className="block">{platform === "google"
+            ? "A recorded Google account read does not prove ad activation or sale causation."
+            : "A matching metrics row does not verify provider account identity or ad activation."}</span>
         </p>
       </article>;
     })}
