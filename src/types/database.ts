@@ -36079,6 +36079,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      accept_opportunity_strategy_proposal_v7: {
+        Args: { p_fields?: Json; p_note?: string; p_proposal_id: string }
+        Returns: string
+      }
       accept_proof_capture_submission: {
         Args: {
           p_body: string

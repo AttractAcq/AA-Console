@@ -3,6 +3,12 @@
 -- overwrite working-out that changed while the model was running.
 begin;
 
+alter table public.opportunity_events drop constraint opportunity_events_event_check;
+alter table public.opportunity_events add constraint opportunity_events_event_check
+  check (event in ('proposed','edited','scored','status_changed','linked',
+    'unlinked','proof_required','proof_satisfied','confidence_changed',
+    'score_proposal_accepted','proposal_rejected','strategy_proposal_accepted'));
+
 create function public.opportunity_strategy_input_hash_v7(p_opportunity_id uuid)
 returns text language plpgsql stable security definer
 set search_path=pg_catalog,public as $$
@@ -91,10 +97,75 @@ begin
   insert into public.opportunity_proposals(
     opportunity_id,client_id,kind,payload,rationale,proposed_by,proposed_by_job_id)
     values(p_opportunity_id,p_client_id,'strategy',
-      jsonb_build_object('fields',p_fields,'input_hash',p_input_hash),
+      jsonb_build_object('fields',p_fields,'input_hash',p_input_hash,
+        'review_hash',public.opportunity_strategy_input_hash_v7(p_opportunity_id)),
       p_rationale,p_proposed_by,p_job_id)
     returning id into v_new;
   return v_new;
+end $$;
+
+create function public.accept_opportunity_strategy_proposal_v7(
+  p_proposal_id uuid,p_fields jsonb default null,p_note text default null
+) returns uuid language plpgsql security definer
+set search_path=pg_catalog,public as $$
+declare
+  proposal public.opportunity_proposals%rowtype;
+  opportunity public.market_opportunities%rowtype;
+  chosen jsonb;
+  field_name text;
+begin
+  select * into proposal from public.opportunity_proposals
+    where id=p_proposal_id for update;
+  if proposal.id is null or proposal.kind<>'strategy' or proposal.resolution<>'open' then
+    raise exception 'An open strategy proposal is required.' using errcode='P0001';
+  end if;
+  if not public.can_shape_opportunity(proposal.client_id) then
+    raise exception 'Only an admin or assigned client manager can decide on a strategy.'
+      using errcode='42501';
+  end if;
+  select * into opportunity from public.market_opportunities
+    where id=proposal.opportunity_id for update;
+  if opportunity.id is null or opportunity.client_id is distinct from proposal.client_id then
+    raise exception 'Strategy proposal and client do not match.' using errcode='42501';
+  end if;
+  if coalesce(proposal.payload->>'review_hash','') !~ '^[0-9a-f]{64}$'
+    or proposal.payload->>'review_hash' is distinct from
+      public.opportunity_strategy_input_hash_v7(proposal.opportunity_id) then
+    raise exception 'The strategy or its sources changed. Request a new strategy run.'
+      using errcode='23514';
+  end if;
+  chosen:=coalesce(p_fields,proposal.payload->'fields');
+  if jsonb_typeof(chosen) is distinct from 'object' then
+    raise exception 'Strategy fields are missing.' using errcode='23514';
+  end if;
+  foreach field_name in array array['core_problem','desired_outcome',
+    'purchase_trigger','entry_awareness','positioning','conversion_action'] loop
+    if nullif(btrim(chosen->>field_name),'') is null
+      or length(chosen->>field_name)>2000 then
+      raise exception 'The strategy % field needs a usable value.',field_name
+        using errcode='23514';
+    end if;
+  end loop;
+  if chosen->>'entry_awareness' not in ('unaware','problem_aware',
+    'solution_aware','product_aware','most_aware') then
+    raise exception 'Choose a valid entry awareness stage.' using errcode='23514';
+  end if;
+  perform public.set_opportunity_fields_v6(
+    proposal.opportunity_id,chosen->>'core_problem',chosen->>'desired_outcome',
+    chosen->>'purchase_trigger',chosen->>'entry_awareness',
+    chosen->>'positioning',chosen->>'conversion_action');
+  update public.opportunity_proposals
+    set resolution='accepted',resolved_by=auth.uid(),resolved_at=now(),
+      payload=payload||jsonb_build_object('accepted_fields',chosen,
+        'acceptance_note',nullif(btrim(p_note),''))
+    where id=p_proposal_id;
+  insert into public.opportunity_events(opportunity_id,client_id,event,actor,detail)
+    values(proposal.opportunity_id,proposal.client_id,
+      'strategy_proposal_accepted','human',
+      case when chosen is distinct from proposal.payload->'fields'
+        then 'Reviewed fields were corrected before acceptance.'
+        else 'Reviewed fields were accepted as proposed.' end);
+  return proposal.opportunity_id;
 end $$;
 
 revoke all on function public.opportunity_strategy_input_hash_v7(uuid)
@@ -106,5 +177,9 @@ revoke all on function public.save_opportunity_strategy_draft_v7(
   from public,anon,authenticated,service_role;
 grant execute on function public.save_opportunity_strategy_draft_v7(
   uuid,uuid,uuid,text,jsonb,jsonb,jsonb,text,text) to service_role;
+revoke all on function public.accept_opportunity_strategy_proposal_v7(uuid,jsonb,text)
+  from public,anon,authenticated,service_role;
+grant execute on function public.accept_opportunity_strategy_proposal_v7(uuid,jsonb,text)
+  to authenticated;
 select public.lock_down_definer_functions();
 commit;

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "d9d57e1bc51160da5e8502fa9af8f52a6f1bde9990e5ac0e6cf3a1d53cc23911",
-  "generatedTypesSha256": "5ba5986f3d4cea3cd8ce92d14a0ea1327b0a86e1b50a44eda04d1cd889b0a325",
-  "generatedSchemaBodySha256": "b3c262af0bd52ae4398db601b045ef0d244b608ff060267e050933dfcfefc479",
+  "migrationSourceDigest": "cd092a60bef5103bc0a4e9f9ec919730214188ae5bc6438684974a3ab18df9e6",
+  "generatedTypesSha256": "1eef83d79bd7d1de66315501f7aa9a98cef5c1da389b4981cc32e5525a7566bd",
+  "generatedSchemaBodySha256": "7128c2d29ac759d69cff771410e1068f8f92c6e58632be68034235183fa4a828",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4054,8 +4054,8 @@
       "version": "20261124035700",
       "name": "562_atomic_opportunity_strategy_draft",
       "filename": "20261124035700_562_atomic_opportunity_strategy_draft.sql",
-      "sha256": "6cfacc2f9136d615810b1ad9c48d487b2f72aff1c0040d9e6ae1e472cd9adbc7",
-      "trimmedMd5": "67114237415bdc9e686a2efebac55057"
+      "sha256": "fb7c9a596d24991c825b9dc66eb4cdaea1dd7ca2b43deb60eccacf57cf20ec92",
+      "trimmedMd5": "b4dd91f2e2a3b83e250403f008a38518"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

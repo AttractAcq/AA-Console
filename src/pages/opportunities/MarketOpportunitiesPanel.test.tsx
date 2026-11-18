@@ -30,7 +30,9 @@ const {
   setStageTemplate,
   fetchOpenProposals,
   fetchEvaluationInputHash,
+  fetchStrategyReviewHash,
   acceptScoreProposal,
+  acceptStrategyProposal,
   rejectProposal,
   requestEvaluation,
   requestStrategy,
@@ -48,7 +50,9 @@ const {
   setStageTemplate: vi.fn(),
   fetchOpenProposals: vi.fn(),
   fetchEvaluationInputHash: vi.fn(),
+  fetchStrategyReviewHash: vi.fn(),
   acceptScoreProposal: vi.fn(),
+  acceptStrategyProposal: vi.fn(),
   rejectProposal: vi.fn(),
   requestEvaluation: vi.fn(),
   requestStrategy: vi.fn(),
@@ -76,7 +80,9 @@ vi.mock("../../lib/opportunities", async () => {
     setStageTemplate,
     fetchOpenProposals,
     fetchEvaluationInputHash,
+    fetchStrategyReviewHash,
     acceptScoreProposal,
+    acceptStrategyProposal,
     rejectProposal,
     requestEvaluation,
     requestStrategy,
@@ -138,7 +144,9 @@ beforeEach(() => {
   fetchOpportunityOfferVersions.mockResolvedValue([{ id: "version-1", label: "Garage v1" }]);
   fetchOpenProposals.mockResolvedValue([]);
   fetchEvaluationInputHash.mockResolvedValue("a".repeat(64));
+  fetchStrategyReviewHash.mockResolvedValue("b".repeat(64));
   acceptScoreProposal.mockResolvedValue(undefined);
+  acceptStrategyProposal.mockResolvedValue(undefined);
   rejectProposal.mockResolvedValue(undefined);
   requestEvaluation.mockResolvedValue(undefined);
   requestStrategy.mockResolvedValue(undefined);
@@ -232,6 +240,25 @@ const scoreProposal = (over: Record<string, unknown> = {}) => ({
   resolved_by: null,
   resolved_at: null,
   rejection_reason: null,
+  ...over,
+});
+
+const strategyProposal = (over: Record<string, unknown> = {}) => scoreProposal({
+  id: "prop-strategy",
+  kind: "strategy",
+  payload: {
+    fields: {
+      core_problem: "No training space",
+      desired_outcome: "A home gym",
+      purchase_trigger: "Winter",
+      entry_awareness: "problem_aware",
+      positioning: "The room you already own",
+      conversion_action: "Book a survey",
+    },
+    review_hash: "b".repeat(64),
+  },
+  rationale: "The garage has unused capacity.",
+  proposed_by: "opportunity_strategise",
   ...over,
 });
 
@@ -756,23 +783,31 @@ describe("asking an agent, and deciding on what it says", () => {
     prompt.mockRestore();
   });
 
-  it("sends a strategy proposal to the editors rather than offering one-click apply", async () => {
-    // Those six fields already have editors in the Strategise view. A second
-    // write path for them would be two places to change the same thing.
+  it("reviews and corrects the exact strategy proposal in Strategise", async () => {
     search.value = "opportunity=opp-1";
-    fetchOpenProposals.mockResolvedValue([
-      scoreProposal({
-        id: "prop-2",
-        kind: "strategy",
-        payload: { fields: { positioning: "The room you already own" } },
-        proposed_by: "opportunity_strategise",
-      }),
-    ]);
-    render(<MarketOpportunitiesPanel view="evaluate" />);
-    expect(await screen.findByText("A strategy is proposed")).toBeInTheDocument();
-    expect(screen.getByText("The room you already own")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Accept this score" })).not.toBeInTheDocument();
-    expect(screen.getByText(/Apply these in the Strategise view/)).toBeInTheDocument();
+    fetchOpenProposals.mockResolvedValue([strategyProposal()]);
+    render(<MarketOpportunitiesPanel view="strategize" />);
+    const card = within((await screen.findByText("Review proposed strategy fields")).closest("section")!);
+    expect(card.getByText("The garage has unused capacity.")).toBeInTheDocument();
+    const accept = card.getByRole("button", { name: "Apply reviewed fields" });
+    await waitFor(() => expect(accept).toBeEnabled());
+    await userEvent.clear(card.getByRole("textbox", { name: "Problem" }));
+    await userEvent.type(card.getByRole("textbox", { name: "Problem" }), "No room to train");
+    await userEvent.type(card.getByRole("textbox", { name: "Review note (optional)" }), "Corrected the wording");
+    await userEvent.click(accept);
+    await waitFor(() => expect(acceptStrategyProposal).toHaveBeenCalledWith(
+      "prop-strategy", expect.objectContaining({ core_problem: "No room to train" }),
+      "Corrected the wording",
+    ));
+  });
+
+  it("holds a strategy proposal when its review snapshot is stale", async () => {
+    search.value = "opportunity=opp-1";
+    fetchOpenProposals.mockResolvedValue([strategyProposal()]);
+    fetchStrategyReviewHash.mockResolvedValue("c".repeat(64));
+    render(<MarketOpportunitiesPanel view="strategize" />);
+    expect(await screen.findByText("Strategy sources changed. Request a new strategy run.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply reviewed fields" })).toBeDisabled();
   });
 
   it("shows only the open proposals for the opportunity in front of you", async () => {

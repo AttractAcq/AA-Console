@@ -14,7 +14,8 @@ import {
   ATTRIBUTE_KINDS, AWARENESS_STAGES, CLASSIFICATION_HINT, CONFIDENCE_LEVELS,
   createCampaignFromOpportunity,
   fetchOpportunityOfferVersions,
-  acceptScoreProposal, fetchOpenProposals, fetchEvaluationInputHash, rejectProposal,
+  acceptScoreProposal, acceptStrategyProposal, fetchOpenProposals,
+  fetchEvaluationInputHash, fetchStrategyReviewHash, rejectProposal,
   requestEvaluation, requestStrategy,
   fetchOpportunities, fetchOpportunityOutputs, fetchOpportunityApprovalStates, fetchOpportunityActivationStates,
   fetchReadiness, fetchScoreFactors, requireProof, scoreOpportunity,
@@ -252,7 +253,7 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
             <>
               <ProposalsPanel
                 opportunityId={selected.id}
-                proposals={proposals.filter((proposal) => proposal.opportunity_id === selected.id)}
+                proposals={proposals.filter((proposal) => proposal.opportunity_id === selected.id && proposal.kind === "score")}
                 factors={factors}
                 busy={busy}
                 onAct={act}
@@ -267,14 +268,18 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
             </>
           )}
           {detailStage === "strategize" && (
-            <StrategizeView opportunity={selected} busy={busy === selected.id} onAct={act} />
+            <>
+              {proposals.filter((proposal) => proposal.opportunity_id === selected.id && proposal.kind === "strategy")
+                .map((proposal) => <StrategyProposalReview key={proposal.id} proposal={proposal} busy={busy === proposal.id} onAct={act} />)}
+              <StrategizeView opportunity={selected} busy={busy === selected.id} onAct={act} />
+            </>
           )}
         </section>
       )}
       {view === "evaluate" && selected && (
         <ProposalsPanel
           opportunityId={selected.id}
-          proposals={proposals.filter((proposal) => proposal.opportunity_id === selected.id)}
+          proposals={proposals.filter((proposal) => proposal.opportunity_id === selected.id && proposal.kind === "score")}
           factors={factors}
           busy={busy}
           onAct={act}
@@ -290,7 +295,11 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
         />
       )}
       {view === "strategize" && selected && (
-        <StrategizeView opportunity={selected} busy={busy === selected.id} onAct={act} />
+        <>
+          {proposals.filter((proposal) => proposal.opportunity_id === selected.id && proposal.kind === "strategy")
+            .map((proposal) => <StrategyProposalReview key={proposal.id} proposal={proposal} busy={busy === proposal.id} onAct={act} />)}
+          <StrategizeView opportunity={selected} busy={busy === selected.id} onAct={act} />
+        </>
       )}
       {view === "activate" && (
         <ActivateView
@@ -1069,6 +1078,99 @@ function EvaluateView({
         </div>
       </section>
     </div>
+  );
+}
+
+const STRATEGY_REVIEW_FIELDS = [
+  ["core_problem", "Problem"], ["desired_outcome", "Desired outcome"],
+  ["purchase_trigger", "Trigger"], ["positioning", "Positioning"],
+  ["conversion_action", "Conversion action"],
+] as const;
+
+function StrategyProposalReview({ proposal, busy, onAct }: {
+  proposal: OpportunityProposal;
+  busy: boolean;
+  onAct: (id: string, work: () => Promise<void>, said: string) => Promise<void>;
+}) {
+  const payload = (proposal.payload ?? {}) as {
+    fields?: Record<string, string>; review_hash?: string;
+  };
+  const [fields, setReviewFields] = useState<Record<string, string>>(() => ({
+    core_problem: payload.fields?.core_problem ?? "",
+    desired_outcome: payload.fields?.desired_outcome ?? "",
+    purchase_trigger: payload.fields?.purchase_trigger ?? "",
+    entry_awareness: payload.fields?.entry_awareness ?? "",
+    positioning: payload.fields?.positioning ?? "",
+    conversion_action: payload.fields?.conversion_action ?? "",
+  }));
+  const [note, setNote] = useState("");
+  const [checked, setChecked] = useState<{ hash: string | null; error: string | null } | null>(null);
+  useEffect(() => {
+    if (!payload.review_hash) return;
+    let live = true;
+    void fetchStrategyReviewHash(proposal.opportunity_id).then((hash) => {
+      if (live) setChecked({ hash, error: null });
+    }).catch((cause) => {
+      if (live) setChecked({ hash: null,
+        error: cause instanceof Error ? cause.message : "Current strategy sources could not be checked." });
+    });
+    return () => { live = false; };
+  }, [proposal.opportunity_id, payload.review_hash]);
+  const current = Boolean(payload.review_hash && checked?.hash === payload.review_hash);
+  const usable = STRATEGY_REVIEW_FIELDS.every(([key]) => fields[key]?.trim())
+    && AWARENESS_STAGES.some((stage) => stage.value === fields.entry_awareness);
+  return (
+    <section className="space-y-3 rounded-xl border border-brand-strong/40 bg-brand-subtle/20 p-5">
+      <div>
+        <h3 className="font-semibold">Review proposed strategy fields</h3>
+        <p className="text-sm text-muted-foreground">
+          The agent saved its lists and awareness messages. Review these six commercial fields before applying them.
+        </p>
+      </div>
+      <p className="text-sm">{proposal.rationale}</p>
+      <p className="text-xs text-muted-foreground">
+        {!payload.review_hash ? "This older proposal needs a new strategy run."
+          : !checked ? "Checking current strategy sources…"
+            : checked.error ? `Source check unavailable: ${checked.error}`
+              : current ? "Strategy sources are current."
+                : "Strategy sources changed. Request a new strategy run."}
+      </p>
+      <div className="grid gap-3 md:grid-cols-2">
+        {STRATEGY_REVIEW_FIELDS.map(([key, label]) => (
+          <label key={key} className="block text-sm">
+            <span>{label}</span>
+            <textarea rows={2} value={fields[key] ?? ""}
+              onChange={(event) => setReviewFields((old) => ({ ...old, [key]: event.target.value }))}
+              className="mt-1 w-full rounded-lg border border-border bg-background p-2" />
+          </label>
+        ))}
+        <label className="block text-sm">
+          <span>Entry awareness</span>
+          <select value={fields.entry_awareness ?? ""}
+            onChange={(event) => setReviewFields((old) => ({ ...old, entry_awareness: event.target.value }))}
+            className="mt-1 w-full rounded-lg border border-border bg-background p-2">
+            <option value="">Choose a stage</option>
+            {AWARENESS_STAGES.map((stage) => <option key={stage.value} value={stage.value}>{stage.label}</option>)}
+          </select>
+        </label>
+      </div>
+      <label className="block text-sm">
+        <span>Review note (optional)</span>
+        <textarea rows={2} value={note} onChange={(event) => setNote(event.target.value)}
+          className="mt-1 w-full rounded-lg border border-border bg-background p-2" />
+      </label>
+      <div className="flex flex-wrap gap-2">
+        <Button disabled={busy || !current || !usable}
+          onClick={() => void onAct(proposal.id,
+            () => acceptStrategyProposal(proposal.id, fields, note),
+            "Reviewed strategy fields applied.")}>Apply reviewed fields</Button>
+        <Button disabled={busy} onClick={() => {
+          const why = window.prompt("Why is this strategy not right?");
+          if (why?.trim()) void onAct(proposal.id,
+            () => rejectProposal(proposal.id, why.trim()), "Strategy proposal rejected.");
+        }}>Reject</Button>
+      </div>
+    </section>
   );
 }
 

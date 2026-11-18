@@ -505,6 +505,28 @@ export async function fetchEvaluationInputHash(opportunityId: string): Promise<s
   return data;
 }
 
+export async function fetchStrategyReviewHash(opportunityId: string): Promise<string> {
+  const { data, error } = await supabase.rpc("opportunity_strategy_input_hash_v7", {
+    p_opportunity_id: opportunityId,
+  });
+  if (error) throw new Error(error.message);
+  if (typeof data !== "string" || !/^[0-9a-f]{64}$/.test(data)) {
+    throw new Error("The current strategy sources could not be checked.");
+  }
+  return data;
+}
+
+export async function acceptStrategyProposal(
+  proposalId: string, fields: Record<string, string>, note?: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("accept_opportunity_strategy_proposal_v7", {
+    p_proposal_id: proposalId,
+    p_fields: fields,
+    ...(note?.trim() ? { p_note: note.trim() } : {}),
+  });
+  if (error) throw new Error(error.message);
+}
+
 export async function requestEvaluation(clientId: string, opportunityId: string): Promise<void> {
   const { error } = await supabase.rpc("request_opportunity_evaluation_v6", {
     p_client_id: clientId, p_opportunity_id: opportunityId,
