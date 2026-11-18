@@ -279,11 +279,12 @@ export async function runOpportunityDiscoveryJob(
     };
   }
 
-  const { data: offers } = await sb
+  const { data: offers, error: offersError } = await sb
     .from("service_offers")
     .select("name")
     .eq("client_id", job.client_id)
     .limit(10);
+  if (offersError) throw new Error(`Offer lookup failed: ${offersError.message}`);
   const offerNames = (offers ?? []).map((o) => String((o as { name?: string }).name ?? "")).filter(Boolean);
 
   const wanted = requestedCount(job.params);

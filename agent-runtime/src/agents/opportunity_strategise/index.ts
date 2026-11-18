@@ -285,13 +285,14 @@ export async function runOpportunityStrategiseJob(
     return { ok: false, retryable: false, failureMessage: "That opportunity belongs to another client." };
   }
 
-  const { data: records } = await sb
+  const { data: records, error: recordsError } = await sb
     .from("client_agent_records")
     .select("domain, title, body")
     .eq("client_id", job.client_id)
     .in("domain", ["market", "icp", "association", "competitor", "brand_strategy", "offer_strategy"])
     .order("created_at", { ascending: true })
     .limit(40);
+  if (recordsError) throw new Error(`Intelligence lookup failed: ${recordsError.message}`);
   const evidence = (records ?? []).map(
     (row) =>
       `(${String((row as { domain: string }).domain)}) ${String((row as { title?: string }).title ?? "")}\n${String((row as { body?: string }).body ?? "")}`,

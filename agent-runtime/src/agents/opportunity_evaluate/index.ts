@@ -171,23 +171,25 @@ export async function runOpportunityEvaluateJob(
 
   // The evidence. Same records discovery reasons from, because a score that
   // cannot point at why is the thing a person is being asked to trust.
-  const { data: records } = await sb
+  const { data: records, error: recordsError } = await sb
     .from("client_agent_records")
     .select("domain, title, body")
     .eq("client_id", job.client_id)
     .in("domain", ["market", "icp", "association", "competitor", "money_model"])
     .order("created_at", { ascending: true })
     .limit(40);
+  if (recordsError) throw new Error(`Intelligence lookup failed: ${recordsError.message}`);
   const evidence = (records ?? []).map(
     (row) =>
       `(${String((row as { domain: string }).domain)}) ${String((row as { title?: string }).title ?? "")}\n${String((row as { body?: string }).body ?? "")}`,
   );
 
-  const { data: offers } = await sb
+  const { data: offers, error: offersError } = await sb
     .from("service_offers")
     .select("name, kind")
     .eq("client_id", job.client_id)
     .limit(10);
+  if (offersError) throw new Error(`Offer lookup failed: ${offersError.message}`);
   const offerLines = (offers ?? []).map(
     (o) => `${String((o as { name?: string }).name ?? "")} (${String((o as { kind?: string }).kind ?? "main")})`,
   ).filter((line) => line.trim().length > 1);
