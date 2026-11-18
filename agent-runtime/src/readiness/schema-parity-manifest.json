@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "0abde19b7c445462f9843e097f56b56d9a248638cf4f1054efb6e74214534f9a",
+  "migrationSourceDigest": "e17d02c78c07770de526710d73805a7ebe30ae4ac7f1899367949a5901c301b0",
   "generatedTypesSha256": "76c4c61b30ac3d7fa17d6686eb7880943afb7d41c79ce8b1864c92de7889310d",
   "generatedSchemaBodySha256": "ced93e33cccbddc763dfa91f497d61896fc0666767152a9f3188de7f06cd9f48",
   "localMigrations": [
@@ -4189,6 +4189,13 @@
       "filename": "20261124041600_581_proof_delivery_sender_review.sql",
       "sha256": "abd4c694a3ade567ba9a21e26afc7aa1b8821f17adb45c6961f8c4e7f87817e6",
       "trimmedMd5": "698bbaa48fe9ee9e96d811cefdf803a3"
+    },
+    {
+      "version": "20261124041700",
+      "name": "582_hold_paid_proof_placement_until_provider_live",
+      "filename": "20261124041700_582_hold_paid_proof_placement_until_provider_live.sql",
+      "sha256": "382da39f1295f7b0aba664b7bfbbe7370751e3f0ce7c13a4ca68664d952af886",
+      "trimmedMd5": "e76bb644cbeea29f1764910f952ae55f"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

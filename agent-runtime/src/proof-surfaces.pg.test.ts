@@ -203,6 +203,7 @@ beforeEach(async () => {
  insert into client_campaigns values('${CAMP}','${CLIENT}');`);
 
   await db.exec(await sql("20261025110000_246_proof_reaches_the_surfaces_it_was_made_for.sql"));
+  await db.exec(await sql("20261124041700_582_hold_paid_proof_placement_until_provider_live.sql"));
 });
 
 afterAll(async () => { await db?.close(); });
@@ -348,7 +349,7 @@ describe("G10 — recording where proof already went", () => {
       .toContain("Only the internal service");
   });
 
-  it("records every distinct proof behind a campaign's creative against the ad", async () => {
+  it("does not claim a paused ad build distributed proof", async () => {
     await asService();
     const second = "44444444-4444-4444-8444-444444444444";
     await db.query(
@@ -362,15 +363,12 @@ describe("G10 — recording where proof already went", () => {
       await db.query(`insert into campaign_artifacts (campaign_id, asset_id) values ($1,$2)`,
         [CAMP, asset]);
     }
-    const { n } = await one<{ n: number }>(
-      `select record_proof_placement_for_ad_v6($1,'camp_9','https://facebook.com/ads/camp_9') as n`,
-      [CAMP]);
-    // Two distinct proofs across three artifacts.
-    expect(Number(n)).toBe(2);
-    // And re-running adds nothing.
-    const again = await one<{ n: number }>(
-      `select record_proof_placement_for_ad_v6($1,'camp_9') as n`, [CAMP]);
-    expect(Number(again.n)).toBe(2);
+    expect(await refusal(
+      `select record_proof_placement_for_ad_v6($1,'camp_9','https://facebook.com/ads/camp_9')`,
+      [CAMP],
+    )).toContain("paused ad build is not a live proof placement");
+    expect(await rows(`select 1 from proof_placements where destination_key='paid_advertising'`))
+      .toHaveLength(0);
   });
 
   it("will not release proof to a disabled sales agent deployment", async () => {
