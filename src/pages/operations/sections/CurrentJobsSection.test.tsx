@@ -14,7 +14,10 @@ vi.mock("../../../components/forms/FormModal", () => ({
     open: boolean; onSubmit: (values: Record<string, unknown>) => Promise<void>;
   }) => open ? <>
     <button onClick={() => void onSubmit({ title: "Make asset", client_id: "client-1",
-      brief_id: "brief-1", production_demand: "daily:demand-1" })}>Assign demand</button>
+      brief_id: "brief-1", production_demand: "daily:12345678-aaaa-4bbb-8ccc-123456789abc" })}>Assign demand</button>
+    <button onClick={() => void onSubmit({ title: "Older campaign asset", client_id: "client-1",
+      brief_id: "brief-1", production_demand: "manual", manual_demand_kind: "campaign",
+      manual_demand_id: "87654321-bbbb-4ccc-8ddd-123456789abc" })}>Assign exact older</button>
     <button onClick={() => void onSubmit({ title: "General work", client_id: "client-1",
       brief_id: "brief-1" })}>Assign general</button>
   </> : null,
@@ -42,10 +45,19 @@ it("binds a selected human job to the exact production demand", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Assign demand" }));
   await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_demand_assignment_v7", {
     p_member_id: "maker-1", p_client_id: "client-1", p_brief_id: "brief-1",
-    p_demand_kind: "daily", p_demand_id: "demand-1", p_title: "Make asset",
+    p_demand_kind: "daily", p_demand_id: "12345678-aaaa-4bbb-8ccc-123456789abc", p_title: "Make asset",
     p_due_date: undefined, p_compensation: undefined,
   }));
   expect(from.mock.results.some((call) => call.value.insert?.mock.calls.length)).toBe(false);
+});
+
+it("accepts an exact campaign request ID outside the loaded choices", async () => {
+  render(<CurrentJobsSection />);
+  await userEvent.click(await screen.findByRole("button", { name: "Assign Job" }));
+  await userEvent.click(screen.getByRole("button", { name: "Assign exact older" }));
+  await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_demand_assignment_v7",
+    expect.objectContaining({ p_demand_kind: "campaign",
+      p_demand_id: "87654321-bbbb-4ccc-8ddd-123456789abc" })));
 });
 
 it("keeps ordinary assignments available without inventing a demand link", async () => {

@@ -77,8 +77,17 @@ export function CurrentJobsSection() {
       name: "production_demand",
       label: "Campaign or daily request",
       kind: "select",
-      options: demandOptions,
-      hint: "Select the exact request when this job fulfills campaign or daily production. The brief must belong to that request.",
+      options: [{ value: "manual", label: "Enter an exact request ID" }, ...demandOptions],
+      hint: "Choose a listed request or enter its full ID. The brief must belong to that request.",
+    },
+    {
+      name: "manual_demand_kind", label: "Request type", kind: "select", required: true,
+      options: [{ value: "campaign", label: "Campaign" }, { value: "daily", label: "Daily" }],
+      showIf: { field: "production_demand", equals: ["manual"] },
+    },
+    {
+      name: "manual_demand_id", label: "Exact request ID", kind: "text", required: true,
+      showIf: { field: "production_demand", equals: ["manual"] },
     },
     { name: "due_date", label: "Due date", kind: "date" },
     { name: "compensation", label: "Compensation", kind: "number" },
@@ -124,8 +133,11 @@ export function CurrentJobsSection() {
           if (!memberId) throw new Error("No team member selected.");
           const selectedDemand = String(v.production_demand ?? "");
           if (selectedDemand) {
-            const [kind, demandId] = selectedDemand.split(":");
-            if (!v.brief_id || !demandId || (kind !== "daily" && kind !== "campaign")) {
+            const [kind, demandId] = selectedDemand === "manual"
+              ? [String(v.manual_demand_kind ?? ""), String(v.manual_demand_id ?? "").trim()]
+              : selectedDemand.split(":");
+            if (!v.brief_id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(demandId)
+              || (kind !== "daily" && kind !== "campaign")) {
               throw new Error("Select a brief and exact production request.");
             }
             const { error } = await supabase.rpc("create_demand_assignment_v7", {

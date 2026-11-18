@@ -146,6 +146,7 @@ export function CampaignSweepWork({ clientId, campaignId }: { clientId: string; 
           <p className="font-medium">{work.item_key.replaceAll("_", " ")} · {route} v{version}</p>
           <span className="text-xs">{shownState.replaceAll("_", " ")}</span>
         </div>
+        <p className="mt-1 break-all text-xs text-muted-foreground">Request ID: <code>{work.id}</code></p>
         <p className="mt-1 text-xs text-muted-foreground">
           {[work.expected_output.platform, work.expected_output.media_type,
             work.expected_output.content_format].filter(Boolean).join(" · ")}

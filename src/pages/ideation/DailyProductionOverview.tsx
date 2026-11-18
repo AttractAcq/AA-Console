@@ -56,6 +56,7 @@ export function DailyProductionOverview() {
           {counts.filter((row) => row.run_id === pkg.run_id).map((row) =>
             <li key={row.demand_id}>
               {row.piece_key.replaceAll("_", " ")} · {row.content_format} · {row.media_type} · {row.destination} · 1 requested · {row.produced} produced · {row.rejected} failed or rejected attempts · {row.revised} revised · {row.workflow_accepted} passed workflow QA · {row.human_approved} human approved
+              <span className="block break-all">Request ID: <code>{row.demand_id}</code></span>
               <ProductionAttemptComparison clientId={clientId}
                 demandId={row.demand_id} count={row.attempts} />
             </li>)}

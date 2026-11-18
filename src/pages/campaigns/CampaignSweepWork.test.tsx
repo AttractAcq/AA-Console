@@ -54,6 +54,7 @@ it("shows current route work and retries only its blocked step", async () => {
   rpc.mockResolvedValue({ data: { id: "step-1" }, error: null });
   render(<CampaignSweepWork clientId="client-1" campaignId="campaign-1" />);
   expect(await screen.findByText(/content piece1 · organic v2/i)).toBeInTheDocument();
+  expect(screen.getAllByText(/Request ID:/)).toHaveLength(2);
   expect(screen.getByText(/content piece2 · paid v1/i)).toBeInTheDocument();
   expect(screen.getByText(/Motion failed/)).toBeInTheDocument();
   expect(screen.getByText(/1 requested · 1 produced · 1 failed or rejected attempts/)).toBeInTheDocument();
