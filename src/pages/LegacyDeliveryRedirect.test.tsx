@@ -70,6 +70,27 @@ it.each(["v1", "v2"])("keeps a historical Strategy %s bookmark in Strategy", (ve
     .toBe("/clients/c1/delivery/intelligence-os?view=strategy&tab=offer-strategy");
 });
 
+it.each([
+  ["edit-repurpose?tab=overview", "content-production-factory?tab=edit"],
+  ["reporting?tab=attribution", "attribution-os?tab=overview"],
+  ["campaign-execution?tab=overview", "campaign-factory"],
+  ["conversion?tab=primary-landing-pages", "website-studio?tab=landing-pages"],
+  ["conversion?tab=secondary-offer-pages", "website-studio?tab=offer-pages"],
+  ["sales?tab=overview", "sales-os?tab=agents"],
+  ["economics?tab=overview", "attribution-os?tab=economics"],
+  ["distribution?tab=paid", "meta-ads-studio?tab=paid"],
+])("sends a retired %s tab to %s", (from, target) => {
+  go(`/clients/c1/delivery/${from}`);
+  expect(screen.getByTestId("landed").textContent)
+    .toBe(`/clients/c1/delivery/${target}`);
+});
+
+it("keeps Organic Distribution tabs on their current module", () => {
+  go("/clients/c1/delivery/distribution?tab=engine&source=old-link");
+  expect(screen.getByTestId("landed").textContent)
+    .toBe("/clients/c1/delivery/content-distribution?tab=engine&source=old-link");
+});
+
 it("sends one campaign's own legacy page to that campaign, not the list", () => {
   go("/clients/c1/delivery/campaign-execution/camp-9");
   expect(screen.getByTestId("landed").textContent)

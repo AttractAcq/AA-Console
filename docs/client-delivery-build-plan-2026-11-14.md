@@ -45,6 +45,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Legacy Strategy link checkpoint, 18 November 2026:** A saved `/delivery/strategy?view=v1` or `view=v2` bookmark previously overrode the redirect default and entered Intelligence. The candidate redirect now preserves the Strategy destination while retaining other query parameters. Navigation and redirect tests passed (29 total). Deployed bookmark behavior still needs a signed-in check.
 
+**Legacy tab migration checkpoint, 18 November 2026:** The candidate redirect now maps every retired tab ID declared in the old Delivery navigation to its current tab, removes Campaign Factory's retired Overview tab, and sends the old Distribution Paid tab to Meta Ads Studio. Other Organic Distribution tabs stay in Content Distribution. Navigation and redirect tests passed (38 total), and TypeScript passed. Deployed bookmark behaviour remains unverified.
+
 ## Phase 1 — shared identity, lineage and state contracts
 
 1. Define stable IDs and version fingerprints for opportunity, offer, campaign, route package, content/proof asset, page, magnet, sales agent, approval, distribution attempt, lead and outcome. Backfill existing records without changing their public meaning.
