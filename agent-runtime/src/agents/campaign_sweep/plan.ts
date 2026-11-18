@@ -12,14 +12,14 @@ export type Platform = (typeof PLATFORMS)[number];
 export type Route = "organic" | "paid";
 export type SweepPiece = {
   route: Route;
-  platform: Platform;
+  platform: Platform | "google_ads";
   media_type: "image" | "text" | "video";
   content_format: "single" | "carousel" | "story" | "reel";
 };
 
 export type SweepStep = {
   stepKey: string;
-  agentKey: "ideation" | "brief" | "creative_build" | "video_build" | "video_edit";
+  agentKey: "ideation" | "brief" | "creative_build" | "video_build" | "video_edit" | "google_search_copy";
   dependencies: string[];
   /** Exactly one of these, which add_workflow_agent_step enforces. */
   inputTable: string;
@@ -97,6 +97,23 @@ export function sweepSteps(args: {
     const createKey = `piece${n}_create`;
 
     const plannedId = args.plannedIdeaIds?.[index];
+    if (piece.platform === "google_ads") {
+      if (piece.route !== "paid" || piece.media_type !== "text"
+        || piece.content_format !== "single" || !plannedId) {
+        throw new Error("Google search copy requires a planned paid text idea for its exact piece.");
+      }
+      steps.push({
+        stepKey: createKey,
+        agentKey: "google_search_copy",
+        dependencies: [],
+        inputTable: "client_ideas",
+        inputFromStepKey: null,
+        inputId: plannedId,
+        usesClientAsInput: false,
+        inputParams: { piece_index: n },
+      });
+      return;
+    }
     if (!plannedId) steps.push({
       stepKey: ideaKey,
       agentKey: "ideation",

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "799c92ebabbc715bd301372a03e0a781a7d62ea79aa9ade7d608493a5db9d6d7",
-  "generatedTypesSha256": "f4f6fca37c5fe6d373c64cb20a2502b67eb97a6270fa9b8e2fcdf1880c7a5ce0",
-  "generatedSchemaBodySha256": "2ce8e60f5b4818511930a1d773164345042a2298e4efce95999bb17794656ce0",
+  "migrationSourceDigest": "ca4a82440b3e0d45923378883776f55e218a29bc204d9627a57b3061f80eec64",
+  "generatedTypesSha256": "cb107cbb5d3327599265c4ac330edef9e4b89681d5569a122c791c1f1d34be8f",
+  "generatedSchemaBodySha256": "5d28fa901c973069b57e4bdcb217d49d419275b1ca3db0b1841db9e9d94bc6c7",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4126,6 +4126,13 @@
       "filename": "20261124040700_572_google_search_copy_versions.sql",
       "sha256": "b33c77938e8ccf8b586d080bdb09dabcb10612e582df0f0e390fa3ec358d23ef",
       "trimmedMd5": "37ac2597705909f841ce24f1649b73cc"
+    },
+    {
+      "version": "20261124040800",
+      "name": "573_google_search_copy_workflow",
+      "filename": "20261124040800_573_google_search_copy_workflow.sql",
+      "sha256": "93cf71ee5be41a0b7f277735bd2f92723a5ca0cda4e687fff959aa17e7ebf2d1",
+      "trimmedMd5": "e15eb43cda257a480ce529bd0c89d1f8"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

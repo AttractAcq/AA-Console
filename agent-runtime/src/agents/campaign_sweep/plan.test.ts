@@ -39,6 +39,23 @@ describe("which platform a campaign's pieces go to", () => {
 describe("the chain a plan implies", () => {
   const base = { platform: "instagram" as const, campaignId: "camp-1" };
 
+  it("routes a planned Google search piece to its own copy producer", () => {
+    const pieces = [
+      { route: "organic" as const, platform: "instagram" as const,
+        media_type: "image" as const, content_format: "single" as const },
+      { route: "paid" as const, platform: "google_ads" as const,
+        media_type: "text" as const, content_format: "single" as const },
+    ];
+    const steps = sweepSteps({ ...base, organicCount: 1, paidCount: 1,
+      pieces, plannedIdeaIds: ["organic-idea", "google-idea"] });
+    expect(steps.at(-1)).toMatchObject({ stepKey: "piece2_create",
+      agentKey: "google_search_copy", inputTable: "client_ideas",
+      inputId: "google-idea", dependencies: [], inputParams: { piece_index: 2 } });
+    expect(steps.filter((step) => step.stepKey.startsWith("piece2_"))).toHaveLength(1);
+    expect(() => sweepSteps({ ...base, organicCount: 1, paidCount: 1, pieces }))
+      .toThrow(/planned paid text idea/);
+  });
+
   it("builds idea, brief and create for each piece", () => {
     const steps = sweepSteps({ ...base, organicCount: 2, paidCount: 0 });
     expect(steps.map((s) => s.stepKey)).toEqual([

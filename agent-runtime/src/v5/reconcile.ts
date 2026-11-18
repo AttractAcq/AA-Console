@@ -45,6 +45,16 @@ export function startWorkflowReconciler(sb: SupabaseClient, config: RuntimeConfi
         if (attested > 0) logger.info("campaign_creative_bytes_attested", { count: attested });
         const magnetAttested = await attestCampaignMagnetWorkflowOutputs(sb);
         if (magnetAttested > 0) logger.info("campaign_magnet_bytes_attested", { count: magnetAttested });
+        const { data: googleCopyQa, error: googleCopyQaError } = await sb.rpc(
+          "accept_ready_google_search_copy_steps_v7", { p_limit: 20 },
+        );
+        if (googleCopyQaError) throw new Error(googleCopyQaError.message);
+        const googleCopyCounts = (Array.isArray(googleCopyQa) ? googleCopyQa[0] : googleCopyQa) as {
+          steps_accepted?: number; steps_blocked?: number;
+        } | null;
+        if (googleCopyCounts && (googleCopyCounts.steps_accepted || googleCopyCounts.steps_blocked)) {
+          logger.info("google_search_copy_internal_qa", googleCopyCounts);
+        }
         const { data: campaignQaData, error: campaignQaError } = await sb.rpc(
           "accept_ready_campaign_workflow_steps_v7", { p_limit: 20 },
         );
@@ -73,6 +83,13 @@ export function startWorkflowReconciler(sb: SupabaseClient, config: RuntimeConfi
         } | null;
         if (magnetCounts && (magnetCounts.steps_accepted || magnetCounts.steps_blocked)) {
           logger.info("campaign_magnet_internal_qa", magnetCounts);
+        }
+        const { data: googleCopyWork, error: googleCopyWorkError } = await sb.rpc(
+          "sync_google_search_copy_work_v7", { p_limit: 100 },
+        );
+        if (googleCopyWorkError) throw new Error(googleCopyWorkError.message);
+        if (typeof googleCopyWork === "number" && googleCopyWork > 0) {
+          logger.info("google_search_copy_work_synced", { count: googleCopyWork });
         }
         const { data: workSynced, error: workError } = await sb.rpc(
           "sync_campaign_sweep_work_v7", { p_limit: 100 },

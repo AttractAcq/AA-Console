@@ -36906,6 +36906,13 @@ export type Database = {
           steps_blocked: number
         }[]
       }
+      accept_ready_google_search_copy_steps_v7: {
+        Args: { p_limit?: number }
+        Returns: {
+          steps_accepted: number
+          steps_blocked: number
+        }[]
+      }
       accept_video_as_finished: {
         Args: { p_asset_id: string }
         Returns: undefined
@@ -45235,6 +45242,10 @@ export type Database = {
         Returns: number
       }
       sync_campaign_sweep_work_v7: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
+      sync_google_search_copy_work_v7: {
         Args: { p_limit?: number }
         Returns: number
       }

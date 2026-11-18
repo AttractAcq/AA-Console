@@ -108,9 +108,6 @@ export async function runCampaignSweepJob(
       || spec.content_hash !== c.content_spec_hash || !Array.isArray(spec.pieces)) {
       return { ok: false, retryable: false, failureMessage: "The reviewed content requirements no longer match this campaign." };
     }
-    if (spec.pieces.some((piece: { platform: string }) => piece.platform === "google_ads")) {
-      return { ok: false, retryable: false, failureMessage: "Google search copy has no campaign sweep producer yet. Use the approved manual build sheet." };
-    }
     if (spec.pieces.some((piece: { media_type: string; content_format: string }) =>
       piece.media_type === "video" && piece.content_format !== "reel")) {
       return { ok: false, retryable: false,
@@ -129,6 +126,11 @@ export async function runCampaignSweepJob(
         return { ok: false, retryable: false, failureMessage: "The reviewed campaign idea batch is incomplete." };
       }
       plannedIdeaIds = ids as string[];
+    }
+    if (spec.pieces.some((piece: { platform: string }) => piece.platform === "google_ads")
+      && !plannedIdeaIds) {
+      return { ok: false, retryable: false,
+        failureMessage: "Google search copy needs exact planned ideas. Regenerate the plan with ideas before preparing this campaign." };
     }
   }
 
@@ -150,7 +152,7 @@ export async function runCampaignSweepJob(
   const steps = sweepSteps({
     organicCount,
     paidCount,
-    platform: platform ?? pieces?.[0]?.platform ?? "instagram",
+    platform: platform ?? "instagram",
     campaignId: c.id,
     pieces,
     plannedIdeaIds,
@@ -264,7 +266,7 @@ export async function runCampaignSweepJob(
           planned_idea_id: plannedIdeaIds?.[index] ?? null,
           workflow_run_id: runId,
         },
-        p_expected_output: { artifact_kind: "asset", final_step_key: finalStepKey,
+        p_expected_output: { artifact_kind: piece.platform === "google_ads" ? "google_search_copy" : "asset", final_step_key: finalStepKey,
           route: piece.route, platform: piece.platform, media_type: piece.media_type,
           content_format: piece.content_format },
       });
