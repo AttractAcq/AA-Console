@@ -24,6 +24,8 @@ declare
   h text;
   factors jsonb;
   p uuid;
+  saved uuid;
+  j uuid;
   refused boolean;
 begin
   select jsonb_object_agg(f.factor,50) into factors from public.opportunity_score_factors f;
@@ -65,5 +67,47 @@ begin
     perform public.accept_opportunity_score_proposal_v6(p);
   exception when check_violation then refused:=true; end;
   if not refused then raise exception 'Unfingerprinted historical proposal was accepted'; end if;
+
+  insert into public.agent_jobs(agent_key,client_id,input_table,input_id)
+    values('opportunity_evaluate','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      'market_opportunities',cid) returning id into j;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  refused:=false;
+  begin
+    perform public.save_opportunity_score_proposal_v7(cid,
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',j,
+      jsonb_build_object('factors',factors,'input_hash',
+        public.opportunity_evaluation_input_hash_v7(cid)),
+      'New evidence',repeat('x',121));
+  exception when check_violation then refused:=true; end;
+  if not refused or not exists(select 1 from public.opportunity_proposals
+      where id=p and resolution='open') then
+    raise exception 'Failed new proposal superseded the existing review card';
+  end if;
+  saved:=public.save_opportunity_score_proposal_v7(cid,
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',j,
+    jsonb_build_object('factors',factors,'input_hash',
+      public.opportunity_evaluation_input_hash_v7(cid)),
+    'New evidence','opportunity_evaluate');
+  if saved is null or not exists(select 1 from public.opportunity_proposals
+      where id=p and resolution='superseded') or not exists(
+      select 1 from public.opportunity_proposals where id=saved and resolution='open')
+    then raise exception 'Atomic proposal replacement did not commit'; end if;
+  if public.save_opportunity_score_proposal_v7(cid,
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',j,
+    jsonb_build_object('factors',factors,'input_hash',
+      public.opportunity_evaluation_input_hash_v7(cid)),
+    'New evidence','opportunity_evaluate') is distinct from saved
+    then raise exception 'Job replay created a second review card'; end if;
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  refused:=false;
+  begin
+    perform public.save_opportunity_score_proposal_v7(cid,
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',j,
+      jsonb_build_object('factors',factors,'input_hash',
+        public.opportunity_evaluation_input_hash_v7(cid)),
+      'New evidence','opportunity_evaluate');
+  exception when insufficient_privilege then refused:=true; end;
+  if not refused then raise exception 'Browser identity saved a score proposal'; end if;
 end $checks$;
 rollback;

@@ -43475,6 +43475,17 @@ export type Database = {
         }
         Returns: string
       }
+      save_opportunity_score_proposal_v7: {
+        Args: {
+          p_client_id: string
+          p_job_id: string
+          p_opportunity_id: string
+          p_payload: Json
+          p_proposed_by: string
+          p_rationale: string
+        }
+        Returns: string
+      }
       schedule_agent_follow_up: {
         Args: {
           p_after_seconds: number

@@ -321,27 +321,15 @@ ${evidence.length > 0 ? `INTELLIGENCE RECORDS\n${evidence.join("\n\n")}` : "Ther
       usage };
   }
 
-  // An earlier open proposal for the same opportunity is superseded rather
-  // than left decidable. Two open score cards for one opportunity is a person
-  // choosing between drafts they have no way to tell apart.
-  const { error: supersedeError } = await sb
-    .from("opportunity_proposals")
-    .update({ resolution: "superseded", resolved_at: new Date().toISOString() })
-    .eq("opportunity_id", job.input_id)
-    .eq("kind", "score")
-    .eq("resolution", "open");
-  if (supersedeError) throw new Error(`Could not supersede the previous proposal: ${supersedeError.message}`);
-
-  const { error: insertError } = await sb.from("opportunity_proposals").insert({
-    opportunity_id: job.input_id,
-    client_id: job.client_id,
-    kind: "score",
-    payload: { factors: checked.factors, reasoning: checked.reasoning, input_hash: inputHash },
-    rationale: checked.rationale,
-    proposed_by: agent.agent_key,
-    proposed_by_job_id: job.id,
+  const { error: saveError } = await sb.rpc("save_opportunity_score_proposal_v7", {
+    p_opportunity_id: job.input_id,
+    p_client_id: job.client_id,
+    p_job_id: job.id,
+    p_payload: { factors: checked.factors, reasoning: checked.reasoning, input_hash: inputHash },
+    p_rationale: checked.rationale,
+    p_proposed_by: agent.agent_key,
   });
-  if (insertError) throw new Error(`Could not save the proposal: ${insertError.message}`);
+  if (saveError) throw new Error(`Could not save the proposal: ${saveError.message}`);
 
   await appendEvent(
     sb,
