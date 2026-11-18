@@ -110,7 +110,7 @@ export function ClientDashboardPanel() {
         </p>
       )}
 
-      {clientId && <ClientOperationalBrief clientId={clientId}
+      {clientId && <ClientOperationalBrief key={clientId} clientId={clientId}
         spend={historyError ? null : spend}
         failedRuns={historyError ? null : failed.length}
         activeRuns={!liveLoaded || liveError ? null : active.length} />}

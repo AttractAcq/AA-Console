@@ -119,7 +119,7 @@ export function ClientOperationalBrief({ clientId, spend, failedRuns, activeRuns
           {brief?.measurement ? `${brief.measurement.leads} leads · ${brief.measurement.sales} sales; ${brief.measurement.sourcedLeads}/${brief.measurement.leads} leads with source; ${brief.measurement.consentedLeads}/${brief.measurement.leads} with recorded consent` : "unknown"}
           {" "}<Link className="text-primary underline" to={`${base}/delivery/attribution-os`}>Inspect journeys</Link>
         </dd></div>
-        <div><dt className="text-muted-foreground">Paid account read-back · 30 days</dt><dd>
+        <div><dt className="text-muted-foreground">Latest paid account inventory read</dt><dd>
           {brief?.measurement ? `Meta: ${brief.measurement.latestMetaRead ? new Date(brief.measurement.latestMetaRead).toLocaleString() : "unknown"} · Google: ${brief.measurement.latestGoogleRead ? new Date(brief.measurement.latestGoogleRead).toLocaleString() : "unknown"}` : "unknown"}
         </dd></div>
       </dl>
