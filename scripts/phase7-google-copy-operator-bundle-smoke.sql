@@ -15,6 +15,15 @@ insert into public.clients(id,name,initials) values
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Paid operator fixture','PO');
 insert into public.client_users(client_id,user_id) values
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','99999999-9999-4999-8999-999999999999');
+insert into auth.users(id,instance_id,aud,role,email,encrypted_password,created_at,updated_at)
+values ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','00000000-0000-0000-0000-000000000000',
+  'authenticated','authenticated','other-paid-client@example.invalid','',now(),now());
+insert into public.profiles(id,role,email) values
+  ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','client','other-paid-client@example.invalid');
+insert into public.clients(id,name,initials) values
+  ('dddddddd-dddd-4ddd-8ddd-dddddddddddd','Other paid fixture','OP');
+insert into public.client_users(client_id,user_id) values
+  ('dddddddd-dddd-4ddd-8ddd-dddddddddddd','eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
 select set_config('request.jwt.claims',
@@ -182,6 +191,19 @@ begin
   perform public.decide_paid_operator_bundle_v7(bundle.id,request_id,true,null);
   if not public.paid_operator_bundle_approved_v7(bundle.id) then
     raise exception 'Exact Google packet approval did not bind'; end if;
+  perform set_config('request.jwt.claim.sub','eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee","role":"authenticated","aal":"aal2"}',true);
+  if public.paid_operator_bundle_approved_v7(bundle.id) then
+    raise exception 'Other client could read packet approval state'; end if;
+  refused:=false;
+  begin
+    perform public.paid_operator_bundle_export_v7(bundle.id);
+  exception when insufficient_privilege then refused:=true; end;
+  if not refused then raise exception 'Other client exported paid packet'; end if;
+  perform set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
   select expires_at into original_expiry from public.approval_requests_v6
     where id=request_id;
   -- The ledger is append-only in application traffic. In this rollback-only

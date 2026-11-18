@@ -11,6 +11,9 @@ declare b public.paid_operator_bundles_v7%rowtype;
 begin
   select * into b from public.paid_operator_bundles_v7 where id=p_bundle_id;
   if b.id is null then return false; end if;
+  if auth.role()<>'service_role' and (auth.role()<>'authenticated'
+    or auth.uid() is null or not public.can_access_client(b.client_id))
+    then return false; end if;
   if b.platform='google' and nullif(btrim(b.snapshot->>'research_task'),'') is null
     then return false; end if;
   if not public.paid_operator_bundle_current_v7(b.id) then return false; end if;
