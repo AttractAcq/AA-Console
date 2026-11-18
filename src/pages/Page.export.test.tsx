@@ -29,13 +29,31 @@ vi.mock("./sites/SitesPanel", () => ({ SitesPanel: () => <p>Sites panel</p> }));
 vi.mock("./distribution/MetaProfilePanel", () => ({ MetaProfilePanel: ({ tab }: { tab: string }) => <p>Meta profile {tab}</p> }));
 vi.mock("./distribution/OrganicPanel", () => ({ OrganicPanel: () => <p>Organic board</p> }));
 vi.mock("./reporting/OrganicReportingPanel", () => ({ OrganicReportingPanel: () => <p>Organic reporting</p> }));
+vi.mock("./proof-distribution/ProofDistributionPanel", () => ({
+  ProofDistributionPanel: ({ tab }: { tab: string }) => <p>Proof distribution {tab}</p>,
+}));
 
 import { v6ModuleNodes } from "../config/navigation";
 import { Page } from "./Page";
 
 const intelligenceOs = v6ModuleNodes.find((node) => node.id === "intelligence-os")!;
+const proofDistribution = v6ModuleNodes.find((node) => node.id === "proof-distribution")!;
 
 beforeEach(() => vi.clearAllMocks());
+
+it("opens the combined Distribution Log from an old Rights deep link", () => {
+  render(
+    <MemoryRouter initialEntries={["/clients/client-1/delivery/proof-distribution?tab=rights"]}>
+      <Routes>
+        <Route path="/clients/:clientId/delivery/proof-distribution"
+          element={<Page node={proofDistribution} />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole("tab", { name: "Distribution Log" }))
+    .toHaveAttribute("aria-selected", "true");
+  expect(screen.getByText("Proof distribution placements")).toBeInTheDocument();
+});
 
 it("downloads whichever tab is open as a PDF", async () => {
   const user = userEvent.setup();

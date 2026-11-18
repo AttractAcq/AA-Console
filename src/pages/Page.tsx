@@ -288,10 +288,12 @@ export function Page({ node }: { node: NavNode }) {
     ? node.tabs?.filter((tab) => strategyTabIds.has(tab.id) === (view === "strategy"))
     : node.tabs;
   const requestedTab = searchParams.get("tab");
+  const resolvedTab = node.id === "proof-distribution" && requestedTab === "rights"
+    ? "placements" : requestedTab;
   const assetLibrary = node.id === "content-production-factory"
     && requestedTab !== null && LEGACY_LIBRARY_TABS.has(requestedTab);
   const activeTab =
-    tabs && (tabs.find((t) => t.id === (assetLibrary ? "assets" : requestedTab)) ?? tabs[0]);
+    tabs && (tabs.find((t) => t.id === (assetLibrary ? "assets" : resolvedTab)) ?? tabs[0]);
   const v6Intelligence = node.id === "intelligence-os";
   const exportModule: ExportModule | null = v6Intelligence
     ? view === "strategy" ? "strategy" : "intelligence"

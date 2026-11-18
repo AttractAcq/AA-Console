@@ -444,9 +444,9 @@ export const v6ModuleNodes: NavNode[] = [
   { id: "proof-distribution", label: "Proof Distribution", path: "proof-distribution", icon: Share2,
     capability: "expanding", tabs: [
       { id: "destinations", label: "Destinations" },
-      // Placements and Rights are archived: see docs/V6_1_ARCHIVED_SURFACES.md.
-      // Their panels still build; only the way in is gone, so v6.2 can delete
-      // the code without a second decision.
+      // The placement trail and removal work are the Distribution Log. The
+      // former Rights view is part of that log; it is not a third tab.
+      { id: "placements", label: "Distribution Log" },
     ] },
   { id: "content-distribution", label: "Organic Content Distribution", path: "content-distribution", icon: Share2,
     capability: "expanding", tabs: [

@@ -146,6 +146,14 @@ describe("destinations", () => {
 });
 
 describe("placements", () => {
+  it("keeps rights and removal coverage beside the distribution log", async () => {
+    render(<ProofDistributionPanel tab="placements" />);
+    expect(await screen.findByRole("heading", { name: "Where this proof actually is" }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Distribution log" }))
+      .toBeInTheDocument();
+  });
+
   it("shows exact payload, rights, provider result and the append-only event trail", async () => {
     state.placements = [placement({ status: "verified", external_id: "provider-42",
       external_url: "https://directory.example/proof/42", verified_at: "2026-11-16T12:00:00Z" })];

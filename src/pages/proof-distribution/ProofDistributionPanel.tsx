@@ -31,15 +31,13 @@ import {
  * "where is this testimonial used" and "this permission expired, what do we
  * pull" were both unanswerable.
  *
- * Three tabs, and they are three questions:
+ * Two tabs answer the operating questions:
  *
  *   Destinations  where can proof go, and is this client switched on for it
- *   Placements    what is going where, and what is stopping each one
- *   Rights        what is live, on whose permission, and what has to come down
+ *   Distribution Log  what went where, with its rights, blockers and history
  *
- * Rights is the tab that justifies the rest. A placement is cheap to make and
- * expensive to forget, and permission ending is the moment the record earns
- * its keep.
+ * The former Rights view stays in the log because permission ending while a
+ * placement is live still needs a visible removal task.
  */
 
 type Tab = "destinations" | "placements" | "rights";
@@ -176,17 +174,32 @@ export function ProofDistributionPanel({ tab }: { tab: Tab }) {
         />
       )}
       {tab === "placements" && (
-        <PlacementsTab
-          placements={placements}
-          retractionReceipts={retractionReceipts}
-          due={due}
-          destinations={destinations}
-          proof={proof}
-          titleOf={titleOf}
-          busy={busy}
-          loading={loading}
-          onAct={act}
-        />
+        <div className="space-y-8">
+          <RightsTab
+            placements={placements}
+            retractionReceipts={retractionReceipts}
+            due={due}
+            proof={proof}
+            titleOf={titleOf}
+            busy={busy}
+            loading={loading}
+            onAct={act}
+          />
+          <section className="space-y-3" aria-label="Distribution log">
+            <h3 className="font-semibold">Distribution log</h3>
+            <PlacementsTab
+              placements={placements}
+              retractionReceipts={retractionReceipts}
+              due={due}
+              destinations={destinations}
+              proof={proof}
+              titleOf={titleOf}
+              busy={busy}
+              loading={loading}
+              onAct={act}
+            />
+          </section>
+        </div>
       )}
       {tab === "rights" && (
         <RightsTab
