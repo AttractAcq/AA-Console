@@ -89,6 +89,42 @@ revoke all on function public.record_post_publish_uncertain_v7(uuid,text)
 grant execute on function public.record_post_publish_uncertain_v7(uuid,text)
   to service_role;
 
+-- The older failure RPC accepted any state other than published. Once a
+-- provider result is uncertain, that could silently requeue the public write.
+create or replace function public.record_post_publish_failure(
+  p_post_id uuid,p_reason text,p_retryable boolean default false,
+  p_max_attempts integer default 3)
+returns public.scheduled_posts language plpgsql volatile security definer
+set search_path=pg_catalog,public as $$
+declare v_post public.scheduled_posts%rowtype; v_slot uuid; v_give_up boolean;
+begin
+  if auth.role()<>'service_role' then
+    raise exception 'Publication failures are recorded by the publisher.' using errcode='42501';
+  end if;
+  if nullif(btrim(p_reason),'') is null then
+    raise exception 'A publication failure needs a reason.' using errcode='23514';
+  end if;
+  select * into v_post from public.scheduled_posts where id=p_post_id for update;
+  if v_post.id is null or v_post.publication_status<>'publishing' then
+    raise exception 'Only an in-progress post can record a publication failure.'
+      using errcode='23514';
+  end if;
+  v_give_up:=not p_retryable or v_post.publish_attempts>=p_max_attempts;
+  update public.scheduled_posts
+     set publication_status=case when v_give_up then 'failed' else 'scheduled' end,
+         failure_reason=btrim(p_reason),publish_claimed_at=null,updated_at=now()
+   where id=p_post_id returning * into v_post;
+  if v_give_up then
+    select s.id into v_slot from public.content_slots s
+      where s.scheduled_post_id=p_post_id and s.stage='scheduled';
+    if v_slot is not null then
+      perform public.advance_slot(v_slot,'failed','agent',p_reason,'publisher',
+        null,null,null,null,null,null,p_reason);
+    end if;
+  end if;
+  return v_post;
+end $$;
+
 create or replace function public.reap_stale_publish_claims(
   p_older_than interval default interval '15 minutes')
 returns integer language plpgsql security definer
@@ -113,6 +149,8 @@ end $$;
 
 comment on function public.record_post_publish_uncertain_v7(uuid,text) is
   'Terminal automatic hold after an ambiguous provider write. An account read is required before a separate reconciliation can clear it.';
+comment on function public.record_post_publish_failure(uuid,text,boolean,integer) is
+  'Record a known failure only while publishing; an uncertain outcome cannot be returned to the automatic queue.';
 comment on function public.reap_stale_publish_claims(interval) is
   'Moves abandoned publishing claims to uncertain; never requeues an effect that may have reached the provider.';
 select public.lock_down_definer_functions();
