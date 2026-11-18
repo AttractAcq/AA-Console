@@ -62,13 +62,25 @@ export function stageReached(row: ArchiveRow): ChainStage {
 /** Plain-language summary of where a piece stopped, for the list. */
 export function stageLabel(row: ArchiveRow): string {
   if (row.published > 0) {
-    return `Published${row.published > 1 ? ` ×${row.published}` : ""}`;
+    return `Publication recorded${row.published > 1 ? ` ×${row.published}` : ""}`;
   }
   if (row.scheduled > 0) return "Scheduled, not yet out";
 
   if (row.approved_assets > 0) return "Approved, not scheduled";
   if (row.assets > 0) return "Built, awaiting approval";
   return "Brief only";
+}
+
+/** A recorded publish transition is not a provider read-back. */
+export function publicationEvidence(post: {
+  published_at: string | null;
+  external_id: string | null;
+  external_url: string | null;
+}): string | null {
+  if (!post.published_at) return null;
+  return post.external_id || post.external_url
+    ? "External reference recorded; provider read-back unverified"
+    : "Publication recorded without an external reference; provider result unverified";
 }
 
 export async function fetchArchive(clientId: string): Promise<ArchiveRow[]> {

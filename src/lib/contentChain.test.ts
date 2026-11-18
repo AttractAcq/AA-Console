@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHAIN_STAGES, matchesSearch, stageLabel, stageReached } from "./contentChain";
+import { CHAIN_STAGES, matchesSearch, publicationEvidence, stageLabel, stageReached } from "./contentChain";
 import type { ArchiveRow } from "./contentChain";
 
 const row = (over: Partial<ArchiveRow> = {}): ArchiveRow => ({
@@ -68,8 +68,18 @@ describe("stageLabel", () => {
   });
 
   it("counts multiple publications rather than saying published once", () => {
-    expect(stageLabel(row({ assets: 1, scheduled: 3, published: 1 }))).toBe("Published");
-    expect(stageLabel(row({ assets: 1, scheduled: 3, published: 3 }))).toBe("Published ×3");
+    expect(stageLabel(row({ assets: 1, scheduled: 3, published: 1 }))).toBe("Publication recorded");
+    expect(stageLabel(row({ assets: 1, scheduled: 3, published: 3 }))).toBe("Publication recorded ×3");
+  });
+});
+
+describe("publicationEvidence", () => {
+  it("does not present a recorded transition or external reference as provider read-back", () => {
+    expect(publicationEvidence({ published_at: null, external_id: null, external_url: null })).toBeNull();
+    expect(publicationEvidence({ published_at: "2026-11-18T00:00:00Z", external_id: null, external_url: null }))
+      .toContain("without an external reference");
+    expect(publicationEvidence({ published_at: "2026-11-18T00:00:00Z", external_id: "post-1", external_url: null }))
+      .toContain("provider read-back unverified");
   });
 });
 

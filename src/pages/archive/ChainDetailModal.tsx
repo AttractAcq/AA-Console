@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { CHAIN_STAGES } from "../../lib/contentChain";
+import { CHAIN_STAGES, publicationEvidence } from "../../lib/contentChain";
 import type { ArchiveRow, ChainStage } from "../../lib/contentChain";
 import { supabase } from "../../lib/supabase";
 import { cn } from "../../lib/cn";
@@ -159,7 +159,7 @@ function emptyFor(stage: ChainStage): string {
     case "distribution":
       return "This was never scheduled.";
     case "reporting":
-      return "Nothing published, so there is nothing to report against.";
+      return "No publication or outcome metrics recorded for this chain.";
     case "iteration":
       return "Built once and never rebuilt.";
     default:
@@ -209,11 +209,14 @@ async function loadStage(stage: ChainStage, row: ArchiveRow): Promise<Record<str
     if (ids.length === 0) return [];
     const { data, error } = await supabase
       .from("scheduled_posts")
-      .select("ref_number, scheduled_for, channel, platform, publication_status, published_at, failure_reason")
+      .select("ref_number, scheduled_for, channel, platform, publication_status, published_at, publish_attempts, external_id, external_url, failure_reason")
       .in("asset_id", ids)
       .order("scheduled_for");
     if (error) throw new Error(error.message);
-    return (data ?? []) as Record<string, unknown>[];
+    return (data ?? []).map((post) => ({
+      ...post,
+      publication_evidence: publicationEvidence(post),
+    })) as Record<string, unknown>[];
   }
 
   if (stage === "reporting") {
