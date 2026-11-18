@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -17,6 +17,7 @@ import { ProofDistributionPanel } from "./ProofDistributionPanel";
 const rpc = vi.fn();
 const requestProofPublish = vi.fn();
 const navigate = vi.fn();
+const currentClient = vi.hoisted(() => ({ id: "c1" }));
 
 const DESTINATIONS = [
   {
@@ -40,6 +41,9 @@ const state = {
   events: [] as Record<string, unknown>[],
   integrations: [] as Record<string, unknown>[],
   publishing: false,
+  placementReadOverride: null as null | ((clientId: string | null) => Promise<{
+    data: Record<string, unknown>[]; error: null;
+  }>),
 };
 
 function result(table: string) {
@@ -59,20 +63,25 @@ function result(table: string) {
 }
 
 const from = vi.fn((table: string) => {
+  let requestedClient: string | null = null;
   const payload = () => Promise.resolve(result(table));
   const chain: Record<string, unknown> = {
     maybeSingle: payload,
     order: () => table === "proof_placement_events" || table === "proof_placements" ? chain : payload(),
-    range: payload,
+    range: () => table === "proof_placements" && state.placementReadOverride
+      ? state.placementReadOverride(requestedClient) : payload(),
     upsert: payload,
     then: (...a: Parameters<Promise<unknown>["then"]>) => payload().then(...a),
   };
-  chain.eq = () => chain;
+  chain.eq = (field: string, value: string) => {
+    if (field === "client_id") requestedClient = value;
+    return chain;
+  };
   chain.select = () => chain;
   return chain;
 });
 
-vi.mock("react-router-dom", () => ({ useParams: () => ({ clientId: "c1" }), useNavigate: () => navigate }));
+vi.mock("react-router-dom", () => ({ useParams: () => ({ clientId: currentClient.id }), useNavigate: () => navigate }));
 vi.mock("../../lib/supabase", () => ({
   supabase: {
     from: (...a: unknown[]) => from(...(a as [string])),
@@ -99,6 +108,7 @@ const placement = (over: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
+  currentClient.id = "c1";
   state.coverage = [];
   vi.clearAllMocks();
   rpc.mockResolvedValue({ data: null, error: null });
@@ -110,6 +120,7 @@ beforeEach(() => {
   state.events = [];
   state.integrations = [];
   state.publishing = false;
+  state.placementReadOverride = null;
 });
 
 describe("destinations", () => {
@@ -146,6 +157,38 @@ describe("destinations", () => {
 });
 
 describe("placements", () => {
+  it("clears the previous client's placement rows as soon as the client changes", async () => {
+    state.placements = [placement({ external_id: "client-one-provider-id" })];
+    const view = render(<ProofDistributionPanel tab="placements" />);
+    expect(await screen.findByText(/client-one-provider-id/)).toBeInTheDocument();
+
+    currentClient.id = "c2";
+    state.placements = [];
+    view.rerender(<ProofDistributionPanel tab="placements" />);
+    expect(screen.queryByText(/client-one-provider-id/)).not.toBeInTheDocument();
+    expect(await screen.findByText(/No placements yet/)).toBeInTheDocument();
+  });
+
+  it("ignores a previous client's placement read that finishes after the new client loads", async () => {
+    let finishOld!: (result: { data: Record<string, unknown>[]; error: null }) => void;
+    const oldRead = new Promise<{ data: Record<string, unknown>[]; error: null }>((resolve) => {
+      finishOld = resolve;
+    });
+    state.placementReadOverride = (id) => id === "c1"
+      ? oldRead : Promise.resolve({ data: [], error: null });
+    const view = render(<ProofDistributionPanel tab="placements" />);
+    await waitFor(() => expect(from).toHaveBeenCalledWith("proof_placements"));
+
+    currentClient.id = "c2";
+    view.rerender(<ProofDistributionPanel tab="placements" />);
+    expect(await screen.findByText(/No placements yet/)).toBeInTheDocument();
+    await act(async () => {
+      finishOld({ data: [placement({ external_id: "stale-client-provider-id" })], error: null });
+      await oldRead;
+    });
+    expect(screen.queryByText(/stale-client-provider-id/)).not.toBeInTheDocument();
+  });
+
   it("keeps rights and removal coverage beside the distribution log", async () => {
     render(<ProofDistributionPanel tab="placements" />);
     expect(await screen.findByRole("heading", { name: "Where this proof actually is" }))

@@ -76,6 +76,10 @@ function auditLegacyProofRemoval(
 
 export function ProofDistributionPanel({ tab }: { tab: Tab }) {
   const { clientId } = useParams<{ clientId: string }>();
+  return <ClientProofDistributionPanel key={clientId ?? "no-client"} clientId={clientId} tab={tab} />;
+}
+
+function ClientProofDistributionPanel({ clientId, tab }: { clientId: string | undefined; tab: Tab }) {
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [clientDestinations, setClientDestinations] = useState<ReadonlyMap<string, ClientDestination>>(new Map());
   const [integrations, setIntegrations] = useState<DestinationIntegration[]>([]);
