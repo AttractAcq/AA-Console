@@ -98,6 +98,9 @@ export function validateEvaluation(
       // rubric, which makes the rest of the set untrustworthy too.
       return { error: `"${name || "(unnamed)"}" is not one of the scoring factors.` };
     }
+    if (name in factors) {
+      return { error: `${name} was scored twice; each factor needs one reviewed reason.` };
+    }
     if (badScore(row.score)) {
       return { error: `${name} came back as something other than a whole number from 0 to 100.` };
     }

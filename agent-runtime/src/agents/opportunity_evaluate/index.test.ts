@@ -69,6 +69,14 @@ describe("what it refuses", () => {
       .toEqual({ error: '"gut_feel" is not one of the scoring factors.' });
   });
 
+  it("refuses two conflicting scores for the same factor", () => {
+    const body = good();
+    body.scores.push({ factor: "available_proof", score: 95, reasoning: "A conflicting second answer." });
+    expect(validateEvaluation(body, FACTORS)).toEqual({
+      error: "available_proof was scored twice; each factor needs one reviewed reason.",
+    });
+  });
+
   it("refuses a score that is not a whole number in range", () => {
     for (const bad of [-1, 101, 72.5, "80", null, undefined]) {
       const body = good();
