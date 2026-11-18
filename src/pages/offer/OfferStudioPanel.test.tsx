@@ -188,11 +188,20 @@ describe("the question Live use existed to answer", () => {
 });
 
 describe("the detail", () => {
-  it("explains where a main offer is compiled from", async () => {
+  it("shows the reviewed Strategy snapshot bound to a new main offer", async () => {
+    database({ offers: [offer()], mainSources: [{ offer_id: "offer-1", strategy_hash: "a".repeat(64) }] });
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Show Garage conversion" }));
+    expect(screen.getByText(/bound to reviewed Offer Strategy/)).toBeInTheDocument();
+    expect(screen.getByText(/Source: reviewed Offer Strategy snapshot/)).toBeInTheDocument();
+  });
+
+  it("labels a historical main offer without a reviewed source", async () => {
     database({ offers: [offer()] });
     show();
     await userEvent.click(await screen.findByRole("button", { name: "Show Garage conversion" }));
-    expect(screen.getByText(/compiled from offer strategy/)).toBeInTheDocument();
+    expect(screen.getByText(/legacy main offer has no reviewed Offer Strategy snapshot/)).toBeInTheDocument();
+    expect(screen.getByText(/Source review is unverified/)).toBeInTheDocument();
   });
 
   it("explains where a secondary offer is compiled from", async () => {

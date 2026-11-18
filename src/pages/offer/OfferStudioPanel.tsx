@@ -293,7 +293,9 @@ export function OfferStudioPanel() {
               <p className="text-muted-foreground">
                 {offer.kind === "secondary"
                   ? "A secondary offer targets one micro-niche, and is compiled from that market opportunity."
-                  : "A main offer is the business's own, and is compiled from offer strategy."}
+                  : mainSource
+                    ? "This main offer is bound to reviewed Offer Strategy."
+                    : "This legacy main offer has no reviewed Offer Strategy snapshot bound."}
               </p>
 
               {offer.kind === "secondary" && (
@@ -310,6 +312,11 @@ export function OfferStudioPanel() {
               {offer.kind === "main" && mainSource && (
                 <p className="text-muted-foreground">
                   Source: reviewed Offer Strategy snapshot {mainSource.strategy_hash.slice(0, 12)}. Later source edits hold new sign-off and campaign use.
+                </p>
+              )}
+              {offer.kind === "main" && !mainSource && (
+                <p className="text-destructive">
+                  Source review is unverified for this historical offer. Inspect its evidence before new campaign use.
                 </p>
               )}
 
