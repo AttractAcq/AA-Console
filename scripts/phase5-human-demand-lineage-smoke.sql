@@ -98,6 +98,12 @@ begin
     or n.human_approved<>0 then
     raise exception 'Exact human history not counted: %',row_to_json(n);
   end if;
+  if not exists (select 1 from public.production_attempt_timing_v8 t
+      where t.demand_id=item_one.id and t.attempt_kind='human_delivery'
+        and t.timing_basis='assignment to delivery'
+        and t.started_at<=t.finished_at) then
+    raise exception 'Human assignment-to-delivery timing missing';
+  end if;
   select * into n from public.production_demand_counts_v8 where demand_id=item_two.id;
   if n.attempts<>0 then
     raise exception 'Shared brief leaked delivery to another demand: %',row_to_json(n);

@@ -14,6 +14,8 @@ declare
   first_job uuid;
   retry_job uuid;
   generation_id uuid;
+  render_id uuid;
+  refused boolean := false;
   counts public.production_demand_counts_v7%rowtype;
 begin
   insert into public.clients(name,initials) values ('Lineage fixture','LF') returning * into c;
@@ -53,7 +55,18 @@ begin
   insert into public.creative_generations(client_id,brief_id,job_id,media_type)
     values(c.id,brief.id,first_job,'image') returning id into generation_id;
   insert into public.creative_renders(generation_id,client_id,job_id,status,asset_id)
-    values(generation_id,c.id,first_job,'done',asset.id);
+    values(generation_id,c.id,first_job,'done',asset.id) returning id into render_id;
+  if not exists (select 1 from public.production_attempt_timing_v8 t
+      where t.attempt_id=render_id and t.demand_id in
+        (select id from public.daily_package_items where package_id=package.id)
+        and t.timing_basis='render' and t.finished_at>=t.started_at) then
+    raise exception 'New render has no exact terminal timing';
+  end if;
+  begin
+    update public.creative_renders set finished_at=now()+interval '1 hour'
+      where id=render_id;
+  exception when others then refused:=true; end;
+  if not refused then raise exception 'Render finish time was rewritten'; end if;
   select * into counts from public.production_demand_counts_v7
     where run_id=run.id and piece_key='static_a';
   if counts.attempts<>1 or counts.produced<>1 or counts.workflow_accepted<>0

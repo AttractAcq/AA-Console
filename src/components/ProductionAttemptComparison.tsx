@@ -12,6 +12,10 @@ type Attempt = {
   revised: boolean;
   human_review_status: string | null;
   accepted_workflow_output: boolean;
+  started_at: string | null;
+  finished_at: string | null;
+  timing_basis: string;
+  failure_reason: string | null;
 };
 type Asset = {
   id: string;
@@ -40,8 +44,8 @@ export function ProductionAttemptComparison({ clientId, demandId, count }: {
     const load = async () => {
       setLoading(true);
       setError(null);
-      const result = await supabase.from("production_attempts_v8")
-        .select("attempt_id, attempt_kind, attempt_status, asset_id, cost_usd, created_at, revised, human_review_status, accepted_workflow_output")
+      const result = await supabase.from("production_attempt_timing_v8")
+        .select("attempt_id, attempt_kind, attempt_status, asset_id, cost_usd, created_at, revised, human_review_status, accepted_workflow_output, started_at, finished_at, timing_basis, failure_reason")
         .eq("client_id", clientId).eq("demand_id", demandId)
         .order("created_at", { ascending: true });
       if (!active) return;
@@ -74,12 +78,17 @@ export function ProductionAttemptComparison({ clientId, demandId, count }: {
         const asset = byAsset.get(attempt.asset_id ?? "");
         const path = asset?.render_path || asset?.storage_path;
         const url = path ? urls.get(path) : undefined;
+        const elapsed = attempt.started_at && attempt.finished_at
+          ? Math.max(0, Math.floor((new Date(attempt.finished_at).getTime()
+            - new Date(attempt.started_at).getTime()) / 1000)) : null;
         return <div key={attempt.attempt_id} className="rounded-md border border-border p-2">
           <p>{attempt.attempt_kind.replaceAll("_", " ")} · {attempt.attempt_status}
             {attempt.revised ? " · revision" : ""} · {new Date(attempt.created_at).toLocaleString()}</p>
           <p>Cost {attempt.cost_usd === null ? "unknown" : `$${Number(attempt.cost_usd).toFixed(2)}`}
             {" · "}Human review {attempt.human_review_status ?? "not available"}
             {" · "}Workflow QA {attempt.accepted_workflow_output ? "accepted" : "not accepted"}</p>
+          <p>{attempt.timing_basis} elapsed {elapsed === null ? "unknown" : `${elapsed}s`}</p>
+          {attempt.failure_reason && <p className="text-destructive">{attempt.failure_reason}</p>}
           {asset && <div className="mt-2">
             <p>{asset.title ?? "Untitled output"} · {asset.media_type}</p>
             {!url && <p>Preview unavailable</p>}

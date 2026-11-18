@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "69d9f982a87b776fcb0328e29c50ffc9abbc89e787ebba97012d06f6c28ba8d2",
-  "generatedTypesSha256": "824a8a8350185c279b8e15ce372e7934f98952e21646f6135693543475170286",
-  "generatedSchemaBodySha256": "e389c934344cef708db94f776752a2113b1549a1bd22a6eb823c7e88db9e8102",
+  "migrationSourceDigest": "8c05aa6cfbf90bd8b86b8fe2103ff97705acd6ab129dadfe8ac0468b22631fbe",
+  "generatedTypesSha256": "9b7dee88476899bcb5b323615b694c69b7c9cfb424d026ffc22c33513a860ced",
+  "generatedSchemaBodySha256": "f69c1fd4cd9cc30831e0a39eb8f1a41f9abea54fb82fe18b19bd506101452850",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4063,6 +4063,13 @@
       "filename": "20261124035800_563_human_production_demand_lineage.sql",
       "sha256": "c17e106d2e50231f8a0ab8e3885e7ed96fb592a613669c816b3257b61ac82da1",
       "trimmedMd5": "d42b68225d89664c005ef16b66a5deeb"
+    },
+    {
+      "version": "20261124035900",
+      "name": "564_production_attempt_timing",
+      "filename": "20261124035900_564_production_attempt_timing.sql",
+      "sha256": "640eaaed81e00bb99bbb6942a01f1f6efbaed1c366bd03a44a83a89c98355695",
+      "trimmedMd5": "28e9c947de49cd8e972ede0f5e7b4af9"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
