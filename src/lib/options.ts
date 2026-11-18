@@ -69,17 +69,15 @@ export async function loadBriefs(): Promise<Option[]> {
 
 /** Exact workflow requests that a human assignment may fulfill. The server
  * verifies the selected brief belongs to the run and piece before binding. */
-export async function loadProductionDemands(): Promise<Option[]> {
-  const [demandResult, clientResult] = await Promise.all([
-    supabase.from("production_demand_v7")
-      .select("client_id, demand_kind, demand_id, piece_key, destination")
-      .limit(500),
-    supabase.from("clients").select("id, name"),
-  ]);
-  const names = new Map((clientResult.data ?? []).map((client) => [client.id, client.name]));
-  return (demandResult.data ?? []).filter((d) => d.client_id && d.demand_id).map((d) => ({
+export async function loadProductionDemands(clientId: string, briefId: string): Promise<Option[]> {
+  const { data, error } = await supabase.from("assignable_production_demands_v7")
+    .select("demand_kind, demand_id, piece_key, destination, requested_at")
+    .eq("client_id", clientId).eq("brief_id", briefId)
+    .order("requested_at", { ascending: false }).limit(200);
+  if (error) throw error;
+  return (data ?? []).filter((d) => d.demand_id).map((d) => ({
     value: `${d.demand_kind}:${d.demand_id}`,
-    label: `${names.get(d.client_id!) ?? d.client_id!.slice(0, 8)} · ${d.demand_kind} · ${d.piece_key} · ${d.destination ?? "unspecified"} · ${d.demand_id!.slice(0, 8)}`,
+    label: `${d.demand_kind} · ${d.piece_key} · ${d.destination ?? "unspecified"} · ${d.requested_at?.slice(0, 10) ?? "date unknown"} · ${d.demand_id!.slice(0, 8)}`,
   }));
 }
 

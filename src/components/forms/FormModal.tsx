@@ -37,13 +37,14 @@ export function FormModal({
   resetKey,
   onSubmit,
   onSaved,
+  onValuesChange,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   fields: FieldDef[];
   submitLabel?: string;
-  intro?: string;
+  intro?: ReactNode;
   /** Rendered under the fields — a choice the form needs that is not a field. */
   extra?: ReactNode;
   /** Extra controls in the footer, beside Cancel — e.g. "Generate with AI". */
@@ -59,6 +60,8 @@ export function FormModal({
   resetKey?: unknown;
   onSubmit: (values: FormValues) => Promise<void>;
   onSaved?: () => void;
+  /** Observe current selections for dependent read-only option lists. */
+  onValuesChange?: (values: FormValues) => void;
 }) {
   const [values, setValues] = useState<FormValues>(() =>
     open ? blankValues(fields, { ...initialValues, ...readDraft(draftKey, fields) }) : blankValues(fields),
@@ -72,6 +75,12 @@ export function FormModal({
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmReplace, setConfirmReplace] = useState(false);
   const [busy, setBusy] = useState(false);
+  const valuesChangeRef = useRef(onValuesChange);
+  valuesChangeRef.current = onValuesChange;
+
+  useEffect(() => {
+    if (open) valuesChangeRef.current?.(values);
+  }, [open, values]);
 
   // Preserve edits through live parent refreshes. A new opening or form
   // identity loads server values plus the safe draft. AI output asks first.
@@ -215,7 +224,7 @@ export function FormModal({
   return (
     <Modal open={open} onClose={() => close()} title={title}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        {intro && <p className="text-sm text-muted-foreground">{intro}</p>}
+        {intro && <div className="text-sm text-muted-foreground">{intro}</div>}
 
         {visible.map((field) => (
           <FieldControl

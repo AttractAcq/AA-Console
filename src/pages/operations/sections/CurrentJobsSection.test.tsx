@@ -2,17 +2,23 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 
-const { from, rpc } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }));
+const { from, rpc, loadDemands } = vi.hoisted(() =>
+  ({ from: vi.fn(), rpc: vi.fn(), loadDemands: vi.fn() }));
 vi.mock("../../../lib/supabase", () => ({ supabase: { from, rpc } }));
 vi.mock("react-router-dom", () => ({ useParams: () => ({ memberId: "maker-1" }) }));
 vi.mock("../../../lib/options", () => ({
   useOptions: () => [], loadBriefs: vi.fn(), loadClients: vi.fn(),
-  loadProductionDemands: vi.fn(),
+  loadProductionDemands: loadDemands,
 }));
 vi.mock("../../../components/forms/FormModal", () => ({
-  FormModal: ({ open, onSubmit }: {
+  FormModal: ({ open, onSubmit, onValuesChange, fields }: {
     open: boolean; onSubmit: (values: Record<string, unknown>) => Promise<void>;
+    onValuesChange: (values: Record<string, unknown>) => void;
+    fields: Array<{ name: string; options?: Array<{ label: string }> }>;
   }) => open ? <>
+    <button onClick={() => onValuesChange({ client_id: "client-1", brief_id: "brief-1" })}>Choose scope</button>
+    {fields.find((field) => field.name === "production_demand")?.options?.map((option) =>
+      <span key={option.label}>{option.label}</span>)}
     <button onClick={() => void onSubmit({ title: "Make asset", client_id: "client-1",
       brief_id: "brief-1", production_demand: "daily:12345678-aaaa-4bbb-8ccc-123456789abc" })}>Assign demand</button>
     <button onClick={() => void onSubmit({ title: "Older campaign asset", client_id: "client-1",
@@ -26,7 +32,9 @@ vi.mock("../../../components/forms/FormModal", () => ({
 import { CurrentJobsSection } from "./CurrentJobsSection";
 
 beforeEach(() => {
-  from.mockReset(); rpc.mockReset();
+  from.mockReset(); rpc.mockReset(); loadDemands.mockReset();
+  loadDemands.mockResolvedValue([{ value: "daily:12345678-aaaa-4bbb-8ccc-123456789abc",
+    label: "Matching request" }]);
   from.mockImplementation(() => {
     const query = {
       select: () => query, eq: () => query, in: () => query, order: () => query,
@@ -42,12 +50,15 @@ beforeEach(() => {
 it("binds a selected human job to the exact production demand", async () => {
   render(<CurrentJobsSection />);
   await userEvent.click(await screen.findByRole("button", { name: "Assign Job" }));
+  await userEvent.click(screen.getByRole("button", { name: "Choose scope" }));
+  expect(await screen.findByText("Matching request")).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Assign demand" }));
   await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_demand_assignment_v7", {
     p_member_id: "maker-1", p_client_id: "client-1", p_brief_id: "brief-1",
     p_demand_kind: "daily", p_demand_id: "12345678-aaaa-4bbb-8ccc-123456789abc", p_title: "Make asset",
     p_due_date: undefined, p_compensation: undefined,
   }));
+  expect(loadDemands).toHaveBeenCalledWith("client-1", "brief-1");
   expect(from.mock.results.some((call) => call.value.insert?.mock.calls.length)).toBe(false);
 });
 

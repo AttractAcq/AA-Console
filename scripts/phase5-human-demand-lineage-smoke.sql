@@ -66,6 +66,12 @@ begin
     (package_id,role,content_format,media_type,campaign_id,pillar_id,final_step_id)
     values(package_two.id,'static_a','single','image',campaign.id,pillar.id,step_two.id)
     returning * into item_two;
+  if (select count(*) from public.assignable_production_demands_v7
+      where client_id=c.id and brief_id=brief.id)<>2
+    or exists(select 1 from public.assignable_production_demands_v7
+      where client_id=c.id and brief_id=other_brief.id) then
+    raise exception 'Brief-filtered demand discovery leaked or omitted a run';
+  end if;
   perform set_config('request.jwt.claim.role','authenticated',true);
   refused:=false;
   begin

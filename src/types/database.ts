@@ -29797,6 +29797,23 @@ export type Database = {
           },
         ]
       }
+      assignable_production_demands_v7: {
+        Row: {
+          brief_id: string | null
+          campaign_id: string | null
+          client_id: string | null
+          content_format: string | null
+          demand_id: string | null
+          demand_kind: string | null
+          destination: string | null
+          media_type: string | null
+          piece_key: string | null
+          requested_at: string | null
+          route_package_id: string | null
+          run_id: string | null
+        }
+        Relationships: []
+      }
       assignment_board: {
         Row: {
           accepted_at: string | null

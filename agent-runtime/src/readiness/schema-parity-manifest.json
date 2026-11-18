@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "8c05aa6cfbf90bd8b86b8fe2103ff97705acd6ab129dadfe8ac0468b22631fbe",
-  "generatedTypesSha256": "9b7dee88476899bcb5b323615b694c69b7c9cfb424d026ffc22c33513a860ced",
-  "generatedSchemaBodySha256": "f69c1fd4cd9cc30831e0a39eb8f1a41f9abea54fb82fe18b19bd506101452850",
+  "migrationSourceDigest": "ed19cf5e2c2d92d8387484f0e4d7aae48d44dd88e994791d856b3e75e499b29c",
+  "generatedTypesSha256": "aa8490da1f5a01fedecff3c5fa5242c177443618d3f2d02d65427b1fb51f7ffb",
+  "generatedSchemaBodySha256": "bbad90b0fd7077512ce6a923bf2ebde3c8a05166289b69f4a7c39108a7b20dec",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4070,6 +4070,13 @@
       "filename": "20261124035900_564_production_attempt_timing.sql",
       "sha256": "640eaaed81e00bb99bbb6942a01f1f6efbaed1c366bd03a44a83a89c98355695",
       "trimmedMd5": "28e9c947de49cd8e972ede0f5e7b4af9"
+    },
+    {
+      "version": "20261124040000",
+      "name": "565_assignable_production_demand_search",
+      "filename": "20261124040000_565_assignable_production_demand_search.sql",
+      "sha256": "dac831bdd301d6cc3efa2fc6bcf60a00779cc9d191b2b4d66d3f50720a3c7229",
+      "trimmedMd5": "024a24bd913e403dcfdb6307b0cb0c9e"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

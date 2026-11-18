@@ -5,7 +5,7 @@ import { Button } from "../../../components/Button";
 import { Panel } from "../../../components/Panel";
 import { DataTable } from "../../../components/DataTable";
 import { FormModal } from "../../../components/forms/FormModal";
-import type { FieldDef } from "../../../components/forms/fields";
+import type { FieldDef, Option } from "../../../components/forms/fields";
 import { loadBriefs, loadClients, loadProductionDemands, useOptions } from "../../../lib/options";
 import { supabase } from "../../../lib/supabase";
 
@@ -25,7 +25,25 @@ export function CurrentJobsSection() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const clientOptions = useOptions(loadClients, assignOpen);
   const briefOptions = useOptions(loadBriefs, assignOpen);
-  const demandOptions = useOptions(loadProductionDemands, assignOpen);
+  const [selection, setSelection] = useState({ clientId: "", briefId: "" });
+  const [demandLookup, setDemandLookup] = useState<{
+    key: string; options: Option[]; error: string | null; loading: boolean;
+  }>({ key: "", options: [], error: null, loading: false });
+  const demandKey = `${selection.clientId}:${selection.briefId}`;
+  const demandOptions = demandLookup.key === demandKey ? demandLookup.options : [];
+
+  useEffect(() => {
+    if (!assignOpen || !selection.clientId || !selection.briefId) return;
+    let active = true;
+    setDemandLookup({ key: demandKey, options: [], error: null, loading: true });
+    void loadProductionDemands(selection.clientId, selection.briefId).then((options) => {
+      if (active) setDemandLookup({ key: demandKey, options, error: null, loading: false });
+    }).catch((error: unknown) => {
+      if (active) setDemandLookup({ key: demandKey, options: [],
+        error: error instanceof Error ? error.message : "Could not find matching requests.", loading: false });
+    });
+    return () => { active = false; };
+  }, [assignOpen, selection.clientId, selection.briefId, demandKey]);
 
   const refresh = useCallback(async () => {
     if (!memberId) return;
@@ -128,6 +146,18 @@ export function CurrentJobsSection() {
         title="Assign Job"
         draftKey={`assign-job:${memberId}`}
         fields={fields}
+        intro={selection.clientId && selection.briefId && demandLookup.key === demandKey
+          ? <>{demandLookup.loading && <p>Finding requests for this brief…</p>}
+              {demandLookup.error && <p role="alert">{demandLookup.error}</p>}
+              {!demandLookup.loading && !demandLookup.error && demandOptions.length === 0
+                && <p>No matching requests found. Use the exact ID if this is an older request.</p>}</>
+          : undefined}
+        onValuesChange={(values) => {
+          const clientId = typeof values.client_id === "string" ? values.client_id : "";
+          const briefId = typeof values.brief_id === "string" ? values.brief_id : "";
+          setSelection((previous) => previous.clientId === clientId && previous.briefId === briefId
+            ? previous : { clientId, briefId });
+        }}
         submitLabel="Assign"
         onSubmit={async (v) => {
           if (!memberId) throw new Error("No team member selected.");
@@ -139,6 +169,9 @@ export function CurrentJobsSection() {
             if (!v.brief_id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(demandId)
               || (kind !== "daily" && kind !== "campaign")) {
               throw new Error("Select a brief and exact production request.");
+            }
+            if (selectedDemand !== "manual" && !demandOptions.some((option) => option.value === selectedDemand)) {
+              throw new Error("This request no longer matches the selected client and brief.");
             }
             const { error } = await supabase.rpc("create_demand_assignment_v7", {
               p_member_id: memberId,
