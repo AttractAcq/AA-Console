@@ -379,6 +379,7 @@ const readyProofDelivery = {
   preview: { client_id: "client-1", delivery_id: "delivery-1",
     request_token: proofDeliveryToken, config_id: "config-1", link_id: "link-1",
     channel: "email", recipient: "customer@example.invalid",
+    sender_ref: "resend:Proof <proof@example.invalid>",
     subject: "Evidence request", message: "Please send evidence",
     capture_url: "https://example.invalid/capture/private" },
   scope: { client_id: "client-1", delivery_id: "delivery-1",
@@ -1254,11 +1255,21 @@ describe("unified approval inbox", () => {
     show();
     const card = await screen.findByRole("article", { name: readyProofDelivery.title });
     expect(within(card).getByText(/Please send evidence/)).toBeInTheDocument();
+    expect(within(card).getByText(/resend:Proof <proof@example.invalid>/)).toBeInTheDocument();
     await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_proof_delivery_inbox_v6", {
       p_review_id: proofDeliveryReviewId, p_request_id: readyProofDelivery.id,
       p_approved: true,
     }));
+  });
+
+  it("holds a proof request whose reviewed sender is missing", async () => {
+    requests = [{ ...readyProofDelivery, preview: {
+      ...readyProofDelivery.preview, sender_ref: undefined,
+    } }];
+    show();
+    const card = await screen.findByRole("article", { name: readyProofDelivery.title });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
   });
 
   it("routes an exact Meta profile proposal through its owning Inbox RPC", async () => {

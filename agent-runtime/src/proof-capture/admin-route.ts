@@ -5,6 +5,7 @@ import type { RuntimeConfig } from "../config.js";
 import { AuthError, BOT_FORBIDDEN_CODE, requireAdminOrClientManager } from "../master/auth.js";
 import { readJsonBody, UUID } from "../mcp/http.js";
 import { hashCaptureToken } from "./public-route.js";
+import { proofSenderIdentity } from "./sender-identity.js";
 export const captureBase = () =>
   (
     process.env.PROOF_CAPTURE_PUBLIC_URL ??
@@ -14,17 +15,7 @@ export function deliveryChannelAvailable(
   channel: string,
   config: RuntimeConfig,
 ): boolean {
-  if (channel === "email") return Boolean(config.resendApiKey);
-  return Boolean(
-    process.env.TWILIO_ACCOUNT_SID &&
-      process.env.TWILIO_AUTH_TOKEN &&
-      (channel === "sms"
-        ? process.env.TWILIO_SMS_FROM
-        : channel === "whatsapp"
-          ? process.env.TWILIO_WHATSAPP_FROM &&
-            process.env.TWILIO_PROOF_WHATSAPP_CONTENT_SID
-          : null),
-  );
+  return proofSenderIdentity(channel, config) !== null;
 }
 export async function handleProofCaptureAdmin(
   req: IncomingMessage,
@@ -246,7 +237,7 @@ export async function handleProofCaptureAdmin(
       }
       const { data: existing, error: ee } = await sb
         .from("proof_request_deliveries")
-        .select("id,config_id,recipient,channel")
+        .select("id,config_id,recipient,channel,sender_ref")
         .eq("client_id", clientId)
         .eq("event_key", eventKey)
         .maybeSingle();
@@ -255,7 +246,8 @@ export async function handleProofCaptureAdmin(
         if (
           existing.config_id !== setup.id ||
           existing.recipient !== recipient ||
-          existing.channel !== channel
+          existing.channel !== channel ||
+          existing.sender_ref !== proofSenderIdentity(channel, config)
         ) {
           json(409, {
             ok: false,
@@ -350,6 +342,7 @@ export async function handleProofCaptureAdmin(
         outcome_event_id: outcomeEventId,
         recipient,
         channel,
+        sender_ref: proofSenderIdentity(channel, config),
         subject: setup.name,
         message: whatsappTemplate
           ? whatsappTemplate.replaceAll("{{1}}", requestMessage)

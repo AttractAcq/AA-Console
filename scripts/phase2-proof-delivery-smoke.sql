@@ -13,10 +13,10 @@ insert into public.proof_capture_links(id,client_id,config_id,token_hash,expires
 values ('dddddddd-dddd-4ddd-8ddd-dddddddddddd','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
  'cccccccc-cccc-4ccc-8ccc-cccccccccccc','fixture-token-hash',now()+interval '14 days');
 insert into public.proof_request_deliveries(id,client_id,config_id,link_id,event_key,
- recipient,channel,subject,message,capture_url)
+ recipient,channel,sender_ref,subject,message,capture_url)
 values ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
  'cccccccc-cccc-4ccc-8ccc-cccccccccccc','dddddddd-dddd-4ddd-8ddd-dddddddddddd',
- 'fixture-event','customer@example.invalid','email','Evidence request',
+ 'fixture-event','customer@example.invalid','email','resend:Proof <proof@example.invalid>','Evidence request',
  'Please send evidence','https://example.invalid/capture/private');
 select set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
 select set_config('request.jwt.claim.role','authenticated',true);
@@ -26,6 +26,26 @@ do $checks$
 declare delivery uuid := 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
  first_request_id uuid; review_id uuid; second_id uuid; claimed_id uuid;
 begin
+ insert into public.proof_request_deliveries(id,client_id,config_id,link_id,event_key,
+  recipient,channel,subject,message,capture_url)
+ values ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeef','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  'cccccccc-cccc-4ccc-8ccc-cccccccccccc','dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+  'legacy-event','customer@example.invalid','email','Legacy request',
+  'Old text','https://example.invalid/capture/private');
+ begin
+  perform public.request_proof_delivery_review_v6('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeef');
+  raise exception 'Sender-free legacy request became reviewable';
+ exception when check_violation then null; end;
+ update public.proof_request_deliveries set status='sent',provider_id='legacy-provider',sent_at=now()
+  where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeef';
+ insert into public.proof_delivery_reviews_v6(delivery_id,client_id)
+ values ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeef','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+ if not exists(select 1 from public.proof_delivery_reviews_v6 q
+  where q.delivery_id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeef'
+   and public.proof_delivery_preview_v6(q)->>'consequence'=
+    'Send this exact proof request to this recipient through the configured provider'
+   and not (public.proof_delivery_preview_v6(q) ? 'sender_ref')) then
+  raise exception 'Historical completed request preview was rewritten'; end if;
  begin
   perform public.decide_proof_delivery(delivery,true);
   raise exception 'Legacy direct approval succeeded';
@@ -41,6 +61,13 @@ begin
  if first_request_id is null or public.request_proof_delivery_review_v6(delivery)<>first_request_id
   or (select status from public.approval_inbox_v6 where id=first_request_id)<>'pending'
   then raise exception 'Exact review was not pending and deduplicated'; end if;
+ if (select preview->>'sender_ref' from public.approval_requests_v6 where id=first_request_id)
+   is distinct from 'resend:Proof <proof@example.invalid>' then
+  raise exception 'Sender account was absent from the exact review'; end if;
+ begin
+  update public.proof_request_deliveries set sender_ref='resend:Other <other@example.invalid>' where id=delivery;
+  raise exception 'Issued delivery sender was retargeted';
+ exception when check_violation then null; end;
  begin
   perform public.decide_proof_delivery_inbox_v6(review_id,first_request_id,true);
   raise exception 'AAL1 approved proof request';

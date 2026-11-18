@@ -600,6 +600,7 @@ function isProofDeliveryReady(request: UnifiedApprovalRequest, clientId: string)
     && request.source_version === `${hash}:${preview.request_token}`
     && preview.client_id === clientId && typeof preview.delivery_id === "string"
     && typeof preview.recipient === "string" && !!preview.recipient
+    && typeof preview.sender_ref === "string" && !!preview.sender_ref
     && typeof preview.message === "string" && !!preview.message
     && typeof preview.capture_url === "string" && !!preview.capture_url
     && ["email", "sms", "whatsapp"].includes(String(preview.channel))

@@ -25581,6 +25581,7 @@ export type Database = {
           provider_id: string | null
           recipient: string
           scheduled_at: string
+          sender_ref: string | null
           sent_at: string | null
           status: string
           subject: string
@@ -25611,6 +25612,7 @@ export type Database = {
           provider_id?: string | null
           recipient: string
           scheduled_at?: string
+          sender_ref?: string | null
           sent_at?: string | null
           status?: string
           subject: string
@@ -25641,6 +25643,7 @@ export type Database = {
           provider_id?: string | null
           recipient?: string
           scheduled_at?: string
+          sender_ref?: string | null
           sent_at?: string | null
           status?: string
           subject?: string
@@ -38495,6 +38498,7 @@ export type Database = {
           provider_id: string | null
           recipient: string
           scheduled_at: string
+          sender_ref: string | null
           sent_at: string | null
           status: string
           subject: string
