@@ -14,7 +14,7 @@ import {
   ATTRIBUTE_KINDS, AWARENESS_STAGES, CLASSIFICATION_HINT, CONFIDENCE_LEVELS,
   createCampaignFromOpportunity,
   fetchOpportunityOfferVersions,
-  acceptScoreProposal, fetchOpenProposals, rejectProposal,
+  acceptScoreProposal, fetchOpenProposals, fetchEvaluationInputHash, rejectProposal,
   requestEvaluation, requestStrategy,
   fetchOpportunities, fetchOpportunityOutputs, fetchOpportunityApprovalStates, fetchOpportunityActivationStates,
   fetchReadiness, fetchScoreFactors, requireProof, scoreOpportunity,
@@ -251,6 +251,7 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
           {detailStage === "evaluate" && (
             <>
               <ProposalsPanel
+                opportunityId={selected.id}
                 proposals={proposals.filter((proposal) => proposal.opportunity_id === selected.id)}
                 factors={factors}
                 busy={busy}
@@ -272,6 +273,7 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
       )}
       {view === "evaluate" && selected && (
         <ProposalsPanel
+          opportunityId={selected.id}
           proposals={proposals.filter((proposal) => proposal.opportunity_id === selected.id)}
           factors={factors}
           busy={busy}
@@ -545,13 +547,32 @@ function OpportunityPicker({
  * the click.
  */
 function ProposalsPanel({
-  proposals, factors, busy, onAct,
+  opportunityId, proposals, factors, busy, onAct,
 }: {
+  opportunityId: string;
   proposals: OpportunityProposal[];
   factors: ScoreFactor[];
   busy: string | null;
   onAct: (id: string, work: () => Promise<void>, said: string) => Promise<void>;
 }) {
+  const [checked, setChecked] = useState<{
+    opportunityId: string; signature: string; hash: string | null; error: string | null;
+  } | null>(null);
+  const scoreSignature = proposals.filter((p) => p.kind === "score")
+    .map((p) => `${p.id}:${(p.payload as { input_hash?: string })?.input_hash ?? ""}`).join("|");
+  const currentCheck = checked?.opportunityId === opportunityId && checked.signature === scoreSignature
+    ? checked : null;
+  useEffect(() => {
+    if (!scoreSignature) return;
+    let current = true;
+    void fetchEvaluationInputHash(opportunityId).then((hash) => {
+      if (current) setChecked({ opportunityId, signature: scoreSignature, hash, error: null });
+    }).catch((cause) => {
+      if (current) setChecked({ opportunityId, signature: scoreSignature, hash: null,
+        error: cause instanceof Error ? cause.message : "The current evaluation inputs could not be checked." });
+    });
+    return () => { current = false; };
+  }, [opportunityId, scoreSignature]);
   if (proposals.length === 0) return null;
   const labelFor = (factor: string) =>
     factors.find((f) => f.factor === factor)?.label ?? factor.replace(/_/g, " ");
@@ -563,7 +584,10 @@ function ProposalsPanel({
           factors?: Record<string, number>;
           reasoning?: Record<string, string>;
           fields?: Record<string, string>;
+          input_hash?: string;
         };
+        const currentScore = proposal.kind === "score" && typeof payload.input_hash === "string"
+          && currentCheck?.hash === payload.input_hash;
         const scored = Object.entries(payload.factors ?? {});
         const fields = Object.entries(payload.fields ?? {});
         return (
@@ -599,6 +623,20 @@ function ProposalsPanel({
               </dl>
             )}
 
+            {proposal.kind === "score" && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                {!payload.input_hash
+                  ? "This older proposal has no source snapshot. Request a new evaluation."
+                  : !currentCheck
+                    ? "Checking current evaluation inputs…"
+                    : currentCheck.error
+                      ? `Source check unavailable: ${currentCheck.error}`
+                      : currentScore
+                        ? "Evaluation inputs are current."
+                        : "Evaluation inputs changed. Request a new evaluation."}
+              </p>
+            )}
+
             {fields.length > 0 && (
               <dl className="mt-3 space-y-1 text-sm">
                 {fields.map(([field, value]) => (
@@ -613,7 +651,7 @@ function ProposalsPanel({
             <div className="mt-4 flex flex-wrap gap-2">
               {proposal.kind === "score" ? (
                 <Button
-                  disabled={busy === proposal.id}
+                  disabled={busy === proposal.id || !currentScore}
                   onClick={() =>
                     void onAct(
                       proposal.id,

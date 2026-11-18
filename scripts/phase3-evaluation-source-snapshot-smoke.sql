@@ -51,6 +51,10 @@ begin
   exception when check_violation then refused:=true; end;
   if not refused or exists(select 1 from public.opportunity_proposals where id=p and resolution='accepted')
     then raise exception 'Changed Intelligence was accepted as the old score'; end if;
+  perform public.reject_opportunity_proposal_v6(p,'The source changed');
+  if not exists(select 1 from public.opportunity_events
+      where opportunity_id=cid and event='proposal_rejected' and detail='The source changed')
+    then raise exception 'Reasoned rejection did not reach the event log'; end if;
 
   insert into public.opportunity_proposals(opportunity_id,client_id,kind,payload,rationale,proposed_by)
     values(cid,'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','score',

@@ -3,6 +3,15 @@
 -- fingerprint stay readable but need a fresh evaluation before acceptance.
 begin;
 
+-- Migration 306 added these two source-owned events but left the earlier
+-- event CHECK unchanged, so both human decision paths rolled back in a full
+-- database even though their narrow PGLite test accepted them.
+alter table public.opportunity_events drop constraint opportunity_events_event_check;
+alter table public.opportunity_events add constraint opportunity_events_event_check
+  check (event in ('proposed','edited','scored','status_changed','linked',
+    'unlinked','proof_required','proof_satisfied','confidence_changed',
+    'score_proposal_accepted','proposal_rejected'));
+
 create function public.opportunity_evaluation_input_hash_v7(p_opportunity_id uuid)
 returns text language plpgsql stable security definer
 set search_path=pg_catalog,public as $$

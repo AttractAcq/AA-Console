@@ -29,6 +29,7 @@ const {
   fetchStageTemplates,
   setStageTemplate,
   fetchOpenProposals,
+  fetchEvaluationInputHash,
   acceptScoreProposal,
   rejectProposal,
   requestEvaluation,
@@ -46,6 +47,7 @@ const {
   fetchStageTemplates: vi.fn(),
   setStageTemplate: vi.fn(),
   fetchOpenProposals: vi.fn(),
+  fetchEvaluationInputHash: vi.fn(),
   acceptScoreProposal: vi.fn(),
   rejectProposal: vi.fn(),
   requestEvaluation: vi.fn(),
@@ -73,6 +75,7 @@ vi.mock("../../lib/opportunities", async () => {
     fetchStageTemplates,
     setStageTemplate,
     fetchOpenProposals,
+    fetchEvaluationInputHash,
     acceptScoreProposal,
     rejectProposal,
     requestEvaluation,
@@ -134,6 +137,7 @@ beforeEach(() => {
   createCampaignFromOpportunity.mockResolvedValue({ id: "camp-1", name: "Garage-to-Gym Conversion" });
   fetchOpportunityOfferVersions.mockResolvedValue([{ id: "version-1", label: "Garage v1" }]);
   fetchOpenProposals.mockResolvedValue([]);
+  fetchEvaluationInputHash.mockResolvedValue("a".repeat(64));
   acceptScoreProposal.mockResolvedValue(undefined);
   rejectProposal.mockResolvedValue(undefined);
   requestEvaluation.mockResolvedValue(undefined);
@@ -218,6 +222,7 @@ const scoreProposal = (over: Record<string, unknown> = {}) => ({
   payload: {
     factors: { economic_value: 90 },
     reasoning: { economic_value: "Highest-margin job they do." },
+    input_hash: "a".repeat(64),
   },
   rationale: "Strong value, proof is the gap.",
   proposed_by: "opportunity_evaluate",
@@ -706,9 +711,39 @@ describe("asking an agent, and deciding on what it says", () => {
     search.value = "opportunity=opp-1";
     fetchOpenProposals.mockResolvedValue([scoreProposal()]);
     render(<MarketOpportunitiesPanel view="evaluate" />);
-    await userEvent.click(await screen.findByRole("button", { name: "Accept this score" }));
+    const accept = await screen.findByRole("button", { name: "Accept this score" });
+    await waitFor(() => expect(accept).toBeEnabled());
+    await userEvent.click(accept);
     await waitFor(() => expect(acceptScoreProposal).toHaveBeenCalledWith("prop-1"));
     expect(acceptScoreProposal).toHaveBeenCalledTimes(1);
+  });
+
+  it("holds a score when its source fingerprint changed", async () => {
+    search.value = "opportunity=opp-1";
+    fetchOpenProposals.mockResolvedValue([scoreProposal()]);
+    fetchEvaluationInputHash.mockResolvedValue("b".repeat(64));
+    render(<MarketOpportunitiesPanel view="evaluate" />);
+    expect(await screen.findByText("Evaluation inputs changed. Request a new evaluation.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Accept this score" })).toBeDisabled();
+  });
+
+  it("holds historical and unreadable score sources", async () => {
+    search.value = "opportunity=opp-1";
+    fetchOpenProposals.mockResolvedValue([scoreProposal({
+      payload: { factors: { economic_value: 90 }, reasoning: {}, input_hash: null },
+    })]);
+    render(<MarketOpportunitiesPanel view="evaluate" />);
+    expect(await screen.findByText("This older proposal has no source snapshot. Request a new evaluation.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Accept this score" })).toBeDisabled();
+  });
+
+  it("keeps acceptance held when the current source check fails", async () => {
+    search.value = "opportunity=opp-1";
+    fetchOpenProposals.mockResolvedValue([scoreProposal()]);
+    fetchEvaluationInputHash.mockRejectedValue(new Error("Read unavailable"));
+    render(<MarketOpportunitiesPanel view="evaluate" />);
+    expect(await screen.findByText("Source check unavailable: Read unavailable")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Accept this score" })).toBeDisabled();
   });
 
   it("requires a reason before rejecting", async () => {
