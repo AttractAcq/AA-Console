@@ -277,8 +277,15 @@ function getPanelBody(
 }
 
 export function Page({ node }: { node: NavNode }) {
-  const [searchParams, setSearchParams] = useSearchParams();
   const { clientId } = useParams<{ clientId: string }>();
+  // Router parameter changes can reuse this element. Remount the full panel
+  // tree so a previous client's forms, rows and late local reads cannot stay
+  // on screen while the next client loads.
+  return <PageContent key={`${node.id}:${clientId ?? "agency"}`} node={node} clientId={clientId} />;
+}
+
+function PageContent({ node, clientId }: { node: NavNode; clientId: string | undefined }) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   // `?view=` is Intelligence OS's two halves. It used to carry v1/v2 as well,
