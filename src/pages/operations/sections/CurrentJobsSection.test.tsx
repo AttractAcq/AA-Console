@@ -26,7 +26,7 @@ beforeEach(() => {
   from.mockReset(); rpc.mockReset();
   from.mockImplementation(() => {
     const query = {
-      select: () => query, eq: () => query, order: () => query,
+      select: () => query, eq: () => query, in: () => query, order: () => query,
       insert: vi.fn().mockResolvedValue({ error: null }),
       then: (resolve: (value: { data: unknown[]; error: null }) => unknown) =>
         Promise.resolve({ data: [], error: null }).then(resolve),
@@ -55,4 +55,22 @@ it("keeps ordinary assignments available without inventing a demand link", async
   await waitFor(() => expect(from.mock.results.some((call) =>
     call.value.insert?.mock.calls.length === 1)).toBe(true));
   expect(rpc).not.toHaveBeenCalled();
+});
+
+it("reads the recorded request binding back on the assignment table", async () => {
+  from.mockImplementation((table: string) => {
+    const data = table === "job_assignments"
+      ? [{ id: "job-1", title: "Produce image", due_date: null,
+        compensation: null, completed_at: null }]
+      : [{ assignment_id: "job-1", demand_kind: "campaign",
+        demand_id: "12345678-aaaa-bbbb-cccc-123456789abc" }];
+    const query = {
+      select: () => query, eq: () => query, in: () => query, order: () => query,
+      then: (resolve: (value: { data: unknown[]; error: null }) => unknown) =>
+        Promise.resolve({ data, error: null }).then(resolve),
+    };
+    return query;
+  });
+  render(<CurrentJobsSection />);
+  expect(await screen.findByText("campaign · 12345678")).toBeInTheDocument();
 });

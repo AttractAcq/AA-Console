@@ -15,6 +15,7 @@ type Job = {
   due_date: string | null;
   compensation: number | null;
   completed_at: string | null;
+  demand: string | null;
 };
 
 export function CurrentJobsSection() {
@@ -36,7 +37,16 @@ export function CurrentJobsSection() {
         .eq("member_id", memberId)
         .order("due_date", { nullsFirst: false });
       if (error) throw error;
-      setJobs((data ?? []) as Job[]);
+      const rows = (data ?? []) as Omit<Job, "demand">[];
+      const bindings = rows.length ? await supabase
+        .from("assignment_demand_bindings_v7")
+        .select("assignment_id, demand_kind, demand_id")
+        .in("assignment_id", rows.map((row) => row.id))
+        : { data: [], error: null };
+      if (bindings.error) throw bindings.error;
+      const byAssignment = new Map((bindings.data ?? []).map((binding) =>
+        [binding.assignment_id, `${binding.demand_kind} · ${binding.demand_id.slice(0, 8)}`]));
+      setJobs(rows.map((row) => ({ ...row, demand: byAssignment.get(row.id) ?? null })));
     } catch (error) {
       setLoadError("Failed to load current jobs: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
     }
@@ -97,9 +107,9 @@ export function CurrentJobsSection() {
           </Panel>
         </div>
         <DataTable
-          columns={["Current Jobs", "Due Date", "Compensation"]}
+          columns={["Current Jobs", "Request", "Due Date", "Compensation"]}
           emptyLabel="No current jobs yet"
-          rows={jobs.map((j) => [j.title, j.due_date ?? "—", j.compensation ?? "—"])}
+          rows={jobs.map((j) => [j.title, j.demand ?? "Unlinked", j.due_date ?? "—", j.compensation ?? "—"])}
         />
       </div>
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import { ProductionAttemptComparison } from "../../components/ProductionAttemptComparison";
 
 type RoutePackage = { id: string; route: string; version: number };
 type Work = {
@@ -153,6 +154,8 @@ export function CampaignSweepWork({ clientId, campaignId }: { clientId: string; 
         {counts && <p className="mt-1 text-xs text-muted-foreground">
           1 requested · {counts.produced} produced · {counts.rejected} failed or rejected attempts · {counts.revised} revised · {counts.workflow_accepted} passed workflow QA · {counts.human_approved} human approved
         </p>}
+        {counts && <ProductionAttemptComparison clientId={clientId}
+          demandId={work.id} count={counts.attempts} />}
         {shownState === "ready_for_review" && <p className="mt-2 text-xs">Internal QA passed. Review the exact asset before distribution.</p>}
         {(work.effective_blocker ?? work.blocker) && <p className="mt-2 text-xs text-destructive">{work.effective_blocker ?? work.blocker}</p>}
         {blocked.map((step) => <div key={step.id} className="mt-2 flex flex-wrap items-center gap-2 text-xs">
