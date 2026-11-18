@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "15eba96d53ed9121795824d5ceaa1ca03fde75b8f8d3e373de33852db01203e3",
-  "generatedTypesSha256": "adb7e587a3d6b22846da52874ede752b18aaa2b72135e91db013cac7e0272c9d",
-  "generatedSchemaBodySha256": "a6546bcd60501ac32aa3215444eb8d00ad6268ab26dea9d8381ff1f476f69a5a",
+  "migrationSourceDigest": "9ec5b7c21ab73a75aa4aef65075ea2fde27bd8a4baa4e131a89512fb3280a288",
+  "generatedTypesSha256": "df8d6b784b607ec2a4eceb5a6e7441d668837351cd57f8b8b8b231deb0aacb4c",
+  "generatedSchemaBodySha256": "1c60618c7282a448d318d34cdf6db65a73ea5bc2b5399480fa33406347e82894",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4042,6 +4042,13 @@
       "filename": "20261124035500_560_campaign_offer_proof_rights_snapshot.sql",
       "sha256": "219210f1bc315b02852674ebcf7b9ae012a9283a42f544550d1e075206852abc",
       "trimmedMd5": "f9374ee108d281ee5da1ac941a0e3f74"
+    },
+    {
+      "version": "20261124035600",
+      "name": "561_opportunity_score_proposal_input_snapshot",
+      "filename": "20261124035600_561_opportunity_score_proposal_input_snapshot.sql",
+      "sha256": "dc379090b7b08310c7f19cf1dcc4730b66e006e0096d61ca1035f0f037974657",
+      "trimmedMd5": "a7b8eb0e30e7c73a75164954b9616c63"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

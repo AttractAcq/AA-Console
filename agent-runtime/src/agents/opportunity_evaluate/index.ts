@@ -154,6 +154,14 @@ export async function runOpportunityEvaluateJob(
     return { ok: false, retryable: false, failureMessage: "That opportunity belongs to another client." };
   }
 
+  const { data: inputHash, error: inputHashError } = await sb.rpc(
+    "opportunity_evaluation_input_hash_v7", { p_opportunity_id: job.input_id },
+  );
+  if (inputHashError) throw new Error(`Evaluation input snapshot failed: ${inputHashError.message}`);
+  if (typeof inputHash !== "string" || !/^[0-9a-f]{64}$/.test(inputHash)) {
+    return { ok: false, retryable: false, failureMessage: "Evaluation inputs could not be fingerprinted." };
+  }
+
   const { data: factorRows, error: factorError } = await sb
     .from("opportunity_score_factors")
     .select("factor, weight, label")
@@ -303,6 +311,16 @@ ${evidence.length > 0 ? `INTELLIGENCE RECORDS\n${evidence.join("\n\n")}` : "Ther
     return { ok: false, retryable: false, failureMessage: `${checked.error} Nothing was saved.`, usage };
   }
 
+  const { data: currentHash, error: currentHashError } = await sb.rpc(
+    "opportunity_evaluation_input_hash_v7", { p_opportunity_id: job.input_id },
+  );
+  if (currentHashError) throw new Error(`Evaluation input recheck failed: ${currentHashError.message}`);
+  if (currentHash !== inputHash) {
+    return { ok: false, retryable: false,
+      failureMessage: "The opportunity or its sources changed during evaluation. Request a new run; nothing was saved.",
+      usage };
+  }
+
   // An earlier open proposal for the same opportunity is superseded rather
   // than left decidable. Two open score cards for one opportunity is a person
   // choosing between drafts they have no way to tell apart.
@@ -318,7 +336,7 @@ ${evidence.length > 0 ? `INTELLIGENCE RECORDS\n${evidence.join("\n\n")}` : "Ther
     opportunity_id: job.input_id,
     client_id: job.client_id,
     kind: "score",
-    payload: { factors: checked.factors, reasoning: checked.reasoning },
+    payload: { factors: checked.factors, reasoning: checked.reasoning, input_hash: inputHash },
     rationale: checked.rationale,
     proposed_by: agent.agent_key,
     proposed_by_job_id: job.id,

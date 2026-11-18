@@ -41263,6 +41263,10 @@ export type Database = {
         Args: { p_opportunity_id: string }
         Returns: string
       }
+      opportunity_evaluation_input_hash_v7: {
+        Args: { p_opportunity_id: string }
+        Returns: string
+      }
       opportunity_proof_ready_v6: { Args: { p_id: string }; Returns: boolean }
       ordinary_media_review_hash_v6: {
         Args: {

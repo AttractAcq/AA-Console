@@ -8,6 +8,7 @@ type ReadResult = { data: unknown; error: { message: string } | null };
 
 function reader(results: Record<string, ReadResult>) {
   return {
+    rpc: async () => ({ data: "a".repeat(64), error: null }),
     from(table: string) {
       const result = results[table];
       if (!result) throw new Error(`Unexpected read: ${table}`);
