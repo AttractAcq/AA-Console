@@ -66,10 +66,15 @@ jobs:
         working-directory: agent-runtime
     steps:
       - uses: actions/checkout@v4
-      # video_edit's render tests shell out to ffmpeg and skip when it is
-      # absent. Skipping silently is how a render path stays untested, so it
-      # is installed here rather than tolerated.
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      # Render tests must have ffmpeg. Use the runner copy when present;
+      # package-index refresh has stalled runtime CI for over an hour.
+      - name: Ensure ffmpeg for render tests
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo timeout 180s apt-get update -o Acquire::Retries=2 -o Acquire::http::Timeout=30
+            sudo timeout 180s apt-get install -y ffmpeg
+          fi
+          ffmpeg -version | head -n 1
         working-directory: .
       - uses: actions/setup-node@v4
         with:
