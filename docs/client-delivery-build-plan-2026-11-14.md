@@ -41,6 +41,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Exit gate:** a signed-off state diagram and page inventory, with explicit answers to both decisions and a list of deployed-versus-source differences. No production mutation in this phase.
 
+**Source inventory checkpoint, 18 November 2026:** The [candidate source inventory](client-delivery-phase0-source-inventory-2026-11-18.md) lists all 20 Delivery routes, their tabs, principal record and action boundaries, archive homes, 15 replaced deep links and the campaign/Motion decisions. It assigns six remaining evidence gaps. This is a source inventory, not a signed-in rendering or deployed/source comparison: the latter still needs current component identities, migration heads, provider/approval coverage and Alex's signoff. Phase 0 remains open.
+
 ## Phase 1 — shared identity, lineage and state contracts
 
 1. Define stable IDs and version fingerprints for opportunity, offer, campaign, route package, content/proof asset, page, magnet, sales agent, approval, distribution attempt, lead and outcome. Backfill existing records without changing their public meaning.
