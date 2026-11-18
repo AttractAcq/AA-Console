@@ -772,6 +772,13 @@ export type Database = {
             foreignKeyName: "assignment_deliveries_v7_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "assignment_deliveries_v7_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id"]
           },
@@ -1384,6 +1391,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brief_dispatches_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "brief_dispatches_source_asset_id_fkey"
@@ -2252,6 +2266,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_artifacts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "campaign_artifacts_asset_id_fkey"
@@ -5471,6 +5492,13 @@ export type Database = {
             foreignKeyName: "client_asset_reviews_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_asset_reviews_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id"]
           },
@@ -6234,6 +6262,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
+            columns: ["derived_from_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
@@ -7957,6 +7992,13 @@ export type Database = {
             foreignKeyName: "client_launch_asset_checks_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_launch_asset_checks_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id"]
           },
@@ -8349,6 +8391,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_leads_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "client_leads_source_asset_id_fkey"
@@ -8916,6 +8965,13 @@ export type Database = {
             foreignKeyName: "client_media_assets_source_asset_id_fkey"
             columns: ["source_asset_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id"]
           },
@@ -9050,6 +9106,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_frames_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "client_media_frames_asset_id_fkey"
@@ -9594,6 +9657,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_pages_reference_asset_id_fkey"
+            columns: ["reference_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "client_pages_reference_asset_id_fkey"
@@ -11054,6 +11124,13 @@ export type Database = {
             foreignKeyName: "content_slots_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "content_slots_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id"]
           },
@@ -11350,6 +11427,13 @@ export type Database = {
             foreignKeyName: "creative_generations_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "creative_generations_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id"]
           },
@@ -11553,6 +11637,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_renders_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "creative_renders_asset_id_fkey"
@@ -11826,6 +11917,13 @@ export type Database = {
             foreignKeyName: "daily_package_items_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id"]
           },
@@ -12042,6 +12140,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_package_recoveries_reserve_asset_id_fkey"
+            columns: ["reserve_asset_id"]
+            isOneToOne: true
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "daily_package_recoveries_reserve_asset_id_fkey"
@@ -16175,6 +16280,13 @@ export type Database = {
             foreignKeyName: "job_assignments_asset_client_fk"
             columns: ["asset_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id", "client_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_client_fk"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id", "client_id"]
           },
@@ -16233,6 +16345,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "job_assignments_asset_id_fkey"
@@ -16366,6 +16485,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "job_assignments_source_asset_id_fkey"
@@ -19809,6 +19935,13 @@ export type Database = {
             foreignKeyName: "motion_design_attachments_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: true
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "motion_design_attachments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id"]
           },
@@ -21884,6 +22017,13 @@ export type Database = {
             foreignKeyName: "ordinary_media_review_requests_v6_asset_id_client_id_fkey"
             columns: ["asset_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id", "client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id", "client_id"]
           },
@@ -21942,6 +22082,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "ordinary_media_review_requests_v6_asset_id_fkey"
@@ -22115,6 +22262,13 @@ export type Database = {
             foreignKeyName: "ordinary_media_signoffs_v6_asset_id_client_id_fkey"
             columns: ["asset_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id", "client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id", "client_id"]
           },
@@ -22173,6 +22327,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
@@ -22917,6 +23078,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_copy_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "post_copy_asset_id_fkey"
@@ -24761,6 +24929,13 @@ export type Database = {
             foreignKeyName: "proof_placements_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_placements_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id"]
           },
@@ -25122,6 +25297,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "proof_production_requests_source_asset_id_fkey"
@@ -26000,6 +26182,13 @@ export type Database = {
             foreignKeyName: "recruitment_meta_campaign_ads_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "recruitment_meta_campaign_ads_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id"]
           },
@@ -26577,6 +26766,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "scheduled_posts_asset_id_fkey"
@@ -27368,6 +27564,13 @@ export type Database = {
             foreignKeyName: "video_approval_signoffs_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_approval_signoffs_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id"]
           },
@@ -27487,6 +27690,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_client_approval_requests_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "video_client_approval_requests_asset_id_fkey"
@@ -27648,6 +27858,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_render_candidates_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "video_render_candidates_asset_id_fkey"
@@ -27908,6 +28125,13 @@ export type Database = {
             foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"
             columns: ["output_asset_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id"]
           },
@@ -27980,6 +28204,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"
@@ -28121,6 +28352,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"
@@ -28298,6 +28536,13 @@ export type Database = {
             foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"
             columns: ["source_asset_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id"]
           },
@@ -28398,6 +28643,13 @@ export type Database = {
             foreignKeyName: "video_seat_review_requests_v6_asset_id_client_id_fkey"
             columns: ["asset_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id", "client_id"]
           },
@@ -28456,6 +28708,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
@@ -28772,6 +29031,13 @@ export type Database = {
             foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"
             columns: ["output_asset_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id"]
           },
@@ -28844,6 +29110,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"
@@ -29126,6 +29399,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_reel_source_rebuilds_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "workflow_reel_source_rebuilds_source_asset_id_fkey"
@@ -29866,6 +30146,13 @@ export type Database = {
             foreignKeyName: "job_assignments_asset_client_fk"
             columns: ["asset_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id", "client_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_client_fk"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id", "client_id"]
           },
@@ -29924,6 +30211,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "job_assignments_asset_id_fkey"
@@ -31416,6 +31710,56 @@ export type Database = {
           },
         ]
       }
+      content_archive_metric_coverage_v8: {
+        Row: {
+          asset_id: string | null
+          click_rows: number | null
+          client_id: string | null
+          cumulative_rows: number | null
+          currency: string | null
+          currency_count: number | null
+          first_metric_date: string | null
+          impression_rows: number | null
+          last_fetched_at: string | null
+          last_metric_date: string | null
+          linked_posts: number | null
+          metric_rows: number | null
+          missing_currency_rows: number | null
+          posts_with_metrics: number | null
+          reach_rows: number | null
+          spend_rows: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       content_archive_unlinked: {
         Row: {
           archived_at: string | null
@@ -31498,6 +31842,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
+            columns: ["derived_from_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
@@ -31634,6 +31985,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_asset_reviews_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "client_asset_reviews_asset_id_fkey"
@@ -32015,6 +32373,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "scheduled_posts_asset_id_fkey"
@@ -34909,6 +35274,13 @@ export type Database = {
             foreignKeyName: "scheduled_posts_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id"]
           },
@@ -35344,6 +35716,13 @@ export type Database = {
             foreignKeyName: "client_media_assets_source_asset_id_fkey"
             columns: ["source_asset_id"]
             isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id"]
           },
@@ -35464,6 +35843,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "proof_production_requests_source_asset_id_fkey"

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "65cb27fbd9f3d0ae1baa0c61d1af33c9d9f147b8c83f5b98fb0ced17facaea63",
-  "generatedTypesSha256": "3f5f2dab8aea3b730e8983761f594010d716aca4d77876e781a46c92d6fd9b2c",
-  "generatedSchemaBodySha256": "ff184e9ce82335ff7d3e3ee06d2ae731e4085732a63443eb13475d0439a6b91e",
+  "migrationSourceDigest": "d6d254a8f356653b1dc9a7a59085084dbbcc6b12237eea95ee0646f54df50d65",
+  "generatedTypesSha256": "b109c3dcc57b5267a8a4795c2a47da7ee161895278b3dddb07c1bcde95d84082",
+  "generatedSchemaBodySha256": "71d741836c91e94cf1326b6efcb94283c249b471a4332ce0548dd9879aa45634",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4098,6 +4098,13 @@
       "filename": "20261124040300_568_content_archive_unlinked_records.sql",
       "sha256": "4f3487dc38fad784273e88fcd6b2ac9ab62b144dc7fe671290c4058ba5a9e22e",
       "trimmedMd5": "b4cda471366d4006d0896aa0327f726d"
+    },
+    {
+      "version": "20261124040400",
+      "name": "569_content_archive_metric_coverage",
+      "filename": "20261124040400_569_content_archive_metric_coverage.sql",
+      "sha256": "0c7b9f23ee6353081bace7c5dab09704537e2e478b81d94425e5f82a3364ce10",
+      "trimmedMd5": "ce4e64982ef780f73b1fddf59af47b8e"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

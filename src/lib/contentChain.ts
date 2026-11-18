@@ -83,6 +83,53 @@ export function publicationEvidence(post: {
     : "Publication recorded without an external reference; provider result unverified";
 }
 
+export type ArchiveMetricCoverage = {
+  linked_posts: number;
+  metric_rows: number;
+  posts_with_metrics: number;
+  cumulative_rows: number;
+  impression_rows: number;
+  reach_rows: number;
+  click_rows: number;
+  spend_rows: number;
+  currency_count: number;
+  missing_currency_rows: number;
+  currency: string | null;
+  first_metric_date: string | null;
+  last_metric_date: string | null;
+  last_fetched_at: string | null;
+};
+
+/** Legacy sums are useful only when their underlying rows are visible. */
+export function archiveMetricPresentation(
+  totals: { impressions: number | null; reach: number | null; clicks: number | null; spend: number | null },
+  coverage: ArchiveMetricCoverage | null,
+): Record<string, string> {
+  if (!coverage) return {
+    metric_coverage: "unknown (coverage read unavailable)",
+    impressions: "unknown", reach: "unknown", clicks: "unknown", spend: "unknown",
+  };
+  const scope = coverage.metric_rows > 0
+    ? `${coverage.metric_rows} metric rows on ${coverage.posts_with_metrics}/${coverage.linked_posts} linked posts; ${coverage.first_metric_date ?? "unknown"} to ${coverage.last_metric_date ?? "unknown"}; fetched ${coverage.last_fetched_at ?? "unknown"}; provider completeness unverified`
+    : `${coverage.linked_posts} linked posts; no ingested metric rows`;
+  const metric = (value: number | null, observedRows: number) => {
+    if (observedRows === 0 || value === null) return "unknown (no ingested value)";
+    if (coverage.cumulative_rows > 0) return "unknown (legacy sum includes cumulative snapshots)";
+    return `${value} (recorded daily rows; coverage unverified)`;
+  };
+  const spend = coverage.spend_rows > 0 &&
+    (coverage.currency_count !== 1 || coverage.missing_currency_rows > 0)
+    ? "unknown (spend currency missing or mixed)"
+    : metric(totals.spend, coverage.spend_rows);
+  return {
+    metric_coverage: scope,
+    impressions: metric(totals.impressions, coverage.impression_rows),
+    reach: metric(totals.reach, coverage.reach_rows),
+    clicks: metric(totals.clicks, coverage.click_rows),
+    spend: spend.startsWith("unknown") ? spend : `${spend} ${coverage.currency}`,
+  };
+}
+
 export async function fetchArchive(clientId: string): Promise<ArchiveRow[]> {
   const { data, error } = await supabase
     .from("content_archive")

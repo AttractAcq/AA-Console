@@ -11,6 +11,7 @@ vi.mock("../../lib/supabase", () => ({
       const chain: Record<string, unknown> = {};
       chain.select = () => chain;
       chain.eq = (field: string, value: string) => { call.filters.push([field, value]); return chain; };
+      chain.in = () => chain;
       chain.maybeSingle = () => Promise.resolve({ data: null, error: null });
       chain.then = (resolve: (value: unknown) => unknown) => resolve({ data: [], error: null });
       return chain;

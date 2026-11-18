@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { CHAIN_STAGES, publicationEvidence } from "../../lib/contentChain";
-import type { ArchiveRow, ChainStage } from "../../lib/contentChain";
+import { CHAIN_STAGES, archiveMetricPresentation, publicationEvidence } from "../../lib/contentChain";
+import type { ArchiveMetricCoverage, ArchiveRow, ChainStage } from "../../lib/contentChain";
 import { supabase } from "../../lib/supabase";
 import { cn } from "../../lib/cn";
 import { shortDate } from "../../lib/media";
@@ -224,11 +224,23 @@ async function loadStage(stage: ChainStage, row: ArchiveRow): Promise<Record<str
     // than one client, so constrain both parts of the archive identity.
     const { data, error } = await supabase
       .from("content_attribution")
-      .select("asset_ref, posts, channels, first_published, impressions, reach, clicks, spend, leads, conversations, appointments, sales, opportunity_value, sale_value, cash_collected")
+      .select("asset_id, asset_ref, posts, channels, first_published, impressions, reach, clicks, spend, leads, conversations, appointments, sales, opportunity_value, sale_value, cash_collected")
       .eq("brief_ref", row.brief_ref)
       .eq("client_id", row.client_id);
     if (error) throw new Error(error.message);
-    return (data ?? []) as Record<string, unknown>[];
+    const assetIds = (data ?? []).map((asset) => asset.asset_id).filter((id): id is string => Boolean(id));
+    if (assetIds.length === 0) return [];
+    const { data: coverageRows, error: coverageError } = await supabase
+      .from("content_archive_metric_coverage_v8")
+      .select("*")
+      .eq("client_id", row.client_id)
+      .in("asset_id", assetIds);
+    if (coverageError) throw new Error(coverageError.message);
+    const coverageByAsset = new Map((coverageRows ?? []).map((item) => [item.asset_id, item as ArchiveMetricCoverage]));
+    return (data ?? []).map((asset) => ({
+      ...asset,
+      ...archiveMetricPresentation(asset, coverageByAsset.get(asset.asset_id) ?? null),
+    })) as Record<string, unknown>[];
   }
 
   // Iteration: every rebuild carries an account of what was wrong with the
