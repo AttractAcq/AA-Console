@@ -34,7 +34,7 @@ do $fixture$
 declare cid uuid:='30303030-3030-4030-8030-303030303030';
   client uuid:='20202020-2020-4020-8020-202020202020';
   idea_id uuid; spec_id uuid; route_id uuid; work_id uuid; v_job_id uuid;
-  run_id uuid; step_id uuid; accepted integer;
+  run_id uuid; step_id uuid; accepted integer; review_id uuid;
   first_id uuid; again_id uuid; first_hash text;
   headlines text[]:=array['Book a Local Consultation','Explore Your Service Options',
     'Speak With Our Team'];
@@ -83,6 +83,10 @@ begin
     or (select count(*) from public.campaign_google_search_copy_versions_v7
       where campaign_id=cid)<>1 then
     raise exception 'Google copy retry did not preserve exact version'; end if;
+  select id into review_id from public.approval_requests_v6
+    where source_kind='google_search_copy' and source_id=first_id::text;
+  if review_id is null or public.google_search_copy_review_source_state_v7(review_id)<>'source_held'
+    then raise exception 'Copy review was not held before internal QA'; end if;
   select steps_accepted into accepted from public.accept_ready_google_search_copy_steps_v7(20);
   if accepted<>1 or (select status from public.workflow_steps where id=step_id)<>'completed'
     then raise exception 'Exact Google copy did not pass internal QA'; end if;
@@ -91,6 +95,17 @@ begin
   if (select state from public.delivery_work_items_v6 where id=work_id)<>'ready_for_review'
     or (select count(*) from public.delivery_work_outputs_v6 where work_item_id=work_id)<>1
     then raise exception 'Google copy did not become reviewable work'; end if;
+  if public.google_search_copy_review_source_state_v7(review_id)<>'pending' then
+    raise exception 'Google copy did not become exact-review ready'; end if;
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  perform set_config('request.jwt.claim.sub','10101010-1010-4010-8010-101010101010',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"10101010-1010-4010-8010-101010101010","role":"authenticated","aal":"aal2"}',true);
+  perform public.decide_google_search_copy_v7(first_id,review_id,true,null);
+  if not public.google_search_copy_approved_v7(first_id) then
+    raise exception 'Exact Google copy approval was not recorded'; end if;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
   begin
     perform public.record_campaign_google_search_copy_v7(work_id,idea_id,v_job_id,
       array['Duplicate','duplicate','Third'],descriptions,rationale);
@@ -106,6 +121,8 @@ begin
     if sqlerrm='Short description set reached storage' then raise; end if;
   end;
   update public.client_campaigns set objective='A revised objective' where id=cid;
+  if public.google_search_copy_approved_v7(first_id) then
+    raise exception 'A stale Google copy approval remained current'; end if;
   begin
     perform public.record_campaign_google_search_copy_v7(work_id,idea_id,v_job_id,
       headlines,descriptions,rationale);

@@ -153,14 +153,24 @@ export function PaidOperatorBundles({ clientId, platform }: {
     } finally { setBusy(false); }
   };
 
-  const download = (bundle: Bundle) => {
-    const blob = new Blob([JSON.stringify({ id: bundle.id, version: bundle.version,
-      sha256: bundle.snapshot_hash, snapshot: bundle.snapshot }, null, 2)],
-    { type: "application/json" });
+  const downloadExactJson = async (bundle: Bundle) => {
+    const result = await supabase.rpc("paid_operator_bundle_export_v7", {
+      p_bundle_id: bundle.id,
+    });
+    if (result.error || typeof result.data !== "string") {
+      throw new Error(result.error?.message ?? "Current operator packet is unavailable.");
+    }
+    const bytes = new TextEncoder().encode(result.data);
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    const actual = [...new Uint8Array(digest)]
+      .map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    if (actual !== bundle.snapshot_hash) throw new Error("Operator packet differs from its reviewed hash.");
+    const blob = new Blob([bytes], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url; link.download = `${platform}-operator-bundle-v${bundle.version}.json`;
     link.click(); setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return actual;
   };
 
   const verifyDownload = async (bundle: Bundle) => {
@@ -168,15 +178,23 @@ export function PaidOperatorBundles({ clientId, platform }: {
     setBusy(true); setError(null); setNotice(null);
     try {
       const files = creativeFiles(bundle);
-      if (files.length === 0) throw new Error("The exact bundle has no downloadable creative files.");
-      download(bundle);
+      const creative = sourceOf(bundle).creative;
+      if (platform === "meta" && files.length === 0)
+        throw new Error("The exact Meta bundle has no downloadable creative files.");
+      if (platform === "google" && (!Array.isArray(creative) || creative.length === 0
+        || !creative.every((item) => item && typeof item === "object"
+          && typeof item.copy_id === "string" && typeof item.copy_hash === "string"
+          && Array.isArray(item.headlines) && Array.isArray(item.descriptions)))) {
+        throw new Error("The exact Google bundle has no reviewed search-copy versions.");
+      }
+      const actual = await downloadExactJson(bundle);
       for (const file of files) await downloadCreative(file);
       const result = await supabase.rpc("record_paid_operator_event_v7", {
         p_bundle_id: bundle.id, p_event: "verified_download",
-        p_reference: `browser-sha256:${bundle.snapshot_hash}`,
+        p_reference: `sha256:${actual}`,
       });
       if (result.error) throw result.error;
-      setNotice("Bundle and creative bytes verified and downloaded. This is a browser report, not an external handoff receipt.");
+      setNotice("Exact bundle bytes verified and downloaded. This is a browser report, not an external handoff receipt.");
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not verify the bundle files.");
@@ -225,7 +243,11 @@ export function PaidOperatorBundles({ clientId, platform }: {
       return <article key={bundle.id} className="rounded border border-border p-3 text-xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="font-medium">{String(source.campaign_name ?? "Campaign")} · v{bundle.version} · {current[bundle.id] ? "current" : "stale or unverified"}</p>
-          <button type="button" className="underline" onClick={() => download(bundle)}>Download exact JSON</button>
+          <button type="button" className="underline disabled:opacity-50" disabled={busy || !current[bundle.id]}
+            onClick={() => void downloadExactJson(bundle).catch((cause: unknown) => setError(
+              cause instanceof Error ? cause.message : "Could not verify operator packet bytes."))}>
+            Download exact JSON
+          </button>
         </div>
         <p className="mt-1 text-muted-foreground">SHA-256 {bundle.snapshot_hash} · {new Date(bundle.created_at).toLocaleString()}</p>
         <details className="mt-2"><summary className="cursor-pointer">Creative, offer, page, targeting, copy and instructions</summary>
@@ -238,7 +260,7 @@ export function PaidOperatorBundles({ clientId, platform }: {
           }}>Download verified {file.title || file.asset_id.slice(0, 8)}</button>)}</div>
         <div className="mt-2 flex flex-wrap gap-3">
           <button type="button" className="underline disabled:opacity-50" disabled={busy || !current[bundle.id]}
-            onClick={() => void verifyDownload(bundle)}>Download and verify all files</button>
+            onClick={() => void verifyDownload(bundle)}>{platform === "google" ? "Download and verify Google packet" : "Download and verify all files"}</button>
           <button type="button" className="underline disabled:opacity-50" disabled={busy || !current[bundle.id] || !trail.some((event) => event.event === "verified_download")}
             onClick={() => void record(bundle, "handoff_reported")}>Report handoff</button>
           <button type="button" className="underline disabled:opacity-50" disabled={busy || !current[bundle.id] || !trail.some((event) => event.event === "handoff_reported")}

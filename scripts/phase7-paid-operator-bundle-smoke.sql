@@ -155,8 +155,14 @@ begin
   exception when check_violation then refused:=true; end;
   if not refused then raise exception 'Handoff skipped verified download'; end if;
   refused:=false;
+  begin
+    perform public.record_paid_operator_event_v7(bundle.id,'verified_download',
+      'browser-sha256:' || bundle.snapshot_hash);
+  exception when check_violation then refused:=true; end;
+  if not refused then raise exception 'Unverified packet hash was accepted'; end if;
+  refused:=false;
   perform public.record_paid_operator_event_v7(bundle.id,'verified_download',
-    'browser-sha256:' || bundle.snapshot_hash);
+    'sha256:' || bundle.snapshot_hash);
   select id into event_id from public.record_paid_operator_event_v7(bundle.id,
     'handoff_reported','ticket-100');
   if event_id is distinct from (select id from public.record_paid_operator_event_v7(

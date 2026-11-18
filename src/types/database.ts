@@ -39939,6 +39939,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      decide_google_search_copy_v7: {
+        Args: {
+          p_approved: boolean
+          p_copy_id: string
+          p_reason?: string
+          p_request_id: string
+        }
+        Returns: string
+      }
       decide_human_idea_inbox_v6: {
         Args: {
           p_approved: boolean
@@ -40803,6 +40812,18 @@ export type Database = {
       google_reply_reconciliation_target_v6: {
         Args: { p_attempt_id: string; p_client_id: string }
         Returns: Json
+      }
+      google_search_copy_approved_v7: {
+        Args: { p_copy_id: string }
+        Returns: boolean
+      }
+      google_search_copy_current_v7: {
+        Args: { p_copy_id: string }
+        Returns: boolean
+      }
+      google_search_copy_review_source_state_v7: {
+        Args: { p_request_id: string }
+        Returns: string
       }
       has_client_sales_entitlement: {
         Args: { p_client_id: string }
@@ -42151,6 +42172,10 @@ export type Database = {
       paid_operator_bundle_current_v7: {
         Args: { p_bundle_id: string }
         Returns: boolean
+      }
+      paid_operator_bundle_export_v7: {
+        Args: { p_bundle_id: string }
+        Returns: string
       }
       paid_operator_source_v7: { Args: { p_package_id: string }; Returns: Json }
       pause_agent_job: {

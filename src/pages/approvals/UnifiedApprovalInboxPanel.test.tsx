@@ -185,6 +185,27 @@ const readyGoogleOperator = {
   owning_path: "/clients/client-1/delivery/google-ads-studio",
 };
 
+const googleCopyId = "99999999-9999-4999-8999-999999999999";
+const googleCopyHash = "9".repeat(64);
+const readyGoogleCopy = {
+  ...request, id: "google-copy-inbox-1", source_system: "aa_console",
+  source_kind: "google_search_copy", source_id: googleCopyId,
+  source_version: googleCopyHash, artifact_hash: googleCopyHash,
+  title: "Google search copy · piece 2", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z",
+  destination: "google_ads:manual_operator_handoff", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { campaign_id: "campaign-1", route_package_id: "route-1",
+    work_item_id: "work-1", copy_hash: googleCopyHash,
+    headlines: ["One", "Two", "Three"],
+    descriptions: ["First description", "Second description"],
+    rationale: "The copy follows the approved offer and intended buyer." },
+  scope: { client_id: "client-1", campaign_id: "campaign-1",
+    route_package_id: "route-1", work_item_id: "work-1",
+    copy_id: googleCopyId, copy_hash: googleCopyHash },
+  owning_path: "/clients/client-1/delivery/campaign-factory?campaign=campaign-1",
+};
+
 const publicAgentId = "55555555-5555-4555-8555-555555555555";
 const publicAgentToken = "66666666-6666-4666-8666-666666666666";
 const publicAgentHash = "1".repeat(64);
@@ -1097,6 +1118,17 @@ describe("unified approval inbox", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_google_operator_bundle_v7", {
       p_bundle_id: googleBundleId, p_request_id: readyGoogleOperator.id, p_approved: true,
+    }));
+  });
+
+  it("reviews exact Google search copy through its paid-route decision RPC", async () => {
+    requests = [readyGoogleCopy];
+    show();
+    const card = await screen.findByRole("article", { name: readyGoogleCopy.title });
+    expect(within(card).getByText("Google search copy decision")).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_google_search_copy_v7", {
+      p_copy_id: googleCopyId, p_request_id: readyGoogleCopy.id, p_approved: true,
     }));
   });
 

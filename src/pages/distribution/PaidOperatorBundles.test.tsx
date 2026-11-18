@@ -30,6 +30,7 @@ vi.mock("../../lib/supabase", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  rows.client_campaigns = [{ id: "campaign-1", name: "Local offer", paid_platform: "meta" }];
   rows.paid_operator_bundles_v7 = [];
   rows.paid_operator_events_v7 = [];
   rows.paid_operator_metric_match_v7 = [];
@@ -72,6 +73,21 @@ it("requires a reported verified download before the handoff button is usable", 
   expect(await screen.findByText(/Local offer · v1 · current/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Report handoff" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Download and verify all files" })).toBeEnabled();
+});
+
+it("shows the reviewed Google copy packet without requiring a media file", async () => {
+  rows.client_campaigns = [{ id: "campaign-1", name: "Local offer", paid_platform: "google" }];
+  rows.paid_operator_bundles_v7 = [{ id: "bundle-google", client_id: "client-1",
+    campaign_id: "campaign-1", package_id: "package-1", platform: "google", version: 1,
+    snapshot_hash: "b".repeat(64), snapshot: { source: { campaign_name: "Local offer",
+      creative: [{ copy_id: "copy-1", copy_hash: "c".repeat(64),
+        headlines: ["Book a consultation"], descriptions: ["Speak with our team"] }] } },
+    created_at: "2026-11-16T00:00:00Z", created_by: "user-1" }];
+  render(<PaidOperatorBundles clientId="client-1" platform="google" />);
+  expect(await screen.findByText(/Local offer · v1 · current/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Download and verify Google packet" })).toBeEnabled();
+  expect(screen.queryByRole("button", { name: /Download verified/ })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Report handoff" })).toBeDisabled();
 });
 
 it("shows a metric row match without calling it provider verification", async () => {
