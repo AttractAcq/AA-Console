@@ -294,6 +294,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 ## Phase 4 — Campaign Factory as the coordinating workflow
 
+**Coordinated-route contract gap, 18 November 2026:** A source audit found that a `both` commercial campaign enters the v6 planner, but its Intelligence snapshot and manifest writers and table constraints still reject `both`. The older action approval and launch evidence views also assume one route. The [contract audit](client-delivery-both-route-planner-audit-2026-11-18.md) specifies the coupled correction and rollback fixture. Phase 4 preparation for a coordinated paid-and-organic campaign is blocked in this source until that correction is implemented and tested; earlier route-work fixtures did not exercise these v6 writers. No hosted change occurred.
+
 1. Create a reviewed plan with objective, micro-niche, approved offer version, organic/paid route packages, platform, audience, positioning, content quantities by format, proof, page, sales agent and optional magnet requirements. The planner may propose quantities; a human can correct and approve the plan.
 2. Convert each required item into a durable work item under the Phase 1 contract. Queue internal producers idempotently, respect per-client spend caps, expose progress and blockers, and retry only the failed item.
 3. Assemble a versioned campaign package with the exact outputs and dependency evidence. A package is `ready_for_review` only when all required assets have passed their internal QA. Human approval of the package does not substitute for each consequential external-action decision.
