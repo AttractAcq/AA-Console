@@ -12,6 +12,8 @@
 
 Sources: [38-finding classification](/Users/alex/.aa-console-evidence/staging-overlay-retry-2026-11-17/parity-38-classification-2026-11-18.json), [read-only history lineage](/Users/alex/.aa-console-evidence/staging-overlay-retry-2026-11-17/history-lineage-read-only-2026-11-18.md), and [post-head staging result](/Users/alex/.aa-console-evidence/staging-overlay-retry-2026-11-17/post-head-result-2026-11-18.md).
 
+**Additional local Git check, 18 November:** The recorded production-72 body hash `f72fe64080b663d1eb61b469e2545e53388a677209816372b85a8b7cda6ef424` matched none of the 819 distinct reachable `.sql` blobs in this checkout's `git rev-list --objects --all`. The earlier 72 file and the later compatibility marker each have one distinct body in reachable history, with different hashes. This narrows the local search but does not identify the production body or rule out deploy artifacts outside Git.
+
 ## Proposed resolution path
 
 1. Preserve the original migration rows and names. Do not insert canonical 259/260 stamps or relabel the alternate rows merely to make a parity counter green.
