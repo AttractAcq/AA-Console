@@ -772,7 +772,7 @@ function SurfaceCoverage() {
       )}
 
       <DataTable
-        columns={["Proof", "Rights", "Live on", "Bound, not published", "Problem"]}
+        columns={["Proof", "Rights", "Present or removal pending", "Bound, not published", "Problem"]}
         emptyLabel={loading ? "Loading…" : "No proof has reached a surface yet"}
         rows={coverage.map((row) => [
           <span key="p">
@@ -804,7 +804,7 @@ function SurfaceCoverage() {
 
       {!loading && coverage.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          {placed.length} of {coverage.length} piece(s) of proof are live somewhere.
+          {placed.length} of {coverage.length} piece(s) of proof are recorded on a surface without confirmed removal.
         </p>
       )}
     </section>

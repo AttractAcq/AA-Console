@@ -212,6 +212,7 @@ beforeEach(async () => {
   await db.exec(await sql("20261025110000_246_proof_reaches_the_surfaces_it_was_made_for.sql"));
   await db.exec(await sql("20261124041700_582_hold_paid_proof_placement_until_provider_live.sql"));
   await db.exec(await sql("20261124041800_583_proof_surface_event_contract.sql"));
+  await db.exec(await sql("20261124041900_584_proof_retraction_keeps_surface_visible.sql"));
 });
 
 afterAll(async () => { await db?.close(); });
@@ -420,7 +421,7 @@ describe("G10 — recording where proof already went", () => {
 });
 
 describe("the question on the day rights lapse", () => {
-  it("names a proof that is live somewhere with rights that are not approved", async () => {
+  it("keeps a published proof destination visible until removal is confirmed", async () => {
     await asService();
     const { id: brief } = await one<{ id: string }>(
       `insert into client_briefs (proof_asset_id) values ($1) returning id`, [PROOF]);
@@ -429,17 +430,41 @@ describe("the question on the day rights lapse", () => {
     const { id: post } = await one<{ id: string }>(
       `insert into scheduled_posts (client_id, asset_id, publication_status, published_at, external_id, external_url)
        values ($1,$2,'published',now(),'provider-post-x','https://instagram.com/p/x') returning id`, [CLIENT, asset]);
-    await db.query(`select record_proof_placement_for_post_v6($1)`, [post]);
+    const { id: placementId } = await one<{ id: string }>(
+      `select record_proof_placement_for_post_v6($1) as id`, [post]);
 
     // The customer withdraws permission.
     await db.query(`update client_proof_assets set usage_rights='not_cleared' where id=$1`, [PROOF]);
+    await db.query(`update proof_placements set status='retraction_required' where id=$1`, [placementId]);
 
-    const row = await one<{ live_placements: number; live_on: string[] | string; problem: string }>(
-      `select live_placements, live_on, problem from proof_surface_coverage where proof_asset_id=$1`,
+    const row = await one<{ live_placements: number; needs_retracting: number;
+      live_on: string[] | string; problem: string }>(
+      `select live_placements, needs_retracting, live_on, problem
+         from proof_surface_coverage where proof_asset_id=$1`,
       [PROOF]);
     expect(Number(row.live_placements)).toBe(1);
+    expect(Number(row.needs_retracting)).toBe(1);
     expect(String(row.live_on)).toContain("organic_social");
-    expect(row.problem).toContain("live somewhere and its rights are not_cleared");
+    expect(row.problem).toContain("Confirm removal");
+
+    await db.query(`update proof_placements set status='retracted' where id=$1`, [placementId]);
+    const removed = await one<{ live_placements: number; needs_retracting: number }>(
+      `select live_placements, needs_retracting from proof_surface_coverage where proof_asset_id=$1`,
+      [PROOF]);
+    expect(Number(removed.live_placements)).toBe(0);
+    expect(Number(removed.needs_retracting)).toBe(0);
+  });
+
+  it("does not call an unplaced proof live when rights end", async () => {
+    const p = await placement("main_website");
+    await db.query(`update proof_placements set status='retraction_required' where id=$1`, [p]);
+    const row = await one<{ live_placements: number; needs_retracting: number;
+      live_on: string[] | null }>(
+      `select live_placements, needs_retracting, live_on
+         from proof_surface_coverage where proof_asset_id=$1`, [PROOF]);
+    expect(Number(row.live_placements)).toBe(0);
+    expect(Number(row.needs_retracting)).toBe(1);
+    expect(row.live_on ?? []).toHaveLength(0);
   });
 
   it("distinguishes bound-but-unpublished from live", async () => {

@@ -423,7 +423,7 @@ describe("where this proof actually is", () => {
     render(<ProofDistributionPanel tab="rights" />);
     expect(await screen.findByText("Where this proof actually is")).toBeTruthy();
     expect(screen.getByText("organic_social, main_website")).toBeTruthy();
-    expect(screen.getByText("1 of 1 piece(s) of proof are live somewhere.")).toBeTruthy();
+    expect(screen.getByText("1 of 1 piece(s) of proof are recorded on a surface without confirmed removal.")).toBeTruthy();
   });
 
   it("leads with proof that is live on lapsed rights", async () => {
@@ -431,12 +431,12 @@ describe("where this proof actually is", () => {
       coverage({ proof_asset_id: "p2", title: "A clean one", problem: null }),
       coverage({
         usage_rights: "not_cleared",
-        problem: "This proof is live somewhere and its rights are not_cleared.",
+        problem: "This proof is still recorded on a surface and its rights are not_cleared. Confirm removal before clearing it.",
       }),
     ];
     render(<ProofDistributionPanel tab="rights" />);
     expect(
-      await screen.findByText("This proof is live somewhere and its rights are not_cleared."),
+      await screen.findByText("This proof is still recorded on a surface and its rights are not_cleared. Confirm removal before clearing it."),
     ).toBeTruthy();
     const alerts = screen.getAllByRole("alert").map((a) => a.textContent);
     expect(alerts.some((t) => t?.includes("1 piece(s) of proof need attention"))).toBe(true);
@@ -455,6 +455,6 @@ describe("where this proof actually is", () => {
     render(<ProofDistributionPanel tab="rights" />);
     expect(await screen.findByText("nowhere")).toBeTruthy();
     expect(screen.getByText(/has not published, so it is not live anywhere yet/)).toBeTruthy();
-    expect(screen.getByText("0 of 1 piece(s) of proof are live somewhere.")).toBeTruthy();
+    expect(screen.getByText("0 of 1 piece(s) of proof are recorded on a surface without confirmed removal.")).toBeTruthy();
   });
 });
