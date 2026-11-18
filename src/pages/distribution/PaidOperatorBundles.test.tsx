@@ -55,6 +55,26 @@ it("requires an exact reviewed package and operator instructions before freezing
   }));
 });
 
+it("requires a Google keyword research task in the exact operator packet", async () => {
+  rows.client_campaigns = [{ id: "campaign-1", name: "Local offer", paid_platform: "google" }];
+  render(<PaidOperatorBundles clientId="client-1" platform="google" />);
+  const freeze = screen.getByRole("button", { name: "Freeze operator bundle" });
+  await screen.findByRole("option", { name: /Local offer · v1/ });
+  await userEvent.selectOptions(screen.getByLabelText("Reviewed campaign package"), "package-1");
+  await userEvent.type(screen.getByLabelText("Paid operator"), "Paid manager");
+  await userEvent.type(screen.getByLabelText("Budget instruction"), "Cap at 25 per day");
+  await userEvent.type(screen.getByLabelText("Tracking instruction"), "Record campaign ID");
+  expect(freeze).toBeDisabled();
+  await userEvent.type(screen.getByLabelText("Keyword research task"),
+    "Research search terms, match types and negatives before launch");
+  await userEvent.click(freeze);
+  await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_google_paid_operator_bundle_v7", {
+    p_package_id: "package-1", p_owner: "Paid manager",
+    p_budget_instruction: "Cap at 25 per day", p_tracking_instruction: "Record campaign ID",
+    p_research_task: "Research search terms, match types and negatives before launch",
+  }));
+});
+
 it("keeps a stale bundle from reporting a handoff", async () => {
   rows.paid_operator_bundles_v7 = [{ id: "bundle-1", client_id: "client-1",
     campaign_id: "campaign-1", package_id: "package-1", platform: "meta", version: 1,

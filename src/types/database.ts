@@ -39219,6 +39219,33 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_google_paid_operator_bundle_v7: {
+        Args: {
+          p_budget_instruction: string
+          p_owner: string
+          p_package_id: string
+          p_research_task: string
+          p_tracking_instruction: string
+        }
+        Returns: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          created_by: string
+          id: string
+          package_id: string
+          platform: string
+          snapshot: Json
+          snapshot_hash: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "paid_operator_bundles_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_lead_capture_endpoint_v6: {
         Args: {
           p_campaign_id?: string

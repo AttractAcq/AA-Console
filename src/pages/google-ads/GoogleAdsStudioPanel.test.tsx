@@ -19,6 +19,10 @@ const { from, enqueueAgentJob, route } = vi.hoisted(() => ({
 vi.mock("../../lib/supabase", () => ({ supabase: { from }, enqueueAgentJob }));
 vi.mock("./GoogleOperatorBundlePanel", () => ({ GoogleOperatorBundlePanel: () => null }));
 vi.mock("./GoogleAdsReadPanel", () => ({ GoogleAdsReadPanel: () => null }));
+vi.mock("../distribution/PaidOperatorBundles", () => ({
+  PaidOperatorBundles: ({ platform }: { platform: string }) =>
+    createElement("section", { "aria-label": `${platform} campaign operator bundles` }),
+}));
 vi.mock("react-router-dom", () => ({
   useParams: () => ({ clientId: route.clientId }),
   Link: ({ to, children }: { to: string; children: unknown }) =>
@@ -131,6 +135,11 @@ describe("it never claims it can build", () => {
 });
 
 describe("the sheet is a sheet, not a plan", () => {
+  it("offers the campaign-bound Google handoff beside the manual sheet path", async () => {
+    render(<GoogleAdsStudioPanel tab="sheet" />);
+    expect(await screen.findByRole("region", { name: "google campaign operator bundles" })).toBeInTheDocument();
+  });
+
   it("shows every seed's note, so nobody reads it as research", async () => {
     database([row({ sheet_id: "sheet-1", sheet_version: 1, missing: ["keyword_research"] })], [sheet()]);
     render(<GoogleAdsStudioPanel tab="sheet" />);

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "a1fbcb9cc14d42e5cf2af9c1880e4e31c96321d5eb37cb73ff3336435a062bad",
-  "generatedTypesSha256": "efa6c88beda20e4019eebdc5ad529d67327b69300ed15d2e06b55cf1a126008e",
-  "generatedSchemaBodySha256": "169616629aae9fd3cdb646ebc3f7c2eab01d6a7f951e4c452c4be3dee7ce6fd1",
+  "migrationSourceDigest": "7e1fb30ca72cc0eeee7e9bacab5ffb37aa5a22938cd25a3d5d980ffdc1c1dba8",
+  "generatedTypesSha256": "f8735c20a8cf67eca9d75a2a1b66c6c660c0bcb955ccebad6e99cf4d3e32a96b",
+  "generatedSchemaBodySha256": "e5e8fe6e78363aece202d377970d1e2713e3c958d29de9c9622eb62096d0f237",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4161,6 +4161,13 @@
       "filename": "20261124041200_577_paid_operator_bundle_review.sql",
       "sha256": "a55fa714c37d91558d957d0f4861399d1c8215ec59077a4008239da9be738af8",
       "trimmedMd5": "f942911da578e02a44c6b39e5989ad37"
+    },
+    {
+      "version": "20261124041300",
+      "name": "578_google_paid_keyword_research_task",
+      "filename": "20261124041300_578_google_paid_keyword_research_task.sql",
+      "sha256": "44893e189be6fe247170771ebd1c746561ea46038dc32b2f0c9966ba1c5ea47a",
+      "trimmedMd5": "a817aa588b82ea967cac8398bf870fcd"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

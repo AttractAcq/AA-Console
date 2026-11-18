@@ -142,14 +142,30 @@ begin
   select id into request_id from public.approval_requests_v6
     where source_kind='campaign_preparation_package' and source_id=frozen.id::text;
   perform public.decide_campaign_preparation_package_v7(frozen.id,request_id,true);
-  select * into bundle from public.create_paid_operator_bundle_v7(frozen.id,
-    'Paid manager','Cap at 25 per day','Use campaign and page source IDs');
-  select * into same_bundle from public.create_paid_operator_bundle_v7(frozen.id,
-    'Paid manager','Cap at 25 per day','Use campaign and page source IDs');
+  begin
+    perform public.create_paid_operator_bundle_v7(frozen.id,
+      'Paid manager','Cap at 25 per day','Use campaign and page source IDs');
+  exception when check_violation then refused:=true; end;
+  if not refused then raise exception 'Google packet omitted keyword research task'; end if;
+  refused:=false;
+  begin
+    perform public.create_google_paid_operator_bundle_v7(frozen.id,
+      'Paid manager','Cap at 25 per day','Use campaign and page source IDs',' ');
+  exception when check_violation then refused:=true; end;
+  if not refused then raise exception 'Blank Google research task was accepted'; end if;
+  refused:=false;
+  select * into bundle from public.create_google_paid_operator_bundle_v7(frozen.id,
+    'Paid manager','Cap at 25 per day','Use campaign and page source IDs',
+    'Research search terms, match types, negatives and location intent before activation');
+  select * into same_bundle from public.create_google_paid_operator_bundle_v7(frozen.id,
+    'Paid manager','Cap at 25 per day','Use campaign and page source IDs',
+    'Research search terms, match types, negatives and location intent before activation');
   if bundle.id<>same_bundle.id or not public.paid_operator_bundle_current_v7(bundle.id)
     or jsonb_array_length(bundle.snapshot->'source'->'creative')<>1
     or bundle.snapshot->'source'->'creative'->0->>'copy_id'<>copy_id::text
     or bundle.snapshot->'source'->'creative'->0->>'copy_hash'<>v_copy_hash
+    or bundle.snapshot->>'research_task'<>
+      'Research search terms, match types, negatives and location intent before activation'
     or bundle.snapshot->'source'->'route'->>'id'<>route_id::text then
     raise exception 'Exact Google bundle lost reviewed copy or route'; end if;
   select id into request_id from public.approval_requests_v6

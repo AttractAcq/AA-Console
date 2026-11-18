@@ -65,6 +65,7 @@ export function PaidOperatorBundles({ clientId, platform }: {
   const [owner, setOwner] = useState("");
   const [budget, setBudget] = useState("");
   const [tracking, setTracking] = useState("");
+  const [researchTask, setResearchTask] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -123,10 +124,15 @@ export function PaidOperatorBundles({ clientId, platform }: {
     if (!packageId || busy) return;
     setBusy(true); setError(null); setNotice(null);
     try {
-      const result = await supabase.rpc("create_paid_operator_bundle_v7", {
-        p_package_id: packageId, p_owner: owner, p_budget_instruction: budget,
-        p_tracking_instruction: tracking,
-      });
+      const result = platform === "google"
+        ? await supabase.rpc("create_google_paid_operator_bundle_v7", {
+          p_package_id: packageId, p_owner: owner, p_budget_instruction: budget,
+          p_tracking_instruction: tracking, p_research_task: researchTask,
+        })
+        : await supabase.rpc("create_paid_operator_bundle_v7", {
+          p_package_id: packageId, p_owner: owner, p_budget_instruction: budget,
+          p_tracking_instruction: tracking,
+        });
       if (result.error) throw result.error;
       setNotice(`Exact ${platform === "meta" ? "Meta" : "Google"} operator bundle frozen. Review its exact instructions and source in Approval Inbox before downloading.`);
       await refresh();
@@ -211,7 +217,7 @@ export function PaidOperatorBundles({ clientId, platform }: {
 
   return <section className="space-y-4 rounded-lg border border-border bg-card p-4" aria-label={`${platform} paid operator bundles`}>
     <div>
-      <h3 className="font-semibold">Human paid operator bundles</h3>
+      <h3 className="font-semibold">{platform === "google" ? "Campaign-bound Google operator bundles" : "Meta paid operator bundles"}</h3>
       <p className="text-xs text-muted-foreground">A current approved campaign package, exact creative signoff and separate human review of this frozen operator bundle are required. Handoff and external IDs are operator reports; no ad is built or activated here.</p>
     </div>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
@@ -238,8 +244,17 @@ export function PaidOperatorBundles({ clientId, platform }: {
         <textarea className="mt-1 w-full rounded border border-border bg-background p-2" value={tracking}
           onChange={(event) => setTracking(event.target.value)} placeholder="UTMs, conversion event and reporting ID" />
       </label>
+      {platform === "google" && <div className="text-xs sm:col-span-2">
+        <label>Keyword research task
+          <textarea className="mt-1 w-full rounded border border-border bg-background p-2" value={researchTask}
+            onChange={(event) => setResearchTask(event.target.value)}
+            placeholder="Research search terms, match types, negatives, geography and intent before activating ads" />
+        </label>
+        <span className="mt-1 block text-muted-foreground">Campaign ideas are seeds. This assigns research to the paid operator; it does not claim the research is complete.</span>
+      </div>}
     </div>
-    <button type="button" disabled={busy || !packageId || !owner.trim() || !budget.trim() || !tracking.trim()}
+    <button type="button" disabled={busy || !packageId || !owner.trim() || !budget.trim() || !tracking.trim()
+      || (platform === "google" && !researchTask.trim())}
       onClick={() => void create()} className="rounded bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50">
       Freeze operator bundle
     </button>

@@ -354,6 +354,8 @@ function isPaidOperatorBundleReady(request: UnifiedApprovalRequest, clientId: st
     && preview.budget_instruction.trim().length > 0
     && typeof preview.tracking_instruction === "string"
     && preview.tracking_instruction.trim().length > 0
+    && (packet.platform !== "google" || (typeof preview.research_task === "string"
+      && preview.research_task.trim().length > 0))
     && Array.isArray(packet.creative) && packet.creative.length > 0
     && (packet.platform === "meta" || packet.platform === "google")
     && request.destination === `${packet.platform}_ads:manual_operator_handoff`
