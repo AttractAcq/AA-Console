@@ -216,6 +216,18 @@ describe("the plan", () => {
 });
 
 describe("campaign pages", () => {
+  it("closes the previous client's detail state when the route changes clients", async () => {
+    const view = show([planned()], READY);
+    await open();
+    await userEvent.click(screen.getByRole("button", { name: "Action buttons" }));
+    await userEvent.click(screen.getByRole("button", { name: "Launch" }));
+    expect(screen.getByRole("dialog", { name: "Confirm campaign action" })).toBeInTheDocument();
+
+    useParams.mockReturnValue({ clientId: "client-2", campaignId: "camp-1" });
+    view.rerender(<CampaignExecutionPanel />);
+    expect(screen.queryByRole("dialog", { name: "Confirm campaign action" })).not.toBeInTheDocument();
+  });
+
   it("shows the v2 campaign table and opens a campaign through its name", async () => {
     useParams.mockReturnValue({ clientId: "client-1" });
     show([planned(), planned({ id: "camp-2", name: "Spring whitening" })]);

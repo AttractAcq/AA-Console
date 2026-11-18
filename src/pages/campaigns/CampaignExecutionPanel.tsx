@@ -200,6 +200,11 @@ function productionStage(campaign: Campaign, checks: Requirement[], isPlanning: 
 
 export function CampaignExecutionPanel() {
   const { clientId, campaignId } = useParams<{ clientId: string; campaignId?: string }>();
+  return <CampaignExecutionPanelContent key={`${clientId ?? "no-client"}:${campaignId ?? "list"}`} />;
+}
+
+function CampaignExecutionPanelContent() {
+  const { clientId, campaignId } = useParams<{ clientId: string; campaignId?: string }>();
   const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [contentSpec, setContentSpec] = useState<ContentSpecPiece[] | null>(null);
