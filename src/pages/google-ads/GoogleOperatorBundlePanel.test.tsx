@@ -51,4 +51,32 @@ describe("Google operator export", () => {
     }));
     expect(rpc).not.toHaveBeenCalledWith("record_google_operator_event_v7", expect.anything());
   });
+
+  it("selects an approved current bundle for an operator report", async () => {
+    const approvedBundle = { ...bundle, id: "bundle-2", version: 2,
+      snapshot_hash: "b".repeat(64) };
+    from.mockImplementation((table: string) => {
+      const chain: Record<string, unknown> = {};
+      Object.assign(chain, {
+        select: () => chain, eq: () => chain, order: () => chain,
+        limit: async () => ({ data: table === "google_operator_bundles_v7"
+          ? [bundle, approvedBundle] : [], error: null }),
+      });
+      return chain;
+    });
+    rpc.mockImplementation(async (name: string, args?: { p_bundle_id?: string }) => ({
+      data: name === "google_operator_bundle_current_v7" ? true
+        : name === "google_operator_bundle_approved_v7"
+          ? args?.p_bundle_id === approvedBundle.id : null,
+      error: null,
+    }));
+    render(<GoogleOperatorBundlePanel sheets={[]} />);
+    const select = await screen.findByRole("combobox", { name: "Approved bundle" });
+    await waitFor(() => expect(select).toHaveValue(approvedBundle.id));
+    await userEvent.type(screen.getByRole("textbox", { name: "Evidence reference" }), "handoff-42");
+    await userEvent.click(screen.getByRole("button", { name: "Record operator report" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("record_google_operator_event_v7",
+      expect.objectContaining({ p_bundle_id: approvedBundle.id,
+        p_event: "handoff_reported", p_reference: "handoff-42" })));
+  });
 });

@@ -40,7 +40,6 @@ export function GoogleOperatorBundlePanel({ sheets }: { sheets: Sheet[] }) {
     if (result.error) throw new Error(result.error.message);
     const rows = result.data ?? [];
     setBundles(rows);
-    if (rows[0]) setEventBundleId((previous) => previous || rows[0].id);
     const [checks, history] = await Promise.all([
       Promise.all(rows.map(async (row) => {
         const [approval, freshness] = await Promise.all([
@@ -56,6 +55,8 @@ export function GoogleOperatorBundlePanel({ sheets }: { sheets: Sheet[] }) {
     setEvents(history.data ?? []);
     setApproved(Object.fromEntries(checks.map((item) => [item.id, item.approved])));
     setCurrent(Object.fromEntries(checks.map((item) => [item.id, item.current])));
+    const reportable = checks.filter((item) => item.approved && item.current).map((item) => item.id);
+    setEventBundleId((previous) => reportable.includes(previous) ? previous : reportable[0] ?? "");
   }, [clientId]);
 
   useEffect(() => {
@@ -161,7 +162,8 @@ export function GoogleOperatorBundlePanel({ sheets }: { sheets: Sheet[] }) {
         </div>
       </div>)}
     </div>
-    {bundles.length > 0 && <div className="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
+    {bundles.some((bundle) => approved[bundle.id] && current[bundle.id]) &&
+      <div className="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
       <label className="text-sm">Approved bundle<select className="mt-1 w-full rounded border border-border bg-background p-2" value={eventBundleId} onChange={(event) => setEventBundleId(event.target.value)}>
         {bundles.filter((bundle) => approved[bundle.id] && current[bundle.id]).map((bundle) => <option key={bundle.id} value={bundle.id}>{bundle.id} · v{bundle.version}</option>)}
       </select></label>
