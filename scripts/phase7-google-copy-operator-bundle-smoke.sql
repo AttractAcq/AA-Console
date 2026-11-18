@@ -85,6 +85,7 @@ declare cid uuid:='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
   request_id uuid; copy_review_id uuid; integration_id uuid;
   credential_id uuid; grant_review_id uuid; read_job_id uuid; read_id uuid;
   event_id uuid; refused boolean:=false;
+  original_expiry timestamptz;
 begin
   select public.campaign_plan_fingerprint(c),c.content_spec_hash into plan_hash,spec_hash
     from public.client_campaigns c where id=cid;
@@ -181,6 +182,34 @@ begin
   perform public.decide_paid_operator_bundle_v7(bundle.id,request_id,true,null);
   if not public.paid_operator_bundle_approved_v7(bundle.id) then
     raise exception 'Exact Google packet approval did not bind'; end if;
+  select expires_at into original_expiry from public.approval_requests_v6
+    where id=request_id;
+  -- The ledger is append-only in application traffic. In this rollback-only
+  -- fixture, temporarily disable its trigger to simulate the passage of time.
+  execute 'alter table public.approval_requests_v6 disable trigger approval_requests_v6_append_only';
+  update public.approval_requests_v6 set expires_at=now()-interval '1 minute'
+    where id=request_id;
+  execute 'alter table public.approval_requests_v6 enable trigger approval_requests_v6_append_only';
+  if public.paid_operator_bundle_approved_v7(bundle.id) then
+    raise exception 'Expired paid operator approval remained usable'; end if;
+  refused:=false;
+  begin
+    perform public.paid_operator_bundle_export_v7(bundle.id);
+  exception when insufficient_privilege then refused:=true; end;
+  if not refused then raise exception 'Expired paid operator packet exported'; end if;
+  refused:=false;
+  begin
+    perform public.record_paid_operator_event_v7(bundle.id,'verified_download',
+      'sha256:' || bundle.snapshot_hash);
+  exception when check_violation then refused:=true; end;
+  if not refused then raise exception 'Expired approval allowed download report'; end if;
+  execute 'alter table public.approval_requests_v6 disable trigger approval_requests_v6_append_only';
+  update public.approval_requests_v6 set expires_at=original_expiry
+    where id=request_id;
+  execute 'alter table public.approval_requests_v6 enable trigger approval_requests_v6_append_only';
+  if not public.paid_operator_bundle_approved_v7(bundle.id) then
+    raise exception 'Restored current paid packet approval remained held'; end if;
+  refused:=false;
   begin
     perform public.record_paid_operator_event_v7(bundle.id,'handoff_reported','ticket-100');
   exception when check_violation then refused:=true; end;
