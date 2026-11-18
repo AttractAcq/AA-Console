@@ -27,6 +27,7 @@
 | 569 | `20261124040400_569_content_archive_metric_coverage.sql` | `0c7b9f23ee6353081bace7c5dab09704537e2e478b81d94425e5f82a3364ce10` | Per-asset metric-row, basis, currency and freshness coverage for truthful Archive reporting |
 | 570 | `20261124040500_570_coordinated_campaign_manifest.sql` | `f0bf6f8905df1da18245427fce20f65b7cdcdd9fe6bbbc095ef33b0bd5335d77` | Both-route Intelligence snapshot and immutable manifest with separate organic and paid obligations |
 | 571 | `20261124040600_571_coordinated_campaign_live_evidence.sql` | `34a21f61cbbd75c4b00c00a37fd8f9411cfe01718a39494114f48015fca09056` | Distinguish partial and full recorded live state for a coordinated campaign |
+| 572 | `20261124040700_572_google_search_copy_versions.sql` | `b33c77938e8ccf8b586d080bdb09dabcb10612e582df0f0e390fa3ec358d23ef` | Store bounded Google search copy as immutable, exact paid-route and required work-item versions; no producer or outward action is enabled |
 
 ## Review and stop gates
 
@@ -34,7 +35,7 @@
 2. Refresh production and staging migration heads and validated schema parity. Disposition the eight unresolved staging history findings with evidence; do not rewrite migration records to hide them. Keep outward switches off.
 3. Run [`phase5-assignment-brief-client-drift.sql`](/Users/alex/aa-console-client-delivery-completion/supabase/verification/phase5-assignment-brief-client-drift.sql) under a genuinely cross-client read role and record the aggregate. A scoped user returning zero is not an audit. Migration 566 preserves historical rows and guards new/retargeted writes.
 4. Review replacement function signatures, grants and invoker/definer rights. Migrations 561–564 alter tables or create new state; migration 567 adds four metric-observation columns and replaces two service-only read-recording functions. Migrations 570–571 widen the immutable campaign snapshot/manifest and launch view for `both` while leaving paid execution adapters held. Migrate the database before deploying browser/runtime code that calls new RPCs or views, particularly migrations 563 and 565. A partial deployment could leave old readers presenting zero placeholders as observed metrics.
-5. Rehearse the exact ordered SQL and application build on an isolated or recoverable staging copy, with data/Auth preservation, tenant/RLS tests and rollback/forward-repair evidence. The earlier hosted staging rehearsal covers only its pinned manifest through migration 551; it does not cover these 20 files.
+5. Rehearse the exact ordered SQL and application build on an isolated or recoverable staging copy, with data/Auth preservation, tenant/RLS tests and rollback/forward-repair evidence. The earlier hosted staging rehearsal covers only its pinned manifest through migration 551; it does not cover these 21 files.
 6. Alex via Chief of Staff owns merge, production migrations and Railway deployment under `AGENTS.md`. Stop at the first failed guard, failed migration or parity mismatch. A code rollback does not undo database changes.
 
 ## Acceptance remains open

@@ -3181,6 +3181,176 @@ export type Database = {
           },
         ]
       }
+      campaign_google_search_copy_versions_v7: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          content_spec_id: string
+          copy_hash: string
+          created_at: string
+          descriptions: string[]
+          headlines: string[]
+          id: string
+          piece_index: number
+          producer_job_id: string
+          rationale: string
+          route_package_id: string
+          source_idea_id: string
+          source_snapshot: Json
+          version: number
+          work_item_id: string
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          content_spec_id: string
+          copy_hash: string
+          created_at?: string
+          descriptions: string[]
+          headlines: string[]
+          id?: string
+          piece_index: number
+          producer_job_id: string
+          rationale: string
+          route_package_id: string
+          source_idea_id: string
+          source_snapshot: Json
+          version: number
+          work_item_id: string
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          content_spec_id?: string
+          copy_hash?: string
+          created_at?: string
+          descriptions?: string[]
+          headlines?: string[]
+          id?: string
+          piece_index?: number
+          producer_job_id?: string
+          rationale?: string
+          route_package_id?: string
+          source_idea_id?: string
+          source_snapshot?: Json
+          version?: number
+          work_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_google_search_copy_v_content_spec_id_campaign_id__fkey"
+            columns: ["content_spec_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_content_spec_versions_v7"
+            referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_google_search_copy_v_route_package_id_campaign_id_fkey"
+            columns: ["route_package_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_route_packages_v6"
+            referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_google_search_copy_v_work_item_id_campaign_id_cli_fkey"
+            columns: ["work_item_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_work_effective_v6"
+            referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_google_search_copy_v_work_item_id_campaign_id_cli_fkey"
+            columns: ["work_item_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_work_items_v6"
+            referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_google_search_copy_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_google_search_copy_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_google_search_copy_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_google_search_copy_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_google_search_copy_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_google_search_copy_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_google_search_copy_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_google_search_copy_versions_v7_producer_job_id_fkey"
+            columns: ["producer_job_id"]
+            isOneToOne: true
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_google_search_copy_versions_v7_producer_job_id_fkey"
+            columns: ["producer_job_id"]
+            isOneToOne: true
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "campaign_google_search_copy_versions_v7_producer_job_id_fkey"
+            columns: ["producer_job_id"]
+            isOneToOne: true
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "campaign_google_search_copy_versions_v7_source_idea_id_fkey"
+            columns: ["source_idea_id"]
+            isOneToOne: false
+            referencedRelation: "client_ideas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_google_search_copy_versions_v7_source_idea_id_fkey"
+            columns: ["source_idea_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["idea_id"]
+          },
+        ]
+      }
       campaign_intelligence_snapshots: {
         Row: {
           acquisition_mode: string
@@ -42349,6 +42519,40 @@ export type Database = {
           p_observed_daily_budget_minor: number
         }
         Returns: string
+      }
+      record_campaign_google_search_copy_v7: {
+        Args: {
+          p_descriptions: string[]
+          p_headlines: string[]
+          p_job_id: string
+          p_rationale: string
+          p_source_idea_id: string
+          p_work_item_id: string
+        }
+        Returns: {
+          campaign_id: string
+          client_id: string
+          content_spec_id: string
+          copy_hash: string
+          created_at: string
+          descriptions: string[]
+          headlines: string[]
+          id: string
+          piece_index: number
+          producer_job_id: string
+          rationale: string
+          route_package_id: string
+          source_idea_id: string
+          source_snapshot: Json
+          version: number
+          work_item_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_google_search_copy_versions_v7"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       record_campaign_page_probe_v6: {
         Args: {

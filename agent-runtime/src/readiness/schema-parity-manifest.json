@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "2889b1f6b0027a247160efdad7dd516e63f71c9f928738c30e96e89a5ba40b1a",
-  "generatedTypesSha256": "b109c3dcc57b5267a8a4795c2a47da7ee161895278b3dddb07c1bcde95d84082",
-  "generatedSchemaBodySha256": "71d741836c91e94cf1326b6efcb94283c249b471a4332ce0548dd9879aa45634",
+  "migrationSourceDigest": "799c92ebabbc715bd301372a03e0a781a7d62ea79aa9ade7d608493a5db9d6d7",
+  "generatedTypesSha256": "f4f6fca37c5fe6d373c64cb20a2502b67eb97a6270fa9b8e2fcdf1880c7a5ce0",
+  "generatedSchemaBodySha256": "2ce8e60f5b4818511930a1d773164345042a2298e4efce95999bb17794656ce0",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4119,6 +4119,13 @@
       "filename": "20261124040600_571_coordinated_campaign_live_evidence.sql",
       "sha256": "34a21f61cbbd75c4b00c00a37fd8f9411cfe01718a39494114f48015fca09056",
       "trimmedMd5": "ca63281a1d92232e549a8126fd56ac30"
+    },
+    {
+      "version": "20261124040700",
+      "name": "572_google_search_copy_versions",
+      "filename": "20261124040700_572_google_search_copy_versions.sql",
+      "sha256": "b33c77938e8ccf8b586d080bdb09dabcb10612e582df0f0e390fa3ec358d23ef",
+      "trimmedMd5": "37ac2597705909f841ce24f1649b73cc"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
