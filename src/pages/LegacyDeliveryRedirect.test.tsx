@@ -64,6 +64,12 @@ it("carries a brief through to the tab that can show it", () => {
     .toBe("/clients/c1/delivery/content-production-factory?tab=briefs&brief=b-7");
 });
 
+it.each(["v1", "v2"])("keeps a historical Strategy %s bookmark in Strategy", (version) => {
+  go(`/clients/c1/delivery/strategy?view=${version}&tab=offer-strategy`);
+  expect(screen.getByTestId("landed").textContent)
+    .toBe("/clients/c1/delivery/intelligence-os?view=strategy&tab=offer-strategy");
+});
+
 it("sends one campaign's own legacy page to that campaign, not the list", () => {
   go("/clients/c1/delivery/campaign-execution/camp-9");
   expect(screen.getByTestId("landed").textContent)

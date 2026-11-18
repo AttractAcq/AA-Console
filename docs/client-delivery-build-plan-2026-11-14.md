@@ -43,6 +43,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Source inventory checkpoint, 18 November 2026:** The [candidate source inventory](client-delivery-phase0-source-inventory-2026-11-18.md) lists all 20 Delivery routes, their tabs, principal record and action boundaries, archive homes, 15 replaced deep links and the campaign/Motion decisions. It assigns six remaining evidence gaps. This is a source inventory, not a signed-in rendering or deployed/source comparison: the latter still needs current component identities, migration heads, provider/approval coverage and Alex's signoff. Phase 0 remains open.
 
+**Legacy Strategy link checkpoint, 18 November 2026:** A saved `/delivery/strategy?view=v1` or `view=v2` bookmark previously overrode the redirect default and entered Intelligence. The candidate redirect now preserves the Strategy destination while retaining other query parameters. Navigation and redirect tests passed (29 total). Deployed bookmark behavior still needs a signed-in check.
+
 ## Phase 1 — shared identity, lineage and state contracts
 
 1. Define stable IDs and version fingerprints for opportunity, offer, campaign, route package, content/proof asset, page, magnet, sales agent, approval, distribution attempt, lead and outcome. Backfill existing records without changing their public meaning.
