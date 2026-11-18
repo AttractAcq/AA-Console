@@ -48,6 +48,10 @@ interface Derived {
  */
 export function GoogleAdsStudioPanel({ tab }: { tab: Tab }) {
   const { clientId } = useParams<{ clientId: string }>();
+  return <GoogleAdsStudioForClient key={clientId ?? "no-client"} clientId={clientId} tab={tab} />;
+}
+
+function GoogleAdsStudioForClient({ clientId, tab }: { clientId: string | undefined; tab: Tab }) {
   const [due, setDue] = useState<SheetDue[]>([]);
   const [sheets, setSheets] = useState<Sheet[]>([]);
   const [loading, setLoading] = useState(true);
