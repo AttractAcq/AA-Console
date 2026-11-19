@@ -19,6 +19,8 @@ Migration 634 preserves the `campaign_live_evidence.leads_attributed` count afte
 
 Migration 635 makes the service-only source catalog select active leads/events when present and archived snapshots/events otherwise. A rollback fixture confirmed identical lead and outcome source keys, fingerprints, campaign IDs and their existing lineage link before archive, during overlap, while archived and after recovery. It checked that the archived lead left the active pipeline. This preserves recorded source nodes; it does not test every downstream action claim or release the cash-positive archive guard.
 
+The [dependent-record audit](client-delivery-archive-dependent-records-audit-2026-11-19.md) found 13 direct foreign keys to active leads. Outside the already copied `lead_events`, deletion currently cascades appointment, outbound, sequence and workflow-attribution rows, detaches four other relationships, and is blocked by three proof relationships. This is a separate lossless-history gate before positive-cash archiving can be enabled.
+
 ## Present behavior and gap
 
 `archive_lead` snapshots a lead and its events into `archived_leads`, then deletes the active `client_leads` row. It still refuses positive `cash_collected`. Migrations 621–635 move identified historical reporting and source-catalog paths, but coordinated archive/recover behavior and action suppression have not passed the full cross-surface gate. Migration 622 preserves **new** promoted-submission links through the durable same-client `lead_identities` key; previously nulled historical links remain unknown.
