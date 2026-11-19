@@ -18295,18 +18295,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "lead_submissions_lead_id_fkey"
-            columns: ["lead_id"]
+            foreignKeyName: "lead_submissions_lead_identity_fkey"
+            columns: ["lead_id", "client_id"]
             isOneToOne: false
-            referencedRelation: "client_leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "lead_submissions_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "lead_progress"
-            referencedColumns: ["lead_id"]
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
           },
         ]
       }

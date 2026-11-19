@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "9e3d74b7f59d768b06664f4ea6fe0426d73052697adf1c14888eebc1a29bc3b0",
-  "generatedTypesSha256": "dad98f2582844bbc1ee84d9deb854e415ba4ffd635a232c3af279a08435d0bb0",
-  "generatedSchemaBodySha256": "585bf2af49aa005e3a228a9fcc686ad27e3ef76bf67befc98f312cb69f71763b",
+  "migrationSourceDigest": "75c51cc8bf51fea89d5098e505d9775c671a08b0610248c3448179e37f8c5487",
+  "generatedTypesSha256": "c5a7059f28b9ca99c451f97aaddfc0ca1776cf2c174a9ede3e9c4970411f4f58",
+  "generatedSchemaBodySha256": "e6765ca6cc8439303428ff939e2adc48174673a430f8a9903ee859a9d161697c",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4469,6 +4469,13 @@
       "filename": "20261124045600_621_archived_lead_journey_trace.sql",
       "sha256": "033e6f59a9516cd063e3fc53493fe73b515b2cd2bc862c2e19f4ac92a0c8cc38",
       "trimmedMd5": "2afef70216ce79bea47840dddd82ba65"
+    },
+    {
+      "version": "20261124045700",
+      "name": "622_preserve_submission_lead_identity",
+      "filename": "20261124045700_622_preserve_submission_lead_identity.sql",
+      "sha256": "cc6bda3014ac6e3a384384ecdbb3c38cf0f48d29e835d237d89e2297c9c76e44",
+      "trimmedMd5": "13f6e3ea0ab73876cb412328a70e4553"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
