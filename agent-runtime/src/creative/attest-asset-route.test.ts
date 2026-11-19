@@ -16,6 +16,12 @@ const HASH = createHash("sha256").update(FILE).digest("hex");
 const IDENTITY = { client_id: CLIENT, asset_id: ASSET,
   storage_path: `${CLIENT}/${ASSET}/render.png`, object_id: OBJECT,
   object_version: "v1", object_updated_at: "2026-11-14T10:00:00Z" };
+const FRAMES = [
+  { ...IDENTITY, frame_id: "00000000-0000-0000-0000-000000000011", position: 1, caption: "First" },
+  { ...IDENTITY, frame_id: "00000000-0000-0000-0000-000000000012", position: 2,
+    storage_path: `${CLIENT}/${ASSET}/frame-2.png`, caption: "Second",
+    object_id: "00000000-0000-0000-0000-000000000014" },
+];
 
 async function call(sb: SupabaseClient) {
   const req = Readable.from([Buffer.from(JSON.stringify({ clientId: CLIENT, assetId: ASSET,
@@ -32,13 +38,22 @@ async function call(sb: SupabaseClient) {
   return { code, payload };
 }
 
-function database(options: { identityClient?: string; secondVersion?: string; role?: string; clientMember?: boolean } = {}) {
+function database(options: { identityClient?: string; secondVersion?: string; role?: string;
+  clientMember?: boolean; frames?: boolean; changedFrame?: boolean } = {}) {
   let identities = 0;
-  const rpc = vi.fn(async (name: string) => {
+  let frameReads = 0;
+  const rpc = vi.fn(async (name: string, _args?: Record<string, unknown>) => {
     if (name === "creative_storage_identity_v6") {
       identities += 1;
       return { data: { ...IDENTITY, client_id: options.identityClient ?? CLIENT,
         object_version: identities === 2 ? options.secondVersion ?? "v1" : "v1" }, error: null };
+    }
+    if (name === "creative_frame_storage_identities_v8") {
+      frameReads += 1;
+      return { data: options.frames ? { client_id: CLIENT, asset_id: ASSET,
+        content_format: "carousel", frames: FRAMES.map((frame) => ({ ...frame,
+          object_version: options.changedFrame && frameReads === 2 && frame.position === 2 ? "v2" : "v1" })) } : null,
+      error: null };
     }
     return { data: name === "attest_creative_storage_bytes_v6" ? ASSET : null, error: null };
   });
@@ -94,5 +109,20 @@ describe("trusted creative byte attestation", () => {
   it("lets a linked client account request byte verification for its own asset", async () => {
     const { sb } = database({ role: "client", clientMember: true });
     expect((await call(sb)).code).toBe(200);
+  });
+
+  it("hashes and records every frame of a multi-file creative", async () => {
+    const { sb, rpc } = database({ frames: true });
+    expect((await call(sb)).code).toBe(200);
+    const calls = rpc.mock.calls.filter(([name]) => name === "attest_creative_frame_bytes_v8");
+    expect(calls).toHaveLength(2);
+    expect(calls[1]?.[1]).toMatchObject({ p_frame_id: FRAMES[1]!.frame_id,
+      p_storage_path: FRAMES[1]!.storage_path, p_sha256: HASH, p_file_bytes: FILE.length });
+  });
+
+  it("refuses changed frame identity before saving any frame attestations", async () => {
+    const { sb, rpc } = database({ frames: true, changedFrame: true });
+    expect((await call(sb)).code).toBe(409);
+    expect(rpc).not.toHaveBeenCalledWith("attest_creative_frame_bytes_v8", expect.anything());
   });
 });

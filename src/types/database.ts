@@ -11494,6 +11494,134 @@ export type Database = {
           },
         ]
       }
+      creative_frame_bytes_v8: {
+        Row: {
+          asset_id: string
+          attested_at: string
+          file_bytes: number
+          frame_id: string
+          object_id: string
+          object_updated_at: string
+          object_version: string | null
+          sha256: string
+          storage_path: string
+        }
+        Insert: {
+          asset_id: string
+          attested_at?: string
+          file_bytes: number
+          frame_id: string
+          object_id: string
+          object_updated_at: string
+          object_version?: string | null
+          sha256: string
+          storage_path: string
+        }
+        Update: {
+          asset_id?: string
+          attested_at?: string
+          file_bytes?: number
+          frame_id?: string
+          object_id?: string
+          object_updated_at?: string
+          object_version?: string | null
+          sha256?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_frame_bytes_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "creative_frame_bytes_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "creative_frame_bytes_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_frame_bytes_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_frame_bytes_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "creative_frame_bytes_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "creative_frame_bytes_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_presence"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "creative_frame_bytes_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "creative_frame_bytes_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "creative_frame_bytes_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_frame_bytes_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_frame_bytes_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_frame_bytes_v8_frame_id_fkey"
+            columns: ["frame_id"]
+            isOneToOne: true
+            referencedRelation: "client_media_frames"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       creative_generations: {
         Row: {
           asset_id: string | null
@@ -38409,6 +38537,19 @@ export type Database = {
         Args: { p_brief_id?: string; p_project_id: string }
         Returns: string
       }
+      attest_creative_frame_bytes_v8: {
+        Args: {
+          p_asset_id: string
+          p_file_bytes: number
+          p_frame_id: string
+          p_object_id: string
+          p_object_updated_at: string
+          p_object_version: string
+          p_sha256: string
+          p_storage_path: string
+        }
+        Returns: string
+      }
       attest_creative_storage_bytes_v6: {
         Args: {
           p_asset_id: string
@@ -40440,6 +40581,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      creative_frame_storage_identities_v8: {
+        Args: { p_asset_id: string }
+        Returns: Json
       }
       creative_requirement_hash_v6: {
         Args: {
