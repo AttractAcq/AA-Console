@@ -28185,6 +28185,47 @@ export type Database = {
           },
         ]
       }
+      service_offer_archive_events_v10: {
+        Row: {
+          action: string
+          actor_id: string
+          client_id: string
+          id: string
+          occurred_at: string
+          offer_id: string
+          service_name: string
+          version_count: number
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          client_id: string
+          id?: string
+          occurred_at?: string
+          offer_id: string
+          service_name: string
+          version_count: number
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          client_id?: string
+          id?: string
+          occurred_at?: string
+          offer_id?: string
+          service_name?: string
+          version_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_offer_archive_events_v10_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_offer_signoffs: {
         Row: {
           approved_at: string
@@ -28295,6 +28336,8 @@ export type Database = {
       }
       service_offers: {
         Row: {
+          archived_at: string | null
+          archived_by: string | null
           client_id: string
           created_at: string
           id: string
@@ -28302,6 +28345,8 @@ export type Database = {
           service_name: string
         }
         Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
           client_id: string
           created_at?: string
           id?: string
@@ -28309,6 +28354,8 @@ export type Database = {
           service_name: string
         }
         Update: {
+          archived_at?: string | null
+          archived_by?: string | null
           client_id?: string
           created_at?: string
           id?: string
@@ -28316,6 +28363,13 @@ export type Database = {
           service_name?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "service_offers_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "service_offers_client_id_fkey"
             columns: ["client_id"]
@@ -40727,6 +40781,8 @@ export type Database = {
       create_main_offer_v7: {
         Args: { p_client_id: string }
         Returns: {
+          archived_at: string | null
+          archived_by: string | null
           client_id: string
           created_at: string
           id: string
@@ -40815,6 +40871,8 @@ export type Database = {
       create_named_main_offer_v9: {
         Args: { p_client_id: string; p_service_name: string }
         Returns: {
+          archived_at: string | null
+          archived_by: string | null
           client_id: string
           created_at: string
           id: string
@@ -40831,6 +40889,8 @@ export type Database = {
       create_named_secondary_offer_v9: {
         Args: { p_opportunity_id: string; p_service_name: string }
         Returns: {
+          archived_at: string | null
+          archived_by: string | null
           client_id: string
           created_at: string
           id: string
@@ -41018,6 +41078,8 @@ export type Database = {
       create_secondary_offer_v7: {
         Args: { p_opportunity_id: string }
         Returns: {
+          archived_at: string | null
+          archived_by: string | null
           client_id: string
           created_at: string
           id: string
@@ -41956,6 +42018,10 @@ export type Database = {
           deleted_frames: number
           deleted_posts: number
         }[]
+      }
+      delete_empty_service_offer_v10: {
+        Args: { p_offer_id: string }
+        Returns: undefined
       }
       delete_recruitment_ad: {
         Args: { p_brief_id: string }
@@ -47156,6 +47222,24 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "client_engine_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_service_offer_archived_v10: {
+        Args: { p_archive: boolean; p_offer_id: string }
+        Returns: {
+          archived_at: string | null
+          archived_by: string | null
+          client_id: string
+          created_at: string
+          id: string
+          kind: string
+          service_name: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_offers"
           isOneToOne: true
           isSetofReturn: false
         }

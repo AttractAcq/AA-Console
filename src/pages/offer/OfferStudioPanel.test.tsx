@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,7 +20,8 @@ import { OfferStudioPanel } from "./OfferStudioPanel";
 
 const offer = (over: Record<string, unknown> = {}) => ({
   id: "offer-1", client_id: "client-1", service_name: "Garage conversion",
-  kind: "main", created_at: "2026-10-01T00:00:00Z", ...over,
+  kind: "main", created_at: "2026-10-01T00:00:00Z",
+  archived_at: null, archived_by: null, ...over,
 });
 const version = (over: Record<string, unknown> = {}) => ({
   id: "ver-2", offer_id: "offer-1", client_id: "client-1", version: 2,
@@ -187,6 +188,40 @@ describe("the source-first Build path", () => {
 });
 
 describe("the table", () => {
+  it("keeps archived offers out of active tables and offers restore", async () => {
+    database({ offers: [offer({ archived_at: "2026-11-19T12:00:00Z" })],
+      versions: [version({ promise: "Historical approved promise" })],
+      drift: [drift({ offer_version_id: "ver-2", version: 2, superseded: false })] });
+    show();
+    const archived = await screen.findByRole("region", { name: "Archived offers" });
+    expect(within(archived).getByText("Garage conversion")).toBeInTheDocument();
+    expect(within(archived).getByText("1 recorded live use remains")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Proposed offers" })).queryByText("Garage conversion")).toBeNull();
+    await userEvent.click(within(archived).getByRole("button", { name: "Show Garage conversion" }));
+    expect(screen.getByText(/Historical approved promise/)).toBeInTheDocument();
+    await userEvent.click(within(archived).getByRole("button", { name: "Restore" }));
+    expect(rpc).toHaveBeenCalledWith("set_service_offer_archived_v10", {
+      p_offer_id: "offer-1", p_archive: false,
+    });
+  });
+
+  it("offers deletion only for an empty draft and archives a versioned offer", async () => {
+    database({ offers: [offer(), offer({ id: "offer-2", service_name: "Roof repair" })],
+      versions: [version()] });
+    show();
+    const proposed = await screen.findByRole("region", { name: "Proposed offers" });
+    expect(within(proposed).getAllByRole("button", { name: "Delete empty draft" })).toHaveLength(1);
+    await userEvent.click(within(proposed).getByRole("button", { name: "Delete empty draft" }));
+    expect(rpc).toHaveBeenCalledWith("delete_empty_service_offer_v10", { p_offer_id: "offer-2" });
+    await waitFor(() => expect(within(screen.getByRole("region", { name: "Proposed offers" }))
+      .getAllByRole("button", { name: "Archive" })[0]).toBeEnabled());
+    await userEvent.click(within(screen.getByRole("region", { name: "Proposed offers" }))
+      .getAllByRole("button", { name: "Archive" })[0]);
+    expect(rpc).toHaveBeenCalledWith("set_service_offer_archived_v10", {
+      p_offer_id: "offer-1", p_archive: true,
+    });
+  });
+
   it("shows a failed source read as unavailable with a retry", async () => {
     database({ offers: [], failTable: "service_offers" });
     show();

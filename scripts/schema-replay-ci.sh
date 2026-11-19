@@ -234,7 +234,7 @@ fi
 
 if [[ "${AA_SCHEMA_PHASE3_SMOKES:-0}" == "1" ]]; then
   smoke_count=0
-  for smoke_file in scripts/phase3-*-smoke.sql; do
+  for smoke_file in scripts/phase3-*-smoke.sql scripts/manual-first-*-smoke.sql; do
     smoke_name="${smoke_file##*/}"
     if psql_local -qAt -f "$smoke_file" >"$run_dir/$smoke_name.private.log" 2>&1; then
       smoke_count=$((smoke_count + 1))

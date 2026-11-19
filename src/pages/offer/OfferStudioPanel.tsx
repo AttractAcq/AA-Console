@@ -184,19 +184,49 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
     if (jobId) setPendingCompiles((current) => [...current, { id: jobId, kind }]);
   }
 
+  async function setArchived(offer: Offer, archive: boolean) {
+    if (busy) return;
+    setBusy(offer.id); setError(null); setNotice(null);
+    const { error: rpcError } = await supabase.rpc("set_service_offer_archived_v10", {
+      p_offer_id: offer.id, p_archive: archive,
+    });
+    setBusy(null);
+    if (rpcError) { setError(rpcError.message); return; }
+    await refresh();
+    setNotice(archive
+      ? "Offer archived. Existing versions and campaign references remain readable; no new use is allowed until restoration."
+      : "Offer restored for new version and campaign use, subject to current source and approval checks.");
+  }
+
+  async function deleteEmptyDraft(offer: Offer) {
+    if (busy) return;
+    setBusy(offer.id); setError(null); setNotice(null);
+    const { error: rpcError } = await supabase.rpc("delete_empty_service_offer_v10", {
+      p_offer_id: offer.id,
+    });
+    setBusy(null);
+    if (rpcError) { setError(rpcError.message); return; }
+    await refresh();
+    setNotice("Empty draft deleted. Its deletion is recorded; no version or approval history was removed.");
+  }
+
   const versionsFor = (offer: Offer) => versions.filter((version) => version.offer_id === offer.id);
   const signedOff = (versionId: string) =>
     signoffs.some((signoff) => signoff.offer_version_id === versionId);
   /** Superseded and still live is the only row that needs doing something about today. */
   const driftingFor = (offer: Offer) =>
     drift.filter((row) => row.offer_id === offer.id && row.superseded === true && row.live === true);
+  const liveUsesFor = (offer: Offer) =>
+    drift.filter((row) => row.offer_id === offer.id && row.live === true);
 
   const latestFor = (offer: Offer) => versionsFor(offer)[0] ?? null;
-  const proposedOffers = offers.filter((offer) => {
+  const activeOffers = offers.filter((offer) => offer.archived_at === null);
+  const archivedOffers = offers.filter((offer) => offer.archived_at !== null);
+  const proposedOffers = activeOffers.filter((offer) => {
     const latest = latestFor(offer);
     return !latest || !signedOff(latest.id);
   });
-  const approvedOffers = offers.filter((offer) => {
+  const approvedOffers = activeOffers.filter((offer) => {
     const latest = latestFor(offer);
     return Boolean(latest && signedOff(latest.id));
   });
@@ -217,6 +247,10 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
     {
       label: "Live elsewhere",
       cell: (offer) => {
+        if (offer.archived_at !== null) {
+          const live = liveUsesFor(offer);
+          return live.length ? `${live.length} recorded live use${live.length === 1 ? " remains" : "s remain"}` : "None recorded";
+        }
         const stale = driftingFor(offer);
         if (stale.length === 0) return "—";
         return (
@@ -238,7 +272,8 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
     </div>;
   }
 
-  const selectedBuildOffer = offers.find((offer) => offer.id === searchParams.get("offer"));
+  const selectedBuildOffer = activeOffers.find((offer) => offer.id === searchParams.get("offer"));
+  const selectedArchivedOffer = archivedOffers.find((offer) => offer.id === searchParams.get("offer"));
   if (view === "build") {
     const kind = buildSource === "opportunity" ? "secondary" : "main";
     return <div className="space-y-4">
@@ -276,7 +311,7 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
             {busy === `compile-${kind}` ? "Queueing…" : "Draft with agent"}</Button>
         </div>
       </section>
-      {offers.length > 0 && <label className="block text-sm">Continue an existing offer
+      {activeOffers.length > 0 && <label className="block text-sm">Continue an existing offer
         <select className="mt-1 block w-full rounded border border-border bg-background px-2 py-1"
           value={selectedBuildOffer?.id ?? ""}
           onChange={(event) => setSearchParams((current) => {
@@ -287,11 +322,14 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
             return next;
           })}>
           <option value="">Choose an existing offer</option>
-          {offers.map((offer) => <option key={offer.id} value={offer.id}>
+          {activeOffers.map((offer) => <option key={offer.id} value={offer.id}>
             {offer.service_name} · {offer.kind === "secondary" ? "opportunity" : "baseline"}
           </option>)}
         </select>
       </label>}
+      {selectedArchivedOffer && <p role="status" className="text-sm text-muted-foreground">
+        This offer is archived. Restore it from Offers before drafting another version.
+      </p>}
       {selectedBuildOffer && <ServiceOffersPanel selectedOfferId={selectedBuildOffer.id} />}
     </div>;
   }
@@ -317,8 +355,14 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
         nameOf={(offer) => offer.service_name}
         action={<Link to={`/clients/${clientId}/delivery/offer-studio?tab=build`}
           className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">Build offer</Link>}
-        rowActions={(offer) => <Link to={`/clients/${clientId}/delivery/offer-studio?tab=build&offer=${offer.id}`}
-          className="text-brand-strong underline">Edit</Link>}
+        rowActions={(offer) => <span className="flex flex-wrap gap-3">
+          <Link to={`/clients/${clientId}/delivery/offer-studio?tab=build&offer=${offer.id}`}
+            className="text-brand-strong underline">Edit</Link>
+          <button type="button" disabled={busy !== null} onClick={() => void setArchived(offer,true)}
+            className="text-brand-strong underline disabled:opacity-50">Archive</button>
+          {versionsFor(offer).length === 0 && <button type="button" disabled={busy !== null}
+            onClick={() => void deleteEmptyDraft(offer)} className="text-destructive underline disabled:opacity-50">Delete empty draft</button>}
+        </span>}
         detail={(offer) => {
           const all = versionsFor(offer);
           const stale = driftingFor(offer);
@@ -412,8 +456,12 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
         paramKey="offer"
         emptyLabel="No latest offer version has a recorded sign-off."
         nameOf={(offer) => offer.service_name}
-        rowActions={(offer) => <Link to={`/clients/${clientId}/delivery/offer-studio?tab=build&offer=${offer.id}`}
-          className="text-brand-strong underline">Revise</Link>}
+        rowActions={(offer) => <span className="flex flex-wrap gap-3">
+          <Link to={`/clients/${clientId}/delivery/offer-studio?tab=build&offer=${offer.id}`}
+            className="text-brand-strong underline">Revise</Link>
+          <button type="button" disabled={busy !== null} onClick={() => void setArchived(offer,true)}
+            className="text-brand-strong underline disabled:opacity-50">Archive</button>
+        </span>}
         detail={(offer) => <div className="space-y-2 text-sm">
           <p>Signed-off version v{latestFor(offer)?.version}. A later revision needs its own exact approval.</p>
           <p>Source and proof rights are rechecked before new campaign use; a historical sign-off alone does not release a stale source.</p>
@@ -435,6 +483,29 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
           </div>}
           <Link to={`/clients/${clientId}/delivery/offer-studio?tab=build&offer=${offer.id}`}
             className="text-brand-strong underline">View versions and linked campaigns</Link>
+        </div>}
+      />
+      <IndexDetail<Offer>
+        title="Archived offers"
+        items={archivedOffers}
+        columns={columns}
+        paramKey="offer"
+        emptyLabel="No archived offers."
+        nameOf={(offer) => offer.service_name}
+        rowActions={(offer) => <button type="button" disabled={busy !== null}
+          onClick={() => void setArchived(offer,false)}
+          className="text-brand-strong underline disabled:opacity-50">Restore</button>}
+        detail={(offer) => <div className="space-y-2 text-sm">
+          <p>Archived {offer.archived_at}. Existing versions and campaign references remain readable.</p>
+          <p>Archive does not retract existing live use. {liveUsesFor(offer).length} recorded live use(s) remain.</p>
+          <p>New versions, sign-offs and campaign bindings are held until this offer is restored.</p>
+          <p>{versionsFor(offer).length} recorded version(s); {versionsFor(offer).filter((version) => signedOff(version.id)).length} signed off.</p>
+          <ul className="space-y-1">
+            {versionsFor(offer).map((version) => <li key={version.id}>
+              v{version.version} · {signedOff(version.id) ? "Signed off" : "Proposed"} · {version.promise} ·
+              <span className="font-mono text-xs"> {version.content_hash.slice(0, 16)}…</span>
+            </li>)}
+          </ul>
         </div>}
       />
     </div>
