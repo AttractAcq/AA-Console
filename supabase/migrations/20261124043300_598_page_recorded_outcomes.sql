@@ -23,7 +23,7 @@ begin
     count(l.id)::integer,
     count(l.id) filter(where l.consent_given_at is not null
       and nullif(btrim(l.consent_wording),'') is not null)::integer,
-    count(l.id) filter(where l.stage in ('shown','sale','cash'))::integer,
+    count(l.id) filter(where l.stage in ('sale','cash'))::integer,
     coalesce(sum(l.cash_collected),0)::numeric,max(l.created_at)
   from public.client_pages p
   left join public.client_leads l on l.client_id=p.client_id
