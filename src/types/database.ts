@@ -44702,6 +44702,26 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      reporting_lead_progress_v10: {
+        Args: { p_client_id: string }
+        Returns: {
+          archived: boolean
+          cash_collected: number
+          cash_currency: string
+          client_id: string
+          created_at: string
+          ever_lost: boolean
+          furthest_rank: number
+          lead_id: string
+          opportunity_value: number
+          sale_currency: string
+          sale_evidence: boolean
+          sale_value: number
+          source_campaign_id: string
+          source_channel: string
+          stage: Database["public"]["Enums"]["lead_stage"]
+        }[]
+      }
       reporting_lead_rows_v10: {
         Args: { p_client_id: string }
         Returns: {

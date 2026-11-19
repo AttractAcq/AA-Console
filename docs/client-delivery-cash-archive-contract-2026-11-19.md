@@ -4,6 +4,8 @@
 
 **Candidate progress, 19 November:** Migration 623 added the internal historical lead source. Migration 624 moves `acquisition_funnel` and `client_money_currency_breakdown` onto it, including archived sale-stage events. Their disposable fixture compares before archive, archived and recovered results. Other listed reporting and operational consumers still need migration and cross-surface tests; the positive-cash archive guard remains in force.
 
+Migrations 625–627 add one internal historical progress source and move three public plus two MCP Economics reports onto it. Disposable fixtures cover probe exclusion, active/archive overlap, an archived sale later marked lost, recorded USD cash and exact before/archive/recovery equality. `content_attribution`, other attribution/MCP summaries and operational claims still need coordinated work and cross-surface checks before the archive guard can change.
+
 ## Present behavior and gap
 
 `archive_lead` snapshots a lead and its events into `archived_leads`, then deletes the active `client_leads` row. It refuses a lead with positive `cash_collected` because current revenue reports read active leads and would lose that cash. Migration 621 makes archived snapshots visible in the scoped journey trace. Migration 622 preserves **new** promoted-submission links through the durable same-client `lead_identities` key. Neither change makes archived cash part of live revenue aggregates, and previously nulled submission links remain unknown.

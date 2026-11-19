@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "dce939b006aa6aeefefb0eec1817f99fcabb538f9ee811279017e8abf20c3e8e",
-  "generatedTypesSha256": "d2f770cf742910f544b953f67ea3a13f5b930d97c12f247e4ea6b9c3a8093122",
-  "generatedSchemaBodySha256": "08120b97abfca992220b5c660b6a80267f32419a509f58622a24454239e4c1b5",
+  "migrationSourceDigest": "0ce94bba61b52914100e2db909e4a44e19546a7b5d938f2a3c144ef232f97cf0",
+  "generatedTypesSha256": "40c7fbdbaf9ee7d7c3c74a7ef839963068e5404793400271508f8cc186cd88ef",
+  "generatedSchemaBodySha256": "6193c6add8b0ed9d5d28168c2a8a673ddba6ade30853766a8bd523aa2096970a",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4490,6 +4490,27 @@
       "filename": "20261124045900_624_historical_funnel_currency_reads.sql",
       "sha256": "5dc1a1297debd5866d5bbc57326838dead84d29632784fab7d1041046f316c8b",
       "trimmedMd5": "88966421b3d3946c7311048d3d19f01d"
+    },
+    {
+      "version": "20261124050000",
+      "name": "625_historical_lead_progress_source",
+      "filename": "20261124050000_625_historical_lead_progress_source.sql",
+      "sha256": "4155b7b158b4aa0f1d6cf1b37d81e550e035e237a9dc54d134032d4d21e87e98",
+      "trimmedMd5": "72285936c2ab9e1cc1390316fbac910a"
+    },
+    {
+      "version": "20261124050100",
+      "name": "626_historical_public_economics",
+      "filename": "20261124050100_626_historical_public_economics.sql",
+      "sha256": "cb6e0bae43098b0901698af1812a7d42170c92d3b3d8f99bea065c081b28a42f",
+      "trimmedMd5": "024e146de965840793b696b1db908a90"
+    },
+    {
+      "version": "20261124050200",
+      "name": "627_historical_mcp_economics",
+      "filename": "20261124050200_627_historical_mcp_economics.sql",
+      "sha256": "05c94df4e2b034e6be84d28acd6dbce065c979dcf2302343f33fb3a651c7b489",
+      "trimmedMd5": "69fd95bdadc309312bb3794517ba783d"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
