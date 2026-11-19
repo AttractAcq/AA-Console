@@ -97,6 +97,15 @@ describe("approving from the library", () => {
     expect(rpc).not.toHaveBeenCalledWith("review_media_asset", expect.anything());
   });
 
+  it("routes pending carousel creative through exact review", async () => {
+    fetchClientAssets.mockResolvedValue([asset({ content_format: "carousel" })]);
+    render(<MediaLibrary mediaType="image" contentFormat="carousel" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Submit for review" }));
+    await waitFor(() => expect(requestOrdinaryMediaReview)
+      .toHaveBeenCalledWith("client-1", "a1"));
+    expect(rpc).not.toHaveBeenCalledWith("review_media_asset", expect.anything());
+  });
+
   // A rejection with no reason sends the maker back with nothing to act on.
   it("will not reject without a reason", async () => {
     render(<MediaLibrary mediaType="image" />);
@@ -139,6 +148,22 @@ describe("approving from the library", () => {
         select: () => ({ in: async () => ({ data: [], error: null }) }),
       } : null);
     render(<MediaLibrary mediaType="image" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Request new review" }));
+    await waitFor(() => expect(requestOrdinaryMediaReview)
+      .toHaveBeenCalledWith("client-1", "a1"));
+  });
+
+  it("offers new review for a stale approved story sequence", async () => {
+    fetchClientAssets.mockResolvedValue([asset({ content_format: "story",
+      review_status: "approved", human_approved_at: "2026-09-10T01:00:00Z" })]);
+    const signoffs = { select: () => signoffs, eq: async () => ({
+      data: [{ asset_id: "a1", current_signoff: false }], error: null,
+    }) };
+    from.mockImplementation((table: string) => table === "ordinary_media_current_status_v6"
+      ? signoffs : table === "client_media_frames" ? {
+        select: () => ({ in: async () => ({ data: [], error: null }) }),
+      } : null);
+    render(<MediaLibrary mediaType="image" contentFormat="story" />);
     await userEvent.click(await screen.findByRole("button", { name: "Request new review" }));
     await waitFor(() => expect(requestOrdinaryMediaReview)
       .toHaveBeenCalledWith("client-1", "a1"));

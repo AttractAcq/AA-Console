@@ -94,10 +94,11 @@ export function MediaLibrary({
       ascending: sort === "oldest",
     });
     setAssets(rows);
-    const approvedSingles = rows.filter((row) => row.review_status === "approved"
+    const approvedCreative = rows.filter((row) => row.review_status === "approved"
       && row.human_approved_at && (row.media_type === "image" || row.media_type === "text")
-      && (row.content_format ?? "single") === "single" && !row.render_path);
-    if (approvedSingles.length) {
+      && ["single", "carousel", "story"].includes(row.content_format ?? "single")
+      && !row.render_path);
+    if (approvedCreative.length) {
       const { data, error } = await supabase.from("ordinary_media_current_status_v6")
         .select("asset_id,current_signoff").eq("client_id", clientId);
       if (error) throw new Error(error.message);
@@ -124,7 +125,7 @@ export function MediaLibrary({
     setActionError(null);
     try {
       await requestOrdinaryMediaReview(clientId, asset.id);
-      setNotice("Submitted the current file for exact review.");
+      setNotice("Submitted the current creative for exact review.");
       await refresh();
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : String(cause));
@@ -188,14 +189,16 @@ export function MediaLibrary({
                     title={asset.title ?? "Untitled"}
                     clientId={clientId}
                     exactReview={(asset.media_type === "image" || asset.media_type === "text")
-                      && (asset.content_format ?? "single") === "single" && !asset.render_path}
+                      && ["single", "carousel", "story"].includes(asset.content_format ?? "single")
+                      && !asset.render_path}
                     onDone={() => void refresh()}
                     onError={setActionError}
                     onNotice={setNotice}
                   />
                 ) : asset.review_status === "approved" && asset.human_approved_at
                     && (asset.media_type === "image" || asset.media_type === "text")
-                    && (asset.content_format ?? "single") === "single" && !asset.render_path
+                    && ["single", "carousel", "story"].includes(asset.content_format ?? "single")
+                    && !asset.render_path
                     && currentSignoffs.get(asset.id) === false ? (
                   <button type="button" disabled={requestingId === asset.id}
                     onClick={() => void requestNewReview(asset)}

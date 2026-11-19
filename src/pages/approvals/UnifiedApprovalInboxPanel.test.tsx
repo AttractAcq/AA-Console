@@ -1582,6 +1582,53 @@ describe("unified approval inbox", () => {
     }));
   });
 
+  it("requires every ordered carousel frame to match before source approval", async () => {
+    const first = { frame_id: "frame-1", position: 1, caption: "Opening",
+      storage_path: "client-1/image.png", file_sha256: mediaFileHash,
+      file_bytes: 12, object_id: "storage-object-1", object_version: "v1",
+      object_updated_at: "2026-11-19T00:00:00Z" };
+    const second = { frame_id: "frame-2", position: 2, caption: "Close",
+      storage_path: "client-1/image-2.png", file_sha256: "a".repeat(64),
+      file_bytes: 15, object_id: "storage-object-2", object_version: null,
+      object_updated_at: "2026-11-19T00:00:00Z" };
+    requests = [{ ...readyOrdinaryMedia, preview: {
+      ...readyOrdinaryMedia.preview,
+      asset: { ...readyOrdinaryMedia.preview.asset, content_format: "carousel" },
+      frames: [first, second],
+    } }];
+    downloadVerifiedCreativeFile.mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("Second frame bytes changed"));
+    show();
+    const card = await screen.findByRole("article", { name: readyOrdinaryMedia.title });
+    const approve = within(card).getByRole("button", { name: "Approve exact version" });
+    expect(approve).toBeDisabled();
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify every frame" }));
+    expect(await within(card).findByRole("alert")).toHaveTextContent("Second frame bytes changed");
+    expect(approve).toBeDisabled();
+    expect(downloadVerifiedCreativeFile).toHaveBeenNthCalledWith(1, first.storage_path, first.file_sha256);
+    expect(downloadVerifiedCreativeFile).toHaveBeenNthCalledWith(2, second.storage_path, second.file_sha256);
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify every frame" }));
+    await waitFor(() => expect(approve).toBeEnabled());
+    await userEvent.click(approve);
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_ordinary_media_inbox_v6", {
+      p_review_id: mediaReviewId, p_request_id: readyOrdinaryMedia.id,
+    }));
+  });
+
+  it("holds a framed creative card when its ordered frame packet is incomplete", async () => {
+    requests = [{ ...readyOrdinaryMedia, preview: {
+      ...readyOrdinaryMedia.preview,
+      asset: { ...readyOrdinaryMedia.preview.asset, content_format: "story" },
+      frames: [{ frame_id: "frame-2", position: 2, storage_path: "client-1/image.png",
+        file_sha256: mediaFileHash, file_bytes: 12, object_id: "storage-object-1",
+        object_version: "v1", object_updated_at: "2026-11-19T00:00:00Z" }],
+    } }];
+    show();
+    const card = await screen.findByRole("article", { name: readyOrdinaryMedia.title });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+  });
+
   it("schedules an exact Engine slot only after the reviewer verifies its file", async () => {
     requests = [readyEngineSlot];
     show();

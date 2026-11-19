@@ -41777,6 +41777,10 @@ export type Database = {
         Returns: boolean
       }
       frame_plan_is_usable: { Args: { p_plan: string[] }; Returns: boolean }
+      framed_creative_evidence_current_v8: {
+        Args: { p_asset_id: string }
+        Returns: boolean
+      }
       gateway_tool_execution_state_v6: {
         Args: { p_approval_id: string }
         Returns: Json

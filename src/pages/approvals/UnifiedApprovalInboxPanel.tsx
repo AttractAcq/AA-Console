@@ -598,12 +598,29 @@ function isOrdinaryMediaReady(request: UnifiedApprovalRequest, clientId: string)
   const asset = preview.asset as Record<string, unknown>;
   const storage = preview.storage as Record<string, unknown>;
   const hash = request.artifact_hash;
+  const framed = asset.content_format === "carousel" || asset.content_format === "story";
+  const frames = preview.frames;
+  const framesReady = !framed || (Array.isArray(frames) && frames.length >= 2
+    && frames.every((entry, index) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
+      const frame = entry as Record<string, unknown>;
+      return frame.position === index + 1 && typeof frame.frame_id === "string"
+        && typeof frame.storage_path === "string" && !!frame.storage_path
+        && typeof frame.file_sha256 === "string" && /^[0-9a-f]{64}$/.test(frame.file_sha256)
+        && typeof frame.file_bytes === "number" && frame.file_bytes > 0
+        && typeof frame.object_id === "string" && !!frame.object_id
+        && (frame.object_version === null || typeof frame.object_version === "string")
+        && typeof frame.object_updated_at === "string";
+    }) && (frames[0] as Record<string, unknown>).storage_path === asset.storage_path
+    && (frames[0] as Record<string, unknown>).file_sha256 === asset.file_sha256
+    && new Set(frames.map((entry) => (entry as Record<string, unknown>).storage_path)).size === frames.length);
   return typeof hash === "string" && /^[0-9a-f]{64}$/.test(hash)
     && typeof preview.request_token === "string" && !!preview.request_token
     && request.source_version === `${hash}:${preview.request_token}`
     && preview.client_id === clientId && preview.asset_id === asset.id
     && asset.client_id === clientId && (asset.media_type === "image" || asset.media_type === "text")
-    && asset.content_format === "single" && typeof asset.storage_path === "string"
+    && (asset.content_format === "single" || framed) && framesReady
+    && typeof asset.storage_path === "string"
     && !!asset.storage_path && typeof asset.file_sha256 === "string"
     && /^[0-9a-f]{64}$/.test(asset.file_sha256)
     && typeof asset.usage_rights === "string" && !!asset.usage_rights
@@ -1299,6 +1316,10 @@ function RequestCard({ request, history, gatewayOutcome, executionEvidence, clie
   const creativeDownloadable = !!creativeAsset
     && typeof creativePath === "string" && !!creativePath
     && typeof creativeAsset.file_sha256 === "string";
+  const ordinaryFrames = request.source_kind === "ordinary_media"
+    && (creativeAsset?.content_format === "carousel" || creativeAsset?.content_format === "story")
+    && Array.isArray(creativePreview?.frames)
+    ? creativePreview.frames as Record<string, unknown>[] : null;
   const canReject = !salesManagerCard && isRejectionReady(request, clientId);
   const canApprove = !salesManagerCard && isApprovalReady(request, clientId);
   const canRevoke = !manager && isGatewayToolRevocable(request, clientId);
@@ -1443,18 +1464,37 @@ function RequestCard({ request, history, gatewayOutcome, executionEvidence, clie
       </div>}
 
       {creativeDownloadable && <div className="mt-4">
-        <p className="mb-2 text-xs text-muted-foreground">Download and inspect the exact creative file to unlock approval.</p>
+        <p className="mb-2 text-xs text-muted-foreground">
+          {ordinaryFrames ? `Download and inspect all ${ordinaryFrames.length} ordered frames to unlock approval.`
+            : "Download and inspect the exact creative file to unlock approval."}
+        </p>
+        {ordinaryFrames && <ol className="mb-3 list-inside list-decimal space-y-1 text-xs">
+          {ordinaryFrames.map((frame) => <li key={String(frame.frame_id)}>
+            <span className="font-medium">{String(frame.caption ?? `Frame ${frame.position}`)}</span>
+            <span className="ml-2 break-all font-mono text-muted-foreground">{String(frame.storage_path)} · {String(frame.file_sha256)}</span>
+          </li>)}
+        </ol>}
         <button type="button" className="rounded-lg border border-border px-4 py-2 text-sm"
-          onClick={() => void downloadVerifiedCreativeFile(
-            creativePath as string,
-            creativeAsset.file_sha256 as string,
-          ).then(() => { setDownloadedCreativeHash(`${request.id}:${request.artifact_hash}`); setDownloadError(null); })
-            .catch((cause: unknown) => setDownloadError(
-              cause instanceof Error ? cause.message : "Could not verify the creative file."))}>
-          Download and verify creative file
+          onClick={() => {
+            setDownloadedCreativeHash(null);
+            setDownloadError(null);
+            void (async () => {
+              if (ordinaryFrames) {
+                for (const frame of ordinaryFrames) {
+                  await downloadVerifiedCreativeFile(frame.storage_path as string, frame.file_sha256 as string);
+                }
+              } else {
+                await downloadVerifiedCreativeFile(creativePath as string, creativeAsset.file_sha256 as string);
+              }
+              setDownloadedCreativeHash(`${request.id}:${request.artifact_hash}`);
+            })().catch((cause: unknown) => setDownloadError(
+              cause instanceof Error ? cause.message : "Could not verify the creative file."));
+          }}>
+          {ordinaryFrames ? "Download and verify every frame" : "Download and verify creative file"}
         </button>
         {downloadedCreativeHash === `${request.id}:${request.artifact_hash}` && <p role="status" className="mt-2 text-xs">
-          The downloaded creative matched the byte hash on this card. Review its content before approval.
+          {ordinaryFrames ? "Every downloaded frame matched its byte hash and order on this card. Review the full sequence before approval."
+            : "The downloaded creative matched the byte hash on this card. Review its content before approval."}
         </p>}
         {downloadError && <p role="alert" className="mt-2 text-xs text-destructive">{downloadError}</p>}
       </div>}

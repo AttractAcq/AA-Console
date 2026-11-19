@@ -137,7 +137,8 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
 
   const hasOrdinaryInboxRoute = (asset: CampaignAsset) =>
     (asset.media_type === "image" || asset.media_type === "text")
-      && asset.content_format === "single" && !asset.render_path;
+      && ["single", "carousel", "story"].includes(asset.content_format ?? "")
+      && !asset.render_path;
   const requestCreativeReview = async (asset: CampaignAsset) => {
     if (!hasOrdinaryInboxRoute(asset)) {
       const result = await supabase.rpc("review_media_asset", {

@@ -94,9 +94,10 @@ export function ClientConsolePage() {
     setNotice(null);
     try {
       if (clientId && (asset.media_type === "image" || asset.media_type === "text")
-        && asset.content_format === "single" && !asset.render_path) {
+        && ["single", "carousel", "story"].includes(asset.content_format ?? "")
+        && !asset.render_path) {
         await requestOrdinaryMediaReview(clientId, asset.id);
-        setNotice("Submitted for account-manager review of the exact file.");
+        setNotice("Submitted for account-manager review of the exact creative.");
       } else {
         const { error: rpcError } = await supabase.rpc("review_media_asset", {
           p_asset_id: asset.id, p_decision: "approved",
@@ -164,7 +165,8 @@ export function ClientConsolePage() {
                 className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {busyId === asset.id ? "Submitting…" : (asset.media_type === "image" || asset.media_type === "text")
-                  && asset.content_format === "single" && !asset.render_path
+                  && ["single", "carousel", "story"].includes(asset.content_format ?? "")
+                  && !asset.render_path
                   ? "Submit for review" : "Approve"}
               </button>,
             ])}
