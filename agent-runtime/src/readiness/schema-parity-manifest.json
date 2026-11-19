@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "f89b8275cd1235b05c09c6c5e038d64fb31f8791ef01d252213a9908645c966f",
+  "migrationSourceDigest": "c844bc03a83f31b239dbbc15ad0d1bf0f8a8ba8bb9b72d4b4ebb5e2a1b9d4079",
   "generatedTypesSha256": "74065bff8b1251f1d95d196869f804bdeb1d4eca808af9798ff8332205de67b9",
   "generatedSchemaBodySha256": "3c0ad2e89ac8dbfa4b1094ce701e00fcdbc749f9c62fc3daf7bcc97fde40264b",
   "localMigrations": [
@@ -4355,8 +4355,15 @@
       "version": "20261124044000",
       "name": "605_organic_source_signoff_gate",
       "filename": "20261124044000_605_organic_source_signoff_gate.sql",
-      "sha256": "3b826ccfdba66e93a55d3234450acbf89d8cc16450d127ae3ffa92d1ca88c8a4",
-      "trimmedMd5": "c935c59b8e74612e62d0bf3d2d348740"
+      "sha256": "d2cb7153c6ffd641da422defe3ffff2f2f1250677f52ea2c97a2ed0f3b22596d",
+      "trimmedMd5": "bfb72aaa84a9542531a18e0ad6fbcfc6"
+    },
+    {
+      "version": "20261124044100",
+      "name": "606_publish_due_source_blocker",
+      "filename": "20261124044100_606_publish_due_source_blocker.sql",
+      "sha256": "991b5ccd0627705f0cde1256e95dad55c30f848ae2455e0e4fa54e68bb7434bc",
+      "trimmedMd5": "0a743c4559e45d244e880b6acb815ef5"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

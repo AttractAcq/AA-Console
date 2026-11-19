@@ -514,6 +514,11 @@ describe("held exact organic publication package", () => {
       import.meta.url,
     ), "utf8");
     await db.exec(migration);
+    const blockerMigration = await readFile(new URL(
+      "../../supabase/migrations/20261124044100_606_publish_due_source_blocker.sql",
+      import.meta.url,
+    ), "utf8");
+    await db.exec(blockerMigration);
     expect((await one<{ packet: unknown }>(
       `select organic_publication_source_snapshot_v6('${POST}') as packet`)).packet)
       .not.toBeNull();
@@ -521,6 +526,9 @@ describe("held exact organic publication package", () => {
     expect((await one<{ packet: unknown }>(
       `select organic_publication_source_snapshot_v6('${POST}') as packet`)).packet)
       .toBeNull();
+    expect((await one<{ blocker: string }>(
+      `select blocker from publish_due where post_id='${POST}'`)).blocker)
+      .toMatch(/exact creative source signoff is missing or stale/);
     await db.exec(`update scheduled_posts set publication_status='publishing',
       publish_claimed_at=now() where id='${POST}';
       select set_config('test.signoff_current','on',false);`);

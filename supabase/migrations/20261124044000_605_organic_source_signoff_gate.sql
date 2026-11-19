@@ -32,7 +32,7 @@ begin
     or (v_asset.media_type::text in ('image','text')
       and v_asset.content_format in ('single','carousel','story')
       and v_asset.render_path is null
-      and not public.ordinary_media_signoff_current_v6(v_asset.id))
+      and public.ordinary_media_signoff_current_v6(v_asset.id) is not true)
     or v_asset.content_format is null
     or v_post.media_type is distinct from v_asset.media_type then return null; end if;
   select * into v_brief from public.client_briefs
@@ -156,7 +156,7 @@ begin
     or (v_asset.media_type::text in ('image','text')
       and v_asset.content_format in ('single','carousel','story')
       and v_asset.render_path is null
-      and not public.ordinary_media_signoff_current_v6(v_asset.id))
+      and public.ordinary_media_signoff_current_v6(v_asset.id) is not true)
     or v_asset.content_format is null
     or v_post.media_type is distinct from v_asset.media_type then return null; end if;
   select * into v_brief from public.client_briefs
