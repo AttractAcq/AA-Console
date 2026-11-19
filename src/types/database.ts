@@ -8822,7 +8822,7 @@ export type Database = {
           client_id: string
           created_at?: string
           created_by?: string | null
-          currency?: string
+          currency: string
           description?: string | null
           external_ref?: string | null
           id?: string

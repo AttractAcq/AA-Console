@@ -2,7 +2,7 @@
 
 **Candidate source:** draft [PR #363](https://github.com/AttractAcq/AA-Console/pull/363). The full SHA-256 values below pin the SQL files, not a hosted release. Recheck the PR head and each hash before any apply.
 **Observed hosted baseline:** Production was last reported at `20261124034600` (migration 551). Staging reached a separately amended migration head of 569 with 569 history rows; its added correction is not a candidate migration. Refresh both heads, cron state, parity and deployment identity before any apply. The eight staging migration-history findings are unresolved.
-**Current candidate scope:** 68 ordered, unhosted migration files (552–619). Migration 592 installs an inactive read-only fifteen-minute cron enqueuer; separately review runtime compatibility and provider read access before activation. Candidate hashes below must be regenerated after any further source edit.
+**Current candidate scope:** 69 ordered, unhosted migration files (552–620). Migration 592 installs an inactive read-only fifteen-minute cron enqueuer; separately review runtime compatibility and provider read access before activation. Candidate hashes below must be regenerated after any further source edit.
 
 ## Ordered candidate
 
@@ -76,6 +76,7 @@
 | 617 | `20261124045200_617_opportunity_currency_capture.sql` | `515034e06cb516a04be4191c2d692f35c35d97c4c262617a563ed2059a9a65f9` | Store nullable opportunity currency, require it on new positive human/direct amounts, and preserve historical unknowns and archive recovery |
 | 618 | `20261124045300_618_opportunity_aggregate_currency_coverage.sql` | `b9c8ecdc73c8cf3526c5d4b379c15945a6b3849d363602c5cbdf282569d68b9e` | Withhold mixed or unverified client, asset and MCP opportunity totals; apply the same currency coverage to content sale/cash and pipeline cash totals |
 | 619 | `20261124045400_619_client_money_currency_breakdown.sql` | `14fc1ad664d80063b923f30fd665d0ccfe1b7e44682a32874cdda8a330cb4774` | Return separate tenant-scoped spend, opportunity, sale and cash amounts by recorded currency, including a distinct unverified lead-money bucket |
+| 620 | `20261124045500_620_require_explicit_spend_currency.sql` | `f7a3cc4a2ac80dd8bdce87f71355879bed67383098ab712b5bb81715ce986fa8` | Remove the silent ZAR spend default and require an explicit three-letter code on new rows while retaining historical rows for provenance review |
 
 **Organic route-package candidate, 19 November 2026:** Both the scheduled snapshot used for review and the claimed snapshot used by final prewrite now include the latest organic route package ID/version. They require an explicitly organic idea, a campaign that runs organic, and a route package matching the current plan fingerprint. This holds paid creative in a coordinated campaign and makes a later route/package revision stale the frozen review. Fifty-four focused runtime/PGlite tests and runtime typecheck passed, including paid-route and stale-plan refusals. A disposable released-to-current upgrade, clean replay, catalog contract, generated types and scoped-read gate passed locally. The publisher claim remains closed, and provider receipt/read-back and real human AAL2 evidence remain open. No hosted change occurred.
 

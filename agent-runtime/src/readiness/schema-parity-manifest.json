@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "a3fa5bbd39c275c431f6e8bb902721907639b2852d25f6336be8dba0ef172488",
-  "generatedTypesSha256": "0a0aa8af22037d5baadc692c280bbf4f1e2776b8b2098101ed836f8a2efb0744",
-  "generatedSchemaBodySha256": "3ce8b68fa55f58bd7ba99f196188e95bd1c0ec67cb153ea6ced7f5b421d2a8fa",
+  "migrationSourceDigest": "493895972ee8d7ed8f813dc7e8723f2f83ef5dc2c594d4a5452f285dc5105faf",
+  "generatedTypesSha256": "3a3c92d2b1fed22b00ebe5b1ee13974b4641d3cd50b9854e0a3882ff79243597",
+  "generatedSchemaBodySha256": "b26f0ba49f6de80ba070e72b25c346f6bc421dbb0346e30d21310aab4b72b515",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4455,6 +4455,13 @@
       "filename": "20261124045400_619_client_money_currency_breakdown.sql",
       "sha256": "14fc1ad664d80063b923f30fd665d0ccfe1b7e44682a32874cdda8a330cb4774",
       "trimmedMd5": "68dc7a1187e74447a491e5d0a00025c8"
+    },
+    {
+      "version": "20261124045500",
+      "name": "620_require_explicit_spend_currency",
+      "filename": "20261124045500_620_require_explicit_spend_currency.sql",
+      "sha256": "f7a3cc4a2ac80dd8bdce87f71355879bed67383098ab712b5bb81715ce986fa8",
+      "trimmedMd5": "6f711ab373412b19f4cd6a8424db6efc"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
