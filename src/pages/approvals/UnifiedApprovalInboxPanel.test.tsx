@@ -15,6 +15,7 @@ vi.mock("../../lib/supabase", () => ({ supabase: {
 vi.mock("./ApprovalCoveragePanel", () => ({ ApprovalCoveragePanel: () => null }));
 vi.mock("./ExternalExecutionAlerts", () => ({ ExternalExecutionAlerts: () => null }));
 vi.mock("./HeldExternalJobs", () => ({ HeldExternalJobs: () => null }));
+vi.mock("./ArchivedReturnAlerts", () => ({ ArchivedReturnAlerts: () => null }));
 vi.mock("react-router-dom", async (original) => ({
   ...(await original<typeof import("react-router-dom")>()),
   useParams: () => ({ clientId: "client-1" }),
