@@ -1,6 +1,8 @@
 # Cash-positive lead archival contract — 19 November 2026
 
-**Status:** Source and isolated-catalog dependency audit for draft PR #363 at `a077d065d4958f58ba29ed4fca9a03b0c77af0ad`. No cash-archive behavior was changed. The current `archive_lead` guard is still required until the reporting and action paths below move together. Hosted projects and outward switches were untouched.
+**Status:** Original source and isolated-catalog dependency audit for draft PR #363 at `a077d065d4958f58ba29ed4fca9a03b0c77af0ad`. No cash-archive behavior was changed. The current `archive_lead` guard is still required until the reporting and action paths below move together. Hosted projects and outward switches were untouched.
+
+**Candidate progress, 19 November:** Migration 623 added the internal historical lead source. Migration 624 moves `acquisition_funnel` and `client_money_currency_breakdown` onto it, including archived sale-stage events. Their disposable fixture compares before archive, archived and recovered results. Other listed reporting and operational consumers still need migration and cross-surface tests; the positive-cash archive guard remains in force.
 
 ## Present behavior and gap
 

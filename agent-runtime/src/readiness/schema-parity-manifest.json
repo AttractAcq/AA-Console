@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "2520ed1049237c1844924b401d6839fb2f19bb684837e98bfae2c9ed14b18424",
+  "migrationSourceDigest": "dce939b006aa6aeefefb0eec1817f99fcabb538f9ee811279017e8abf20c3e8e",
   "generatedTypesSha256": "d2f770cf742910f544b953f67ea3a13f5b930d97c12f247e4ea6b9c3a8093122",
   "generatedSchemaBodySha256": "08120b97abfca992220b5c660b6a80267f32419a509f58622a24454239e4c1b5",
   "localMigrations": [
@@ -4483,6 +4483,13 @@
       "filename": "20261124045800_623_historical_lead_reporting_source.sql",
       "sha256": "fe68e6b316050e830e99bc10ce0469d6471439c2032c19e9bde7f9ac721e52e7",
       "trimmedMd5": "7ff0ea314a2f04b11d67fd6f43c04389"
+    },
+    {
+      "version": "20261124045900",
+      "name": "624_historical_funnel_currency_reads",
+      "filename": "20261124045900_624_historical_funnel_currency_reads.sql",
+      "sha256": "5dc1a1297debd5866d5bbc57326838dead84d29632784fab7d1041046f316c8b",
+      "trimmedMd5": "88966421b3d3946c7311048d3d19f01d"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
