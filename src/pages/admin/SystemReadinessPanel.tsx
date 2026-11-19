@@ -37,6 +37,7 @@ const EVIDENCE_LABELS: Record<string, string> = {
 const CRON_ISSUE_LABELS: Record<string, string> = {
   missing: "Missing",
   inactive: "Inactive",
+  unexpectedly_active: "Active before reviewed release",
   schedule_mismatch: "Schedule differs",
   duplicate: "Duplicate name",
   unexpected: "Not in registry",

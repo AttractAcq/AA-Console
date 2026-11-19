@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "04acd476085d0f0d8a03eba36657623a60ebf93fc6465fe1ece5e43bdaba489a",
+  "migrationSourceDigest": "9fe9cabf2fa9ce955d5865ac719ddf125f29fdbe021b4f3c7be28484f714d918",
   "generatedTypesSha256": "3abfa7203a6d7dbff04d0366c831a97194603b5cf04106ff3a6af8d8b40ccb06",
   "generatedSchemaBodySha256": "810eca854861b0dca5212fe4afba50959ff901aa8bbf5320bf839e8c3701543e",
   "localMigrations": [
@@ -4264,8 +4264,8 @@
       "version": "20261124042700",
       "name": "592_organic_provider_readback_reconcile",
       "filename": "20261124042700_592_organic_provider_readback_reconcile.sql",
-      "sha256": "eeb5f1b2ff87e73fb35cf338349c38f53f76a713e2e5b79740013c8a3ef1586d",
-      "trimmedMd5": "b2aef534a7b69d5483438d0b68fefc85"
+      "sha256": "48ed1f82d0a47911b666754b8b41d78c92a82e727e79e39e9c2700aafd29ca97",
+      "trimmedMd5": "e2af0ea4617157985619a46ff616753f"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

@@ -1,6 +1,6 @@
 -- Revisit acknowledged Meta objects with GET only. An unavailable read is
--- never a reason to send the post again. The schedule only enqueues read-only
--- GET work; it never changes an outward publication switch or post state.
+-- never a reason to send the post again. Install the schedule inactive so a
+-- staging migration cannot resume a new job outside the cron review.
 begin;
 
 create view public.organic_provider_readback_retry_due_v8
@@ -89,7 +89,10 @@ revoke all on function public.enqueue_organic_readback_reconciliation_v8()
   from public,anon,authenticated,service_role;
 grant execute on function public.enqueue_organic_readback_reconciliation_v8() to service_role;
 
-select cron.schedule('organic-provider-readback-reconcile','*/15 * * * *',
-  $cron$select public.enqueue_organic_readback_reconciliation_v8();$cron$);
+with scheduled as (
+  select cron.schedule('organic-provider-readback-reconcile','*/15 * * * *',
+    $cron$select public.enqueue_organic_readback_reconciliation_v8();$cron$) as jobid
+)
+select cron.alter_job(job_id:=jobid,active:=false) from scheduled;
 select public.lock_down_definer_functions();
 commit;

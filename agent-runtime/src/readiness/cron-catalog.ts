@@ -31,8 +31,11 @@ export const EXPECTED_CRON_SCHEDULES: Readonly<Record<string, string>> = Object.
   "organic-provider-readback-reconcile": "*/15 * * * *",
 });
 
+/** Installed by candidate migration 592, but held until a reviewed activation. */
+export const EXPECTED_INACTIVE_CRON_JOBS = new Set(["organic-provider-readback-reconcile"]);
+
 export type CronCatalogJob = { name: string; schedule: string; active: boolean };
-export type CronCatalogIssue = "missing" | "inactive" | "schedule_mismatch" | "duplicate" | "unexpected";
+export type CronCatalogIssue = "missing" | "inactive" | "unexpectedly_active" | "schedule_mismatch" | "duplicate" | "unexpected";
 export type CronCatalogAuditRow = {
   name: string;
   expectedSchedule: string | null;
@@ -87,7 +90,9 @@ export function auditCronCatalog(
     const issues: CronCatalogIssue[] = [];
     if (observed.length === 0) issues.push("missing");
     if (observed.length > 1) issues.push("duplicate");
-    if (observed.some((job) => !job.active)) issues.push("inactive");
+    const shouldBeActive = !EXPECTED_INACTIVE_CRON_JOBS.has(name);
+    if (observed.some((job) => job.active !== shouldBeActive))
+      issues.push(shouldBeActive ? "inactive" : "unexpectedly_active");
     if (observed.some((job) => job.schedule !== expectedSchedule)) issues.push("schedule_mismatch");
     return {
       name, expectedSchedule,

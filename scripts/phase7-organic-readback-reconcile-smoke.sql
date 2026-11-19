@@ -2,6 +2,14 @@
 -- creation guards only inside this rollback transaction; all reads and the
 -- enqueue call run with triggers back on. No provider request is made.
 begin;
+do $schedule$
+begin
+  if not exists(select 1 from cron.job
+      where jobname='organic-provider-readback-reconcile'
+        and schedule='*/15 * * * *' and active=false) then
+    raise exception 'Read-only retry schedule was not installed inactive';
+  end if;
+end $schedule$;
 set local session_replication_role='replica';
 do $seed$
 declare c uuid; p uuid; s uuid;
