@@ -94,8 +94,8 @@ begin
       or coalesce(claim->>'kind','') not in ('general','quantified')
       or nullif(btrim(claim->>'text'),'') is null
       or length(claim->>'text')>1000
-      or (claim->>'kind'='quantified' and nullif(claim->>'proof_asset_id','') is null) then
-      raise exception 'Every claim needs a kind and text; quantified claims need proof.'
+      or nullif(claim->>'proof_asset_id','') is null then
+      raise exception 'Every claim needs a kind, text and linked proof.'
         using errcode='22023'; end if;
   end loop;
   content_digest:=encode(sha256(convert_to(jsonb_build_object(

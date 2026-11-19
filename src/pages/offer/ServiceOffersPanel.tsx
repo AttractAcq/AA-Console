@@ -11,10 +11,11 @@ type ManifestOffer = Database["public"]["Tables"]["campaign_manifest_offers"]["R
 type Campaign = Database["public"]["Tables"]["client_campaigns"]["Row"];
 type Proof = Pick<Database["public"]["Tables"]["client_proof_assets"]["Row"],
   "id" | "title" | "claim" | "evidence" | "usage_rights" | "expires_on">;
+type GeneralClaim = { text: string; proofAssetId: string };
 type Form = {
   offerId: string | null; serviceName: string; audience: string; promise: string;
   inclusions: string; exclusions: string; price: string; currency: string;
-  deliveryCost: string; claims: string; retainedClaims: Json[];
+  deliveryCost: string; generalClaims: GeneralClaim[]; retainedClaims: Json[];
   dreamOutcome: string; dreamOutcomeBoost: string; likelihood: string;
   likelihoodMechanism: string; timeDelay: string; delayReductionSteps: string;
   effortSacrifice: string; effortReductionSteps: string; riskReversal: string;
@@ -22,12 +23,11 @@ type Form = {
 };
 const emptyForm: Form = { offerId: null, serviceName: "", audience: "", promise: "",
   inclusions: "", exclusions: "", price: "", currency: "EUR", deliveryCost: "",
-  claims: "", retainedClaims: [], dreamOutcome: "", dreamOutcomeBoost: "",
+  generalClaims: [], retainedClaims: [], dreamOutcome: "", dreamOutcomeBoost: "",
   likelihood: "", likelihoodMechanism: "", timeDelay: "", delayReductionSteps: "",
   effortSacrifice: "", effortReductionSteps: "", riskReversal: "", bonuses: "",
   scarcity: "", urgency: "", deliveryLimits: "" };
 const lines = (value: string) => value.split("\n").map((item) => item.trim()).filter(Boolean);
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function valueObject(value: Json | null): Record<string, Json> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, Json> : {};
@@ -83,16 +83,9 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
     const queryError = offerResult.error ?? versionResult.error ?? signoffResult.error
       ?? manifestResult.error ?? linkResult.error ?? campaignResult.error;
     if (queryError) { setLoading(false); setError(queryError.message); return; }
-    const proofIds = [...new Set((versionResult.data ?? []).flatMap((version) =>
-      Array.isArray(version.claims) ? version.claims.filter(isClaim)
-        .filter((claim) => claim.kind === "quantified" &&
-          uuidPattern.test(claim.proof_asset_id ?? ""))
-        .map((claim) => claim.proof_asset_id!) : []))];
-    const proofResult = proofIds.length > 0
-      ? await supabase.from("client_proof_assets")
-        .select("id,title,claim,evidence,usage_rights,expires_on")
-        .eq("client_id", clientId).in("id", proofIds)
-      : { data: [] as Proof[], error: null };
+    const proofResult = await supabase.from("client_proof_assets")
+      .select("id,title,claim,evidence,usage_rights,expires_on")
+      .eq("client_id", clientId);
     setLoading(false);
     if (proofResult.error) { setError(`Offer proof is unavailable: ${proofResult.error.message}`); return; }
     setError(null);
@@ -115,8 +108,13 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
     });
   }, [offers, selectedOfferId]);
 
-  function update(field: Exclude<keyof Form, "offerId" | "retainedClaims">, value: string) {
+  function update(field: Exclude<keyof Form, "offerId" | "retainedClaims" | "generalClaims">, value: string) {
     setForm((prior) => ({ ...prior, [field]: value }));
+    setDraftKey(crypto.randomUUID());
+  }
+  function updateClaim(index: number, field: keyof GeneralClaim, value: string) {
+    setForm((prior) => ({ ...prior, generalClaims: prior.generalClaims.map((claim, item) =>
+      item === index ? { ...claim, [field]: value } : claim) }));
     setDraftKey(crypto.randomUUID());
   }
 
@@ -128,9 +126,9 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
       inclusions: version.inclusions.join("\n"), exclusions: version.exclusions.join("\n"),
       price: version.price_amount?.toString() ?? "", currency: version.currency ?? "EUR",
       deliveryCost: version.delivery_cost_estimate?.toString() ?? "",
-      claims: Array.isArray(version.claims) ? version.claims
+      generalClaims: Array.isArray(version.claims) ? version.claims
         .filter(isClaim).filter((claim) => claim.kind === "general")
-        .map((claim) => claim.text).join("\n") : "",
+        .map((claim) => ({ text: claim.text, proofAssetId: claim.proof_asset_id ?? "" })) : [],
       retainedClaims: Array.isArray(version.claims) ? version.claims
         .filter(isClaim).filter((claim) => claim.kind === "quantified") : [],
       dreamOutcome: valueText(equation, "dream_outcome"),
@@ -167,9 +165,23 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
       setBusy(null);
       return;
     }
+    const generalClaims = form.generalClaims.filter((claim) => claim.text.trim());
+    const unsupported = generalClaims.find((claim) => {
+      const proof = proofs.find((item) => item.id === claim.proofAssetId);
+      return !proof || proof.usage_rights !== "approved"
+        || (proof.expires_on !== null && proof.expires_on < new Date().toISOString().slice(0, 10))
+        || !proof.evidence?.trim()
+        || (proof.claim ?? "").trim().replace(/\s+/g, " ").toLowerCase()
+          !== claim.text.trim().replace(/\s+/g, " ").toLowerCase();
+    });
+    if (unsupported) {
+      setError("Each general claim needs a current cleared proof record with matching claim text and evidence.");
+      setBusy(null);
+      return;
+    }
     const claims: Json = [
       ...form.retainedClaims,
-      ...lines(form.claims).map((text) => ({ kind: "general", text })),
+      ...generalClaims.map((claim) => ({ kind: "general", text: claim.text.trim(), proof_asset_id: claim.proofAssetId })),
     ];
     const bonuses = lines(form.bonuses).map((row) => row.split("|").map((part) => part.trim()));
     if (bonuses.length > 5 || bonuses.some((parts) => parts.length < 2 || parts.length > 3
@@ -333,9 +345,31 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
           onChange={(event) => update("deliveryCost", event.target.value)}
           className="mt-1 w-full rounded-lg border border-border bg-background p-2" /></label>
       </div>
-      <label className="block text-sm">General claims, one per line<textarea rows={3} value={form.claims}
-        onChange={(event) => update("claims", event.target.value)}
-        className="mt-1 w-full rounded-lg border border-border bg-background p-2" /></label>
+      <fieldset className="space-y-3 rounded-lg border border-border p-3">
+        <legend className="text-sm font-medium">General claims and supporting proof</legend>
+        <p className="text-xs text-muted-foreground">Each claim must match the cleared proof claim and have recorded evidence. Review the source before saving.</p>
+        {form.generalClaims.map((claim, index) => <div key={index} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+          <label className="text-sm">Claim
+            <input value={claim.text} onChange={(event) => updateClaim(index, "text", event.target.value)}
+              className="mt-1 w-full rounded-lg border border-border bg-background p-2" />
+          </label>
+          <label className="text-sm">Cleared proof
+            <select value={claim.proofAssetId} onChange={(event) => updateClaim(index, "proofAssetId", event.target.value)}
+              className="mt-1 w-full rounded-lg border border-border bg-background p-2">
+              <option value="">Select proof</option>
+              {proofs.filter((proof) => proof.usage_rights === "approved" && Boolean(proof.evidence?.trim())
+                && (proof.expires_on === null || proof.expires_on >= new Date().toISOString().slice(0, 10)))
+                .map((proof) => <option key={proof.id} value={proof.id}>{proof.title}: {proof.claim}</option>)}
+            </select>
+          </label>
+          <button type="button" onClick={() => { setForm((prior) => ({ ...prior,
+            generalClaims: prior.generalClaims.filter((_, item) => item !== index) })); setDraftKey(crypto.randomUUID()); }}
+            className="self-end rounded-lg border border-border px-3 py-2 text-sm">Remove</button>
+        </div>)}
+        <button type="button" onClick={() => { setForm((prior) => ({ ...prior,
+          generalClaims: [...prior.generalClaims, { text: "", proofAssetId: "" }] })); setDraftKey(crypto.randomUUID()); }}
+          className="rounded-lg border border-border px-3 py-2 text-sm">Add claim</button>
+      </fieldset>
       {form.retainedClaims.length > 0 && <p className="text-xs text-muted-foreground">
         {form.retainedClaims.length} quantified claim(s) and their proof links will carry into this revision.
       </p>}

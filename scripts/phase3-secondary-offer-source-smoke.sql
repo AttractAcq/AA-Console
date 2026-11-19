@@ -83,6 +83,25 @@ begin
   select id into rights_id from public.proof_rights_requests_v6
     where canonical_request_id=rights_request;
   perform public.approve_proof_rights_v6(rights_id,rights_request);
+  begin
+    perform public.create_service_offer_version_v9(offer.id,o.client_id,
+      'New secondary offer','Homeowners with unused garages','A garage ready for training',
+      array['Insulation'],array['Gym equipment'],null,null,null,
+      jsonb_build_array(jsonb_build_object('kind','general',
+        'text','Completed within the agreed period')),
+      equation,'missing-general-proof');
+    raise exception 'A general claim without proof entered a structured offer';
+  exception when invalid_parameter_value then null; end;
+  unsupported_version := public.create_service_offer_version_v9(offer.id,o.client_id,
+    'New secondary offer','Homeowners with unused garages','A garage ready for training',
+    array['Insulation'],array['Gym equipment'],null,null,null,
+    jsonb_build_array(jsonb_build_object('kind','general',
+      'text','Completed within the agreed period','proof_asset_id',claim_proof.id)),
+    equation,'unsupported-general-offer-version');
+  select id into unsupported_request_id from public.approval_requests_v6
+    where source_kind='service_offer' and source_id=unsupported_version.id::text;
+  if public.service_offer_source_state_v6(unsupported_request_id)<>'source_held' then
+    raise exception 'Mismatched general proof claim reached offer review'; end if;
   unsupported_version := public.create_service_offer_version_v9(offer.id,o.client_id,
     'New secondary offer','Homeowners with unused garages','A garage ready for training',
     array['Insulation'],array['Gym equipment'],null,null,null,

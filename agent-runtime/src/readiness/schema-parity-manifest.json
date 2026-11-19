@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "70199033205a5d7a8774c85b857b66236785baf03952ce332d2263e4b514a168",
-  "generatedTypesSha256": "1405f01d244c812332bc16f73ff5d394ad96d37cae9b45af6f6a9e2e8f0231e7",
-  "generatedSchemaBodySha256": "a42173b217908b2d96e2d7241aba9153fdf504c574bcc78ac762100fffbbcf54",
+  "migrationSourceDigest": "eb737151d0e2905d1393cf4b105d312ca64e9ece64afde464b141b189bc15459",
+  "generatedTypesSha256": "5e2e869342ea6543b1e7720ee7b8c077fa2772c3b04d3bb8226addce2484fb9d",
+  "generatedSchemaBodySha256": "3b32cff7aa9444e0f5ac44032292625ea7c28d13dead800e7ef93a3fbe8675cc",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4691,8 +4691,8 @@
       "version": "20261124052800",
       "name": "653_offer_value_equation_versions",
       "filename": "20261124052800_653_offer_value_equation_versions.sql",
-      "sha256": "daca2cd4eb3f6db503d5f5433c0e9f0504d4e7c7c3932d15abf21d55ebabbe70",
-      "trimmedMd5": "46382f3a50f4e086a87fb372317514ce"
+      "sha256": "e9e1772f4d5e8d318f78123dcfb21405ba25623bf5183a9caf9c1421f247ba46",
+      "trimmedMd5": "152c3213e8ec4a58069ea9b072543373"
     },
     {
       "version": "20261124052900",
@@ -4712,8 +4712,8 @@
       "version": "20261124053100",
       "name": "656_offer_quantified_claim_support",
       "filename": "20261124053100_656_offer_quantified_claim_support.sql",
-      "sha256": "6b28c25f6afefc45eb4c1d5d5a2108024ba027e6b5628d662d779be797c5d67d",
-      "trimmedMd5": "d36edf48b130cffe4e598b9e9ef49102"
+      "sha256": "7555669acc7f3ed89d46ca4c7294b104fcae7e8893635044f1faa730968c54ba",
+      "trimmedMd5": "bf5087393d486c63d2ca5de86655d433"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

@@ -170,6 +170,34 @@ describe("the source-first Build path", () => {
     }));
   });
 
+  it("requires cleared matching proof for a general claim in a new offer version", async () => {
+    const proofId = "11111111-1111-4111-8111-111111111111";
+    database({ offers: [offer()], proofs: [{ id: proofId, title: "Garage handover",
+      claim: "Completed within the agreed period", evidence: "Signed handover note",
+      usage_rights: "approved", expires_on: null }] });
+    show("build", "/?tab=build&offer=offer-1");
+    await screen.findByRole("heading", { name: "New offer version" });
+    for (const name of ["Audience", "Offer promise", "Dream outcome",
+      "How this offer strengthens the outcome", "Perceived likelihood of achievement",
+      "Proof or mechanism that raises likelihood", "Time delay",
+      "Steps that reduce delay, one per line", "Effort and sacrifice",
+      "Steps that reduce effort, one per line"]) {
+      await userEvent.type(screen.getByRole("textbox", { name }), "Recorded plan");
+    }
+    await userEvent.click(screen.getByRole("button", { name: "Add claim" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Claim" }), "Unrelated claim");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Cleared proof" }), proofId);
+    await userEvent.click(screen.getByRole("button", { name: "Save draft version" }));
+    expect(await screen.findByText(/Each general claim needs a current cleared proof record/)).toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalledWith("create_service_offer_version_v9", expect.anything());
+    await userEvent.clear(screen.getByRole("textbox", { name: "Claim" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Claim" }), "Completed within the agreed period");
+    await userEvent.click(screen.getByRole("button", { name: "Save draft version" }));
+    expect(rpc).toHaveBeenCalledWith("create_service_offer_version_v9", expect.objectContaining({
+      p_claims: [{ kind: "general", text: "Completed within the agreed period", proof_asset_id: proofId }],
+    }));
+  });
+
   it("keeps versions for another offer out of the selected Build editor", async () => {
     database({
       offers: [offer(), offer({ id: "offer-2", service_name: "Roof repair" })],

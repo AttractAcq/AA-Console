@@ -1,9 +1,9 @@
--- New structured offers may cite a quantified result only when the cleared
+-- New structured offers may cite a claim only when the cleared
 -- proof actually states that claim and records evidence for it. Legacy offer
 -- versions retain their existing rights-only gate and historical decisions.
 begin;
 
-create function public.offer_quantified_claims_current_v11(p_version_id uuid)
+create function public.offer_claims_supported_v11(p_version_id uuid)
 returns boolean language plpgsql stable security definer
 set search_path=pg_catalog,public set timezone='UTC' as $$
 declare v public.service_offer_versions%rowtype; v_claim jsonb;
@@ -11,7 +11,7 @@ begin
   select * into v from public.service_offer_versions where id=p_version_id;
   if not found then return false; end if;
   for v_claim in select value from jsonb_array_elements(v.claims) loop
-    if v_claim->>'kind'='quantified' and (
+    if v_claim->>'kind' in ('general','quantified') and (
       coalesce(v_claim->>'proof_asset_id','') !~*
         '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       or not exists(select 1 from public.client_proof_assets proof
@@ -25,7 +25,7 @@ begin
   end loop;
   return true;
 end $$;
-revoke all on function public.offer_quantified_claims_current_v11(uuid)
+revoke all on function public.offer_claims_supported_v11(uuid)
   from public,anon,authenticated,service_role;
 
 -- Keep the Inbox blocker and the AAL2 signoff transaction on the same rule.
@@ -73,7 +73,7 @@ begin
   if exists(select 1 from public.service_offer_signoffs signed
     where signed.offer_version_id=v.id) then return 'source_decided'; end if;
   if v.value_equation is not null then
-    if not public.offer_quantified_claims_current_v11(v.id) then return 'source_held'; end if;
+    if not public.offer_claims_supported_v11(v.id) then return 'source_held'; end if;
   else
     for v_claim in select value from jsonb_array_elements(v.claims) loop
       if v_claim->>'kind'='quantified' and
@@ -98,7 +98,7 @@ begin
   if new.offer_version_id is null then return new; end if;
   select * into v from public.service_offer_versions where id=new.offer_version_id;
   if found and v.value_equation is not null and
-    not public.offer_quantified_claims_current_v11(v.id) then
+    not public.offer_claims_supported_v11(v.id) then
     raise exception 'The offer claim no longer matches current cleared proof.'
       using errcode='23514';
   end if;

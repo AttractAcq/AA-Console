@@ -43872,7 +43872,7 @@ export type Database = {
         Args: { p_sequence_id: string }
         Returns: boolean
       }
-      offer_quantified_claims_current_v11: {
+      offer_claims_supported_v11: {
         Args: { p_version_id: string }
         Returns: boolean
       }
