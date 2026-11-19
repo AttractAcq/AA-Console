@@ -28,6 +28,10 @@ vi.mock("../google-ads/GoogleAdsReadPanel", () => ({
   GoogleAdsReadPanel: ({ clientId, readOnly }: { clientId: string; readOnly: boolean }) =>
     <p>Paid account for {clientId}: {readOnly ? "view only" : "actions"}</p>,
 }));
+vi.mock("./GoogleProfilePerformancePanel", () => ({
+  GoogleProfilePerformancePanel: ({ clientId }: { clientId: string }) =>
+    <p>Performance read for {clientId}</p>,
+}));
 
 import { GoogleProfilePanel } from "./GoogleProfilePanel";
 
@@ -550,10 +554,10 @@ describe("posts and metrics", () => {
     expect(await screen.findByText(/current placement unverified/)).toBeInTheDocument();
   });
 
-  it("says metrics are not ingested rather than showing zeroes", async () => {
+  it("separates Business Profile performance from paid account data", async () => {
     render(<GoogleProfilePanel tab="metrics" />);
-    expect(await screen.findByText(/nothing in this runtime calls yet/)).toBeInTheDocument();
-    expect(screen.getByText(/Rather than show zeroes that look like data/)).toBeInTheDocument();
+    expect(await screen.findByText(/Missing dates and metrics remain unknown/)).toBeInTheDocument();
+    expect(screen.getByText("Performance read for client-1")).toBeInTheDocument();
     expect(screen.getByText("Paid account for client-1: view only")).toBeInTheDocument();
     expect(screen.getByText(/does not measure Business Profile views or actions/)).toBeInTheDocument();
   });

@@ -15451,6 +15451,165 @@ export type Database = {
           },
         ]
       }
+      google_profile_performance_points_v8: {
+        Row: {
+          client_id: string
+          day: string
+          metric: string
+          run_id: string
+          value: number
+        }
+        Insert: {
+          client_id: string
+          day: string
+          metric: string
+          run_id: string
+          value: number
+        }
+        Update: {
+          client_id?: string
+          day?: string
+          metric?: string
+          run_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_profile_performance_points_v8_run_id_client_id_fkey"
+            columns: ["run_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_profile_performance_current_v8"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_points_v8_run_id_client_id_fkey"
+            columns: ["run_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_profile_performance_runs_v8"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
+      google_profile_performance_runs_v8: {
+        Row: {
+          client_id: string
+          credential_secret_id: string
+          fetched_at: string
+          from_date: string
+          id: string
+          integration_id: string
+          job_id: string
+          location_id: string
+          location_ref: string
+          observed_metrics: string[]
+          through_date: string
+        }
+        Insert: {
+          client_id: string
+          credential_secret_id: string
+          fetched_at?: string
+          from_date: string
+          id?: string
+          integration_id: string
+          job_id: string
+          location_id: string
+          location_ref: string
+          observed_metrics: string[]
+          through_date: string
+        }
+        Update: {
+          client_id?: string
+          credential_secret_id?: string
+          fetched_at?: string
+          from_date?: string
+          id?: string
+          integration_id?: string
+          job_id?: string
+          location_id?: string
+          location_ref?: string
+          observed_metrics?: string[]
+          through_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "client_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integration_health"
+            referencedColumns: ["integration_id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_location_id_client_id_fkey"
+            columns: ["location_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_google_locations"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_location_id_client_id_fkey"
+            columns: ["location_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_profile_due"
+            referencedColumns: ["location_id", "client_id"]
+          },
+        ]
+      }
       google_profile_reconciliation_checks_v6: {
         Row: {
           attempt_id: string
@@ -33419,6 +33578,100 @@ export type Database = {
           },
         ]
       }
+      google_profile_performance_current_v8: {
+        Row: {
+          client_id: string | null
+          credential_secret_id: string | null
+          fetched_at: string | null
+          from_date: string | null
+          id: string | null
+          integration_id: string | null
+          job_id: string | null
+          location_id: string | null
+          location_ref: string | null
+          observed_metrics: string[] | null
+          through_date: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "client_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integration_health"
+            referencedColumns: ["integration_id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_location_id_client_id_fkey"
+            columns: ["location_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_google_locations"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_performance_runs_v8_location_id_client_id_fkey"
+            columns: ["location_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_profile_due"
+            referencedColumns: ["location_id", "client_id"]
+          },
+        ]
+      }
       google_reply_execution_overview_v6: {
         Row: {
           approval_request_id: string | null
@@ -43323,6 +43576,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      record_google_profile_performance_read_v8: {
+        Args: {
+          p_client_id: string
+          p_credential_secret_id: string
+          p_from_date: string
+          p_integration_id: string
+          p_job_id: string
+          p_location_id: string
+          p_location_ref: string
+          p_observed_metrics: string[]
+          p_points: Json
+          p_through_date: string
+        }
+        Returns: string
+      }
       record_google_profile_reconciliation_v6: {
         Args: {
           p_attempt_id: string
@@ -44189,6 +44457,10 @@ export type Database = {
       request_global_engine_activation_v6: { Args: never; Returns: string }
       request_global_video_owner_v6: {
         Args: { p_user_id: string }
+        Returns: string
+      }
+      request_google_profile_performance_read_v8: {
+        Args: { p_location_id: string }
         Returns: string
       }
       request_google_profile_reconciliation_v6: {

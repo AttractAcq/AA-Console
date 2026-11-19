@@ -11,6 +11,7 @@ import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
 import { PROFILE_FIELD_PATCH_HOLD } from "../../../agent-runtime/src/profiles/prewrite-gate.js";
 import { GoogleAdsReadPanel } from "../google-ads/GoogleAdsReadPanel";
+import { GoogleProfilePerformancePanel } from "./GoogleProfilePerformancePanel";
 import { fetchProofProviderReads, type ProofProviderRead } from "../../lib/proofDistribution";
 
 type Location = Database["public"]["Tables"]["client_google_locations"]["Row"];
@@ -609,13 +610,12 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="font-semibold">Business Profile metrics</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              Views, searches and actions come from the Business Profile performance API, which
-              nothing in this runtime calls yet. Rather than show zeroes that look like data, this
-              says so: the ingest is the next slice, and it needs the same{" "}
-              <code className="text-xs">google_business</code> credential the rest of this page is
-              waiting on.
+              Daily impressions and actions come from a separate Business Profile performance read.
+              Missing dates and metrics remain unknown. This requires a verified location and a
+              current <code className="text-xs">google_business</code> credential.
             </p>
           </div>
+          <GoogleProfilePerformancePanel clientId={clientId} locations={locations} />
           <div className="space-y-2">
             <h3 className="font-semibold">Paid Google activity</h3>
             <p className="text-sm text-muted-foreground">

@@ -55,6 +55,7 @@ import { runGoogleReplyReconciliationJob } from "../google-profile/reply-reconci
 import { runGoogleAdsSheetJob } from "../agents/google_ads_sheet/index.js";
 import { runGoogleSearchCopyJob } from "../agents/google_search_copy/index.js";
 import { runGoogleAdsReadJob } from "../agents/google_ads_read/index.js";
+import { runGoogleProfileMetricsReadJob } from "../agents/google_profile_metrics_read/index.js";
 import { runMetaAdsReadJob } from "../agents/meta_ads_read/index.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
 import { runClientApprovalDispatchJob } from "../agents/client_approval_dispatch/index.js";
@@ -221,6 +222,7 @@ const RUNNERS: Record<string, JobRunner> = {
   google_ads_sheet: runGoogleAdsSheetJob,
   google_search_copy: runGoogleSearchCopyJob,
   google_ads_read: runGoogleAdsReadJob,
+  google_profile_metrics_read: runGoogleProfileMetricsReadJob,
   meta_ads_read: runMetaAdsReadJob,
   // outcome until that product decision is made.
 };

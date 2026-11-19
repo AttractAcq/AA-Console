@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "7149c713c7232b40fd4001309e836d633cfb4e44234060371b3da3c9c06268b3",
-  "generatedTypesSha256": "c15ee31993eea4de0e705e01eb2e982be5f13854dfa66a970f789b3b521a0a79",
-  "generatedSchemaBodySha256": "bba19f6ca2fb7ba92371fc1b4836c14a64c02a333444e113648d1e5ff01a0ef2",
+  "migrationSourceDigest": "73ade0f39f3f7c4f141bcab9817cdfd9cf28f8429c77c58c2fd22e5ae4a4c957",
+  "generatedTypesSha256": "d916b52bf4537afb34723c61d1e3b88ccdf062a52a5f79026d3530fc5f2d5764",
+  "generatedSchemaBodySha256": "9643f748d346e3365d2cb1c8238c81c47f6597515585c79f29bc93e7dcaf7241",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4294,6 +4294,13 @@
       "filename": "20261124043100_596_meta_profile_presence_readback.sql",
       "sha256": "d1eeeebe905899d8aa01cf678b6c354f8766595c5130553992aca55eed1fa2ca",
       "trimmedMd5": "41dfe806be80d1159a2adce3c514e464"
+    },
+    {
+      "version": "20261124043200",
+      "name": "597_google_profile_performance_read",
+      "filename": "20261124043200_597_google_profile_performance_read.sql",
+      "sha256": "56f58efe5a91f479ca4827a453b27bd2b92c5007ad12b7e0baab8d7bf58aa8fd",
+      "trimmedMd5": "86a722022c15e1463b8e94c193c14674"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
