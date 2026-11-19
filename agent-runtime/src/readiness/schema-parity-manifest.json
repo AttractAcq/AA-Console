@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "acd0c1546a7690090f720bf36f5f93f7f7b160bee12e3392a9bd4ad4cff284b7",
+  "migrationSourceDigest": "e4cbd95163bd9257926cbbacea59e28b2dc1de8c2a0669fe0b3117f627be2135",
   "generatedTypesSha256": "240dad902b5c1a48903bdb3c5da6e464bca11f15d84fc07a668741848f9e70f4",
   "generatedSchemaBodySha256": "f35c2315106d94f453bd484ee4c929b802338301eb4f8827c326e443c9751cda",
   "localMigrations": [
@@ -4560,6 +4560,13 @@
       "filename": "20261124050900_634_historical_campaign_lead_evidence.sql",
       "sha256": "5f85e4da82ba3b7b4dabf8f46c2ab09827c47baa4cc7104240406689bac2dc2c",
       "trimmedMd5": "1246e96f2a30a45b902970128bc995cb"
+    },
+    {
+      "version": "20261124051000",
+      "name": "635_archived_delivery_lineage_sources",
+      "filename": "20261124051000_635_archived_delivery_lineage_sources.sql",
+      "sha256": "2db250bb46b85210f64b2988c88d57f1ff7e010b5bcb51c3bf976a4d9aa8138b",
+      "trimmedMd5": "783098488e610b621bc819bce1431d76"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
