@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { Button } from "../../components/Button";
 import { CollapsiblePanel } from "../../components/CollapsiblePanel";
 import { EmptyState } from "../../components/EmptyState";
@@ -40,6 +40,8 @@ const CARDS: Array<{ key: string; label: string; hero?: boolean }> = [
   { key: "main_offer", label: "Main Offer" },
   { key: "competitors", label: "Competitors" },
   { key: "proof_testimonials", label: "Proof / Testimonials" },
+  { key: "brand_voice", label: "Brand Voice" },
+  { key: "sales_process", label: "Sales Process" },
 ];
 
 type ContextRow = Record<string, string | null>;
@@ -56,6 +58,8 @@ export function BusinessContextPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [row, setRow] = useState<ContextRow | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [savedKey, setSavedKey] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) return;
@@ -86,6 +90,7 @@ export function BusinessContextPanel() {
   return (
     <div>
       <OnboardingSource what="Business context" />
+      {savedKey && <p role="status" className="mb-3 text-sm text-brand-strong">Saved {CARDS.find((card) => card.key === savedKey)?.label}.</p>}
       <div className="mb-4 flex justify-end">
         <Button icon={Plus} onClick={() => setInputOpen(true)}>
           Business Input
@@ -107,11 +112,38 @@ export function BusinessContextPanel() {
                 ) : (
                   <EmptyState label={label} minHeight={hero ? 100 : 80} />
                 )}
+                <div className="mt-3 flex justify-end">
+                  <button type="button" onClick={() => { setSavedKey(null); setEditingKey(key); }}
+                    className="flex items-center gap-1.5 rounded text-xs font-medium text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                    Edit {label}
+                  </button>
+                </div>
               </CollapsiblePanel>
             );
           })}
         </div>
       </div>
+
+      <FormModal
+        open={editingKey !== null}
+        onClose={() => setEditingKey(null)}
+        title={`Edit ${CARDS.find((card) => card.key === editingKey)?.label ?? "business context"}`}
+        intro="Save this field to update Business Context. Existing campaign input snapshots keep the version they used."
+        fields={FIELDS.filter((field) => field.name === editingKey)}
+        initialValues={editingKey ? { [editingKey]: row?.[editingKey] ?? "" } : {}}
+        onSubmit={async (values) => {
+          if (!clientId || !editingKey) throw new Error("No business field selected.");
+          const value = String(values[editingKey] ?? "").trim();
+          const { error } = await supabase.from("client_business_context")
+            .upsert({ client_id: clientId, [editingKey]: value || null }, { onConflict: "client_id" });
+          if (error) throw error;
+        }}
+        onSaved={() => {
+          setSavedKey(editingKey);
+          void refresh();
+        }}
+      />
 
       <FormModal
         open={inputOpen}
