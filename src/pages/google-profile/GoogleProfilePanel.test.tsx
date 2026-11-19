@@ -67,7 +67,7 @@ function database(options: {
   locations?: unknown[]; due?: unknown[]; reviews?: unknown[];
   replies?: unknown[]; replyOutcomes?: unknown[]; replyJobs?: unknown[];
   placements?: unknown[]; changes?: unknown[]; profileCards?: unknown[];
-  profileOutcomes?: unknown[]; profileJobs?: unknown[];
+  profileOutcomes?: unknown[]; profileJobs?: unknown[]; providerReads?: unknown[];
 } = {}) {
   from.mockImplementation((table: string) => {
     const payload = () => {
@@ -81,6 +81,7 @@ function database(options: {
         case "google_review_replies": return options.replies ?? [];
         case "google_reply_execution_overview_v6": return options.replyOutcomes ?? [];
         case "agent_jobs": return options.replyJobs ?? [];
+        case "proof_placement_provider_read_latest_v8": return options.providerReads ?? [];
         default: return options.placements ?? [];
       }
     };
@@ -521,6 +522,32 @@ describe("posts and metrics", () => {
     // No way to post from here: that would be two things able to post to one
     // profile.
     expect(screen.queryByRole("button", { name: /Post/i })).not.toBeInTheDocument();
+  });
+
+  it("separates a placement from an exact provider read and flags stale observations", async () => {
+    database({
+      placements: [{ id: "pl-1", client_id: "client-1", status: "placed",
+        external_id: "accounts/a/locations/l/localPosts/p", external_url: null,
+        payload_hash: "a".repeat(64), attempts: 1, placed_at: "2026-11-19T08:00:00Z",
+        created_at: "2026-11-19T07:00:00Z" }],
+      providerReads: [{ placement_id: "pl-1", external_id: "accounts/a/locations/l/localPosts/p",
+        payload_hash: "a".repeat(64), result: "live_exact_text",
+        checked_at: "2026-11-19T09:00:00Z" }],
+    });
+    const view = render(<GoogleProfilePanel tab="posts" />);
+    expect(await screen.findByText(/Provider GET: live exact text/)).toBeInTheDocument();
+    database({
+      placements: [{ id: "pl-1", client_id: "client-1", status: "placed",
+        external_id: "accounts/a/locations/l/localPosts/p", external_url: null,
+        payload_hash: "b".repeat(64), attempts: 1, placed_at: "2026-11-19T08:00:00Z",
+        created_at: "2026-11-19T07:00:00Z" }],
+      providerReads: [{ placement_id: "pl-1", external_id: "accounts/a/locations/l/localPosts/p",
+        payload_hash: "a".repeat(64), result: "live_exact_text",
+        checked_at: "2026-11-19T09:00:00Z" }],
+    });
+    view.unmount();
+    render(<GoogleProfilePanel tab="posts" />);
+    expect(await screen.findByText(/current placement unverified/)).toBeInTheDocument();
   });
 
   it("says metrics are not ingested rather than showing zeroes", async () => {
