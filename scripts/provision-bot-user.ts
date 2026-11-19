@@ -4,6 +4,8 @@ import { pathToFileURL } from "node:url";
 // Service-role provisioner for one Console bot login.
 // Does not use create_console_user. Do not run against staging or production
 // without a separate CLEAR. This file never writes the password to disk.
+// disable bans the Auth user, revokes bot sessions, and demotes the profile.
+// It does not delete the user: a lead-magnet decider cannot be deleted.
 
 export const BOT_KEYS = [
   "bot-cos",
@@ -40,7 +42,21 @@ export const CONFIRM = {
   provision: "create-bot-user",
   reset: "reset-bot-password",
   unenroll: "unenroll-bot-mfa",
+  disable: "disable-bot-user",
 } as const;
+
+// GoTrue's documented 100-year ban. Re-applying it extends banned_until from now.
+export const BOT_BAN_DURATION = "876000h";
+// admin | employee | client. employee is the non-admin staff role.
+export const DISABLED_BOT_ROLE = "employee" as const;
+
+export function maintenanceDryRun(
+  confirmValue: string | undefined,
+  expected: string,
+  forcedDryRun: boolean,
+): boolean {
+  return forcedDryRun || confirmValue !== expected;
+}
 
 export type ProfileRow = {
   id: string;
@@ -69,7 +85,7 @@ export type BotProvisionClient = {
       }>;
       updateUserById: (
         id: string,
-        attributes: { password: string },
+        attributes: { password: string } | { ban_duration: string },
       ) => Promise<{ data: { user: AuthUser | null } | null; error: AuthError | null }>;
       mfa: {
         listFactors: (params: { userId: string }) => Promise<{
@@ -97,6 +113,9 @@ export type BotProvisionClient = {
       is_bot: true;
       bot_key: string;
     }) => Promise<{ error: AuthError | null }>;
+    update: (row: { role: typeof DISABLED_BOT_ROLE }) => {
+      eq: (column: "id", value: string) => Promise<{ error: AuthError | null }>;
+    };
   };
   rpc: (
     fn: "revoke_bot_sessions",
@@ -246,7 +265,11 @@ async function requireBotAccount(client: BotProvisionClient, botKeyInput: string
   if (!profile || profile.is_bot !== true || profile.bot_key !== botKey || (profileEmail !== "" && profileEmail !== email)) {
     throw new ProvisionError(`Refusing ${email}: the profile is not bot ${botKey}. Nothing was changed.`);
   }
-  return { botKey, email, userId: user.id };
+  return { botKey, email, userId: user.id, role: profile.role };
+}
+
+function publishedIdentity(account: { botKey: BotKey; email: string; userId: string }) {
+  return { botKey: account.botKey, email: account.email, userId: account.userId };
 }
 
 export async function resetBotPassword(
@@ -254,7 +277,8 @@ export async function resetBotPassword(
   input: { botKey: string; password: string; dryRun?: boolean },
 ): Promise<{ status: "reset" | "dry_run"; botKey: BotKey; email: string; userId: string }> {
   const account = await requireBotAccount(client, input.botKey);
-  if (input.dryRun) return { status: "dry_run", ...account };
+  const identity = publishedIdentity(account);
+  if (input.dryRun) return { status: "dry_run", ...identity };
   if (input.password.length < 16) {
     throw new ProvisionError("password must be at least 16 characters");
   }
@@ -266,7 +290,7 @@ export async function resetBotPassword(
       `Password was changed but sessions were not revoked: ${scrub(revoked.error.message, input.password)}`,
     );
   }
-  return { status: "reset", ...account };
+  return { status: "reset", ...identity };
 }
 
 export async function unenrollBotMfa(
@@ -274,10 +298,11 @@ export async function unenrollBotMfa(
   input: { botKey: string; dryRun?: boolean },
 ): Promise<{ status: "unenrolled" | "dry_run"; botKey: BotKey; email: string; userId: string; factorIds: string[] }> {
   const account = await requireBotAccount(client, input.botKey);
+  const identity = publishedIdentity(account);
   const listed = await client.auth.admin.mfa.listFactors({ userId: account.userId });
   if (listed.error) throw new ProvisionError(listed.error.message);
   const factorIds = (listed.data?.factors ?? []).map((factor) => factor.id);
-  if (input.dryRun) return { status: "dry_run", ...account, factorIds };
+  if (input.dryRun) return { status: "dry_run", ...identity, factorIds };
   for (const id of factorIds) {
     const removed = await client.auth.admin.mfa.deleteFactor({ id, userId: account.userId });
     if (removed.error) {
@@ -288,7 +313,53 @@ export async function unenrollBotMfa(
   if (revoked.error) {
     throw new ProvisionError(`MFA factors were deleted but sessions were not revoked: ${revoked.error.message}`);
   }
-  return { status: "unenrolled", ...account, factorIds };
+  return { status: "unenrolled", ...identity, factorIds };
+}
+
+export async function disableBotUser(
+  client: BotProvisionClient,
+  input: { botKey: string; dryRun?: boolean },
+): Promise<{
+  status: "disabled" | "dry_run";
+  botKey: BotKey;
+  email: string;
+  userId: string;
+  previousRole: string;
+  role: typeof DISABLED_BOT_ROLE;
+  banDuration: typeof BOT_BAN_DURATION;
+}> {
+  const account = await requireBotAccount(client, input.botKey);
+  const result = {
+    botKey: account.botKey,
+    email: account.email,
+    userId: account.userId,
+    previousRole: account.role,
+    role: DISABLED_BOT_ROLE,
+    banDuration: BOT_BAN_DURATION,
+  };
+  if (input.dryRun) return { status: "dry_run", ...result };
+
+  const banned = await client.auth.admin.updateUserById(account.userId, {
+    ban_duration: BOT_BAN_DURATION,
+  });
+  if (banned.error) throw new ProvisionError(banned.error.message);
+
+  const revoked = await client.rpc("revoke_bot_sessions", { p_user_id: account.userId });
+  if (revoked.error) {
+    throw new ProvisionError(
+      `Auth user was banned but sessions were not revoked: ${revoked.error.message}`,
+    );
+  }
+
+  const updated = await client.from("profiles")
+    .update({ role: DISABLED_BOT_ROLE })
+    .eq("id", account.userId);
+  if (updated.error) {
+    throw new ProvisionError(
+      `Auth user was banned and sessions were revoked, but the profile role was not changed: ${updated.error.message}`,
+    );
+  }
+  return { status: "disabled", ...result };
 }
 
 async function readPassword(): Promise<string> {
@@ -311,9 +382,14 @@ function arg(name: string): string {
   return value;
 }
 
-function commandName(): "provision" | "reset-password" | "unenroll-mfa" {
+function commandName(): "provision" | "reset-password" | "unenroll-mfa" | "disable" {
   const first = process.argv[2];
-  if (first === "reset-password" || first === "unenroll-mfa" || first === "provision") return first;
+  if (
+    first === "reset-password"
+    || first === "unenroll-mfa"
+    || first === "disable"
+    || first === "provision"
+  ) return first;
   return "provision";
 }
 
@@ -350,17 +426,35 @@ async function main(): Promise<void> {
   const botKey = arg("--bot-key");
   const command = commandName();
   const forcedDryRun = process.argv.includes("--dry-run");
+  if (command === "disable") {
+    const dryRun = maintenanceDryRun(
+      process.env.BOT_DISABLE_CONFIRM,
+      CONFIRM.disable,
+      forcedDryRun,
+    );
+    const result = await disableBotUser(client, { botKey, dryRun });
+    process.stdout.write(
+      `${result.status} ${result.botKey} ${result.email} ${result.userId} role=${result.previousRole}->${result.role} ban=${result.banDuration}\n`,
+    );
+    return;
+  }
   if (command === "reset-password") {
-    const confirmed = process.env.BOT_RESET_CONFIRM === CONFIRM.reset;
-    const dryRun = forcedDryRun || !confirmed;
+    const dryRun = maintenanceDryRun(
+      process.env.BOT_RESET_CONFIRM,
+      CONFIRM.reset,
+      forcedDryRun,
+    );
     const password = dryRun ? "" : await readPassword();
     const result = await resetBotPassword(client, { botKey, password, dryRun });
     process.stdout.write(`${result.status} ${result.botKey} ${result.email} ${result.userId}\n`);
     return;
   }
   if (command === "unenroll-mfa") {
-    const confirmed = process.env.BOT_MFA_CONFIRM === CONFIRM.unenroll;
-    const dryRun = forcedDryRun || !confirmed;
+    const dryRun = maintenanceDryRun(
+      process.env.BOT_MFA_CONFIRM,
+      CONFIRM.unenroll,
+      forcedDryRun,
+    );
     const result = await unenrollBotMfa(client, { botKey, dryRun });
     process.stdout.write(`${result.status} ${result.botKey} ${result.email} ${result.userId} factors=${result.factorIds.length}\n`);
     return;
