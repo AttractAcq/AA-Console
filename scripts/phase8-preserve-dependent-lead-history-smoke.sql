@@ -127,8 +127,28 @@ begin
       'wrong-client-user','c6360000-0000-4000-8000-000000000001');
   exception when foreign_key_violation then refused:=true; end;
   if not refused then raise exception 'Cross-client lead reference succeeded'; end if;
+  refused:=false;
+  begin
+    update public.client_appointments set status='booked'
+    where id='d6360000-0000-4000-8000-000000000001';
+  exception when foreign_key_violation then refused:=true; end;
+  if not refused then raise exception 'Archived appointment was rebooked'; end if;
+  refused:=false;
+  begin
+    update public.dm_conversations set status='open'
+    where id='f6360000-0000-4000-8000-000000000001';
+  exception when foreign_key_violation then refused:=true; end;
+  if not refused then raise exception 'Archived DM conversation was reopened'; end if;
+  if (select count(*) from pg_trigger
+      where tgfoid='public.guard_archived_lead_reactivation_v11()'::regprocedure
+        and not tgisinternal)<>6 then
+    raise exception 'Dependent status reactivation guards missing'; end if;
 end $archived$;
 select public.recover_lead('c6360000-0000-4000-8000-000000000001');
+update public.client_appointments set status='booked'
+where id='d6360000-0000-4000-8000-000000000001';
+update public.dm_conversations set status='open'
+where id='f6360000-0000-4000-8000-000000000001';
 do $recovered$
 begin
   if not exists (select 1 from public.client_leads
