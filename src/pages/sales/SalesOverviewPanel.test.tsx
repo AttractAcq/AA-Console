@@ -40,6 +40,7 @@ type Conv = Partial<{
   handed_over: boolean;
   outcome: string | null;
   lead_id: string | null;
+  archive_match_lead_id: string | null;
   started_at: string;
 }>;
 
@@ -80,6 +81,7 @@ const conv = (over: Conv = {}): Conv => ({
   handed_over: false,
   outcome: null,
   lead_id: null,
+  archive_match_lead_id: null,
   started_at: new Date().toISOString(),
   ...over,
 });
@@ -224,6 +226,12 @@ describe("sinceLabel", () => {
 });
 
 describe("the overview grid", () => {
+  it("shows archived-contact sales conversations awaiting identity review", async () => {
+    show([built()], [conv({ archive_match_lead_id: "archived-1", lead_id: null })]);
+    expect(await screen.findByText(/1 archived-contact return awaiting identity review/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Open" }));
+    expect(screen.getByText(/archived contact — identity review needed/)).toBeInTheDocument();
+  });
   it("shows a card per agent with what it has actually done", async () => {
     show(
       [built()],

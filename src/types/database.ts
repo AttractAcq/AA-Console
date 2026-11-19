@@ -27262,6 +27262,7 @@ export type Database = {
       }
       sales_agent_conversations: {
         Row: {
+          archive_match_lead_id: string | null
           client_id: string
           contact_email: string | null
           contact_name: string | null
@@ -27279,6 +27280,7 @@ export type Database = {
           transcript: Json
         }
         Insert: {
+          archive_match_lead_id?: string | null
           client_id: string
           contact_email?: string | null
           contact_name?: string | null
@@ -27296,6 +27298,7 @@ export type Database = {
           transcript?: Json
         }
         Update: {
+          archive_match_lead_id?: string | null
           client_id?: string
           contact_email?: string | null
           contact_name?: string | null
@@ -27313,6 +27316,13 @@ export type Database = {
           transcript?: Json
         }
         Relationships: [
+          {
+            foreignKeyName: "sales_agent_conversations_archive_match_identity_fkey_v11"
+            columns: ["archive_match_lead_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
+          },
           {
             foreignKeyName: "sales_agent_conversations_client_id_fkey"
             columns: ["client_id"]
@@ -27349,11 +27359,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "sales_agent_conversations_lead_id_fkey"
-            columns: ["lead_id"]
+            foreignKeyName: "sales_agent_conversations_lead_identity_fkey_v11"
+            columns: ["lead_id", "client_id"]
             isOneToOne: false
             referencedRelation: "lead_identities"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "client_id"]
           },
           {
             foreignKeyName: "sales_agent_conversations_page_id_fkey"

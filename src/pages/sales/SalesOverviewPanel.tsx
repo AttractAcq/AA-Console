@@ -65,6 +65,7 @@ type Conversation = {
   handed_over: boolean;
   outcome: string | null;
   lead_id: string | null;
+  archive_match_lead_id: string | null;
   started_at: string;
 };
 
@@ -115,7 +116,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
       supabase
         .from("sales_agent_conversations")
         .select(
-          "id, sales_agent_id, contact_name, contact_email, contact_phone, qualified, handed_over, outcome, lead_id, started_at",
+          "id, sales_agent_id, contact_name, contact_email, contact_phone, qualified, handed_over, outcome, lead_id, archive_match_lead_id, started_at",
         )
         .eq("client_id", clientId)
         .order("started_at", { ascending: false }),
@@ -260,6 +261,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
           {visibleAgents.map((a) => {
             const mine = conversations.filter((c) => c.sales_agent_id === a.id);
             const captured = mine.filter((c) => c.lead_id).length;
+            const heldReturns = mine.filter((c) => c.archive_match_lead_id && !c.lead_id).length;
             const qualified = mine.filter((c) => c.qualified).length;
             const state = liveStateOf(a, builds[a.id]);
             const questions = a.qualification?.length ?? 0;
@@ -316,6 +318,9 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
                           : "No conversations yet"
                         : `Last conversation ${sinceLabel(mine[0]?.started_at ?? null)}`}
                     </p>
+                    {heldReturns > 0 && <p className="mt-1 text-xs text-foreground">
+                      {heldReturns} archived-contact return{heldReturns === 1 ? "" : "s"} awaiting identity review
+                    </p>}
 
                     <p className="mt-1 text-xs text-muted-foreground">
                       {questions} question{questions === 1 ? "" : "s"} ·{" "}
@@ -656,7 +661,9 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {c.qualified ? "Qualified" : "Not qualified"}
-                          {c.lead_id ? " · became a lead" : " · no lead"}
+                          {c.archive_match_lead_id && !c.lead_id
+                            ? " · archived contact — identity review needed"
+                            : c.lead_id ? " · became a lead" : " · no lead"}
                           {c.handed_over ? " · handed to a person" : ""}
                           {c.contact_email || c.contact_phone
                             ? ` · ${c.contact_email ?? c.contact_phone}`
