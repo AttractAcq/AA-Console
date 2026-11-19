@@ -45616,6 +45616,15 @@ export type Database = {
           reservation_id: string
         }[]
       }
+      resolve_archived_dm_return_v11: {
+        Args: {
+          p_action: string
+          p_conversation_id: string
+          p_expected_hash: string
+          p_reason: string
+        }
+        Returns: string
+      }
       resolve_archived_return_batch_v11: {
         Args: {
           p_action: string

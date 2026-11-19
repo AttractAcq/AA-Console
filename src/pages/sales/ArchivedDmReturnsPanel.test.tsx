@@ -10,20 +10,48 @@ import { ArchivedDmReturnsPanel } from "./ArchivedDmReturnsPanel";
 beforeEach(() => rpc.mockReset());
 
 describe("archived DM returns", () => {
-  it("shows exact retained messages without offering an identity decision or reply", async () => {
+  it("reviews exact retained messages and records a source-bound AAL2 identity decision without a reply", async () => {
     rpc.mockImplementation((name: string) => Promise.resolve(name === "list_archived_dm_returns_v11"
       ? { data: [{ conversation_id: "dm-1", archived_lead_id: "old-1", platform: "instagram",
         display_name: "Returning contact", last_inbound_at: "2026-11-19T12:00:00Z", unread_inbound: 1 }], error: null }
-      : { data: { client_id: "client-1", conversation_id: "dm-1", archived_name: "Archived original",
-        display_name: "Returning contact", platform: "instagram", source_hash: "a".repeat(64),
-        messages: [{ id: "message-1", direction: "inbound", body: "I am back",
-          occurred_at: "2026-11-19T12:00:00Z" }] }, error: null }));
+      : name === "archived_return_batch_review_packet_v11"
+        ? { data: { client_id: "client-1", archived_lead_id: "old-1", source_count: 0, dm_count: 1 }, error: null }
+        : name === "resolve_archived_dm_return_v11"
+          ? { data: "lead-1", error: null }
+          : { data: { client_id: "client-1", conversation_id: "dm-1", archived_lead_id: "old-1",
+            archived_name: "Archived original", display_name: "Returning contact",
+            platform: "instagram", source_hash: "a".repeat(64),
+            messages: [{ id: "message-1", direction: "inbound", body: "I am back",
+              occurred_at: "2026-11-19T12:00:00Z" }] }, error: null }));
     render(<ArchivedDmReturnsPanel clientId="client-1" />);
     await userEvent.click(await screen.findByRole("button", { name: "View exact messages" }));
     expect(await screen.findByRole("dialog", { name: "Archived DM identity review" })).toHaveTextContent("I am back");
-    expect(screen.queryByRole("button", { name: /approve|recover|reply/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /reply/i })).not.toBeInTheDocument();
     expect(rpc).toHaveBeenCalledWith("archived_dm_return_review_packet_v11",
       { p_conversation_id: "dm-1" });
+    await userEvent.click(screen.getByRole("button", { name: "Record AAL2 identity decision" }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Reviewed outcome" }), "recover");
+    await userEvent.type(screen.getByRole("textbox", { name: "Reason for this decision" }),
+      "This is the same continuing relationship");
+    await userEvent.click(screen.getByRole("button", { name: "Record AAL2 decision" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("resolve_archived_dm_return_v11",
+      expect.objectContaining({ p_conversation_id: "dm-1", p_action: "recover",
+        p_expected_hash: "a".repeat(64) })));
+  });
+
+  it("holds the individual decision when another archived-contact door is pending", async () => {
+    rpc.mockImplementation((name: string) => Promise.resolve(name === "list_archived_dm_returns_v11"
+      ? { data: [{ conversation_id: "dm-1", archived_lead_id: "old-1", platform: "facebook",
+        display_name: "Returning contact", last_inbound_at: null, unread_inbound: 2 }], error: null }
+      : name === "archived_return_batch_review_packet_v11"
+        ? { data: { client_id: "client-1", archived_lead_id: "old-1", source_count: 1, dm_count: 1 }, error: null }
+        : { data: { client_id: "client-1", conversation_id: "dm-1", archived_lead_id: "old-1",
+          archived_name: "Archived original", display_name: "Returning contact",
+          platform: "facebook", source_hash: "b".repeat(64), messages: [] }, error: null }));
+    render(<ArchivedDmReturnsPanel clientId="client-1" />);
+    await userEvent.click(await screen.findByRole("button", { name: "View exact messages" }));
+    expect(await screen.findByText(/one coordinated review/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Record AAL2 identity decision" })).not.toBeInTheDocument();
   });
 
   it("discards a late read from the previous client", async () => {
