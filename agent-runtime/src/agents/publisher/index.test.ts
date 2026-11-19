@@ -150,9 +150,11 @@ function database(
               id: "slot-1", client_id: POST.client_id, asset_id: POST.asset_id,
               platform: POST.platform, stage: "scheduled", idea_id: "idea-1",
             },
-            client_ideas: { id: filters.id, client_id: POST.client_id, campaign_id: "campaign-1" },
+            client_ideas: { id: filters.id, client_id: POST.client_id,
+              campaign_id: "campaign-1", acquisition_route: "organic" },
             client_campaigns: {
               id: filters.id, client_id: POST.client_id, acquisition_mode: "organic",
+              runs_organic: true,
             },
           };
           const overrides: Record<string, Record<string, unknown> | null | undefined> = {
@@ -380,6 +382,8 @@ describe("what stops a post before anything is sent", () => {
     ["a paid scheduled post", { routePost: { channel: "paid" } }],
     ["a post without route lineage", { routeSlot: null }],
     ["a slot without a campaign idea", { routeIdea: { campaign_id: null } }],
+    ["a paid idea in a coordinated campaign", { routeIdea: { acquisition_route: "paid" },
+      routeCampaign: { acquisition_mode: "both", runs_organic: true } }],
     ["a paid campaign", { routeCampaign: { acquisition_mode: "paid" } }],
     ["a legacy campaign", { routeCampaign: { acquisition_mode: "legacy" } }],
     ["a mismatched slot asset", { routeSlot: { asset_id: "other-asset" } }],
@@ -402,6 +406,15 @@ describe("what stops a post before anything is sent", () => {
     expect(publish).not.toHaveBeenCalled();
     expect(signCalls).toEqual([]);
     expect(failureFor(rpc, "post-1")).toMatchObject({ p_retryable: true });
+  });
+
+  it("accepts an explicitly organic idea in a coordinated campaign", async () => {
+    const { sb, rpc } = database({ routeCampaign: {
+      acquisition_mode: "both", runs_organic: true,
+    } });
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
+    expect(publish).toHaveBeenCalledOnce();
+    expect(argsOf(rpc, "record_post_published")).toMatchObject({ p_post_id: POST.post_id });
   });
 
   it("rechecks after preparation, before an ordinary provider write", async () => {

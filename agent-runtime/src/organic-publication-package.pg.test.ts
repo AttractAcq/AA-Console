@@ -364,4 +364,49 @@ describe("held exact organic publication package", () => {
     await expect(db.query(`select require_organic_publication_prewrite_v6('${POST}')`))
       .rejects.toThrow(/AAL2 publication approval/);
   });
+
+  it("binds a both-route organic idea to the current organic package and refuses drift", async () => {
+    await db.exec(`
+      alter table client_campaigns add column runs_organic boolean default false;
+      alter table client_ideas add column acquisition_route text;
+      create table campaign_route_packages_v6(
+        id uuid primary key,client_id uuid,campaign_id uuid,route text,
+        version int,plan_fingerprint text);
+      create function public.campaign_plan_fingerprint(public.client_campaigns)
+        returns text language sql stable as $$select 'f'::text$$;
+      update client_campaigns set acquisition_mode='both',paid_platform='meta',
+        runs_organic=true where id='${CAMPAIGN}';
+      update client_ideas set acquisition_route='organic' where id='${IDEA}';
+      insert into campaign_route_packages_v6 values
+        ('88888888-8888-4888-8888-888888888888','${CLIENT}','${CAMPAIGN}',
+          'organic',1,'f');
+      update scheduled_posts set publication_status='scheduled',publish_claimed_at=null
+        where id='${POST}';
+    `);
+    const migration = await readFile(new URL(
+      "../../supabase/migrations/20261124042300_588_organic_publication_route_package.sql",
+      import.meta.url,
+    ), "utf8");
+    await db.exec(migration);
+    const source = await one<{ packet: { route_package_id: string; route_package_version: number } }>(
+      `select organic_publication_source_snapshot_v6('${POST}') as packet`);
+    expect(source.packet).toMatchObject({
+      route_package_id: "88888888-8888-4888-8888-888888888888",
+      route_package_version: 1,
+    });
+    await db.exec(`update client_ideas set acquisition_route='paid' where id='${IDEA}'`);
+    expect((await one<{ packet: unknown }>(
+      `select organic_publication_source_snapshot_v6('${POST}') as packet`)).packet).toBeNull();
+    await db.exec(`update client_ideas set acquisition_route='organic' where id='${IDEA}';
+      update campaign_route_packages_v6 set plan_fingerprint='stale'`);
+    expect((await one<{ packet: unknown }>(
+      `select organic_publication_source_snapshot_v6('${POST}') as packet`)).packet).toBeNull();
+    await db.exec(`update campaign_route_packages_v6 set plan_fingerprint='f';
+      update scheduled_posts set publication_status='publishing',
+        publish_claimed_at=now() where id='${POST}'`);
+    const claimed = await one<{ packet: { route_package_id: string } }>(
+      `select organic_publication_claim_snapshot_v7('${POST}') as packet`);
+    expect(claimed.packet.route_package_id).toBe(source.packet.route_package_id);
+    expect((await db.query("select * from claim_posts_for_publishing(5)")).rows).toHaveLength(0);
+  });
 });
