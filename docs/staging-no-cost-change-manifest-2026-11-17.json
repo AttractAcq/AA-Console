@@ -1,0 +1,1211 @@
+{
+  "schemaVersion": 1,
+  "preparedAt": "2026-11-17T14:42:11.552Z",
+  "sourceCommit": "4c16dd6cb432cfd8db38989e6cc5c7deeacaf0ea",
+  "targetProjectRef": "vmmertwoboqiazcsougw",
+  "baselineHistoryRows": 277,
+  "excludedCanonicalVersions": [
+    "20261025233000",
+    "20261025235000"
+  ],
+  "preservedAlternateVersions": [
+    "20261025240000",
+    "20261025250000"
+  ],
+  "postMigrationHistoryRows": 569,
+  "postMigrationHead": "20261124034600",
+  "phases": [
+    {
+      "name": "staging_260_correction",
+      "files": [
+        {
+          "name": "20261026000000_260_staging_google_reconcile.sql",
+          "sha256": "bae478c14e9731cd97ea150d55b716457877f2f19db3982f3c4e5491a2e91554"
+        }
+      ]
+    },
+    {
+      "name": "migrations_261_272",
+      "files": [
+        {
+          "name": "20261029120000_261_system_readiness_inventory.sql",
+          "sha256": "c317c9788cabf490979e2d6b8e76830b6f2e9c3499ebfbc5583e781e92515032"
+        },
+        {
+          "name": "20261029130000_262_runtime_heartbeat_retention.sql",
+          "sha256": "04f3b9b9bbffbd8f05206f3b3caf9ed7d88b5488a97fa6c8e984e2727a3d2e6c"
+        },
+        {
+          "name": "20261029140000_263_auth_signup_role_hardening.sql",
+          "sha256": "a4eaadaf5a09c3649fc6ee0c948c37f986ba5fdd02c883978a4ca99c6cefad62"
+        },
+        {
+          "name": "20261029150000_264_low_level_transition_isolation.sql",
+          "sha256": "f4c5e23fac1ba49cf1a97763366d8ad75945d484798a86a8ae1dedd827132b39"
+        },
+        {
+          "name": "20261029160000_265_lead_and_media_entitlements.sql",
+          "sha256": "b9c7b21ec2bdecd00b8984f82f242248a53272041e02dbdada6689bbfc74f305"
+        },
+        {
+          "name": "20261029170000_266_commercial_reporting_and_storage_scope.sql",
+          "sha256": "9f0d96ee3d8708846fbd0838ec9ed72f70fbf571ac26d8b2af6db0d6943922d2"
+        },
+        {
+          "name": "20261029180000_267_sales_entitlement_boundary.sql",
+          "sha256": "1b42a2536b212e50e68fb948e1fb15feeb4de1026cdc52638659fd5d7c59cf3a"
+        },
+        {
+          "name": "20261029190000_268_contact_and_conversation_scope.sql",
+          "sha256": "05ca4d1cbb269617b3760e52426519f7590d5a2ee1559b561535f0423c0fd28d"
+        },
+        {
+          "name": "20261029200000_269_authenticated_sales_rpc_scope.sql",
+          "sha256": "ea60bb774a7e8b6c2d6613558eeecdf418031e0cded66f7073c5a09e8845a299"
+        },
+        {
+          "name": "20261029210000_270_default_deny_auth_and_active_staff.sql",
+          "sha256": "30302170417e9a4915d4d3594844bbf75c53c26bc4dd65becb8cab706d7925d0"
+        },
+        {
+          "name": "20261029220000_271_profileless_authenticated_scope.sql",
+          "sha256": "b55c3229fb3a9a14cbaf454c35e1107c98426961b487325fac93e6b71404140c"
+        },
+        {
+          "name": "20261030100000_272_onboarding_step_integrity.sql",
+          "sha256": "c7abc702f5c05de152d4d0c9c4e23373db8261d01b22d5aef9203e7640964eb4"
+        }
+      ]
+    },
+    {
+      "name": "migrations_273_279",
+      "files": [
+        {
+          "name": "20261030110000_273_canonical_approval_ledger.sql",
+          "sha256": "c547896719c8124555d95b857a83ab6b4063ce8f3165c0b86602914420f0e75e"
+        },
+        {
+          "name": "20261030120000_274_campaign_action_inbox_bridge.sql",
+          "sha256": "4757b616ce22067a428d00a4f6ec4f100f69d13e2943466be31093487429c908"
+        },
+        {
+          "name": "20261030130000_275_sales_entitlement_inbox_binding.sql",
+          "sha256": "d795dd294271016b556320a233420473c7fc59fb355433abc99cd36d59e81578"
+        },
+        {
+          "name": "20261030140000_276_recruitment_brief_inbox.sql",
+          "sha256": "6d7d6d30f067e5ac3c247e408cc4292ab115e14334c12c6006d5f0b6bf1b19e1"
+        },
+        {
+          "name": "20261030141000_277_engine_slot_preview_inbox.sql",
+          "sha256": "92d5bdf872fb593172caf03912fc10c91411ee7094634ade73bf6cb9764a190e"
+        },
+        {
+          "name": "20261030150000_278_google_review_reply_inbox.sql",
+          "sha256": "1be9ddadfe8a4504a484049668977f381839194a8b87fba75a96e0957ef14ee0"
+        },
+        {
+          "name": "20261030160000_279_approval_class_coverage.sql",
+          "sha256": "735b1a8a405fc808c5a7361e93c6b7c1261ec6407aa3af7f7a60754a3ac8a2ac"
+        }
+      ]
+    },
+    {
+      "name": "migrations_280_551",
+      "files": [
+        {
+          "name": "20261030170000_280_rule_six_supported_flags.sql",
+          "sha256": "f5269191957505630737cd4b45fbf44d4a2e979331181500bf0ddc4e3ade63eb"
+        },
+        {
+          "name": "20261030180000_281_the_configuration_nobody_can_enter.sql",
+          "sha256": "3d82c86d9f1334aa9c50c325a2122e396fcbd582668ab946557308c9ad94e642"
+        },
+        {
+          "name": "20261030190000_282_the_engines_own_configuration.sql",
+          "sha256": "560cca1b036500083f0e8582ad02d47b9470fd0ac03ebb86e89342967454eda6"
+        },
+        {
+          "name": "20261101000000_283_public_route_quota.sql",
+          "sha256": "e1bb71ef97e832621c5f7e26dc58b8e3188b94240553eb602d0efa4b1998f9c9"
+        },
+        {
+          "name": "20261101010000_284_sales_runtime_budget_reservations.sql",
+          "sha256": "53cffed5ee5f6e093e24010de00aace6662f3de5150f21d1d3ab395a266192ba"
+        },
+        {
+          "name": "20261101020000_285_public_perimeter_admin_status.sql",
+          "sha256": "11c4af5a9a43df974540a2e0724d6314254ba28f1bd3b37ad8b6f386d4fc6721"
+        },
+        {
+          "name": "20261101030000_286_retire_browser_password_creation.sql",
+          "sha256": "d18474623337c48bf1312d7ed857fbb5d12ad5870b33ac4d1ead1e53be7e9361"
+        },
+        {
+          "name": "20261101031000_287_console_invitation_requests.sql",
+          "sha256": "9664aae0b4ceaaa04ba1334918a613e7d966f8f83252fd3d571e9f51497da8c4"
+        },
+        {
+          "name": "20261101032000_288_console_invitation_decision_and_send.sql",
+          "sha256": "069aff006c0dd787bce6e8e044765d63d26536370405756febc9b0cae38b1774"
+        },
+        {
+          "name": "20261101033000_289_console_invitation_acceptance.sql",
+          "sha256": "ea3c599ace3519f6b50fd6f83db41e530d6a40ca895d622bf3018196ae27ab87"
+        },
+        {
+          "name": "20261101040000_290_organic_schedule_route.sql",
+          "sha256": "f1e734dc16ef04b72a1ab6921b2329a7d49272b99ced6fc8d2fed8b270e79dbd"
+        },
+        {
+          "name": "20261101050000_291_production_release_candidate_inbox.sql",
+          "sha256": "59568099d26eecf09b0fdcdfc0d77ec2c40f721f05c83df6218363f7c0273566"
+        },
+        {
+          "name": "20261101060000_292_meta_v6_atomic_job_binding.sql",
+          "sha256": "e64074e004ebc305cfd68d5055897d6cebe41895ea65b65bed35c3e774206c54"
+        },
+        {
+          "name": "20261101070000_293_meta_legacy_producer_containment.sql",
+          "sha256": "e81ed4dce71fcbe13efc99c0db4be96fb6bef1d20bbf6e19c7e098a98698c92c"
+        },
+        {
+          "name": "20261101080000_294_integration_credential_eligibility.sql",
+          "sha256": "832693904f2ef224628f941f5b725db06d63400ddf506a3265ffd6ecf0f49fc8"
+        },
+        {
+          "name": "20261101090000_295_organic_publication_package_boundary.sql",
+          "sha256": "1252a74d1818b90c47d3906bd921553ead19e3a0c84ae3f7c144bac182c8adeb"
+        },
+        {
+          "name": "20261101100000_296_trusted_production_release_decision.sql",
+          "sha256": "177ec5e32852e74daf8fbf9e92a7a6c4606659a63845346fd552bdb2b48de7ca"
+        },
+        {
+          "name": "20261101110000_297_proof_submission_read_scope.sql",
+          "sha256": "cac27a9136fafe30a9b79941547b237fdc127dbc88de5f59ad17228b19dd7937"
+        },
+        {
+          "name": "20261101120000_298_approved_release_proof_refresh.sql",
+          "sha256": "6015269018f36db5bd6b28ff09119ca91acb1bc08171de6c4f0b3a1352a8ff5d"
+        },
+        {
+          "name": "20261101130000_299_current_client_role_entitlement.sql",
+          "sha256": "6a35c77e2d2d9d831114d68820998a42635d59af7918fbbb2088fd275f244d08"
+        },
+        {
+          "name": "20261101140000_300_production_release_merge_lease.sql",
+          "sha256": "fab9ac7ede8edd2ac979df8f8c1d86d9d792c1b46936a4c21daf1cc0a1452812"
+        },
+        {
+          "name": "20261101150000_301_current_employee_role_entitlement.sql",
+          "sha256": "bdf220695c094bab22270a51067a23e22161cfdaab74663538a609fe27586856"
+        },
+        {
+          "name": "20261102000000_302_a_campaign_may_be_paid_organic_or_both.sql",
+          "sha256": "caa3d32b25552f1c7f962717a6936244eb0af5406694ec532620f5a7a620ea37"
+        },
+        {
+          "name": "20261102010000_303_a_main_offer_and_a_secondary_offer.sql",
+          "sha256": "618a53d80ff1a59cf69a1000ce94f42c626d84cda2813c6fb64460b62de8e43d"
+        },
+        {
+          "name": "20261102020000_304_how_many_opportunities_to_look_for.sql",
+          "sha256": "b512a77db032e656cded72d1e469c4b596acbba53c658b9a9e8c9664dbb2b337"
+        },
+        {
+          "name": "20261104000000_305_the_mcp_campaign_writer_learns_the_route_flags.sql",
+          "sha256": "8e2c3bdc7807c722f7f6454a1c0296e992b69a3a6632eeb8fbd06ee5c49acbac"
+        },
+        {
+          "name": "20261104010000_306_an_agent_may_propose_a_score_not_assert_one.sql",
+          "sha256": "b7bf38424b60b4300d7ac16c515aa5339bbb8d8d2145908efd0880bdc01a6f40"
+        },
+        {
+          "name": "20261104020000_307_the_offer_compiler.sql",
+          "sha256": "9f6be92826e26ee4b4eb375fb7f6a291a1f2aca09a9a70f6562c60f8d59981ec"
+        },
+        {
+          "name": "20261105000000_308_a_both_campaign_plans_each_route_s_volume.sql",
+          "sha256": "30ec658fcf47011f3d4f666661dad6de5269ffb1130ecf8f7762b9411f0def29"
+        },
+        {
+          "name": "20261105010000_309_a_plan_is_reviewed_before_the_agents_run.sql",
+          "sha256": "63e4119680ef18f75531926bcb6b9b5bb96f62f62ab7640202174c26dc1dbcf4"
+        },
+        {
+          "name": "20261105020000_310_the_campaign_sweep_is_a_workflow_kind.sql",
+          "sha256": "ad311f1c632a6e0194d58f60769c97940d6fd5d19c464599c7d8757c06394f3a"
+        },
+        {
+          "name": "20261105030000_311_a_clip_with_no_shot_in_it_is_recoverable.sql",
+          "sha256": "81417ba9bc9971ca6e3185cc1a7232c505412921c562509d8ddd25901235281a"
+        },
+        {
+          "name": "20261105040000_312_the_archive_takes_the_remaining_domains.sql",
+          "sha256": "d9aede052cde5d2494ea118e949058dc8fe364c7c2610bdb6770082215fd7d24"
+        },
+        {
+          "name": "20261106000000_313_the_deploy_executor_attests_what_went_live.sql",
+          "sha256": "3a87179a130fdface3ff71309ffc601141a3320bb4a1070dc6500445b2b25e0a"
+        },
+        {
+          "name": "20261111010000_314_offer_studio_new_offer_permission.sql",
+          "sha256": "83f869c0650963f536a766c9696ab5ab85e7da3a8356aab22765f07300899308"
+        },
+        {
+          "name": "20261111020000_315_compile_offer_and_version_atomically.sql",
+          "sha256": "8b904e6c868b9db5559ab0fb30ceaabef48079f3b719b1abd611b49940e18ed1"
+        },
+        {
+          "name": "20261114000000_316_delivery_work_contract.sql",
+          "sha256": "b47412577bd990eb90937e98e6dee8dd1ca554e04dc7abe7c5ac5b8a9535903f"
+        },
+        {
+          "name": "20261114010000_317_delivery_lineage_catalog.sql",
+          "sha256": "63edb57ae391aa0795224d78690b10f3927b60d4c8b3275110793fb70b95b514"
+        },
+        {
+          "name": "20261114020000_318_delivery_lineage_links.sql",
+          "sha256": "2dfd78192d5ff456564686e908fb5d8cbfc850fd34e12a02afe37a774cdd9caf"
+        },
+        {
+          "name": "20261114030000_319_delivery_dependency_invalidation.sql",
+          "sha256": "af53e00facf0ec1c656f750fc88e6f334c102421821dbd476984480ddc23ef06"
+        },
+        {
+          "name": "20261114040000_320_delivery_live_lineage_guards.sql",
+          "sha256": "4811f4986df356c3ddb7bc3d51f38223133a85007a3349793d1a02221a23a341"
+        },
+        {
+          "name": "20261114050000_321_delivery_asset_bytes.sql",
+          "sha256": "6b651322f348f0f2dd644ec81cc2de07b940be5ee6d607d8b18415bb5d5ac23a"
+        },
+        {
+          "name": "20261114060000_322_campaign_route_guard_insert.sql",
+          "sha256": "9249bf9848feffc86334d4a2ed4f0521ebcda99324c7ba887c017a957ae11d5d"
+        },
+        {
+          "name": "20261114070000_323_storage_change_invalidates_creative.sql",
+          "sha256": "6bcfc81335cce5882c7a2c7500637c35ac384d5825d3864dfc807ae3becb98e3"
+        },
+        {
+          "name": "20261115190000_324_bot_console_identity.sql",
+          "sha256": "8677596bdd24077e6d42a82846c93ed3a82cc324610516aa2a6f60bc07446733"
+        },
+        {
+          "name": "20261124000000_325_client_runtime_controls.sql",
+          "sha256": "b058941bde439dfc4b76c0897e5a33d24777f6c294cc5717e05847c71d540629"
+        },
+        {
+          "name": "20261124000100_326_owned_campaign_action_claim.sql",
+          "sha256": "b28349545ffb12913eef19d450fcc9ba5a62185b76351ab26bc9437dac8a51cb"
+        },
+        {
+          "name": "20261124000200_327_client_control_activity.sql",
+          "sha256": "8024ce59bd72d51cd020cdb642497c3f931036db0a59c6c55b7d0c07ae810603"
+        },
+        {
+          "name": "20261124000300_328_service_offer_inbox.sql",
+          "sha256": "c25b2a27dc11ebc717c83ff74334cb64d6b598363296fca85c8f2cb9cb40104b"
+        },
+        {
+          "name": "20261124000400_329_campaign_action_attempt_receipts.sql",
+          "sha256": "d8bdc0e8088b8c1d47ffde9a9252ba077c1e083fabd8af489cd0a5c79705be29"
+        },
+        {
+          "name": "20261124000500_330_attested_campaign_action_switch.sql",
+          "sha256": "5f179420b4eeddc7e2f2209c72ed319af1f3fe4ce0a95eee24d81194938ff5e4"
+        },
+        {
+          "name": "20261124000600_331_campaign_action_prewrite.sql",
+          "sha256": "da510ed14755e14b77902668311718f2f8b94c3a199f453324b128931fca13d2"
+        },
+        {
+          "name": "20261124000700_332_campaign_action_revocation.sql",
+          "sha256": "21a41a01fe742f9aa423b9981277c12c78d0183660cd5c9ecc17cd19f714b77b"
+        },
+        {
+          "name": "20261124000800_333_revoked_campaign_action_due.sql",
+          "sha256": "556d5b1a36556566b7fcaf442101cb3165c1337834f9153dd066a59386adb61b"
+        },
+        {
+          "name": "20261124000900_334_service_offer_signoff_guard.sql",
+          "sha256": "0426df1c6cf34d1f2c1e17c40db46bb798c1b5f84bdbdd969b87f78688dca31f"
+        },
+        {
+          "name": "20261124001000_335_owned_internal_campaign_actions.sql",
+          "sha256": "9a16c67e590850caf4ccbc2962f176adf6b4fd9b57d820b2bf5d22ffad97f374"
+        },
+        {
+          "name": "20261124001100_336_lead_magnet_inbox_source.sql",
+          "sha256": "7df90aae7a7d46c2ca410ea575b9c2a53e4794a0b1bc74ef52cb73e7644fcf69"
+        },
+        {
+          "name": "20261124001200_337_lead_magnet_inbox_view.sql",
+          "sha256": "f7d591b92e8f96fab5d25d9d7e365a7007042a3d45033df95a4ec3a70b17befe"
+        },
+        {
+          "name": "20261124001300_338_lead_magnet_decision_guard.sql",
+          "sha256": "524912e214eb2164709b7ae7c04e0351a56141aea693093aadff26344392c652"
+        },
+        {
+          "name": "20261124001400_339_lead_magnet_due_inbox_gate.sql",
+          "sha256": "588600f9926aa21287460b7568cd3eb90d84bdee60559fe32d19c6290a7c42a2"
+        },
+        {
+          "name": "20261124001500_340_lead_magnet_coverage.sql",
+          "sha256": "305a5dc82d9702cc4ce3e43922860e8dd18d3067106894dbb7b31f36dd234731"
+        },
+        {
+          "name": "20261124001600_341_sales_agent_public_use_source.sql",
+          "sha256": "791d245731f02381b4460dfc3a36eecb5d560870dadf1aa6e5a5afa0cc1f9b2f"
+        },
+        {
+          "name": "20261124001700_342_sales_agent_public_use_inbox_view.sql",
+          "sha256": "046c5ee2946f69e6656c3052fd2c919cb2e41960044534aa19bba7c05b067266"
+        },
+        {
+          "name": "20261124001800_343_sales_agent_public_use_decisions.sql",
+          "sha256": "ecb5a8f619e47ec7ed12d99654a8c158a32e9467ffa7d20ae9383c8e1f62aa57"
+        },
+        {
+          "name": "20261124001900_344_sales_agent_public_use_executor.sql",
+          "sha256": "297e7a79dd3f449cb9f8485c4496a598e2e3ca96c0a26cba963ffbde5b21f57f"
+        },
+        {
+          "name": "20261124002000_345_opportunity_approval_source.sql",
+          "sha256": "e218665cc239ff4acd521fc906e21e2a5c3b02955834a321d747f12cdd4960b7"
+        },
+        {
+          "name": "20261124002100_346_opportunity_approval_inbox_view.sql",
+          "sha256": "668b8154a15222907b7b78e4f0cdbb27d28592cd1dd729abbe665dc48c4fe58c"
+        },
+        {
+          "name": "20261124002200_347_opportunity_approval_decision.sql",
+          "sha256": "54f28f54e775bc71bd90438393d15efd98d36125bb93b33249ad4dca24701701"
+        },
+        {
+          "name": "20261124002300_348_opportunity_approval_campaign_gate.sql",
+          "sha256": "cc5380011b1ea469a2f2bc56eae0ac3bd55ffe856643a83681e5ea5d7466af08"
+        },
+        {
+          "name": "20261124002400_349_proof_rights_source.sql",
+          "sha256": "79932693c16aad61a5f6a97010e6c0030fb2fcf8a647c2b302a6aea978ffaed4"
+        },
+        {
+          "name": "20261124002500_350_proof_rights_inbox_view.sql",
+          "sha256": "843c44f95f73de555ff8cdf8eb3527ec4418497856a0332e2983862be4e62765"
+        },
+        {
+          "name": "20261124002600_351_proof_rights_decision_guard.sql",
+          "sha256": "6656c3a9fded2c298743a1aad93ccfc0288254f618f2562c753256c7a59e3f00"
+        },
+        {
+          "name": "20261124002700_352_proof_rights_coverage.sql",
+          "sha256": "5304481d24215485fa040268edddf305f3690d160f2d2ca3790851163328b971"
+        },
+        {
+          "name": "20261124002800_353_standalone_proof_placement_inbox.sql",
+          "sha256": "e301a381abcf8ad3d04c169e36fc1a64692563b69af3069aa4bc929d7bc34ad1"
+        },
+        {
+          "name": "20261124002900_354_standalone_proof_placement_inbox_view.sql",
+          "sha256": "afe254ce684e953c50aaa78f5039f6bda9a1a0faf5efc96009a92141e1551b86"
+        },
+        {
+          "name": "20261124003000_355_proof_placement_coverage.sql",
+          "sha256": "f0a3cba7dd4dd5d4b3d31427826fd9ab94812ea71d3a3ffb7b78e1033dd82841"
+        },
+        {
+          "name": "20261124003100_356_proof_placement_prewrite_gate.sql",
+          "sha256": "204d9a990424bac6398a0f93871a8c0fe62b21c58434759359b22eec53da1bc6"
+        },
+        {
+          "name": "20261124003200_357_proof_placement_due_inbox_gate.sql",
+          "sha256": "46d21238813236278637dae2e32037552eae108430e4dc952cf96229221bcde3"
+        },
+        {
+          "name": "20261124003300_358_proof_media_rights_identity.sql",
+          "sha256": "4021ddbe91a1e7d935c22b64b2a0c5dba0a3f9b964790351648e56c7b8410b05"
+        },
+        {
+          "name": "20261124003400_359_proof_media_rights_request.sql",
+          "sha256": "d61ddd31fba07adaa3ec6a5d35ab0d6eb12375cb2dff93060881a936552dffb6"
+        },
+        {
+          "name": "20261124003500_360_proof_media_rights_source_state.sql",
+          "sha256": "7d8fd3a8b1d01edc5011917beaee9c7fb2ddc265733e480db7ee66fc1a9bbc78"
+        },
+        {
+          "name": "20261124003600_361_proof_media_rights_coverage.sql",
+          "sha256": "6a5901134ba0dda484e6a4b256b5414100c6c56062cf83c2d99e6be1d9f12e39"
+        },
+        {
+          "name": "20261124003700_362_proof_artifact_inbox_source.sql",
+          "sha256": "dea771ba80a077ac3a0ef84483a1022033eda5fec0d36ca2b384b8728d7750c1"
+        },
+        {
+          "name": "20261124003800_363_proof_artifact_inbox_view.sql",
+          "sha256": "b755768f7f6b0a1bf7da65ca195e9a7510469c55a4e545cbe553617c92ed7e08"
+        },
+        {
+          "name": "20261124003900_364_proof_artifact_inbox_decision.sql",
+          "sha256": "3df2874ca3338a17575405b01fb4a5739a14db5e7c59383f8dc86e964b38174e"
+        },
+        {
+          "name": "20261124004000_365_proof_artifact_placement_gate.sql",
+          "sha256": "5c3b308fdb74dd3838fb2c0ec04682207dd541eab267ee6bf4a0d8e24577a944"
+        },
+        {
+          "name": "20261124004100_366_proof_artifact_coverage.sql",
+          "sha256": "15d25aba9e178d093495b6f61e4cd238b3936a386ded87c51d2732566758d2cd"
+        },
+        {
+          "name": "20261124004200_367_proof_placement_due_current_artifact.sql",
+          "sha256": "0ebfc7ff147743a2c4f6ab54b0f52dfc0dd252f838a5b34b108ee23ac7a58d2e"
+        },
+        {
+          "name": "20261124004300_368_creative_storage_attestation.sql",
+          "sha256": "9eba6263ea304846f20df53aab9888ef24d3501fc449a96316b8e386b93c32c6"
+        },
+        {
+          "name": "20261124004400_369_ordinary_media_review_source.sql",
+          "sha256": "edf1338fe068c2c6d4872def1b3a714bf038411872917b1294afcb6e6718feb4"
+        },
+        {
+          "name": "20261124004500_370_ordinary_media_inbox_view.sql",
+          "sha256": "e461535ef13bf7eee4d26e94fc9dfc495a676ada65e51c2137dd6223e50c0b7f"
+        },
+        {
+          "name": "20261124004600_371_ordinary_media_inbox_decision.sql",
+          "sha256": "c88be84fda0d4ed3f043cfa0759df59b2748c2edfd1cf515ecf95cb0f3cf28c1"
+        },
+        {
+          "name": "20261124004700_372_ordinary_media_coverage.sql",
+          "sha256": "653f5d40e1ee44f30a84de799991a002fd29c198672c4176587a8b2d22ec1a93"
+        },
+        {
+          "name": "20261124004800_373_ordinary_media_current_signoff.sql",
+          "sha256": "3af9caf71301ced173cf1c544c44ca7be904ef780bd29518abc9c9250ec513fd"
+        },
+        {
+          "name": "20261124004900_374_ordinary_media_current_status.sql",
+          "sha256": "46f3a3801ebbf7a675b4a44620fedaa2ebf89d5f77456c379a6415eb328b5eb0"
+        },
+        {
+          "name": "20261124005000_375_ordinary_media_schedule_gate.sql",
+          "sha256": "e510affa7dad193909e7051df3af92a5c34e682312955b3561f24ebc3d6f1a12"
+        },
+        {
+          "name": "20261124005100_376_engine_slot_schedule_hold.sql",
+          "sha256": "c0a6bea37060dbe064584230991fd697272307e2fbda42c113b5d469303237ad"
+        },
+        {
+          "name": "20261124005200_377_engine_slot_exact_evidence.sql",
+          "sha256": "0e3ad38c580492f3b92a70ce0f534cefd970a4e46ffc62221c74ee50315414ab"
+        },
+        {
+          "name": "20261124005300_378_engine_slot_inbox_view.sql",
+          "sha256": "009298fa6139e94db9afeca64417d45dca35fe4f0d950b8e5e8efd0dc32c5d9a"
+        },
+        {
+          "name": "20261124005400_379_engine_slot_inbox_decision.sql",
+          "sha256": "c88825e0d1c269ff8115c7ccb418032ba69053fa500321364dc7591aaa8b2445"
+        },
+        {
+          "name": "20261124005500_380_engine_slot_coverage.sql",
+          "sha256": "5ad0a2d2817c3c860c240f0573c51da32014d900a701b91298195aff0d2bc183"
+        },
+        {
+          "name": "20261124005600_381_engine_asset_signoff_guard.sql",
+          "sha256": "cc5aae8ab7979821ba6518815239cd7337eaf5182fce39e25b2283d27cdfdf67"
+        },
+        {
+          "name": "20261124005700_382_recruitment_media_current_gate.sql",
+          "sha256": "86c752e7857ed5dd284233cd52873f12f12da003f3514fa1371b5a905150e411"
+        },
+        {
+          "name": "20261124005800_383_recruitment_media_coverage.sql",
+          "sha256": "235ad85905a509d725a72aa54ee500453f568614739cb3ad75f046fd608523ab"
+        },
+        {
+          "name": "20261124005900_384_recruitment_meta_media_bytes_snapshot.sql",
+          "sha256": "05fc15aada3743736ab02db5781b2c00962136a6b66fdc4187bc0312b19d082a"
+        },
+        {
+          "name": "20261124010000_385_proof_delivery_inbox.sql",
+          "sha256": "a16111a4c661ca112f63f3043d6a347dd9a98fffebcf75c7e2a9433fe0d2fe16"
+        },
+        {
+          "name": "20261124010100_386_proof_delivery_inbox_view.sql",
+          "sha256": "2ff1a2cdf44d2c6f49ce265fef3c24947ff317ae2b1504b66ebc8ef3746f5340"
+        },
+        {
+          "name": "20261124010200_387_proof_delivery_coverage.sql",
+          "sha256": "d5869da8eda4fd83430c1b9f23e73d1da005e38014b5b42b814bf0747cead25c"
+        },
+        {
+          "name": "20261124010300_388_meta_profile_change_inbox.sql",
+          "sha256": "f46db8de2d27db6f5b36bd66162ca5711bb3d440acbdbbe45ef3f2f2b8f2b3f1"
+        },
+        {
+          "name": "20261124010400_389_meta_profile_inbox_view.sql",
+          "sha256": "f5954b40b4434bd60da4ecccecc05c4a847b5ce7628b0d02cff7b4508ccc895e"
+        },
+        {
+          "name": "20261124010500_390_meta_profile_change_coverage.sql",
+          "sha256": "af1a61f92e3ba9adbb08fd863580a4ae861ff4075688393a742d9ab9dbc6e68d"
+        },
+        {
+          "name": "20261124010600_391_google_profile_change_inbox.sql",
+          "sha256": "8aadc8a730ef9f3cd515a82758c045cc8e7a2fd926b708c2476346530467e2bb"
+        },
+        {
+          "name": "20261124010700_392_google_profile_inbox_view.sql",
+          "sha256": "b312609928f81e1d88fec5a96ea79439c282b213af85730e175c1f026bbc13da"
+        },
+        {
+          "name": "20261124010800_393_google_profile_change_coverage.sql",
+          "sha256": "baaab5bc85e3356a3a45f7d3cbf7071dce24d3f56824299c17b93c93361c4002"
+        },
+        {
+          "name": "20261124010900_394_opportunity_activation_inbox.sql",
+          "sha256": "21163bc021bb81ef82c738ab39f06172ec09a03dd01010385287e02c1c27664b"
+        },
+        {
+          "name": "20261124011000_395_opportunity_activation_inbox_view.sql",
+          "sha256": "eb14c59fd41adce669d824ba19aa4a5a4bcf72ad45b9d484c071f4d71aa149e7"
+        },
+        {
+          "name": "20261124011100_396_opportunity_activation_coverage.sql",
+          "sha256": "93922a88ca2733b3530f867e9752c092115a8418fd2b286a1e0e6335f35ccfe0"
+        },
+        {
+          "name": "20261124011200_397_message_template_inbox.sql",
+          "sha256": "f3fe34cf1e3c39dc4829f6360cbb6d8f6d7475c95602827707440ca87956be89"
+        },
+        {
+          "name": "20261124011300_398_message_send_gate.sql",
+          "sha256": "8c268f7421ae15e89e48bb2c41c57ef6b53a5926fc9726c52ae3aaa216a65adb"
+        },
+        {
+          "name": "20261124011400_399_message_template_inbox_view.sql",
+          "sha256": "353a876c7292bb4691ee66a79cb41cf56fcc9fc6fb0e7231c482ecce0831f74f"
+        },
+        {
+          "name": "20261124011500_400_message_template_coverage.sql",
+          "sha256": "37ecf8b0e01983c8c9994fbba8389be94d8417dd99215bdc0b99721c1963cf66"
+        },
+        {
+          "name": "20261124011600_401_nurture_sequence_review.sql",
+          "sha256": "e273aba1d3ee23b0db499f82e13de0e3a9450f79cc7a74f66d02634edf093194"
+        },
+        {
+          "name": "20261124011700_402_nurture_sequence_current_gate.sql",
+          "sha256": "3ba679d547f5dd1a490026785660b27bd9147ddc8c0c2dbca1ca4fa2df0b6e6c"
+        },
+        {
+          "name": "20261124011800_403_nurture_sequence_inbox_view.sql",
+          "sha256": "c00a403de12dff03c0147fe592654faf5a3e3ff10779a562230cc6824d2456fd"
+        },
+        {
+          "name": "20261124011900_404_nurture_sequence_coverage.sql",
+          "sha256": "8d8545be5d776ecaea0258e834d86f803f48865a8b8c52fb75bcc3c1407ed50a"
+        },
+        {
+          "name": "20261124012000_405_nurture_sequence_due_current.sql",
+          "sha256": "f181e9f80447b42eb55b29da7fd13bb1f45a4cd4d35dbe473b52b1f74ce3917c"
+        },
+        {
+          "name": "20261124012100_406_video_seat_review_source.sql",
+          "sha256": "2d0d600009b38973e0023f5b4e0bdaae5868f1b00d66e194e225f4eb7bc672f0"
+        },
+        {
+          "name": "20261124012200_407_video_seat_decision_gate.sql",
+          "sha256": "9d4a73f6838b23e18bc84fadc404569619277fd4c169a5399da1dd6147dabbad"
+        },
+        {
+          "name": "20261124012300_408_video_seat_inbox_view.sql",
+          "sha256": "d99b5ddb019b84e78b98fb8ab41c52f0cde791cf4c55116e397e8d7d1cb658c6"
+        },
+        {
+          "name": "20261124012400_409_video_approval_state_current.sql",
+          "sha256": "e41caa7f4996415cc810c53251990f63180a577f18a7afd154308f96376769d2"
+        },
+        {
+          "name": "20261124012500_410_video_review_invalidation.sql",
+          "sha256": "410f0f26acac91b5f2e7c64cfdbb4946d191ab2cbcd504214909a58993ea53ac"
+        },
+        {
+          "name": "20261124012600_411_video_seat_coverage.sql",
+          "sha256": "a88d65149efb60893e991b97101601bedb8c5f458a40c167fbae98dbf433ef1a"
+        },
+        {
+          "name": "20261124012700_412_motion_render_exact_review.sql",
+          "sha256": "d8572919b5b19355e022c21f51a504dc4f548f75cc6965b5da5a8e9c749dbe50"
+        },
+        {
+          "name": "20261124012800_413_motion_render_inbox_view.sql",
+          "sha256": "374b8aa63f54dd91b4b0cf91c3de886aa70d82bb8838d74d7195d69ec0062f9a"
+        },
+        {
+          "name": "20261124012900_414_motion_render_invalidation.sql",
+          "sha256": "e833b4d99de368aa33367327f4168cd8162c2835152232a3f5869321f664a823"
+        },
+        {
+          "name": "20261124013000_415_motion_due_current.sql",
+          "sha256": "af2078c69c8b7124ab8b620607458e4ae6bf21f245aad2e3598ca3612adf6d30"
+        },
+        {
+          "name": "20261124013100_416_motion_render_coverage.sql",
+          "sha256": "45c7ea6e026eb87e7d22c06ea9de0a3bf081f713fd2a18c57d1d23513501c363"
+        },
+        {
+          "name": "20261124013200_417_human_idea_selection_inbox.sql",
+          "sha256": "34b8b990ec6d5322c6321d3017256da91e94949ac54ad3e201ac5e5d3c8935f2"
+        },
+        {
+          "name": "20261124013300_418_human_idea_inbox_view.sql",
+          "sha256": "e7f9d4ebdfe9c4cdc650290e4bcb628d6f7edf6dc193e9fc601087a73e098996"
+        },
+        {
+          "name": "20261124013400_419_human_idea_decision_boundary.sql",
+          "sha256": "9c0c767950a3497fb7a384fe0b712216b6c2e4dc16f019a5d30b891023917b1b"
+        },
+        {
+          "name": "20261124013500_420_video_repurpose_idea_review.sql",
+          "sha256": "aae219ff92a6e572dfd19829b298c24e2f83b2d5a8ed514a5b9e1ed780490755"
+        },
+        {
+          "name": "20261124013600_421_brief_job_selection_gate.sql",
+          "sha256": "09270591d6ef40adbf093bce185405a16339f31737a70f3927358f5e1a55370a"
+        },
+        {
+          "name": "20261124013700_422_human_idea_coverage.sql",
+          "sha256": "1dcea970fb41416107711a449de95baabc5ba241b3edd47c1d4f1bb9a64e9a28"
+        },
+        {
+          "name": "20261124013800_423_brief_output_current_gate.sql",
+          "sha256": "66464f9e7617fe1845cd8ef8c3b6505d439fbee573c60272ea9e03d6fcd84e8b"
+        },
+        {
+          "name": "20261124013900_424_client_switch_activation_review.sql",
+          "sha256": "bda7835fd8d41b152f86e94d99dde3b66a4f34266afa7d893356829f48be853f"
+        },
+        {
+          "name": "20261124014000_425_client_switch_inbox_view.sql",
+          "sha256": "e8b8dda099916a149a41895617eaccc61d523e4487f04c82db88e11338c408fa"
+        },
+        {
+          "name": "20261124014100_426_client_switch_coverage.sql",
+          "sha256": "624d7097827cd4571f850161f1758ba69ec03aaecb1654568815a34b0aaeb5ed"
+        },
+        {
+          "name": "20261124014200_427_booking_capture_activation_review.sql",
+          "sha256": "f0ccdc0e5a2b1c99ebdf59402955a5fee8d56769e8a76526948558e3e276fdb9"
+        },
+        {
+          "name": "20261124014300_428_aux_activation_coverage.sql",
+          "sha256": "09b21ee63db2081235c7c2a489e3c8ed10b53b5fb8b526bd166b67846579f8cb"
+        },
+        {
+          "name": "20261124014400_429_global_engine_activation_review.sql",
+          "sha256": "453332392e7498b61f85a600e36239b77720306ccbc68fcfd96de327f6728503"
+        },
+        {
+          "name": "20261124014500_430_global_engine_inbox_view.sql",
+          "sha256": "173864bb2969182aa8a608f2fb121d1809ee4d55fab2be971adf3254bd971316"
+        },
+        {
+          "name": "20261124014600_431_agency_approval_lineage.sql",
+          "sha256": "69890427bd80b5e951c69b746d031e0a3c97b0516dbc30060bd7d57b0670774b"
+        },
+        {
+          "name": "20261124014700_432_global_activation_coverage.sql",
+          "sha256": "8fc8856e617253eb99283c5cd95fddfe9b61dad01da54bd56910f1d523e1d582"
+        },
+        {
+          "name": "20261124014800_433_credential_rotation_stops_ingest.sql",
+          "sha256": "c9f880617f6f9ae6eb703b5ec76b29ac430af70ca685e12694c5f88fa1a218ee"
+        },
+        {
+          "name": "20261124014900_434_integration_access_grant.sql",
+          "sha256": "d3f114254bd18c70e55ca29dee4cbcba42e1644bceb99699c359c3b00e37cec2"
+        },
+        {
+          "name": "20261124015000_435_integration_grant_inbox_view.sql",
+          "sha256": "8e4bf38e5f235c4d380a753c9a87303a7a6f69090d43dfcdccfe948605238b14"
+        },
+        {
+          "name": "20261124015100_436_integration_grant_coverage.sql",
+          "sha256": "0493d0012ed02da4681da500742ac6bed7a40196d40b7e493afba9e8d1906b0a"
+        },
+        {
+          "name": "20261124015200_437_integration_scope_change_revokes_grant.sql",
+          "sha256": "8d9c7c7c7d2cbcfeb435acffa5a04ad0eb5dc725bb9c9b1083520766972466c3"
+        },
+        {
+          "name": "20261124015300_438_integration_scope_coverage.sql",
+          "sha256": "860a04399a9a3dbc38f3941c6d05fefd303cd209c89a481c06a099e465804949"
+        },
+        {
+          "name": "20261124015400_439_creative_requirement_review.sql",
+          "sha256": "69afac64166a6a1fb622b32fda906ce065d39916e6f45614e243f3ea4a42add5"
+        },
+        {
+          "name": "20261124015500_440_creative_requirement_inbox_view.sql",
+          "sha256": "a52c06d8fc54d22c0ab1b26d0012f150fc4c4c069d11e5d4f7f3feba6fc74653"
+        },
+        {
+          "name": "20261124015600_441_creative_authority_coverage.sql",
+          "sha256": "624b29f8e91ad44aaf3319cc9057e30bd23bc7e41cd0729715205a4a25a2b4f1"
+        },
+        {
+          "name": "20261124015700_442_global_video_owner_review.sql",
+          "sha256": "9bb53d7cb5bb24aca6e56728de40c48a20c1419ae5e16cd1c47aab914913010a"
+        },
+        {
+          "name": "20261124015800_443_global_video_owner_inbox_view.sql",
+          "sha256": "66bc0ba90a316ca1ed14c5302e508b1f5f35165366cf92f2f846c9d4fcdde3a8"
+        },
+        {
+          "name": "20261124015900_444_global_owner_coverage.sql",
+          "sha256": "7d19f927d5407f75705beaf16436badcc0787169e88b7c52f4f1bc2619fc9241"
+        },
+        {
+          "name": "20261124020000_445_client_authority_assignment_review.sql",
+          "sha256": "1d98f957714ef3303fa05760060d317773eb91f49619e4dc74986f3414e47465"
+        },
+        {
+          "name": "20261124020100_446_client_authority_assignment_inbox_view.sql",
+          "sha256": "d13e519cb71bb670f8d6b888a39899b11a6c75035117fc944b1f6c23c4c8e295"
+        },
+        {
+          "name": "20261124020200_447_client_authority_assignment_coverage.sql",
+          "sha256": "be0dd63cdef053498840b9c61323e76a1393dff819dca9497a8079607aa3c8ba"
+        },
+        {
+          "name": "20261124020300_448_gateway_tool_review_source.sql",
+          "sha256": "8871914f518719731840352ca5207d43bc28294f07414a752861c14bc8544ed0"
+        },
+        {
+          "name": "20261124020400_449_gateway_tool_inbox_view.sql",
+          "sha256": "33d4bd66f7302107191d95a7315c49625a1a95208c46987f72b954e1a49e230e"
+        },
+        {
+          "name": "20261124020500_450_gateway_tool_coverage.sql",
+          "sha256": "06813ac77a20021ea0089f35dfe4747497575ecdec672b5b3b9e692e54b232a2"
+        },
+        {
+          "name": "20261124020600_451_gateway_execution_receipts.sql",
+          "sha256": "ec3ba94a16d68c47958985c01835d51ee1769ec08e1559870c81b3452a8b21ea"
+        },
+        {
+          "name": "20261124020700_452_gateway_receipt_coverage.sql",
+          "sha256": "e8a3fd824a96eee0960651cbea40bc89e6df20069e863b2521be831206182921"
+        },
+        {
+          "name": "20261124020800_453_gateway_outcome_and_revocation.sql",
+          "sha256": "ff2e5ae6190a848b8725448f7864afe46d31670a2f1149a3e370475ff884734f"
+        },
+        {
+          "name": "20261124020900_454_gateway_sites_prewrite.sql",
+          "sha256": "2b90afc7d859aa63bfabf197faa24023e8f8258d84d10315cf249eb7984bced0"
+        },
+        {
+          "name": "20261124021000_455_gateway_sites_invocation.sql",
+          "sha256": "eeaf57794c472c4f66bd5a9e12b502908e4f8b06562fdd4a0fda7604c493ed33"
+        },
+        {
+          "name": "20261124021100_456_recruitment_brief_production_gate.sql",
+          "sha256": "cf74f3e87a7779d35e6cc9ce141413ccb63daa1c4082f4151a4af00306946d42"
+        },
+        {
+          "name": "20261124021200_457_google_reply_prewrite.sql",
+          "sha256": "91e05c717b889342d79a24df14b95a117a28f62c3be086af4defcfb7793d6f6d"
+        },
+        {
+          "name": "20261124021300_458_google_reply_attempt.sql",
+          "sha256": "a4b4fcbeb51d3a247b5da8b2b0716723d820c815bc50ef90eb254a438f1fecad"
+        },
+        {
+          "name": "20261124021400_459_google_reply_job.sql",
+          "sha256": "104b477f491ddeec6ee88a4aee62e3d424d296a2b553714d06a2e5939642c46a"
+        },
+        {
+          "name": "20261124021500_460_google_reply_credential_gate.sql",
+          "sha256": "afc38a84baedc329308b1de3bb63f374e2ed23052af7f247908fa99f4c38b28c"
+        },
+        {
+          "name": "20261124021600_461_metrics_backfill_review.sql",
+          "sha256": "04696e05e7b85d0ca5e81d763362475a12055d10c588077c38878e9744b952d4"
+        },
+        {
+          "name": "20261124021700_462_metrics_backfill_inbox_view.sql",
+          "sha256": "89d8e5dae6d9fb42484eb7fa340deba01d89e7938297e68682fb498587efad05"
+        },
+        {
+          "name": "20261124021800_463_metrics_backfill_coverage.sql",
+          "sha256": "49bdadc4d59e284dbe1fad94559386bd6c571eaa7d56c3c2cf875a11164aa828"
+        },
+        {
+          "name": "20261124021900_464_campaign_budget_exact_review.sql",
+          "sha256": "d9cabd3b3884b52d46d2fd280aaeb32b154515f40c2a3e71d5ca4428b8a9e1af"
+        },
+        {
+          "name": "20261124022000_465_campaign_budget_inbox_view.sql",
+          "sha256": "0154290a65e8954912685c201a295a2cc32141f29468cf7d61c77dc22a65ffbd"
+        },
+        {
+          "name": "20261124022100_466_campaign_budget_review_coverage.sql",
+          "sha256": "24d3f7dd71704032ee9e7059275102c2ef329fb636865b29bea45b3bb3502821"
+        },
+        {
+          "name": "20261124022200_467_meta_budget_credential_gate.sql",
+          "sha256": "b86be20987a5c1f5699d7fc0cc7c1c784ebb7c632f22bcaeac3c20c47d875f2b"
+        },
+        {
+          "name": "20261124022300_468_retire_generic_profile_campaign_action.sql",
+          "sha256": "86ebdf2df9d007419016a9e35b21608206d8632a599679c0632aa8e9eddaeab7"
+        },
+        {
+          "name": "20261124022400_469_google_profile_current_prewrite.sql",
+          "sha256": "37d3c6ceac007fe307fd14e0f01bdc1fbd92a4a0a4ad5958cd8727615dc6130d"
+        },
+        {
+          "name": "20261124022500_470_meta_profile_review_epoch.sql",
+          "sha256": "50d0c6cca5bca8d0dcd3c7add0bea0435d2d7308d4dce4d9b0a901f65891c3ec"
+        },
+        {
+          "name": "20261124022600_471_meta_profile_target_prewrite.sql",
+          "sha256": "38c61f9b0f3ef4651065029df8d063b2042314ea12f5823197818ee2f88d203d"
+        },
+        {
+          "name": "20261124022700_472_google_profile_attempt.sql",
+          "sha256": "8a7bb852ca5591c1db750ca94c911ba71f54408e4ab26ef7a5bca4e61c37ece2"
+        },
+        {
+          "name": "20261124022800_473_google_profile_job.sql",
+          "sha256": "2a3f5348784d9ca2f883210af2dcbed222d912c64f39456e9f9f6c37c3837cef"
+        },
+        {
+          "name": "20261124022900_474_google_profile_confirmed_source.sql",
+          "sha256": "98ac962192877d4bb335e826fb4a190d6d61a9ee5cd7bc659585ddca8e8ca4b8"
+        },
+        {
+          "name": "20261124023000_475_meta_profile_attempt.sql",
+          "sha256": "895e8d5d6e00076399968828dafd1aa31a57a6081b7dfcda9a08bf3eda17ce26"
+        },
+        {
+          "name": "20261124023100_476_meta_profile_job.sql",
+          "sha256": "bdac584f55d8244d8d10145f4a717200ca9bab542eba721f41956a56fb93bb4a"
+        },
+        {
+          "name": "20261124023200_477_meta_profile_confirmed_source.sql",
+          "sha256": "0a26fc829af9f47218d6a7e37c031eb7d5be5aa640e10ee8352073552f274120"
+        },
+        {
+          "name": "20261124023300_478_google_reply_confirmed_source.sql",
+          "sha256": "2b124889a662d9f6818ac59542b7ad312392b50e9471f6ce8a6c70418fd6b5c5"
+        },
+        {
+          "name": "20261124023400_479_client_external_outcomes.sql",
+          "sha256": "4d4f122ec798134a86aa890afc38ba47089ae40c4c5a9e57ce7d6a5c2bc0a1e6"
+        },
+        {
+          "name": "20261124023500_480_meta_profile_uncertain_reconciliation.sql",
+          "sha256": "b9de7b657a8cfabb110142be0b3db06c6724fe700e0ecd3db8af1f17bc7f2743"
+        },
+        {
+          "name": "20261124023600_481_meta_profile_reconciliation_job.sql",
+          "sha256": "72e5804ac5d16e2ff17039cecaaf64d7e5a26828c9ca451b1abd6acc10fb94e6"
+        },
+        {
+          "name": "20261124023700_482_meta_reconciliation_outcome_projection.sql",
+          "sha256": "e50385dbffe4bf4be172344c40f0f11e7446d19efb84fea40094b97f360fe0d1"
+        },
+        {
+          "name": "20261124023800_483_google_profile_uncertain_reconciliation.sql",
+          "sha256": "f6623ce14cfd6b724b6312e28b6bb141d4f145803f56061ba847ec930ff42a20"
+        },
+        {
+          "name": "20261124023900_484_google_profile_reconciliation_job.sql",
+          "sha256": "d34fe4b7657b430cc89f3619536ae15621ddad063b61c3c35a49097828004e04"
+        },
+        {
+          "name": "20261124024000_485_google_profile_reconciliation_projection.sql",
+          "sha256": "3387b865b1edf2bf9e56d20a82a10a424e5bc3e3b2146f8c5032f8ae7ad971f1"
+        },
+        {
+          "name": "20261124024100_486_google_reply_uncertain_reconciliation.sql",
+          "sha256": "517f87b0b0e69c738971ea4c3fe41123c352019eabcc7b84663155daa9b19f66"
+        },
+        {
+          "name": "20261124024200_487_google_reply_reconciliation_job.sql",
+          "sha256": "dcd87a34416ea6c638dc38666e8b272ac36ee25d055382b44d374868a01a0360"
+        },
+        {
+          "name": "20261124024300_488_google_reply_reconciliation_projection.sql",
+          "sha256": "4195f8f4f9a9e8ee5ebccd99ed2e7a20cf1b739c86b5e37096fa5c330502a4b0"
+        },
+        {
+          "name": "20261124024400_489_google_reply_moderation_gate.sql",
+          "sha256": "6ce1badbce70a8a14eba0ca68ed55f6b79c2ad6f591c5d3b9b8e429fd41f2a6a"
+        },
+        {
+          "name": "20261124024500_490_google_reply_legacy_outcome_audit.sql",
+          "sha256": "9e18483745bbc30183db3a056db83dfc3111117a6e41a31dbc736bca8cdf2c3a"
+        },
+        {
+          "name": "20261124024600_491_campaign_action_uncertain_outcome.sql",
+          "sha256": "e876f9ee22f7b4b8d4f8b3c2cada937051c052fa9c6f6c00fa70ce435277685b"
+        },
+        {
+          "name": "20261124024700_492_campaign_action_uncertain_projection.sql",
+          "sha256": "b85d090ce3c5ba2addc4b346527282c324393713363837e762731193592b00c9"
+        },
+        {
+          "name": "20261124024800_493_campaign_action_expired_lease_alert.sql",
+          "sha256": "7dcbe885b5ec5ef03913f682c9b5a2ebe7f11e57bf95603684ccdfb0d7a62156"
+        },
+        {
+          "name": "20261124024900_494_campaign_budget_readback.sql",
+          "sha256": "29460419016936305a32f90e0bf33ef1db686d6a8630a456a7253ed46cfa0bf9"
+        },
+        {
+          "name": "20261124025000_495_campaign_page_readback.sql",
+          "sha256": "b3ab46fc3d998e9c57309c1fc906d1ca58ab0a65e2b70a9f00bef3ee8c5e2c99"
+        },
+        {
+          "name": "20261124025100_496_campaign_proof_release_observations.sql",
+          "sha256": "2df570414302d30d14045a3edfc9d5eb681e8e24c254948811e3d22553af1b96"
+        },
+        {
+          "name": "20261124025200_497_campaign_lead_enrolment_source_audit.sql",
+          "sha256": "f352628aae445f1a237dbfba275c5a1072b039281394700edf658dc151dcd2c4"
+        },
+        {
+          "name": "20261124025300_498_campaign_proof_retraction_demand.sql",
+          "sha256": "f8a347e1c19d3c441250f0f0843a1a4e6b7583a3ba45208c9c20a02b3aaf7255"
+        },
+        {
+          "name": "20261124025400_499_proof_retraction_receipts.sql",
+          "sha256": "01a36eae1223db9808d4fca03152678d44480e19f6eb370d5a7adb88852c9909"
+        },
+        {
+          "name": "20261124025500_500_legacy_proof_retraction_audit.sql",
+          "sha256": "a34d742594bbd8c0cb6b657e5dfb7670091794a98375978a36cf399af4fc538d"
+        },
+        {
+          "name": "20261124025600_501_proof_approval_execution_projection.sql",
+          "sha256": "b450bdcdfbf9cc520e0e9af0c26a2d7bc466af01089096027f83fa2ab95fab14"
+        },
+        {
+          "name": "20261124025700_502_proof_delivery_attempt_request_binding.sql",
+          "sha256": "58ad3e00722f3215135592b48a380fd06941247605b0362e84c702fd67c4ce98"
+        },
+        {
+          "name": "20261124025800_503_proof_delivery_outcome_alerts.sql",
+          "sha256": "77c3fd53b032b12071c20b3a3e20d6376386194bb46510ae11c4cfd725305e00"
+        },
+        {
+          "name": "20261124025900_504_lead_magnet_exact_send_attempts.sql",
+          "sha256": "da8fc3e219af42a6627dd3ee728de612104401b56f5d4d179316472fb97eac3c"
+        },
+        {
+          "name": "20261124030000_505_lead_magnet_external_outcome_alerts.sql",
+          "sha256": "db8d1e0b50b9997f19cff4d945a512e42e6b44fe3f958277a93123d4a17681ae"
+        },
+        {
+          "name": "20261124030100_506_secondary_offer_opportunity_source.sql",
+          "sha256": "2fbed3737b75487c7b83fefb0d1a754a8fcf22d60c54de7c02a785446ad48f8f"
+        },
+        {
+          "name": "20261124030200_507_model_section_source_review.sql",
+          "sha256": "798cd96f1456c2b5f11c7b017941b62349c01ce89d586813b501c1fce6eaeffc"
+        },
+        {
+          "name": "20261124030300_508_main_offer_strategy_source.sql",
+          "sha256": "e5d185239e06dc83e5fe46f4be042a691a8ae0862d3429719e2ab45ad62ec628"
+        },
+        {
+          "name": "20261124030400_509_google_review_proof_source_gate.sql",
+          "sha256": "9772eaf98e2512e6a0c80bc998caac23a992a1a67e3991da320cf547d34c4f3f"
+        },
+        {
+          "name": "20261124030500_510_google_review_proof_invalidation.sql",
+          "sha256": "87536f106f840bb24cef2cfa0cfd19d170c0e0d21c2684e1e566367be33c4b2e"
+        },
+        {
+          "name": "20261124030600_511_outcome_followup_consent.sql",
+          "sha256": "8dfa41c4d19b050569bae1cd830095d6f46ce17117bfab945938b75e4410924e"
+        },
+        {
+          "name": "20261124030700_512_service_outcome_followup_source.sql",
+          "sha256": "63788d6089409f27cc5c4b58395c5ce00a22435a9e9dbb67d4cb6a499b3eb590"
+        },
+        {
+          "name": "20261124030800_513_campaign_content_spec.sql",
+          "sha256": "319d7965cc70999ae931aef68df0b741592ccb0e3343c79e7f59d428a1484ba2"
+        },
+        {
+          "name": "20261124030900_514_bind_campaign_planned_ideas.sql",
+          "sha256": "9102fed729030b5a1184961ce78ac9e42f39c58f026dad97f13442d03caba053"
+        },
+        {
+          "name": "20261124031000_515_campaign_sweep_qa_and_sibling_progress.sql",
+          "sha256": "f909aac30bdf99196802b3e108010291c633e9fad2ec2348766a2ae8e60dc436"
+        },
+        {
+          "name": "20261124031100_516_campaign_plan_selects_exact_ideas.sql",
+          "sha256": "f0da01d40bea85ded7fb01180e2e3c4c2542402e2a66796515ac5d679dbd4a69"
+        },
+        {
+          "name": "20261124031200_517_campaign_sweep_work_items.sql",
+          "sha256": "64df6260a9f5ebc2e2d71f18faf03f71aeb40936b2b7ea3d24a99a667f4b5e9b"
+        },
+        {
+          "name": "20261124031300_518_campaign_sweep_step_retry.sql",
+          "sha256": "3b967b5eeadcbe0d8c578a86b52ca574e4135d827bf2f96a7934001d0ce64244"
+        },
+        {
+          "name": "20261124031400_519_campaign_conversion_sweep.sql",
+          "sha256": "cde63e2ff6a151bf5ec8c8cf1cf2dc99cffa6b239c99a4e6e1acf8b0bc9f133a"
+        },
+        {
+          "name": "20261124031500_520_campaign_conversion_qa.sql",
+          "sha256": "7e4a32101bbe11fab4cf57b5c384aee13ce8cda3583629de90fdad0ee0ede0dc"
+        },
+        {
+          "name": "20261124031600_521_campaign_conversion_retry.sql",
+          "sha256": "0974e0d72183ffc1ef78bdc121982cb6b68b5e07a848e0cc20ebe35117d6ab98"
+        },
+        {
+          "name": "20261124031700_522_campaign_package_readiness.sql",
+          "sha256": "35b829e13784b80f01ce92d9e63a3b145b120b61c5b29033ded64c736c8623ab"
+        },
+        {
+          "name": "20261124031800_523_campaign_preparation_snapshot.sql",
+          "sha256": "d4c9a18b884d0f517728fe238fbf67e8671532bdbc8e8b627c3779ed63f03b0b"
+        },
+        {
+          "name": "20261124031900_524_campaign_package_review.sql",
+          "sha256": "cce9861958245113216faca5290a90e6eb4663c2052e53c4dac60d736eb48797"
+        },
+        {
+          "name": "20261124032000_525_campaign_package_inbox_view.sql",
+          "sha256": "7e1b15923d152d273516e60867db45ddd63cce9d8908d9b5eca7e39de6b4cda0"
+        },
+        {
+          "name": "20261124032100_526_campaign_magnet_plan_requirement.sql",
+          "sha256": "2dcc36eed681b9d08457f3eb9d111601034bd225fc1255e2d8af71cf5868a55c"
+        },
+        {
+          "name": "20261124032200_527_campaign_magnet_readiness_hold.sql",
+          "sha256": "df0db6b9a151157d93a5dc83916647fe094fa7aed8630c2d4db55dadcda957ba"
+        },
+        {
+          "name": "20261124032300_528_campaign_magnet_draft_work.sql",
+          "sha256": "929214a7940a2cba58e75a0f49b5bbfc3a228df664dcab17bc76d6b069420732"
+        },
+        {
+          "name": "20261124032400_529_campaign_magnet_package_work.sql",
+          "sha256": "f9870b6c894b3a9b5f3fdf61af0af890529f17fc47b4f76b0cc9841e60eda98e"
+        },
+        {
+          "name": "20261124032500_530_campaign_magnet_workflow.sql",
+          "sha256": "b324f6c6a7f4d77fdeaacde27f8ee180b48b42335bc9f15ca041377d47b1e198"
+        },
+        {
+          "name": "20261124032600_531_campaign_magnet_work_sync.sql",
+          "sha256": "fdf1de05848a2eac7e2fa768a22906e06f272be037f260e76a51e4c07c02daad"
+        },
+        {
+          "name": "20261124032700_532_campaign_magnet_retry.sql",
+          "sha256": "4f4e52e0708d10b7be277b774d227545193c93f6434bf03cfbb382c5434d3cb8"
+        },
+        {
+          "name": "20261124032800_533_lead_magnet_operator_handoff.sql",
+          "sha256": "e4b1b1ce99938de181713930fac6bd2cb95110470d2e18b7aa72ff90a49f5a71"
+        },
+        {
+          "name": "20261124032900_534_production_attempt_lineage.sql",
+          "sha256": "065ded5991aba39490c2376c91b4810735de69f01f2fa9a2ffa59322314c52d1"
+        },
+        {
+          "name": "20261124033000_535_proof_production_attempts.sql",
+          "sha256": "c441b4026ee291f7c65a55146b3025af57381926125749ee008e40d6675323dc"
+        },
+        {
+          "name": "20261124033100_536_motion_attachment_requires_accepted_cut.sql",
+          "sha256": "823ec24d4c4e32cf165846895bcfc60f341ab9280d2b30541f42c72a7c50354d"
+        },
+        {
+          "name": "20261124033200_537_page_probe_evidence.sql",
+          "sha256": "1180649b7cd5606a08b8706821f6ce4807145e0bff3e147a54dc7e8e609ac552"
+        },
+        {
+          "name": "20261124033300_538_organic_publication_events.sql",
+          "sha256": "daa811880ec0979913c79d6ae7eabcf2262319dbce7e77957c23bd659db2b07b"
+        },
+        {
+          "name": "20261124033400_539_paid_operator_bundle.sql",
+          "sha256": "d6575f7d84dd21d73f82d316289dbafe451cfed229b5b523827761960324bcf6"
+        },
+        {
+          "name": "20261124033500_540_paid_operator_metric_match.sql",
+          "sha256": "9a36466a03f15360d52ffdecf761a90061b73bfb04a22bfbf6d7d49f13f46180"
+        },
+        {
+          "name": "20261124033600_541_google_manual_operator_bundle.sql",
+          "sha256": "2316a584f4b20a04581b318d1eb8fa3a52f2030863ff8ad6fe62e5008774f47d"
+        },
+        {
+          "name": "20261124033700_542_google_ads_readonly_inventory.sql",
+          "sha256": "04c9500d3d970c052aac00b1be6a632127b24ee5303b05653f0aef4d94a57a61"
+        },
+        {
+          "name": "20261124033800_543_google_ads_ad_inventory.sql",
+          "sha256": "d7bf6ea3f8a23faffde79c2aba8db03a8100ddb2bb58ee572b4b4cb31c11cc72"
+        },
+        {
+          "name": "20261124033900_544_meta_ads_readonly_inventory.sql",
+          "sha256": "6b3d91fca105606d352d9309357051510172e6f740b9789671af252022d0ff90"
+        },
+        {
+          "name": "20261124034000_545_attribution_coverage.sql",
+          "sha256": "385d803e2cef53b91928b0bddf5b65cd732c475b111464b4bf19c5b139617948"
+        },
+        {
+          "name": "20261124034100_546_archive_action_gate.sql",
+          "sha256": "e04d314723e1d7214b7c5be6ca1e7e43c7800530529b414bb86c37862a5a8fe0"
+        },
+        {
+          "name": "20261124034200_547_model_archive_versions.sql",
+          "sha256": "55a82fc338e3adc617f831a96089debe637cf4a4d8c892b739c9334132b2717b"
+        },
+        {
+          "name": "20261124034300_548_lead_journey_trace.sql",
+          "sha256": "d215493694edff7dc5f986270c3b446dcc3906ff4f97970847fa9e08c79abe62"
+        },
+        {
+          "name": "20261124034400_549_caller_security_for_execution_views.sql",
+          "sha256": "a3aa2678172d4c9d53750dfbc72f8a7261a45d7de1fc9bddc6923a23489dc474"
+        },
+        {
+          "name": "20261124034500_550_route_capture_lineage.sql",
+          "sha256": "4621b74786949bc2f442d247dd4f0901e19b717e7e0a482f1dc20649fe8e7895"
+        },
+        {
+          "name": "20261124034600_551_scoped_delivery_read_paths.sql",
+          "sha256": "8392de5f68f9dc14c1aa902c88b9c78fcc0b3a8f2ad1c4a6124039eed4d240d5"
+        }
+      ]
+    }
+  ],
+  "postHeadSql": {
+    "name": "post-head-hosted-reconciliation.sql",
+    "sha256": "dc8c651a995b82de43077e4f0d5b7d1117e64ecae67d3ea064e2ec593757177c"
+  }
+}

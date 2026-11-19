@@ -1,0 +1,110 @@
+{
+  "stagingProjectRef": "vmmertwoboqiazcsougw",
+  "observedAt": "2026-10-30T00:34:16.408Z",
+  "history": {
+    "rowCount": 277,
+    "sha256": "f8e3d65c23e4388f80b154437f54e9c56f56956913d9e53c636d7d5294c9ce17"
+  },
+  "checks": {
+    "P02": {
+      "rowCount": 2,
+      "sha256": "79235ffd20b90e6cf41596efef086eb47066312f1c955f4b8eed01e44e7d05fc"
+    },
+    "P03": {
+      "rowCount": 1,
+      "sha256": "7f92a0f01af8e26694c35f53d441ba74f2350345eac6b689261e3a7eab665239"
+    },
+    "P04": {
+      "rowCount": 1,
+      "sha256": "0d637273ad5e65b6d8210d790d628c6a468db0cf51342c02fa91b177bf6f913a"
+    },
+    "P05": {
+      "rowCount": 1,
+      "sha256": "2e95bafd07069e8354f14469174e6034c5a47db52e51d937e873a60c3c7ab7a7"
+    },
+    "P06": {
+      "rowCount": 1,
+      "sha256": "4003889a124380483952366b901075ce66f9c29f8061febf02b68fbdbd1fb453"
+    },
+    "P07": {
+      "rowCount": 1,
+      "sha256": "d7991efaedd20b648a056419a243794b83e0afc0f88f52ce7d7757ff5f002737"
+    },
+    "P08": {
+      "rowCount": 68,
+      "sha256": "952d33eea2c3f081972a8f7cb61301538b5450632c7023033e3d988f9bf2dec6"
+    },
+    "P09": {
+      "rowCount": 44,
+      "sha256": "22690623399dd5efac32bb59538dda4aeb523312aeff981e14fd22b3271ad90c"
+    },
+    "P10": {
+      "rowCount": 12,
+      "sha256": "9edb1801c11714b43910ca91a13b87208252a4771028bf803fa268ea45a6a09f"
+    },
+    "P11": {
+      "rowCount": 2,
+      "sha256": "e35bf4e91a8fbd3eaf961bba39126946f068d014246e3e6f2cad900e4ef26151"
+    },
+    "P12": {
+      "rowCount": 1,
+      "sha256": "cd2ea035cfc977c0862d2d3cffd09f65a12370cc4097089d3067d450a2f3c49e"
+    },
+    "P13": {
+      "rowCount": 1,
+      "sha256": "da5dee723982cc36b62405578c2623e7fc65ab903acbc88ded14335044996726"
+    },
+    "P14": {
+      "rowCount": 13,
+      "sha256": "d66cd7ea9dd0dccfcfece3068a2cd0c91418ca745b39e266015fbff9102353d1"
+    },
+    "P15": {
+      "rowCount": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "P16": {
+      "rowCount": 1,
+      "sha256": "1ae98a85dc342acc72d37e0ad09a45dc99e4632ad9e8c839ce9685198e344a44"
+    },
+    "P17": {
+      "rowCount": 1,
+      "sha256": "3863c9bcbb225d5910977eb5981ab5c1c9365a9bffe36313cf1f05f69d97f7fb"
+    },
+    "P18": {
+      "rowCount": 12,
+      "sha256": "8909e76e41695f12be2edd5fbf8ea2cf832680cf6604b2bb4ee833190d0556f5"
+    },
+    "P19": {
+      "rowCount": 17,
+      "sha256": "393fa6caf2e67c6b53b3909ea168b194db53427d2961b2dd6dd6f59b93bc4876"
+    },
+    "P20": {
+      "rowCount": 9,
+      "sha256": "358cd541b4475c4084d926c79eb10af38a6be9265c7fe2fe8b5af3d9d347df9d"
+    }
+  },
+  "sourceFiles": {
+    "20261025233000_259_which_client_a_message_belongs_to.sql": "83012f6e3349cdac1ae7dbaa4d765fa4135ffe7d80a1ace55372f4f22c186c62",
+    "20261025235000_260_building_the_google_campaign.sql": "2faa6d2e3494eac3ad92082813566526c376facf52a3c531d77dd84a74963e9e",
+    "20261029120000_261_system_readiness_inventory.sql": "c317c9788cabf490979e2d6b8e76830b6f2e9c3499ebfbc5583e781e92515032",
+    "20261029130000_262_runtime_heartbeat_retention.sql": "04f3b9b9bbffbd8f05206f3b3caf9ed7d88b5488a97fa6c8e984e2727a3d2e6c",
+    "20261029140000_263_auth_signup_role_hardening.sql": "a4eaadaf5a09c3649fc6ee0c948c37f986ba5fdd02c883978a4ca99c6cefad62",
+    "20261029150000_264_low_level_transition_isolation.sql": "f4c5e23fac1ba49cf1a97763366d8ad75945d484798a86a8ae1dedd827132b39",
+    "20261029160000_265_lead_and_media_entitlements.sql": "b9c7b21ec2bdecd00b8984f82f242248a53272041e02dbdada6689bbfc74f305",
+    "20261029170000_266_commercial_reporting_and_storage_scope.sql": "9f0d96ee3d8708846fbd0838ec9ed72f70fbf571ac26d8b2af6db0d6943922d2",
+    "20261029180000_267_sales_entitlement_boundary.sql": "1b42a2536b212e50e68fb948e1fb15feeb4de1026cdc52638659fd5d7c59cf3a",
+    "20261029190000_268_contact_and_conversation_scope.sql": "05ca4d1cbb269617b3760e52426519f7590d5a2ee1559b561535f0423c0fd28d",
+    "20261029200000_269_authenticated_sales_rpc_scope.sql": "ea60bb774a7e8b6c2d6613558eeecdf418031e0cded66f7073c5a09e8845a299",
+    "20261029210000_270_default_deny_auth_and_active_staff.sql": "30302170417e9a4915d4d3594844bbf75c53c26bc4dd65becb8cab706d7925d0",
+    "20261029220000_271_profileless_authenticated_scope.sql": "b55c3229fb3a9a14cbaf454c35e1107c98426961b487325fac93e6b71404140c",
+    "20261030100000_272_onboarding_step_integrity.sql": "c7abc702f5c05de152d4d0c9c4e23373db8261d01b22d5aef9203e7640964eb4",
+    "20261030110000_273_canonical_approval_ledger.sql": "c547896719c8124555d95b857a83ab6b4063ce8f3165c0b86602914420f0e75e",
+    "20261030120000_274_campaign_action_inbox_bridge.sql": "4757b616ce22067a428d00a4f6ec4f100f69d13e2943466be31093487429c908",
+    "20261030130000_275_sales_entitlement_inbox_binding.sql": "d795dd294271016b556320a233420473c7fc59fb355433abc99cd36d59e81578",
+    "20261030140000_276_recruitment_brief_inbox.sql": "6d7d6d30f067e5ac3c247e408cc4292ab115e14334c12c6006d5f0b6bf1b19e1",
+    "20261030141000_277_engine_slot_preview_inbox.sql": "92d5bdf872fb593172caf03912fc10c91411ee7094634ade73bf6cb9764a190e",
+    "20261030150000_278_google_review_reply_inbox.sql": "1be9ddadfe8a4504a484049668977f381839194a8b87fba75a96e0957ef14ee0",
+    "20261030160000_279_approval_class_coverage.sql": "735b1a8a405fc808c5a7361e93c6b7c1261ec6407aa3af7f7a60754a3ac8a2ac",
+    "20261026000000_260_staging_google_reconcile.sql": "bae478c14e9731cd97ea150d55b716457877f2f19db3982f3c4e5491a2e91554"
+  }
+}
