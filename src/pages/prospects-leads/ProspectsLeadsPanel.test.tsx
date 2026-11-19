@@ -116,6 +116,19 @@ describe("AA lead funnel", () => {
     expect(screen.getByRole("dialog", { name: "Edit Naledi K" })).toBeInTheDocument();
   });
 
+  it("does not resend untouched sale and cash values when another detail changes", async () => {
+    show([lead({ sale_value: 3000, cash_collected: 1000, owner_member_id: "owner-a" })]);
+    await userEvent.click(await screen.findByRole("button", { name: "Edit Naledi K" }));
+    expect(screen.getByRole("button", { name: "Save details" })).toBeDisabled();
+    await userEvent.clear(screen.getByLabelText("Next action"));
+    await userEvent.type(screen.getByLabelText("Next action"), "Call tomorrow");
+    expect(screen.getByRole("button", { name: "Save details" })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "Save details" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("update_lead", {
+      p_lead_id: "lead-1", p_fields: { next_action: "Call tomorrow" },
+    }));
+  });
+
   it("moves through advance_lead and requires a reason for Lost", async () => {
     show();
     await userEvent.click(await screen.findByRole("button", { name: "Edit Naledi K" }));

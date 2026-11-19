@@ -3,7 +3,7 @@ import { Modal } from "../Modal";
 import { FieldControl } from "../forms/fields";
 import type { FormValues } from "../forms/fields";
 import { supabase } from "../../lib/supabase";
-import { detailFields, leadFieldsPayload, leadFormValues, type OwnerOption } from "./leadDetails";
+import { changedLeadFieldsPayload, detailFields, leadFormValues, type OwnerOption } from "./leadDetails";
 import { STAGE_OPTIONS, stageLabel, type LeadStage } from "./stages";
 import type { Lead, LeadEvent } from "./types";
 import { isMissingFunction, MIGRATION_PENDING_NOTE } from "../../lib/schemaGaps";
@@ -19,6 +19,7 @@ export function LeadEditModal({ lead, owners, onClose, onChanged, onArchived }: 
 }) {
   const [tab, setTab] = useState<Tab>("details");
   const [values, setValues] = useState<FormValues>({});
+  const [baselineValues, setBaselineValues] = useState<FormValues>({});
   const [targetStage, setTargetStage] = useState<LeadStage>("profile_visit");
   const [moveNote, setMoveNote] = useState("");
   const [note, setNote] = useState("");
@@ -32,7 +33,9 @@ export function LeadEditModal({ lead, owners, onClose, onChanged, onArchived }: 
   useEffect(() => {
     if (!lead) return;
     setTab("details");
-    setValues(leadFormValues(lead));
+    const openedValues = leadFormValues(lead);
+    setValues(openedValues);
+    setBaselineValues(openedValues);
     setTargetStage(lead.stage);
     setMoveNote("");
     setNote("");
@@ -70,6 +73,7 @@ export function LeadEditModal({ lead, owners, onClose, onChanged, onArchived }: 
   }
 
   if (!lead) return null;
+  const detailsDirty = Object.keys(values).some((key) => values[key] !== baselineValues[key]);
 
   return <Modal open onClose={onClose} title={`Edit ${lead.name ?? "lead"}`}>
     <div className="space-y-4">
@@ -84,21 +88,20 @@ export function LeadEditModal({ lead, owners, onClose, onChanged, onArchived }: 
 
       {tab === "details" && <form className="space-y-3" onSubmit={(event) => {
         event.preventDefault();
+        const submittedValues = { ...values };
         void run(async () => {
-          const fields = leadFieldsPayload(values);
-          // A prior owner may have been retired or lost sales access. Sending
-          // the unchanged ID back would make an unrelated edit fail the new
-          // assignment guard. Only a deliberate owner change is revalidated.
-          if (fields.owner_member_id === lead.owner_member_id) delete fields.owner_member_id;
+          const fields = changedLeadFieldsPayload(submittedValues, baselineValues);
+          if (Object.keys(fields).length === 0) throw new Error("No details have changed.");
           const { error: saveError } = await supabase.rpc("update_lead", { p_lead_id: lead.id, p_fields: fields });
           if (saveError) throw saveError;
           await onChanged();
+          setBaselineValues(submittedValues);
         });
       }}>
         {detailFields(owners).map((field) => <FieldControl key={field.name} field={field}
           value={values[field.name] ?? ""}
           onChange={(value) => setValues((previous) => ({ ...previous, [field.name]: value }))} />)}
-        <button type="submit" disabled={busy} className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50">Save details</button>
+        <button type="submit" disabled={busy || !detailsDirty} className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50">Save details</button>
       </form>}
 
       {tab === "move" && <div className="space-y-3">

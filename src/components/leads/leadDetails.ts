@@ -55,3 +55,10 @@ export function leadFieldsPayload(values: FormValues): Record<string, string | n
   if (!payload.name) throw new Error("Name is required.");
   return payload;
 }
+
+/** Only send fields the operator changed; a stale form must not rewrite cash. */
+export function changedLeadFieldsPayload(values: FormValues, baseline: FormValues): Record<string, string | number | null> {
+  const current = leadFieldsPayload(values);
+  const original = leadFieldsPayload(baseline);
+  return Object.fromEntries(Object.entries(current).filter(([key, value]) => value !== original[key]));
+}
