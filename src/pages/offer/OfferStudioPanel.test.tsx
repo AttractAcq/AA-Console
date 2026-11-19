@@ -41,6 +41,7 @@ const drift = (over: Record<string, unknown> = {}) => ({
 function database(data: {
   offers?: unknown[]; versions?: unknown[]; signoffs?: unknown[]; drift?: unknown[]; jobs?: unknown[];
   opportunities?: unknown[]; approvals?: unknown[]; sources?: unknown[]; mainSources?: unknown[];
+  proofs?: unknown[];
   failTable?: string;
 }) {
   const byTable: Record<string, unknown[]> = {
@@ -53,6 +54,7 @@ function database(data: {
     opportunity_approval_state_v6: data.approvals ?? [],
     secondary_offer_sources_v7: data.sources ?? [],
     main_offer_sources_v7: data.mainSources ?? [],
+    client_proof_assets: data.proofs ?? [],
   };
   // The panel chains select -> eq -> order for some tables and select -> eq for
   // others, so the chain is a thenable rather than having one terminal method:
@@ -177,6 +179,24 @@ describe("the source-first Build path", () => {
     expect(await screen.findByRole("heading", { name: "Garage conversion versions" })).toBeInTheDocument();
     expect(screen.getByText("Version 2 · Draft")).toBeInTheDocument();
     expect(screen.queryByText("A repaired roof")).toBeNull();
+  });
+
+  it("shows the recorded evidence and flags a missing proof link during exact offer review", async () => {
+    const proofId = "11111111-1111-4111-8111-111111111111";
+    const missingId = "22222222-2222-4222-8222-222222222222";
+    database({ offers: [offer()], versions: [version({
+      promise: "A garage ready for training",
+      claims: [
+        { kind: "quantified", text: "Completed within the agreed period", proof_asset_id: proofId },
+        { kind: "quantified", text: "A second unsupported result", proof_asset_id: missingId },
+      ],
+    })], proofs: [{ id: proofId, title: "Garage handover", claim: "Completed within the agreed period",
+      evidence: "Signed handover note", usage_rights: "approved", expires_on: null }] });
+    show("build", "/?tab=build&offer=offer-1");
+    await userEvent.click(await screen.findByText("Inclusions, limits and claims"));
+    expect(screen.getByText("Proof: Garage handover")).toBeInTheDocument();
+    expect(screen.getByText("Evidence: Signed handover note")).toBeInTheDocument();
+    expect(screen.getByText("The linked proof record is unavailable for this client.")).toBeInTheDocument();
   });
 
   it("lets a saved Versions link choose an existing offer", async () => {

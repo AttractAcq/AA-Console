@@ -9,6 +9,8 @@ type Signoff = Database["public"]["Tables"]["service_offer_signoffs"]["Row"];
 type Manifest = Database["public"]["Tables"]["campaign_manifest_versions"]["Row"];
 type ManifestOffer = Database["public"]["Tables"]["campaign_manifest_offers"]["Row"];
 type Campaign = Database["public"]["Tables"]["client_campaigns"]["Row"];
+type Proof = Pick<Database["public"]["Tables"]["client_proof_assets"]["Row"],
+  "id" | "title" | "claim" | "evidence" | "usage_rights" | "expires_on">;
 type Form = {
   offerId: string | null; serviceName: string; audience: string; promise: string;
   inclusions: string; exclusions: string; price: string; currency: string;
@@ -25,6 +27,7 @@ const emptyForm: Form = { offerId: null, serviceName: "", audience: "", promise:
   effortSacrifice: "", effortReductionSteps: "", riskReversal: "", bonuses: "",
   scarcity: "", urgency: "", deliveryLimits: "" };
 const lines = (value: string) => value.split("\n").map((item) => item.trim()).filter(Boolean);
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function valueObject(value: Json | null): Record<string, Json> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, Json> : {};
@@ -55,6 +58,7 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
   const [manifests, setManifests] = useState<Manifest[]>([]);
   const [manifestOffers, setManifestOffers] = useState<ManifestOffer[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [proofs, setProofs] = useState<Proof[]>([]);
   const [selectedManifestId, setSelectedManifestId] = useState("");
   const [selectedOfferVersionId, setSelectedOfferVersionId] = useState("");
   const [form, setForm] = useState<Form>(emptyForm);
@@ -76,10 +80,21 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
       supabase.from("campaign_manifest_offers").select("*").eq("client_id", clientId),
       supabase.from("client_campaigns").select("*").eq("client_id", clientId),
     ]);
-    setLoading(false);
     const queryError = offerResult.error ?? versionResult.error ?? signoffResult.error
       ?? manifestResult.error ?? linkResult.error ?? campaignResult.error;
-    if (queryError) { setError(queryError.message); return; }
+    if (queryError) { setLoading(false); setError(queryError.message); return; }
+    const proofIds = [...new Set((versionResult.data ?? []).flatMap((version) =>
+      Array.isArray(version.claims) ? version.claims.filter(isClaim)
+        .filter((claim) => claim.kind === "quantified" &&
+          uuidPattern.test(claim.proof_asset_id ?? ""))
+        .map((claim) => claim.proof_asset_id!) : []))];
+    const proofResult = proofIds.length > 0
+      ? await supabase.from("client_proof_assets")
+        .select("id,title,claim,evidence,usage_rights,expires_on")
+        .eq("client_id", clientId).in("id", proofIds)
+      : { data: [] as Proof[], error: null };
+    setLoading(false);
+    if (proofResult.error) { setError(`Offer proof is unavailable: ${proofResult.error.message}`); return; }
     setError(null);
     setOffers(offerResult.data ?? []);
     setVersions(versionResult.data ?? []);
@@ -87,6 +102,7 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
     setManifests(manifestResult.data ?? []);
     setManifestOffers(linkResult.data ?? []);
     setCampaigns(campaignResult.data ?? []);
+    setProofs(proofResult.data ?? []);
   }, [clientId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
@@ -234,7 +250,7 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
       <h2 className="text-xl font-semibold">{selectedOffer?.service_name ?? "Selected offer"} versions</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         Draft a service-specific offer with its promise, inclusions, limits and economics.
-        Each revision is a new version. Quantified claims require current, cleared proof before human sign-off.
+        Each revision is a new version. A quantified claim must match the cleared proof's claim text and have recorded evidence before sign-off or new campaign use.
       </p>
     </div>
     {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
@@ -403,6 +419,19 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
                   <p>Included: {version.inclusions.join("; ") || "None specified"}</p>
                   <p>Limits: {version.exclusions.join("; ") || "None specified"}</p>
                   <pre className="overflow-auto rounded-lg bg-muted p-3 text-xs">{JSON.stringify(version.claims, null, 2)}</pre>
+                  {Array.isArray(version.claims) && version.claims.filter(isClaim)
+                    .filter((claim) => claim.kind === "quantified").map((claim, index) => {
+                      const proof = proofs.find((item) => item.id === claim.proof_asset_id);
+                      return <div key={`${claim.proof_asset_id ?? "missing"}-${index}`} className="rounded border border-border p-3">
+                        <p className="font-medium">Claim: {claim.text}</p>
+                        {proof ? <>
+                          <p>Proof: {proof.title || proof.id}</p>
+                          <p>Recorded proof claim: {proof.claim || "Missing"}</p>
+                          <p>Evidence: {proof.evidence || "Missing"}</p>
+                          <p>Rights: {proof.usage_rights} · Expires: {proof.expires_on || "No recorded expiry"}</p>
+                        </> : <p role="alert">The linked proof record is unavailable for this client.</p>}
+                      </div>;
+                    })}
                 </div>
               </details>
               <details className="mt-3 text-sm"><summary className="cursor-pointer">Value equation</summary>
