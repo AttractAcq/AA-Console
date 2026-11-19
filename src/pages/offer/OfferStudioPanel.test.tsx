@@ -40,6 +40,7 @@ const drift = (over: Record<string, unknown> = {}) => ({
 function database(data: {
   offers?: unknown[]; versions?: unknown[]; signoffs?: unknown[]; drift?: unknown[]; jobs?: unknown[];
   opportunities?: unknown[]; approvals?: unknown[]; sources?: unknown[]; mainSources?: unknown[];
+  failTable?: string;
 }) {
   const byTable: Record<string, unknown[]> = {
     service_offers: data.offers ?? [],
@@ -56,7 +57,7 @@ function database(data: {
   // others, so the chain is a thenable rather than having one terminal method:
   // awaiting it at any point yields the rows.
   from.mockImplementation((table: string) => {
-    const result = { data: byTable[table] ?? [], error: null };
+    const result = { data: byTable[table] ?? [], error: table === data.failTable ? { message: "Read denied" } : null };
     const chain: Record<string, unknown> = {};
     Object.assign(chain, {
       select: () => chain,
@@ -166,9 +167,24 @@ describe("the source-first Build path", () => {
     expect(screen.getByText("Version 2 · Draft")).toBeInTheDocument();
     expect(screen.queryByText("A repaired roof")).toBeNull();
   });
+
+  it("lets a saved Versions link choose an existing offer", async () => {
+    database({ offers: [offer()] });
+    show("build", "/?tab=versions");
+    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Continue an existing offer" }), "offer-1");
+    expect(await screen.findByRole("heading", { name: "Garage conversion versions" })).toBeInTheDocument();
+  });
 });
 
 describe("the table", () => {
+  it("shows a failed source read as unavailable with a retry", async () => {
+    database({ offers: [], failTable: "service_offers" });
+    show();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Offers are unavailable: Read denied");
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.queryByText(/No offers yet/)).toBeNull();
+  });
+
   it("shows each offer with its kind and latest version", async () => {
     database({ offers: [offer()], versions: [version()] });
     show();

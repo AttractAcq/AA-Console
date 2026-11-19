@@ -32,6 +32,7 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
   const [buildSource, setBuildSource] = useState<"baseline" | "opportunity" | null>(null);
   const [serviceName, setServiceName] = useState("");
   const [loading, setLoading] = useState(true);
+  const [readError, setReadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -60,10 +61,10 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
       offerResult.error ?? versionResult.error ?? signoffResult.error ?? driftResult.error
       ?? opportunityResult.error ?? approvalResult.error ?? sourceResult.error ?? mainSourceResult.error;
     if (queryError) {
-      setError(queryError.message);
+      setReadError(queryError.message);
       return;
     }
-    setError(null);
+    setReadError(null);
     setOffers(offerResult.data ?? []);
     setVersions(versionResult.data ?? []);
     setSignoffs(signoffResult.data ?? []);
@@ -216,6 +217,12 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
   }
+  if (readError) {
+    return <div role="alert" className="space-y-2 text-sm text-destructive">
+      <p>Offers are unavailable: {readError}</p>
+      <button type="button" onClick={() => void refresh()}>Retry</button>
+    </div>;
+  }
 
   const selectedBuildOffer = offers.find((offer) => offer.id === searchParams.get("offer"));
   if (view === "build") {
@@ -255,6 +262,22 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
             {busy === `compile-${kind}` ? "Queueing…" : "Draft with agent"}</Button>
         </div>
       </section>
+      {offers.length > 0 && <label className="block text-sm">Continue an existing offer
+        <select className="mt-1 block w-full rounded border border-border bg-background px-2 py-1"
+          value={selectedBuildOffer?.id ?? ""}
+          onChange={(event) => setSearchParams((current) => {
+            const next = new URLSearchParams(current);
+            next.set("tab", "build");
+            if (event.target.value) next.set("offer", event.target.value);
+            else next.delete("offer");
+            return next;
+          })}>
+          <option value="">Choose an existing offer</option>
+          {offers.map((offer) => <option key={offer.id} value={offer.id}>
+            {offer.service_name} · {offer.kind === "secondary" ? "opportunity" : "baseline"}
+          </option>)}
+        </select>
+      </label>}
       {selectedBuildOffer && <ServiceOffersPanel selectedOfferId={selectedBuildOffer.id} />}
     </div>;
   }
