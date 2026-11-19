@@ -130,7 +130,9 @@ function show(agents: unknown[] = [built()], convs: Conv[] = [], jobs: Job[] = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  rpc.mockResolvedValue({ data: null, error: null });
+  rpc.mockImplementation((name: string) => Promise.resolve({
+    data: name === "list_archived_dm_returns_v11" ? [] : null, error: null,
+  }));
   useParams.mockReturnValue({ clientId: "client-1" });
   getUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
 });

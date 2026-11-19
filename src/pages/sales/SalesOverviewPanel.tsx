@@ -10,6 +10,7 @@ import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
 import { fetchArchivedReturnBatchPacket, type ArchivedReturnBatchPacket } from "../../lib/archivedReturnBatch";
 import { ArchivedReturnBatchModal } from "./ArchivedReturnBatchModal";
+import { ArchivedDmReturnsPanel } from "./ArchivedDmReturnsPanel";
 import { ArchiveAction } from "../../components/ArchiveAction";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 import { cn } from "../../lib/cn";
@@ -248,6 +249,8 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
   return (
     <div>
       {!campaignId && <AgentActivityBar inFlight={inFlight} failures={recentFailures} />}
+
+      {!campaignId && clientId && <ArchivedDmReturnsPanel key={clientId} clientId={clientId} />}
 
       <div className="mb-4 flex justify-end">
         <Button icon={Plus} onClick={() => setBuildOpen(true)}>
