@@ -21,11 +21,22 @@ insert into public.client_media_assets
 values ('cccccccc-cccc-4ccc-8ccc-cccccccccccc',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','image','single','Engine image',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/engine.png','agency_owned');
+insert into public.client_media_assets
+  (id,client_id,media_type,content_format,title,storage_path,render_path,usage_rights)
+values ('cccccccc-cccc-4ccc-8ccc-cccccccccccd',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','image','single','Finished Engine image',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/source.png',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/finished.png','agency_owned');
 insert into storage.objects(id,bucket_id,name,version) values
   ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','client-media',
-   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/engine.png','v1');
+   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/engine.png','v1'),
+  ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeed','client-media',
+   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/source.png','v1'),
+  ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeef','client-media',
+   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/finished.png','v1');
 insert into public.post_copy(asset_id,platform,caption) values
-  ('cccccccc-cccc-4ccc-8ccc-cccccccccccc','instagram','Exact caption');
+  ('cccccccc-cccc-4ccc-8ccc-cccccccccccc','instagram','Exact caption'),
+  ('cccccccc-cccc-4ccc-8ccc-cccccccccccd','instagram','Finished render caption');
 insert into public.client_integrations(client_id,provider,credential_label,status)
 values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','instagram','17890000000000000','connected');
 insert into public.content_slots
@@ -33,20 +44,33 @@ insert into public.content_slots
 values ('dddddddd-dddd-4ddd-8ddd-dddddddddddd',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','instagram',now()+interval '2 days',
   'awaiting_approval','cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+insert into public.content_slots
+  (id,client_id,platform,scheduled_at,stage,asset_id)
+values ('dddddddd-dddd-4ddd-8ddd-ddddddddddde',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','instagram',now()+interval '3 days',
+  'awaiting_approval','cccccccc-cccc-4ccc-8ccc-cccccccccccd');
 insert into public.slot_events(slot_id,from_stage,to_stage,actor)
-values ('dddddddd-dddd-4ddd-8ddd-dddddddddddd','qa','awaiting_approval','engine');
+values ('dddddddd-dddd-4ddd-8ddd-dddddddddddd','qa','awaiting_approval','engine'),
+  ('dddddddd-dddd-4ddd-8ddd-ddddddddddde','qa','awaiting_approval','engine');
 select set_config('request.jwt.claim.role','service_role',true);
 select public.attest_creative_storage_bytes_v6(
   'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/engine.png',repeat('a',64),19,
   'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','v1',
   (select updated_at from storage.objects where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'));
+select public.attest_creative_storage_bytes_v6(
+  'cccccccc-cccc-4ccc-8ccc-cccccccccccd',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/finished.png',repeat('b',64),21,
+  'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeef','v1',
+  (select updated_at from storage.objects where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeef'));
 select set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claims',
   '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal1"}',true);
 do $checks$
 declare v_request uuid;
+  v_render_request uuid;
+  v_render_preview jsonb;
 begin
   begin
     update public.client_media_assets set usage_rights=null
@@ -156,6 +180,29 @@ begin
   perform set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
   perform set_config('request.jwt.claims',
     '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  v_render_request:=public.request_engine_slot_exact_review_v6(
+    'dddddddd-dddd-4ddd-8ddd-ddddddddddde');
+  select e.preview->'exact_package' into v_render_preview
+    from public.approval_request_evidence_v6 e where e.request_id=v_render_request;
+  if v_render_preview#>>'{asset,render_path}'<>
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/finished.png'
+    or v_render_preview#>>'{asset,file_sha256}'<>repeat('b',64)
+    or v_render_preview#>>'{storage,object_id}'<>
+      'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeef'
+    or public.engine_slot_exact_source_state_v6(v_render_request)<>'pending' then
+    raise exception 'Engine render packet did not bind the finished file'; end if;
+  perform public.decide_engine_slot_inbox_v6(
+    'dddddddd-dddd-4ddd-8ddd-ddddddddddde',v_render_request,true);
+  if public.organic_creative_source_current_v8(
+      (select scheduled_post_id from public.content_slots
+        where id='dddddddd-dddd-4ddd-8ddd-ddddddddddde')) is not true then
+    raise exception 'Finished Engine render did not gain source authority'; end if;
+  update storage.objects set version='v2'
+    where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeef';
+  if public.organic_creative_source_current_v8(
+      (select scheduled_post_id from public.content_slots
+        where id='dddddddd-dddd-4ddd-8ddd-ddddddddddde')) is true then
+    raise exception 'Changed Engine render retained source authority'; end if;
   update storage.objects set version='v2'
     where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
   if public.engine_slot_exact_source_state_v6(v_request)<>'superseded'

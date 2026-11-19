@@ -1312,7 +1312,8 @@ function RequestCard({ request, history, gatewayOutcome, executionEvidence, clie
     && !Array.isArray(creativeSource)
     ? creativeSource as Record<string, unknown> : null;
   const creativePath = creativeAsset && (request.source_kind === "video_seat"
-    || request.source_kind === "motion_render" || request.source_kind === "ordinary_media"
+    || request.source_kind === "motion_render" || (request.source_kind === "ordinary_media"
+      || request.source_kind === "engine_slot")
       && (creativeAsset.content_format ?? "single") === "single" && creativeAsset.render_path
     ? creativeAsset.render_path : creativeAsset.storage_path);
   const creativeDownloadable = !!creativeAsset

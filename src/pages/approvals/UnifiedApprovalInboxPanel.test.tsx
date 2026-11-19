@@ -1677,6 +1677,20 @@ describe("unified approval inbox", () => {
     }));
   });
 
+  it("verifies the finished Engine render instead of its source file", async () => {
+    requests = [{ ...readyEngineSlot, preview: { exact_package: {
+      ...readyEngineSlot.preview.exact_package,
+      asset: { ...readyEngineSlot.preview.exact_package.asset,
+        render_path: "client-1/finished.png" },
+    } } }];
+    show();
+    const card = await screen.findByRole("article", { name: readyEngineSlot.title });
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify creative file" }));
+    await waitFor(() => expect(downloadVerifiedCreativeFile).toHaveBeenCalledWith(
+      "client-1/finished.png", mediaFileHash));
+  });
+
   it("rejects an offer with a reason", async () => {
     const user = userEvent.setup();
     requests = [readyOffer];
