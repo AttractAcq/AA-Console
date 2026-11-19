@@ -262,7 +262,7 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
       <h2 className="text-xl font-semibold">{selectedOffer?.service_name ?? "Selected offer"} versions</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         Draft a service-specific offer with its promise, inclusions, limits and economics.
-        Each revision is a new version. A quantified claim must match the cleared proof's claim text and have recorded evidence before sign-off or new campaign use.
+        Each revision is a new version. Every explicit claim in a new structured offer must match cleared proof text and recorded evidence before sign-off or new campaign use.
       </p>
     </div>
     {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
@@ -454,7 +454,7 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
                   <p>Limits: {version.exclusions.join("; ") || "None specified"}</p>
                   <pre className="overflow-auto rounded-lg bg-muted p-3 text-xs">{JSON.stringify(version.claims, null, 2)}</pre>
                   {Array.isArray(version.claims) && version.claims.filter(isClaim)
-                    .filter((claim) => claim.kind === "quantified").map((claim, index) => {
+                    .filter((claim) => claim.kind === "general" || claim.kind === "quantified").map((claim, index) => {
                       const proof = proofs.find((item) => item.id === claim.proof_asset_id);
                       return <div key={`${claim.proof_asset_id ?? "missing"}-${index}`} className="rounded border border-border p-3">
                         <p className="font-medium">Claim: {claim.text}</p>
@@ -463,7 +463,9 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
                           <p>Recorded proof claim: {proof.claim || "Missing"}</p>
                           <p>Evidence: {proof.evidence || "Missing"}</p>
                           <p>Rights: {proof.usage_rights} · Expires: {proof.expires_on || "No recorded expiry"}</p>
-                        </> : <p role="alert">The linked proof record is unavailable for this client.</p>}
+                        </> : <p role="alert">{claim.proof_asset_id
+                          ? "The linked proof record is unavailable for this client."
+                          : "No proof link was recorded for this claim."}</p>}
                       </div>;
                     })}
                 </div>

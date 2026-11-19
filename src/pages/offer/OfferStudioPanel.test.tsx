@@ -216,14 +216,15 @@ describe("the source-first Build path", () => {
       promise: "A garage ready for training",
       claims: [
         { kind: "quantified", text: "Completed within the agreed period", proof_asset_id: proofId },
+        { kind: "general", text: "Completed within the agreed period", proof_asset_id: proofId },
         { kind: "quantified", text: "A second unsupported result", proof_asset_id: missingId },
       ],
     })], proofs: [{ id: proofId, title: "Garage handover", claim: "Completed within the agreed period",
       evidence: "Signed handover note", usage_rights: "approved", expires_on: null }] });
     show("build", "/?tab=build&offer=offer-1");
     await userEvent.click(await screen.findByText("Inclusions, limits and claims"));
-    expect(screen.getByText("Proof: Garage handover")).toBeInTheDocument();
-    expect(screen.getByText("Evidence: Signed handover note")).toBeInTheDocument();
+    expect(screen.getAllByText("Proof: Garage handover")).toHaveLength(2);
+    expect(screen.getAllByText("Evidence: Signed handover note")).toHaveLength(2);
     expect(screen.getByText("The linked proof record is unavailable for this client.")).toBeInTheDocument();
   });
 
