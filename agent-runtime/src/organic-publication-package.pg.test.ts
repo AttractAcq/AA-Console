@@ -268,4 +268,32 @@ describe("held exact organic publication package", () => {
     expect((await db.query("select * from organic_publication_package_candidates_v6(5)")).rows)
       .toHaveLength(0);
   });
+
+  it("makes only a current rights-bearing frozen package reviewable", async () => {
+    await db.exec(`update client_campaigns set acquisition_mode='organic',paid_platform=null;
+      update client_media_assets set usage_rights='client_owned' where id='${ASSET}';`);
+    const candidate = await one<{ source_snapshot_hash: string }>(
+      "select source_snapshot_hash from organic_publication_package_candidates_v6(5)");
+    const media = [{ source_path: SOURCE, frozen_bucket: "publication-media",
+      frozen_path: FROZEN, sha256: SHA, byte_size: 123, mime_type: "image/png" }];
+    const { id: packageId } = await one<{ id: string }>(
+      "select register_organic_publication_package_v6($1,$2,$3::jsonb,$4::jsonb) as id",
+      [POST, candidate.source_snapshot_hash, JSON.stringify(media),
+        JSON.stringify({ caption: "The exact caption\n\n#proof", first_comment: null })]);
+    const migration = await readFile(new URL(
+      "../../supabase/migrations/20261124042100_586_organic_publication_exact_review.sql",
+      import.meta.url,
+    ), "utf8");
+    await db.exec(migration.slice(0, migration.indexOf("-- The canonical Inbox keeps")));
+    const { id: requestId } = await one<{ id: string }>(
+      "select id from approval_requests_v6 where source_id=$1", [packageId]);
+    expect((await one<{ state: string }>(
+      "select organic_publication_source_state_v6($1) as state", [requestId])).state)
+      .toBe("pending");
+    await db.exec(`update post_copy_effective set caption='Changed after review'
+      where scheduled_post_id='${POST}'`);
+    expect((await one<{ state: string }>(
+      "select organic_publication_source_state_v6($1) as state", [requestId])).state)
+      .toBe("superseded");
+  });
 });
