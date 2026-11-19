@@ -4,7 +4,9 @@
 
 **Candidate progress, 19 November:** Migration 623 added the internal historical lead source. Migration 624 moves `acquisition_funnel` and `client_money_currency_breakdown` onto it, including archived sale-stage events. Their disposable fixture compares before archive, archived and recovered results. Other listed reporting and operational consumers still need migration and cross-surface tests; the positive-cash archive guard remains in force.
 
-Migrations 625–627 add one internal historical progress source and move three public plus two MCP Economics reports onto it. Disposable fixtures cover probe exclusion, active/archive overlap, an archived sale later marked lost, recorded USD cash and exact before/archive/recovery equality. `content_attribution`, other attribution/MCP summaries and operational claims still need coordinated work and cross-surface checks before the archive guard can change.
+Migrations 625–627 add one internal historical progress source and move three public plus two MCP Economics reports onto it. Disposable fixtures cover probe exclusion, active/archive overlap, an archived sale later marked lost, recorded USD cash and exact before/archive/recovery equality. At that point, `content_attribution`, other attribution/MCP summaries and operational claims still needed coordinated work and cross-surface checks before the archive guard could change.
+
+Migrations 628–629 move `content_attribution`, `top_content_by_revenue` and MCP content performance onto archived-aware asset outcomes. The view retains security-invoker behavior; its narrow aggregate helper returns zero lead outcomes to a viewer without lead entitlement and denies anonymous direct execution. Local fixtures preserved cash and sale contribution before/archive/recovery, denied an ungranted MCP bot-client call, and kept absent provider metrics unknown. The MCP conversion funnel, pipeline summary, page/offer reporting and action claims still need separate work.
 
 ## Present behavior and gap
 

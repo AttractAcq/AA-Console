@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "0ce94bba61b52914100e2db909e4a44e19546a7b5d938f2a3c144ef232f97cf0",
-  "generatedTypesSha256": "40c7fbdbaf9ee7d7c3c74a7ef839963068e5404793400271508f8cc186cd88ef",
-  "generatedSchemaBodySha256": "6193c6add8b0ed9d5d28168c2a8a673ddba6ade30853766a8bd523aa2096970a",
+  "migrationSourceDigest": "180bcce9a33010b6f474944419297edfeedf73a014762499ce42b3a580b8cefc",
+  "generatedTypesSha256": "b1de15348458382e6b1011b285a0e2a0c3839ee0e39b0ed8ab74b078628b3f43",
+  "generatedSchemaBodySha256": "432d328b52c3febd32cb4b75027bf0ec3a47dbb9c8e58cc96d4e95525b88b62e",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4511,6 +4511,20 @@
       "filename": "20261124050200_627_historical_mcp_economics.sql",
       "sha256": "05c94df4e2b034e6be84d28acd6dbce065c979dcf2302343f33fb3a651c7b489",
       "trimmedMd5": "69fd95bdadc309312bb3794517ba783d"
+    },
+    {
+      "version": "20261124050300",
+      "name": "628_historical_content_asset_outcomes",
+      "filename": "20261124050300_628_historical_content_asset_outcomes.sql",
+      "sha256": "bf973b47ceab4acbc24eb5a4845962c1bb9075701b5a5ce30915470c774ceffc",
+      "trimmedMd5": "e9349007388279db242507ca9472d01d"
+    },
+    {
+      "version": "20261124050400",
+      "name": "629_historical_mcp_content_performance",
+      "filename": "20261124050400_629_historical_mcp_content_performance.sql",
+      "sha256": "601961731dc2f5c2e823bbbc8a15926780f3e9063e385029656efebe730ea792",
+      "trimmedMd5": "c8dd9059e7473edff977dc715315b2fb"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

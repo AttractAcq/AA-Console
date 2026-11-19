@@ -18,8 +18,8 @@ REPO = Path(__file__).resolve().parents[1]
 MANIFEST = REPO / "docs/client-delivery-pr363-migration-review-2026-11-18.md"
 MIGRATIONS = REPO / "supabase/migrations"
 START = "20261124034600"
-END = "20261124050200"
-EXPECTED = 76
+END = "20261124050400"
+EXPECTED = 78
 
 
 def docker(container: str, *args: str, input_bytes: bytes | None = None,
@@ -148,7 +148,7 @@ def main() -> None:
     state["after"] = after
     state["history"] = final_history
     state["old_cron_digest_after"] = old_cron_digest(args.container, baseline["cron_max_id"])
-    state["verified"] = (final_history == f"645|{END}"
+    state["verified"] = (final_history == f"647|{END}"
                          and after["clients"] == baseline["clients"]
                          and after["auth_users"] == baseline["auth_users"]
                          and after["storage_policies"] == baseline["storage_policies"]

@@ -39731,6 +39731,22 @@ export type Database = {
         }
         Returns: string
       }
+      content_asset_outcomes_v10: {
+        Args: { p_asset_id: string; p_client_id: string }
+        Returns: {
+          appointments: number
+          cash_collected: number
+          conversations: number
+          followers: number
+          leads: number
+          lost: number
+          opportunity_value: number
+          profile_visits: number
+          qualified: number
+          sale_value: number
+          sales: number
+        }[]
+      }
       create_booking_link_v6: {
         Args: {
           p_campaign_id?: string
