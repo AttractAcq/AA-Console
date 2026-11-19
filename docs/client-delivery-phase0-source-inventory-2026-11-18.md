@@ -1,6 +1,6 @@
 # Client Delivery source inventory — 18 November 2026
 
-**Scope and evidence level:** This is an inventory of the candidate source first inspected at `4d5624310df9d8d15dc6cf457a6f3991ff146c62`, with later source checkpoints in the build plan. It is not a signed-in or deployed-page acceptance result. The 20 Delivery routes and their tab IDs come from `src/config/navigation.ts`; `src/App.tsx` registers the routes, and `src/pages/Page.tsx` binds tabs to panels. A rendered panel proves a source surface exists, not that its data, executor or external provider works. The live source-versus-deployment difference is still open: hosted staging and production were last recorded at migration 551, while draft PR #363 contains candidate migrations 552–580. Recheck deployed component SHAs and migration heads before release.
+**Scope and evidence level:** This is an inventory of the candidate source first inspected at `4d5624310df9d8d15dc6cf457a6f3991ff146c62`, with later source checkpoints in the build plan. It is not a signed-in or deployed-page acceptance result. The 20 Delivery routes and their tab IDs come from `src/config/navigation.ts`; `src/App.tsx` registers the routes, and `src/pages/Page.tsx` binds tabs to panels. A rendered panel proves a source surface exists, not that its data, executor or external provider works. The live source-versus-deployment difference is still open: production was last recorded at migration 551 and staging at a separately amended head of 569, while draft PR #363 now contains candidate migrations through 607. Recheck deployed component SHAs and migration heads before release.
 
 | Order | Delivery route | Source tabs or view | Main record or reader boundary | Action / review boundary | Archive or history home |
 | --- | --- | --- | --- | --- | --- |
@@ -36,4 +36,6 @@
 | P0-01 | Release owner | Record fresh browser/runtime/gateway SHAs, migration heads and current route rendering for the target client; compare each against candidate source. |
 | P0-02 | Product owner and client operator | Sign off this page/tab inventory and the two product decisions against the real account workflow. |
 | P0-03 | Approvals owner | Enumerate every live required class and prove each has an owning queue, exact preview, decision and outcome; the source panel list is insufficient. |
-| P0-04 | Provider/integrations owner | Verif
+| P0-04 | Provider/integrations owner | Verify the exact connected Meta, Instagram, Google Ads and Business Profile account identities, scopes and action rights with current provider reads. Stored connection rows and credential presence are insufficient. |
+| P0-05 | Delivery and archive owner | Verify every archive and restore path against a finished record and confirm historical lineage and rejection reasons remain readable. Local rollback fixtures do not prove hosted retrieval. |
+| P0-06 | Acceptance owner | Run the signed-in page and legacy-link review with an authorized test client, then record organic and paid external receipts and source-to-cash outcomes separately. Keep unsupported routes and missing metrics marked unknown. |
