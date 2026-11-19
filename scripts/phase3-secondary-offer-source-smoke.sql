@@ -70,16 +70,31 @@ begin
   select id into rights_id from public.proof_rights_requests_v6
     where canonical_request_id=rights_request;
   perform public.approve_proof_rights_v6(rights_id,rights_request);
-  v := public.create_service_offer_version_v6(o.client_id,'New secondary offer',
+  v := public.create_service_offer_version_v9(offer.id,o.client_id,'New secondary offer',
     'Homeowners with unused garages','A garage ready for training',
     array['Insulation'],array['Gym equipment'],null,null,null,
     jsonb_build_array(jsonb_build_object('kind','quantified',
       'text','Completed within the agreed period','proof_asset_id',claim_proof.id)),
-    'secondary-offer-version',offer.id);
+    jsonb_build_object(
+      'dream_outcome','A garage ready for training',
+      'dream_outcome_boost','Insulation makes winter training practical',
+      'likelihood','A scoped conversion based on the garage survey',
+      'likelihood_mechanism','Survey and measured installation plan',
+      'time_delay','Schedule after survey and materials confirmation',
+      'delay_reduction_steps',jsonb_build_array('Survey before final quote'),
+      'effort_sacrifice','The owner must clear the garage',
+      'effort_reduction_steps',jsonb_build_array('Provide a clearing checklist'),
+      'risk_reversal','Written scope before deposit',
+      'bonuses','[]'::jsonb,'scarcity','','urgency','',
+      'delivery_limits','Subject to a completed survey'),
+    'secondary-offer-version');
   select id into request_id from public.approval_requests_v6
     where source_kind='service_offer' and source_id=v.id::text;
-  if public.service_offer_source_state_v6(request_id)<>'pending' then
-    raise exception 'Sourced offer did not reach review'; end if;
+  if public.service_offer_source_state_v6(request_id)<>'pending'
+    or not exists(select 1 from public.approval_requests_v6 r
+      where r.id=request_id and r.preview->'value_equation'=v.value_equation
+        and r.artifact_hash=v.content_hash) then
+    raise exception 'Current value-equation offer did not reach exact review'; end if;
   perform public.approve_service_offer_version_v6(v.id);
   if not exists(select 1 from public.service_offer_signoffs where offer_version_id=v.id)
     then raise exception 'Offer approval did not sign off exact version'; end if;
