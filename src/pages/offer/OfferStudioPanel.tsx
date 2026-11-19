@@ -25,6 +25,7 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
   const [versions, setVersions] = useState<Version[]>([]);
   const [signoffs, setSignoffs] = useState<Signoff[]>([]);
   const [drift, setDrift] = useState<Drift[]>([]);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [approvedOpportunities, setApprovedOpportunities] = useState<Opportunity[]>([]);
   const [sources, setSources] = useState<SecondarySource[]>([]);
   const [mainSources, setMainSources] = useState<MainSource[]>([]);
@@ -69,8 +70,10 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
     setVersions(versionResult.data ?? []);
     setSignoffs(signoffResult.data ?? []);
     setDrift(driftResult.data ?? []);
+    const allOpportunities = opportunityResult.data ?? [];
+    setOpportunities(allOpportunities);
     const currentIds = new Set((approvalResult.data ?? []).filter((row) => row.approval_current).map((row) => row.opportunity_id));
-    const current = (opportunityResult.data ?? []).filter((row) => currentIds.has(row.id));
+    const current = allOpportunities.filter((row) => currentIds.has(row.id));
     setApprovedOpportunities(current);
     setSources(sourceResult.data ?? []);
     setMainSources(mainSourceResult.data ?? []);
@@ -188,18 +191,29 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
   const driftingFor = (offer: Offer) =>
     drift.filter((row) => row.offer_id === offer.id && row.superseded === true && row.live === true);
 
+  const latestFor = (offer: Offer) => versionsFor(offer)[0] ?? null;
+  const proposedOffers = offers.filter((offer) => {
+    const latest = latestFor(offer);
+    return !latest || !signedOff(latest.id);
+  });
+  const approvedOffers = offers.filter((offer) => {
+    const latest = latestFor(offer);
+    return Boolean(latest && signedOff(latest.id));
+  });
   const columns: IndexColumn<Offer>[] = [
-    { label: "Offer", cell: (offer) => offer.service_name },
-    { label: "Kind", cell: (offer) => (offer.kind === "secondary" ? "Secondary" : "Main") },
-    {
-      label: "Versions",
-      cell: (offer) => {
-        const all = versionsFor(offer);
-        if (all.length === 0) return "none yet";
-        const latest = all[0]!;
-        return `v${latest.version}${signedOff(latest.id) ? ", signed off" : ", not signed off"}`;
-      },
-    },
+    { label: "Service", cell: (offer) => offer.service_name },
+    { label: "Status", cell: (offer) => latestFor(offer) ? (signedOff(latestFor(offer)!.id) ? "Signed off" : "Proposed") : "Needs draft" },
+    { label: "Opportunity", cell: (offer) => {
+      if (offer.kind !== "secondary") return "Baseline service";
+      const source = sources.find((row) => row.offer_id === offer.id);
+      return source ? opportunities.find((row) => row.id === source.opportunity_id)?.name
+        ?? source.opportunity_id : "Source unknown";
+    } },
+    { label: "Version", cell: (offer) => latestFor(offer) ? `v${latestFor(offer)!.version}` : "No version" },
+    { label: "Owner", cell: (offer) => {
+      const latest = latestFor(offer);
+      return signoffs.find((signoff) => signoff.offer_version_id === latest?.id)?.approved_by ?? "Not recorded";
+    } },
     {
       label: "Live elsewhere",
       cell: (offer) => {
@@ -295,14 +309,16 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
         </p>
       )}
       <IndexDetail<Offer>
-        title="Offers"
-        items={offers}
+        title="Proposed offers"
+        items={proposedOffers}
         columns={columns}
         paramKey="offer"
-        emptyLabel="No offers yet. Open Build to make a baseline service or approved-opportunity offer."
+        emptyLabel="No proposed offers. Open Build to make a baseline service or approved-opportunity offer."
         nameOf={(offer) => offer.service_name}
         action={<Link to={`/clients/${clientId}/delivery/offer-studio?tab=build`}
           className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">Build offer</Link>}
+        rowActions={(offer) => <Link to={`/clients/${clientId}/delivery/offer-studio?tab=build&offer=${offer.id}`}
+          className="text-brand-strong underline">Edit</Link>}
         detail={(offer) => {
           const all = versionsFor(offer);
           const stale = driftingFor(offer);
@@ -385,6 +401,41 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
             </div>
           );
         }}
+      />
+      <p className="text-xs text-muted-foreground">
+        Approved offers below have a recorded sign-off on their latest version. Current source and proof rights are checked again before campaign use.
+      </p>
+      <IndexDetail<Offer>
+        title="Approved offers"
+        items={approvedOffers}
+        columns={columns}
+        paramKey="offer"
+        emptyLabel="No latest offer version has a recorded sign-off."
+        nameOf={(offer) => offer.service_name}
+        rowActions={(offer) => <Link to={`/clients/${clientId}/delivery/offer-studio?tab=build&offer=${offer.id}`}
+          className="text-brand-strong underline">Revise</Link>}
+        detail={(offer) => <div className="space-y-2 text-sm">
+          <p>Signed-off version v{latestFor(offer)?.version}. A later revision needs its own exact approval.</p>
+          <p>Source and proof rights are rechecked before new campaign use; a historical sign-off alone does not release a stale source.</p>
+          {offer.kind === "secondary" && sources.find((row) => row.offer_id === offer.id) && <p>
+            Source opportunity: <Link className="text-brand-strong underline"
+              to={`/clients/${clientId}/delivery/market-opportunities?opportunity=${sources.find((row) => row.offer_id === offer.id)?.opportunity_id}`}>
+              {opportunities.find((row) => row.id === sources.find((source) => source.offer_id === offer.id)?.opportunity_id)?.name ?? "Open opportunity"}
+            </Link>
+          </p>}
+          {driftingFor(offer).length > 0 && <div>
+            <p className="font-medium text-destructive">Superseded versions still live</p>
+            <ul className="space-y-1 text-muted-foreground">
+              {driftingFor(offer).map((row) => <li key={`${row.offer_version_id}-${row.record_id}-${row.surface}`}>
+                v{row.version} on {row.surface ?? "an unnamed surface"}
+                {row.label ? ` (${row.label})` : ""}
+                {row.live_note ? ` — ${row.live_note}` : ""}
+              </li>)}
+            </ul>
+          </div>}
+          <Link to={`/clients/${clientId}/delivery/offer-studio?tab=build&offer=${offer.id}`}
+            className="text-brand-strong underline">View versions and linked campaigns</Link>
+        </div>}
       />
     </div>
   );

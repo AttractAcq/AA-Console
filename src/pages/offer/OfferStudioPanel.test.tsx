@@ -185,13 +185,14 @@ describe("the table", () => {
     expect(screen.queryByText(/No offers yet/)).toBeNull();
   });
 
-  it("shows each offer with its kind and latest version", async () => {
+  it("shows an unsigned latest version in Proposed offers", async () => {
     database({ offers: [offer()], versions: [version()] });
     show();
-    expect(await screen.findByText("Garage conversion")).toBeInTheDocument();
-    expect(screen.getByText("Main")).toBeInTheDocument();
-    // Not signed off, and it says so rather than leaving it blank.
-    expect(screen.getByText("v2, not signed off")).toBeInTheDocument();
+    const proposed = await screen.findByRole("region", { name: "Proposed offers" });
+    expect(within(proposed).getByText("Garage conversion")).toBeInTheDocument();
+    expect(within(proposed).getByText("Baseline service")).toBeInTheDocument();
+    expect(within(proposed).getByText("Proposed")).toBeInTheDocument();
+    expect(within(proposed).getByText("v2")).toBeInTheDocument();
   });
 
   it("reports a signed-off version as signed off", async () => {
@@ -201,13 +202,36 @@ describe("the table", () => {
       signoffs: [{ offer_version_id: "ver-2", client_id: "client-1" }],
     });
     show();
-    expect(await screen.findByText("v2, signed off")).toBeInTheDocument();
+    const approved = await screen.findByRole("region", { name: "Approved offers" });
+    expect(within(approved).getByText("Garage conversion")).toBeInTheDocument();
+    expect(within(approved).getByText("Signed off")).toBeInTheDocument();
+    expect(within(approved).getByText("v2")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Proposed offers" })).queryByText("Garage conversion")).toBeNull();
   });
 
-  it("distinguishes a secondary offer", async () => {
+  it("shows an unbound secondary offer as source unknown", async () => {
     database({ offers: [offer({ id: "offer-2", kind: "secondary", service_name: "Roofers" })] });
     show();
-    expect(await screen.findByText("Secondary")).toBeInTheDocument();
+    const proposed = await screen.findByRole("region", { name: "Proposed offers" });
+    expect(within(proposed).getByText("Roofers")).toBeInTheDocument();
+    expect(within(proposed).getByText("Source unknown")).toBeInTheDocument();
+  });
+
+  it("shows the linked opportunity, reviewer and revision action for a signed offer", async () => {
+    database({
+      offers: [offer({ kind: "secondary" })], versions: [version()],
+      signoffs: [{ offer_version_id: "ver-2", approved_by: "reviewer-1", client_id: "client-1" }],
+      sources: [{ offer_id: "offer-1", opportunity_id: "opp-1" }],
+      opportunities: [{ id: "opp-1", name: "Winter garage gym", micro_market: "Garages" }],
+      approvals: [{ opportunity_id: "opp-1", approval_current: true }],
+    });
+    show();
+    const approved = await screen.findByRole("region", { name: "Approved offers" });
+    expect(within(approved).getByText("Winter garage gym")).toBeInTheDocument();
+    expect(within(approved).getByText("reviewer-1")).toBeInTheDocument();
+    expect(within(approved).getByRole("link", { name: "Revise" })).toHaveAttribute(
+      "href", "/clients/client-1/delivery/offer-studio?tab=build&offer=offer-1",
+    );
   });
 });
 
