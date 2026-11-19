@@ -27398,6 +27398,98 @@ export type Database = {
           },
         ]
       }
+      sales_agent_return_resolutions_v11: {
+        Row: {
+          action: string
+          archived_lead_id: string
+          client_id: string
+          conversation_id: string
+          id: string
+          reason: string
+          resolved_lead_id: string
+          reviewed_at: string
+          reviewer_aal: string
+          reviewer_id: string
+          source_hash: string
+        }
+        Insert: {
+          action: string
+          archived_lead_id: string
+          client_id: string
+          conversation_id: string
+          id?: string
+          reason: string
+          resolved_lead_id: string
+          reviewed_at?: string
+          reviewer_aal: string
+          reviewer_id: string
+          source_hash: string
+        }
+        Update: {
+          action?: string
+          archived_lead_id?: string
+          client_id?: string
+          conversation_id?: string
+          id?: string
+          reason?: string
+          resolved_lead_id?: string
+          reviewed_at?: string
+          reviewer_aal?: string
+          reviewer_id?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_agent_return_resolutions__archived_lead_id_client_id_fkey"
+            columns: ["archived_lead_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "sales_agent_return_resolutions__resolved_lead_id_client_id_fkey"
+            columns: ["resolved_lead_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "sales_agent_return_resolutions_v11_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sales_agent_return_resolutions_v11_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sales_agent_return_resolutions_v11_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_agent_return_resolutions_v11_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sales_agent_return_resolutions_v11_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "sales_agent_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales_runtime_daily_budgets: {
         Row: {
           budget_day: string
@@ -45327,6 +45419,15 @@ export type Database = {
         Args: { p_placement_id: string; p_read_id: string }
         Returns: string
       }
+      resolve_sales_agent_return_v11: {
+        Args: {
+          p_action: string
+          p_conversation_id: string
+          p_expected_hash: string
+          p_reason: string
+        }
+        Returns: string
+      }
       resolve_sales_deployment: {
         Args: { p_public_id: string }
         Returns: {
@@ -45751,6 +45852,10 @@ export type Database = {
       sales_agent_public_use_current_v6: {
         Args: { p_agent_id: string }
         Returns: boolean
+      }
+      sales_agent_return_review_packet_v11: {
+        Args: { p_conversation_id: string }
+        Returns: Json
       }
       sales_entitlement_inbox_binding_valid_v6: {
         Args: {

@@ -229,6 +229,17 @@ describe("sinceLabel", () => {
 
 describe("the overview grid", () => {
   it("shows archived-contact sales conversations awaiting identity review", async () => {
+    rpc.mockImplementation((name: string) => name === "sales_agent_return_review_packet_v11"
+      ? Promise.resolve({ data: {
+        source_hash: "a".repeat(64), conversation_id: "c-1", archived_lead_id: "archived-1",
+        archived_name: "Archived original", archived_email: "original@example.invalid",
+        archived_phone: null, archived_source: "sales_agent", archived_at: "2026-11-01T00:00:00Z",
+        matched: { contact_name: "Original contact", contact_email: "original@example.invalid",
+          outcome: "Original inquiry" }, current_name: "Updated contact",
+        current_email: "original@example.invalid", current_phone: null,
+        current_outcome: "Later inquiry",
+      }, error: null })
+      : Promise.resolve({ data: "resolved-lead", error: null }));
     show([built()], [conv({ archive_match_lead_id: "archived-1", lead_id: null,
       contact_name: "Updated contact",
       archive_match_snapshot: { contact_name: "Original contact", contact_email: "original@example.invalid" } })]);
@@ -236,6 +247,15 @@ describe("the overview grid", () => {
     await userEvent.click(screen.getByRole("button", { name: "Open" }));
     expect(screen.getByText(/archived contact — identity review needed/)).toBeInTheDocument();
     expect(screen.getByText(/Match-time contact: Original contact/)).toHaveTextContent("original@example.invalid");
+    await userEvent.click(screen.getByRole("button", { name: "Review archived contact" }));
+    expect(await screen.findByText(/Archived record: Archived original/)).toBeInTheDocument();
+    expect(screen.getByText(/Current conversation contact: Updated contact/)).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Reviewed outcome" }), "recover");
+    await userEvent.type(screen.getByRole("textbox", { name: "Reason for this decision" }), "Reviewed exact identity");
+    await userEvent.click(screen.getByRole("button", { name: "Record AAL2 decision" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("resolve_sales_agent_return_v11",
+      expect.objectContaining({ p_conversation_id: "c-1", p_action: "recover",
+        p_expected_hash: "a".repeat(64) })));
   });
   it("shows a card per agent with what it has actually done", async () => {
     show(

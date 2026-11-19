@@ -13,6 +13,10 @@ import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialo
 import { cn } from "../../lib/cn";
 import { liveStateOf, sinceLabel, STATE_TONE } from "./liveState";
 import {
+  fetchSalesAgentReturnPacket, resolveSalesAgentReturn,
+  type SalesAgentReturnPacket,
+} from "../../lib/salesAgentReturn";
+import {
   approvalConfirmBody,
   revokeConfirmBody,
 } from "./approval";
@@ -91,6 +95,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
     null,
   );
   const [notice, setNotice] = useState<string | null>(null);
+  const [returnReview, setReturnReview] = useState<SalesAgentReturnPacket | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -674,12 +679,21 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
                           <p className="mt-1 text-xs text-muted-foreground">{c.outcome}</p>
                         )}
                         {c.archive_match_lead_id && !c.lead_id && c.archive_match_snapshot && (
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Match-time contact: {c.archive_match_snapshot.contact_name ?? "Unnamed"}
-                            {c.archive_match_snapshot.contact_email || c.archive_match_snapshot.contact_phone
-                              ? ` · ${c.archive_match_snapshot.contact_email ?? c.archive_match_snapshot.contact_phone}`
-                              : ""}
-                          </p>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            <p>Match-time contact: {c.archive_match_snapshot.contact_name ?? "Unnamed"}
+                              {c.archive_match_snapshot.contact_email || c.archive_match_snapshot.contact_phone
+                                ? ` · ${c.archive_match_snapshot.contact_email ?? c.archive_match_snapshot.contact_phone}`
+                                : ""}</p>
+                            <button type="button"
+                              className="mt-1 rounded font-medium text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              onClick={() => void fetchSalesAgentReturnPacket(c.id).then((packet) => {
+                                setOpenId(null);
+                                setReturnReview(packet);
+                              }).catch((cause: unknown) => setNotice(cause instanceof Error
+                                ? cause.message : "Could not load the identity review."))}>
+                              Review archived contact
+                            </button>
+                          </div>
                         )}
                       </li>
                     ))}
@@ -697,6 +711,48 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
           </div>
         </div>
       )}
+
+      <FormModal
+        open={returnReview !== null}
+        onClose={() => setReturnReview(null)}
+        title="Review sales-agent return"
+        submitLabel="Record AAL2 decision"
+        intro={returnReview && <div className="space-y-2 text-sm">
+          <p>Matched contact: {returnReview.matched.contact_name ?? "Unnamed"} · {returnReview.matched.contact_email
+            ?? returnReview.matched.contact_phone ?? "no contact"}.</p>
+          <p>Archived record: {returnReview.archived_name ?? returnReview.archived_lead_id} · {returnReview.archived_email
+            ?? returnReview.archived_phone ?? "no contact"} · original source {returnReview.archived_source ?? "unknown"}.</p>
+          <p>Current conversation contact: {returnReview.current_name ?? "Unnamed"} · {returnReview.current_email
+            ?? returnReview.current_phone ?? "no contact"}. The conversation may have changed since the match.</p>
+          <p>Match-time outcome: {returnReview.matched.outcome ?? "unknown"}. A changed conversation or archived record makes this review stale.</p>
+          <p>Reopen keeps the historical lead identity. Start a separate lead keeps the archive and records a new identity. Both require current AAL2 and a reason.</p>
+        </div>}
+        fields={[
+          { name: "action", label: "Reviewed outcome", kind: "select", required: true,
+            options: [
+              { value: "recover", label: "Reopen archived lead" },
+              { value: "new_lead", label: "Start separate lead" },
+            ] },
+          { name: "reason", label: "Reason for this decision", kind: "textarea", required: true,
+            rows: 3, hint: "Explain why this is the same continuing relationship or a separate acquisition journey." },
+        ]}
+        onSubmit={async (values) => {
+          if (!returnReview) throw new Error("The review packet is unavailable.");
+          const action = String(values.action);
+          if (action !== "recover" && action !== "new_lead") throw new Error("Choose a reviewed outcome.");
+          await resolveSalesAgentReturn({
+            conversationId: returnReview.conversation_id,
+            action,
+            sourceHash: returnReview.source_hash,
+            reason: String(values.reason ?? ""),
+          });
+        }}
+        onSaved={() => {
+          setReturnReview(null);
+          setNotice("Reviewed sales-agent identity transition recorded.");
+          void refresh();
+        }}
+      />
 
       <ConfirmModal
         open={confirm !== null}
