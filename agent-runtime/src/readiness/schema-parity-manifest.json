@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "73ade0f39f3f7c4f141bcab9817cdfd9cf28f8429c77c58c2fd22e5ae4a4c957",
-  "generatedTypesSha256": "d916b52bf4537afb34723c61d1e3b88ccdf062a52a5f79026d3530fc5f2d5764",
-  "generatedSchemaBodySha256": "9643f748d346e3365d2cb1c8238c81c47f6597515585c79f29bc93e7dcaf7241",
+  "migrationSourceDigest": "d4969451ea0dfce74f03f672e8da3b6437104b7b6a3d48b90e8c9cea5a08a4f7",
+  "generatedTypesSha256": "3b3238259a29b4ed6a4799fc8b4c77d02d550ff5f315a79a6d60a3b83a7d7529",
+  "generatedSchemaBodySha256": "dccf730eb844314c654af9dea5f1fd28630d7ed9125f9b81fb0024a20a9bc957",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4301,6 +4301,13 @@
       "filename": "20261124043200_597_google_profile_performance_read.sql",
       "sha256": "56f58efe5a91f479ca4827a453b27bd2b92c5007ad12b7e0baab8d7bf58aa8fd",
       "trimmedMd5": "86a722022c15e1463b8e94c193c14674"
+    },
+    {
+      "version": "20261124043300",
+      "name": "598_page_recorded_outcomes",
+      "filename": "20261124043300_598_page_recorded_outcomes.sql",
+      "sha256": "e9a151b4bfb474af03689acf49865e4e0583c72f577a9da1f92af71c0e64f7e4",
+      "trimmedMd5": "4e2e9c745f6e49e4ab24dc4e4b511e5e"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
