@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "e1b30cabc4d8cbcf9724968cc6e1641428c6dcc85019550341b0df9fa2b9ab24",
-  "generatedTypesSha256": "462803d037e21a5a5e7d04871c1e3d1a1822fd1dfce349ae0ae2929f1ba7b6d8",
-  "generatedSchemaBodySha256": "c9dd7e6e7b66dfc06dcd3d018e29a1c692e8debe5386096a4655df062a68cd42",
+  "migrationSourceDigest": "3db7ba3e231445e4ed33d01f1b3b0d219fee854d2af059e1284e9097acb0e292",
+  "generatedTypesSha256": "f875a65dbfc7bfb2195b3f2a0e0245aae49316431bd4cefe9f7af7386f543dd4",
+  "generatedSchemaBodySha256": "23347fc61690d2d02b106f6e51babdff64b9cee2bd6538f28067bcd8b243c39f",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4651,6 +4651,20 @@
       "filename": "20261124052200_647_archived_return_batch_review_packet.sql",
       "sha256": "1ecd805c4ff31a610d6ebc36f4cfb817a15e26a7c7e3cc306e7f4b9ba79edd51",
       "trimmedMd5": "af81deeb6365c8fa48bf9dc4db59a60b"
+    },
+    {
+      "version": "20261124052300",
+      "name": "648_guard_grouped_archived_return_decisions",
+      "filename": "20261124052300_648_guard_grouped_archived_return_decisions.sql",
+      "sha256": "f638994270e7a30343143a2250991662722817f550f01c3684bd7e550d1c1227",
+      "trimmedMd5": "b051247a0854ec305ad4b320c31f74b4"
+    },
+    {
+      "version": "20261124052400",
+      "name": "649_resolve_grouped_archived_returns",
+      "filename": "20261124052400_649_resolve_grouped_archived_returns.sql",
+      "sha256": "52aacfb8f49ae28af7a726c1e124de7f769043b0fe4085b32bc96e805a955552",
+      "trimmedMd5": "55cbbc6dbcc90a18a4d0173102925e10"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

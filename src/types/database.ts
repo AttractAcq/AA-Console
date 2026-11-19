@@ -717,6 +717,91 @@ export type Database = {
           },
         ]
       }
+      archived_return_batch_resolutions_v11: {
+        Row: {
+          action: string
+          archived_lead_id: string
+          client_id: string
+          id: string
+          reason: string
+          resolved_lead_id: string
+          reviewed_at: string
+          reviewer_aal: string
+          reviewer_id: string
+          source_count: number
+          source_hash: string
+        }
+        Insert: {
+          action: string
+          archived_lead_id: string
+          client_id: string
+          id?: string
+          reason: string
+          resolved_lead_id: string
+          reviewed_at?: string
+          reviewer_aal: string
+          reviewer_id: string
+          source_count: number
+          source_hash: string
+        }
+        Update: {
+          action?: string
+          archived_lead_id?: string
+          client_id?: string
+          id?: string
+          reason?: string
+          resolved_lead_id?: string
+          reviewed_at?: string
+          reviewer_aal?: string
+          reviewer_id?: string
+          source_count?: number
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "archived_return_batch_resolutio_archived_lead_id_client_id_fkey"
+            columns: ["archived_lead_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "archived_return_batch_resolutio_resolved_lead_id_client_id_fkey"
+            columns: ["resolved_lead_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "archived_return_batch_resolutions_v11_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "archived_return_batch_resolutions_v11_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "archived_return_batch_resolutions_v11_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "archived_return_batch_resolutions_v11_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       assignment_deliveries_v7: {
         Row: {
           asset_id: string
@@ -18033,6 +18118,7 @@ export type Database = {
         Row: {
           action: string
           archived_lead_id: string
+          batch_resolution_id: string | null
           client_id: string
           id: string
           reason: string
@@ -18046,6 +18132,7 @@ export type Database = {
         Insert: {
           action: string
           archived_lead_id: string
+          batch_resolution_id?: string | null
           client_id: string
           id?: string
           reason: string
@@ -18059,6 +18146,7 @@ export type Database = {
         Update: {
           action?: string
           archived_lead_id?: string
+          batch_resolution_id?: string | null
           client_id?: string
           id?: string
           reason?: string
@@ -18076,6 +18164,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "lead_identities"
             referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "lead_return_resolutions_v11_batch_resolution_id_fkey"
+            columns: ["batch_resolution_id"]
+            isOneToOne: false
+            referencedRelation: "archived_return_batch_resolutions_v11"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "lead_return_resolutions_v11_client_id_fkey"
@@ -27402,6 +27497,7 @@ export type Database = {
         Row: {
           action: string
           archived_lead_id: string
+          batch_resolution_id: string | null
           client_id: string
           conversation_id: string
           id: string
@@ -27415,6 +27511,7 @@ export type Database = {
         Insert: {
           action: string
           archived_lead_id: string
+          batch_resolution_id?: string | null
           client_id: string
           conversation_id: string
           id?: string
@@ -27428,6 +27525,7 @@ export type Database = {
         Update: {
           action?: string
           archived_lead_id?: string
+          batch_resolution_id?: string | null
           client_id?: string
           conversation_id?: string
           id?: string
@@ -27452,6 +27550,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "lead_identities"
             referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "sales_agent_return_resolutions_v11_batch_resolution_id_fkey"
+            columns: ["batch_resolution_id"]
+            isOneToOne: false
+            referencedRelation: "archived_return_batch_resolutions_v11"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "sales_agent_return_resolutions_v11_client_id_fkey"
@@ -45376,6 +45481,17 @@ export type Database = {
           reason: string
           reservation_id: string
         }[]
+      }
+      resolve_archived_return_batch_v11: {
+        Args: {
+          p_action: string
+          p_archived_lead_id: string
+          p_expected_hash: string
+          p_primary_id?: string
+          p_primary_kind?: string
+          p_reason: string
+        }
+        Returns: string
       }
       resolve_archived_return_v11: {
         Args: {

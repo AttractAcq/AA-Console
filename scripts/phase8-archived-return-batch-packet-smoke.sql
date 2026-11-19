@@ -14,6 +14,7 @@ select set_config('request.jwt.claims','{"role":"service_role"}',true);
 do $fixture$
 declare cid uuid:='b6470000-0000-4000-8000-000000000001';
   agent_id uuid; archived_id uuid; first_id uuid; second_id uuid;
+  dm_archive_id uuid; dm_sales_id uuid; fake_batch_id uuid;
   packet jsonb; revised jsonb; with_dm jsonb; refused boolean;
 begin
   insert into public.client_sales_agents(client_id,name,purpose)
@@ -77,6 +78,35 @@ begin
     raise exception 'Batch packet lost source identity or implied approval';
   end if;
   refused:=false;
+  begin
+    insert into public.sales_agent_return_resolutions_v11(
+      client_id,conversation_id,archived_lead_id,resolved_lead_id,
+      action,reason,source_hash,reviewer_id,reviewer_aal)
+    values(cid,first_id,archived_id,archived_id,'recover',
+      'Tried only one arrival',
+      public.sales_agent_return_review_packet_v11(first_id)->>'source_hash',
+      'a6470000-0000-4000-8000-000000000001','aal2');
+  exception when check_violation then refused:=true; end;
+  if not refused then raise exception 'Direct resolution row bypassed grouped hold'; end if;
+  insert into public.archived_return_batch_resolutions_v11(
+    client_id,archived_lead_id,resolved_lead_id,action,reason,
+    source_hash,source_count,reviewer_id,reviewer_aal)
+  values(cid,archived_id,archived_id,'recover','Reviewed both arrivals',
+    packet->>'source_hash',2,
+    'a6470000-0000-4000-8000-000000000001','aal2')
+  returning id into fake_batch_id;
+  refused:=false;
+  begin
+    insert into public.sales_agent_return_resolutions_v11(
+      client_id,conversation_id,archived_lead_id,resolved_lead_id,
+      action,reason,source_hash,reviewer_id,reviewer_aal,batch_resolution_id)
+    values(cid,first_id,archived_id,archived_id,'new_lead',
+      'Mismatched grouped outcome',
+      public.sales_agent_return_review_packet_v11(first_id)->>'source_hash',
+      'a6470000-0000-4000-8000-000000000001','aal2',fake_batch_id);
+  exception when check_violation then refused:=true; end;
+  if not refused then raise exception 'Mismatched grouped decision marker was accepted'; end if;
+  refused:=false;
   begin perform public.resolve_sales_agent_return_v11(first_id,'recover',
     public.sales_agent_return_review_packet_v11(first_id)->>'source_hash',
     'Reviewed only the first arrival');
@@ -113,6 +143,44 @@ begin
          and c.closed_reason='archived_lead_return_review')
      or exists(select 1 from public.client_leads where client_id=cid) then
     raise exception 'DM return was hidden, reopened or promoted by review';
+  end if;
+
+  -- One sales arrival plus one held DM is also a grouped identity case.
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claim.sub','',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+  insert into public.client_leads(client_id,name,email,source,source_channel,stage)
+    values(cid,'Other archived original','other-return@example.invalid',
+      'sales_agent','sales_agent','conversation') returning id into dm_archive_id;
+  insert into public.dm_identities(client_id,platform,external_user_id,
+    display_name,lead_id)
+    values(cid,'instagram','other-batch-user','Other DM return',dm_archive_id);
+  perform public.archive_lead(dm_archive_id,'Finished other original');
+  insert into public.sales_agent_conversations(client_id,sales_agent_id,
+    contact_name,contact_email,qualified,outcome,transcript)
+    values(cid,agent_id,'Other sales arrival','other-return@example.invalid',false,
+      'Another conversation','[]'::jsonb) returning id into dm_sales_id;
+  if public.capture_sales_agent_lead(dm_sales_id) is not null then
+    raise exception 'Single sales archived return became an active lead'; end if;
+  perform public.record_inbound_dm_v6(cid,'instagram','other-batch-user',
+    'other-batch-message','Returning again','Other DM return',now());
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  perform set_config('request.jwt.claim.sub',
+    'a6470000-0000-4000-8000-000000000001',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"a6470000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}',true);
+  packet:=public.archived_return_batch_review_packet_v11(dm_archive_id);
+  if packet->>'source_count'<>'1' or packet->>'dm_count'<>'1'
+     or packet->>'decision_state'<>'grouped_hold' then
+    raise exception 'One sales plus one DM failed grouped review'; end if;
+  refused:=false;
+  begin perform public.resolve_sales_agent_return_v11(dm_sales_id,'new_lead',
+    public.sales_agent_return_review_packet_v11(dm_sales_id)->>'source_hash',
+    'Cannot ignore the related DM arrival');
+  exception when check_violation then refused:=true; end;
+  if not refused or exists(select 1 from public.client_leads
+      where client_id=cid and email='other-return@example.invalid') then
+    raise exception 'Sales return bypassed the held DM or leaked a lead';
   end if;
 end $fixture$;
 rollback;

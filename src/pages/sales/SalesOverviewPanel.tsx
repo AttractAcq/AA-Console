@@ -717,7 +717,12 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
         </div>
       )}
 
-      <ArchivedReturnBatchModal packet={batchReview} onClose={() => setBatchReview(null)} />
+      <ArchivedReturnBatchModal packet={batchReview} onClose={() => setBatchReview(null)}
+        onSaved={() => {
+          setBatchReview(null);
+          setNotice("Grouped lead identity decision recorded.");
+          void refresh();
+        }} />
 
       <FormModal
         open={returnReview !== null}

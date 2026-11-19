@@ -233,7 +233,8 @@ describe("the overview grid", () => {
       ? Promise.resolve({ data: {
         archived_lead_id: "archived-1", archived_name: "Archived original",
         source_hash: "b".repeat(64), source_count: 1, dm_count: 0,
-        decision_state: "single_source", blocker: "One source is pending.", sources: [], dms: [],
+        decision_state: "single_source", blocker: "One source is pending.",
+        sources: [{ kind: "sales_agent", conversation_id: "c-1", source_hash: "a".repeat(64) }], dms: [],
       }, error: null })
       : name === "sales_agent_return_review_packet_v11"
       ? Promise.resolve({ data: {
@@ -270,10 +271,16 @@ describe("the overview grid", () => {
         source_hash: "b".repeat(64), source_count: 2, dm_count: 0,
         decision_state: "grouped_hold", blocker: "All arrivals need one exact coordinated AAL2 identity decision.",
         sources: [
-          { kind: "sales_agent", conversation_id: "c-1", current_name: "Updated contact" },
-          { kind: "form", submission_id: "s-2", submitted_name: "Form arrival" },
+          { kind: "sales_agent", conversation_id: "c-1", current_name: "Updated contact",
+            source_hash: "a".repeat(64) },
+          { kind: "form", submission_id: "s-2", submitted_name: "Form arrival",
+            submitted_email: "form@example.invalid", consent_wording: "I agree to a reply",
+            source_snapshot: { purpose: "page_form", source_channel: "organic" },
+            source_hash: "c".repeat(64) },
         ], dms: [],
-      }, error: null }) : Promise.resolve({ data: null, error: null }));
+      }, error: null }) : name === "resolve_archived_return_batch_v11"
+        ? Promise.resolve({ data: "resolved-lead", error: null })
+        : Promise.resolve({ data: null, error: null }));
     show([built()], [conv({ archive_match_lead_id: "archived-1", lead_id: null,
       archive_match_snapshot: { contact_name: "Original contact" } })]);
     await screen.findByText(/1 archived-contact return awaiting identity review/);
@@ -281,7 +288,15 @@ describe("the overview grid", () => {
     await userEvent.click(screen.getByRole("button", { name: "Review archived contact" }));
     expect(await screen.findByRole("dialog", { name: "Related archived-contact arrivals" })).toBeInTheDocument();
     expect(screen.getByText("Form arrival")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Record AAL2 decision" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Consent: I agree to a reply/)).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Reviewed outcome" }), "new_lead");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Primary source for attribution" }), "form:s-2");
+    await userEvent.type(screen.getByRole("textbox", { name: "Reason for this decision" }),
+      "These arrivals are one new relationship");
+    await userEvent.click(screen.getByRole("button", { name: "Record grouped AAL2 decision" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("resolve_archived_return_batch_v11",
+      expect.objectContaining({ p_archived_lead_id: "archived-1", p_action: "new_lead",
+        p_primary_kind: "form", p_primary_id: "s-2" })));
     expect(rpc).not.toHaveBeenCalledWith("sales_agent_return_review_packet_v11", expect.anything());
   });
   it("shows a card per agent with what it has actually done", async () => {

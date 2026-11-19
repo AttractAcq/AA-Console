@@ -297,7 +297,12 @@ export function LeadCapturePanel() {
         </section>
       )}
 
-      <ArchivedReturnBatchModal packet={batchReview} onClose={() => setBatchReview(null)} />
+      <ArchivedReturnBatchModal packet={batchReview} onClose={() => setBatchReview(null)}
+        onSaved={() => {
+          setBatchReview(null);
+          setNotice("Grouped lead identity decision recorded.");
+          void refresh();
+        }} />
 
       <FormModal
         open={returnReview !== null}

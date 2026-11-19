@@ -15,14 +15,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
   fetchCapturedLeads, fetchEndpoints, fetchSubmissions, createEndpoint, setEndpointEnabled,
   fetchArchivedReturnPacket, resolveArchivedReturn, fetchArchivedReturnBatchPacket,
+  resolveArchivedReturnBatch,
 } = vi.hoisted(() => ({
   fetchCapturedLeads: vi.fn(), fetchEndpoints: vi.fn(), fetchSubmissions: vi.fn(),
   createEndpoint: vi.fn(), setEndpointEnabled: vi.fn(),
   fetchArchivedReturnPacket: vi.fn(), resolveArchivedReturn: vi.fn(),
   fetchArchivedReturnBatchPacket: vi.fn(),
+  resolveArchivedReturnBatch: vi.fn(),
 }));
 
-vi.mock("../../lib/archivedReturnBatch", () => ({ fetchArchivedReturnBatchPacket }));
+vi.mock("../../lib/archivedReturnBatch", () => ({
+  fetchArchivedReturnBatchPacket, resolveArchivedReturnBatch,
+}));
 
 vi.mock("../../lib/leadCapture", async () => {
   const actual = await vi.importActual<Record<string, unknown>>("../../lib/leadCapture");
@@ -109,6 +113,7 @@ beforeEach(() => {
     source_count: 1, dm_count: 0, decision_state: "single_source",
     blocker: "One source is pending.", sources: [], dms: [],
   });
+  resolveArchivedReturnBatch.mockResolvedValue("lead-new");
 });
 
 describe("who arrived", () => {
@@ -293,5 +298,35 @@ describe("what did not become a lead", () => {
     expect(screen.getByText(/Held instagram DM/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Record AAL2 decision" })).not.toBeInTheDocument();
     expect(fetchArchivedReturnPacket).not.toHaveBeenCalled();
+  });
+
+  it("reviews a grouped form and sales return through one decision", async () => {
+    fetchSubmissions.mockResolvedValue([submission({
+      status: "received", lead_id: null, archive_match_lead_id: "arch-1",
+    })]);
+    fetchArchivedReturnBatchPacket.mockResolvedValue({
+      archived_lead_id: "arch-1", archived_name: "Jay Okafor", source_hash: "d".repeat(64),
+      source_count: 2, dm_count: 0, decision_state: "grouped_hold",
+      blocker: "All arrivals need one exact coordinated AAL2 identity decision.",
+      sources: [
+        { kind: "form", submission_id: "sub-1", submitted_name: "Jay Okafor",
+          consent_wording: "I agree." },
+        { kind: "sales_agent", conversation_id: "conv-2", current_name: "Jay returns" },
+      ], dms: [],
+    });
+    const user = userEvent.setup();
+    render(<LeadCapturePanel />);
+    await user.click(await screen.findByRole("button", { name: "Review return" }));
+    expect(await screen.findByText(/Consent: I agree/)).toBeInTheDocument();
+    await user.selectOptions(screen.getByRole("combobox", { name: "Reviewed outcome" }), "new_lead");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Primary source for attribution" }), "form:sub-1");
+    await user.type(screen.getByRole("textbox", { name: "Reason for this decision" }),
+      "This is one new relationship");
+    await user.click(screen.getByRole("button", { name: "Record grouped AAL2 decision" }));
+    await waitFor(() => expect(resolveArchivedReturnBatch).toHaveBeenCalledWith({
+      archivedLeadId: "arch-1", action: "new_lead", sourceHash: "d".repeat(64),
+      reason: "This is one new relationship", primaryKind: "form", primaryId: "sub-1",
+    }));
+    expect(resolveArchivedReturn).not.toHaveBeenCalled();
   });
 });
