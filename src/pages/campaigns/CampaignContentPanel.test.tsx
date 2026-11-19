@@ -178,6 +178,14 @@ it("requires a rejection reason and surfaces review failures", async () => {
 // as three flat lists, a campaign with twelve ideas buried its single brief
 // below all of them, and a briefed idea gave no sign its brief existed.
 describe("the content chain, grouped by piece", () => {
+  it("shows only the selected route positions in the typed campaign table", async () => {
+    ideas = [idea, { ...idea, id: "idea-2", campaign_position: 2,
+      title: "Paid search offer" }];
+    show({ layout: "v2", routePositions: [2], contentCount: 1 });
+    expect(await screen.findByRole("button", { name: /Paid search offer/ })).toBeInTheDocument();
+    expect(screen.queryByText("WhatsApp photo triage")).not.toBeInTheDocument();
+    expect(screen.getByText("0 ready to distribute · 1 planned · 1 ideas")).toBeInTheDocument();
+  });
   it("shows a brief underneath the idea it was written from", async () => {
     show();
     const ideaCard = (await screen.findByText("WhatsApp photo triage")).closest("div.rounded-md");

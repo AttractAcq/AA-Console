@@ -412,3 +412,17 @@ export function resolveNeeds(
     needs_sales_agent: submitted.needs_sales_agent === true,
   };
 }
+
+/** Operator selections on a typed manual campaign outrank template and model suggestions. */
+export function fixedOperatorModules(
+  campaignKind: string | null,
+  selected: { needs_landing_page: boolean; needs_sales_agent: boolean; needs_lead_magnet: boolean },
+  proposed: CampaignPlan,
+): CampaignPlan {
+  if (!campaignKind) return proposed;
+  return { ...proposed,
+    needs_landing_page: selected.needs_landing_page,
+    needs_sales_agent: selected.needs_sales_agent,
+    needs_lead_magnet: selected.needs_lead_magnet,
+  };
+}

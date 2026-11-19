@@ -6830,6 +6830,7 @@ export type Database = {
           budget: number | null
           budget_context_epoch_v6: number
           built_at: string | null
+          campaign_kind: string | null
           channels: string[]
           client_id: string
           cloned_from_campaign_id: string | null
@@ -6840,6 +6841,8 @@ export type Database = {
           conversion_event: string | null
           core_message: string | null
           created_at: string
+          creation_fingerprint: string | null
+          creation_key: string | null
           daily_budget: number | null
           ends_on: string | null
           entry_state: Database["public"]["Enums"]["audience_state"] | null
@@ -6890,6 +6893,7 @@ export type Database = {
           budget?: number | null
           budget_context_epoch_v6?: number
           built_at?: string | null
+          campaign_kind?: string | null
           channels?: string[]
           client_id: string
           cloned_from_campaign_id?: string | null
@@ -6900,6 +6904,8 @@ export type Database = {
           conversion_event?: string | null
           core_message?: string | null
           created_at?: string
+          creation_fingerprint?: string | null
+          creation_key?: string | null
           daily_budget?: number | null
           ends_on?: string | null
           entry_state?: Database["public"]["Enums"]["audience_state"] | null
@@ -6950,6 +6956,7 @@ export type Database = {
           budget?: number | null
           budget_context_epoch_v6?: number
           built_at?: string | null
+          campaign_kind?: string | null
           channels?: string[]
           client_id?: string
           cloned_from_campaign_id?: string | null
@@ -6960,6 +6967,8 @@ export type Database = {
           conversion_event?: string | null
           core_message?: string | null
           created_at?: string
+          creation_fingerprint?: string | null
+          creation_key?: string | null
           daily_budget?: number | null
           ends_on?: string | null
           entry_state?: Database["public"]["Enums"]["audience_state"] | null
@@ -40202,6 +40211,7 @@ export type Database = {
           budget: number | null
           budget_context_epoch_v6: number
           built_at: string | null
+          campaign_kind: string | null
           channels: string[]
           client_id: string
           cloned_from_campaign_id: string | null
@@ -40212,6 +40222,8 @@ export type Database = {
           conversion_event: string | null
           core_message: string | null
           created_at: string
+          creation_fingerprint: string | null
+          creation_key: string | null
           daily_budget: number | null
           ends_on: string | null
           entry_state: Database["public"]["Enums"]["audience_state"] | null
@@ -40277,6 +40289,7 @@ export type Database = {
           budget: number | null
           budget_context_epoch_v6: number
           built_at: string | null
+          campaign_kind: string | null
           channels: string[]
           client_id: string
           cloned_from_campaign_id: string | null
@@ -40287,6 +40300,8 @@ export type Database = {
           conversion_event: string | null
           core_message: string | null
           created_at: string
+          creation_fingerprint: string | null
+          creation_key: string | null
           daily_budget: number | null
           ends_on: string | null
           entry_state: Database["public"]["Enums"]["audience_state"] | null
@@ -40941,6 +40956,92 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_opportunity_campaign_plan_v11: {
+        Args: {
+          p_acquisition_mode: string
+          p_client_id: string
+          p_direction: string
+          p_ideate_on_plan: boolean
+          p_name: string
+          p_needs_landing_page: boolean
+          p_needs_lead_magnet: boolean
+          p_needs_sales_agent: boolean
+          p_offer_version_id: string
+          p_opportunity_id: string
+          p_paid_platform: string
+          p_pillar_ids: string[]
+          p_template: string
+        }
+        Returns: {
+          acquisition_mode: string
+          ad_campaign_id: string | null
+          archived_at: string | null
+          audience: string | null
+          brief: string
+          budget: number | null
+          budget_context_epoch_v6: number
+          built_at: string | null
+          campaign_kind: string | null
+          channels: string[]
+          client_id: string
+          cloned_from_campaign_id: string | null
+          content_count: number
+          content_ideas_generated_at: string | null
+          content_spec_hash: string | null
+          content_spec_id: string | null
+          conversion_event: string | null
+          core_message: string | null
+          created_at: string
+          creation_fingerprint: string | null
+          creation_key: string | null
+          daily_budget: number | null
+          ends_on: string | null
+          entry_state: Database["public"]["Enums"]["audience_state"] | null
+          exit_state: Database["public"]["Enums"]["audience_state"] | null
+          feeds_from_campaign_id: string | null
+          id: string
+          ideate_on_plan: boolean
+          job_id: string | null
+          kpi_metric: string | null
+          kpi_target: number | null
+          launched_at: string | null
+          meta_ad_set_id: string | null
+          meta_built_at: string | null
+          meta_campaign_id: string | null
+          mirrors_template:
+            | Database["public"]["Enums"]["campaign_template"]
+            | null
+          name: string
+          needs_landing_page: boolean
+          needs_lead_magnet: boolean
+          needs_sales_agent: boolean
+          objective: string | null
+          offer_summary: string | null
+          offer_version_id: string | null
+          optimisation_event: string | null
+          organic_content_count: number
+          paid_content_count: number
+          paid_platform: string | null
+          plan_approved_at: string | null
+          plan_approved_by: string | null
+          plan_approved_fingerprint: string | null
+          plan_review_note: string | null
+          planned_idea_epoch: number
+          runs_organic: boolean
+          runs_paid: boolean
+          starts_on: string | null
+          status: string
+          target_countries: string[]
+          template: Database["public"]["Enums"]["campaign_template"] | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_campaigns"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_paid_operator_bundle_v7: {
         Args: {
           p_budget_instruction: string
@@ -41196,6 +41297,7 @@ export type Database = {
           budget: number | null
           budget_context_epoch_v6: number
           built_at: string | null
+          campaign_kind: string | null
           channels: string[]
           client_id: string
           cloned_from_campaign_id: string | null
@@ -41206,6 +41308,8 @@ export type Database = {
           conversion_event: string | null
           core_message: string | null
           created_at: string
+          creation_fingerprint: string | null
+          creation_key: string | null
           daily_budget: number | null
           ends_on: string | null
           entry_state: Database["public"]["Enums"]["audience_state"] | null
@@ -41270,6 +41374,7 @@ export type Database = {
           budget: number | null
           budget_context_epoch_v6: number
           built_at: string | null
+          campaign_kind: string | null
           channels: string[]
           client_id: string
           cloned_from_campaign_id: string | null
@@ -41280,6 +41385,93 @@ export type Database = {
           conversion_event: string | null
           core_message: string | null
           created_at: string
+          creation_fingerprint: string | null
+          creation_key: string | null
+          daily_budget: number | null
+          ends_on: string | null
+          entry_state: Database["public"]["Enums"]["audience_state"] | null
+          exit_state: Database["public"]["Enums"]["audience_state"] | null
+          feeds_from_campaign_id: string | null
+          id: string
+          ideate_on_plan: boolean
+          job_id: string | null
+          kpi_metric: string | null
+          kpi_target: number | null
+          launched_at: string | null
+          meta_ad_set_id: string | null
+          meta_built_at: string | null
+          meta_campaign_id: string | null
+          mirrors_template:
+            | Database["public"]["Enums"]["campaign_template"]
+            | null
+          name: string
+          needs_landing_page: boolean
+          needs_lead_magnet: boolean
+          needs_sales_agent: boolean
+          objective: string | null
+          offer_summary: string | null
+          offer_version_id: string | null
+          optimisation_event: string | null
+          organic_content_count: number
+          paid_content_count: number
+          paid_platform: string | null
+          plan_approved_at: string | null
+          plan_approved_by: string | null
+          plan_approved_fingerprint: string | null
+          plan_review_note: string | null
+          planned_idea_epoch: number
+          runs_organic: boolean
+          runs_paid: boolean
+          starts_on: string | null
+          status: string
+          target_countries: string[]
+          template: Database["public"]["Enums"]["campaign_template"] | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_campaigns"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_standalone_campaign_plan_v11: {
+        Args: {
+          p_campaign_kind: string
+          p_client_id: string
+          p_direction: string
+          p_ideate_on_plan: boolean
+          p_idempotency_key: string
+          p_name: string
+          p_needs_landing_page: boolean
+          p_needs_lead_magnet: boolean
+          p_needs_sales_agent: boolean
+          p_offer_version_id: string
+          p_paid_platform: string
+          p_pillar_ids: string[]
+        }
+        Returns: {
+          acquisition_mode: string
+          ad_campaign_id: string | null
+          archived_at: string | null
+          audience: string | null
+          brief: string
+          budget: number | null
+          budget_context_epoch_v6: number
+          built_at: string | null
+          campaign_kind: string | null
+          channels: string[]
+          client_id: string
+          cloned_from_campaign_id: string | null
+          content_count: number
+          content_ideas_generated_at: string | null
+          content_spec_hash: string | null
+          content_spec_id: string | null
+          conversion_event: string | null
+          core_message: string | null
+          created_at: string
+          creation_fingerprint: string | null
+          creation_key: string | null
           daily_budget: number | null
           ends_on: string | null
           entry_state: Database["public"]["Enums"]["audience_state"] | null

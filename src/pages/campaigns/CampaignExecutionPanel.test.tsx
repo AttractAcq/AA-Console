@@ -268,12 +268,12 @@ describe("campaign pages", () => {
   it("shows both route packages and paid build sections for a combined campaign", async () => {
     show([planned({ acquisition_mode: "both", paid_platform: "meta" })], READY);
     expect(await screen.findByRole("heading", { name: "Winter full-arch push" })).toBeInTheDocument();
-    expect(screen.getByText("Organic + Paid · Meta Ads")).toBeInTheDocument();
+    expect(screen.getByText("Legacy / unknown · Organic + Paid · Meta Ads")).toBeInTheDocument();
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
       "Plan", "Content", "Landing Page", "Sales Agent", "Meta Ads", "Launch state",
     ]);
     await userEvent.click(screen.getByRole("tab", { name: "Meta Ads" }));
-    expect(screen.getByRole("heading", { name: "Meta activation" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Meta paid handoff" })).toBeInTheDocument();
   });
 
   it("labels a combined campaign correctly in the overview table", async () => {
@@ -281,14 +281,24 @@ describe("campaign pages", () => {
     show([planned({ acquisition_mode: "both", paid_platform: "google" })], READY);
     const row = (await screen.findByRole("link", { name: "Winter full-arch push" })).closest("tr");
     expect(row).toHaveTextContent("Organic + Paid · Google Ads");
-    expect(row).toHaveTextContent("Both");
-    expect(row).not.toHaveTextContent("Legacy");
+    expect(row).toHaveTextContent("Legacy / unknown");
+  });
+
+  it("shows only selected modules and routes for a typed standalone organic campaign", async () => {
+    fetchCampaignOrigins.mockResolvedValue(new Map());
+    show([planned({ campaign_kind: "standalone_organic", acquisition_mode: "organic",
+      needs_landing_page: false, needs_sales_agent: false, needs_lead_magnet: true })]);
+    expect(await screen.findByRole("heading", { name: "Winter full-arch push" })).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Plan", "Organic", "Lead Magnet", "Launch",
+    ]);
+    expect(screen.getByText(/Standalone campaign. No market opportunity is required/)).toBeInTheDocument();
   });
 
   it("shows route and artifact blockers while keeping a planned campaign's edit form to its name", async () => {
     show([planned({ acquisition_mode: "paid", paid_platform: "meta" })], NOT_READY);
     expect(await screen.findByRole("region", { name: "Readiness and blockers" })).toHaveTextContent("0 of 2 pieces ready");
-    expect(screen.getByText("Paid · Meta Ads")).toBeInTheDocument();
+    expect(screen.getByText("Legacy / unknown · Paid · Meta Ads")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Edit campaign" }));
     expect(screen.getByRole("textbox", { name: "Campaign name" })).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Objective" })).not.toBeInTheDocument();
@@ -653,6 +663,44 @@ describe("proposing a campaign", () => {
       "Fill the January consultation diary with full-arch patients, using the written plan assessment the offer strategy says nobody is using.",
   };
 
+  it("creates a standalone organic campaign without an opportunity or unselected producers", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
+    fetchOpportunityApprovalStates.mockResolvedValue(new Map());
+    from.mockImplementation(() => rows([]));
+    rpc.mockResolvedValue({ data: [], error: null });
+    render(<CampaignExecutionPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Campaign type" }), "standalone_organic");
+    expect(screen.queryByRole("combobox", { name: "Approved market opportunity" })).not.toBeInTheDocument();
+    await userEvent.type(screen.getByRole("textbox", { name: "Campaign name" }), "Useful weekly advice");
+    await userEvent.type(screen.getByRole("textbox", { name: "What this campaign is for" }), "Help local homeowners");
+    await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_standalone_campaign_plan_v11",
+      expect.objectContaining({ p_campaign_kind: "standalone_organic", p_paid_platform: null,
+        p_offer_version_id: null, p_needs_landing_page: false,
+        p_needs_sales_agent: false, p_needs_lead_magnet: false })));
+    expect(rpc).not.toHaveBeenCalledWith("create_opportunity_campaign_plan_v11", expect.anything());
+  });
+
+  it("stores the paid destination and selected conversion modules for a standalone campaign", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
+    from.mockImplementation(() => rows([]));
+    rpc.mockResolvedValue({ data: [], error: null });
+    render(<CampaignExecutionPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Campaign type" }), "standalone_paid");
+    await userEvent.type(screen.getByRole("textbox", { name: "Campaign name" }), "Local paid launch");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Paid platform" }), "meta");
+    await userEvent.type(screen.getByRole("textbox", { name: "What this campaign is for" }), "Book local enquiries");
+    await userEvent.click(screen.getByRole("checkbox", { name: "Landing page" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Lead magnet" }));
+    await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_standalone_campaign_plan_v11",
+      expect.objectContaining({ p_campaign_kind: "standalone_paid", p_paid_platform: "meta",
+        p_needs_landing_page: true, p_needs_sales_agent: false,
+        p_needs_lead_magnet: true })));
+  });
+
   it("can plan a new campaign without generating content ideas", async () => {
     useParams.mockReturnValue({ clientId: "client-1" });
     from.mockImplementation((table: string) => table === "client_content_pillars"
@@ -669,7 +717,7 @@ describe("proposing a campaign", () => {
     expect(toggle).toBeChecked();
     await userEvent.click(toggle);
     await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_sourced_campaign_plan_v7", expect.objectContaining({
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_opportunity_campaign_plan_v11", expect.objectContaining({
       p_opportunity_id: "opp-1", p_offer_version_id: "version-1",
       p_ideate_on_plan: false, p_acquisition_mode: "organic", p_pillar_ids: [],
     })));
@@ -687,7 +735,7 @@ describe("proposing a campaign", () => {
     await userEvent.selectOptions(screen.getByLabelText(/Campaign route/i), "organic");
     await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Book inspections");
     await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_sourced_campaign_plan_v7", expect.objectContaining({
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_opportunity_campaign_plan_v11", expect.objectContaining({
       p_offer_version_id: "version-1", p_acquisition_mode: "organic",
     })));
   });
@@ -705,7 +753,7 @@ describe("proposing a campaign", () => {
     await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
     expect(await screen.findByText(/Choose a currently approved and ready market opportunity/i))
       .toBeInTheDocument();
-    expect(rpc).not.toHaveBeenCalledWith("create_sourced_campaign_plan_v7", expect.anything());
+    expect(rpc).not.toHaveBeenCalledWith("create_opportunity_campaign_plan_v11", expect.anything());
   });
 
   it("stores a paid Google route without applying Meta's campaign template", async () => {
@@ -722,11 +770,11 @@ describe("proposing a campaign", () => {
     expect(screen.queryByLabelText(/Campaign template/i)).not.toBeInTheDocument();
     await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Book consultations from search");
     await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_sourced_campaign_plan_v7", expect.objectContaining({
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_opportunity_campaign_plan_v11", expect.objectContaining({
       p_acquisition_mode: "paid", p_paid_platform: "google",
     })));
-    expect(rpc.mock.calls.find(([name]) => name === "create_sourced_campaign_plan_v7")?.[1])
-      .not.toHaveProperty("p_template");
+    expect(rpc.mock.calls.find(([name]) => name === "create_opportunity_campaign_plan_v11")?.[1])
+      .toHaveProperty("p_template", null);
   });
 
   it("creates a coordinated organic and Meta paid campaign with both route flags", async () => {
@@ -741,7 +789,7 @@ describe("proposing a campaign", () => {
     await userEvent.selectOptions(screen.getByLabelText(/Paid platform/i), "meta");
     await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Coordinate paid and organic");
     await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_sourced_campaign_plan_v7", expect.objectContaining({
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_opportunity_campaign_plan_v11", expect.objectContaining({
       p_acquisition_mode: "both", p_paid_platform: "meta",
     })));
     expect(rpc).not.toHaveBeenCalledWith("enqueue_agent_job", expect.anything());
@@ -839,7 +887,7 @@ describe("proposing a campaign", () => {
       }
       return rows([planned()]);
     });
-    rpc.mockImplementation((name: string) => name === "create_sourced_campaign_plan_v7"
+    rpc.mockImplementation((name: string) => name === "create_opportunity_campaign_plan_v11"
       ? Promise.resolve({ data: null, error: { message: "pillar write failed" } })
       : Promise.resolve({ data: [], error: null }));
 
@@ -852,7 +900,7 @@ describe("proposing a campaign", () => {
     await userEvent.click(screen.getByRole("checkbox", { name: /Honest proof/i }));
     await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
 
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_sourced_campaign_plan_v7",
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_opportunity_campaign_plan_v11",
       expect.objectContaining({ p_pillar_ids: ["pil-1"] })));
     expect(rpc).not.toHaveBeenCalledWith("enqueue_agent_job", expect.anything());
     expect(await screen.findByText(/pillar write failed/i)).toBeInTheDocument();

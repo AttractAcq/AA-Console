@@ -29,7 +29,7 @@ export type FieldDef = {
   /** Native input type for kind "text" — email/tel bring up the right keyboard. */
   inputType?: "text" | "email" | "tel";
   /** Render only when another field currently holds one of these values. */
-  showIf?: { field: string; equals: string[] };
+  showIf?: { field: string; equals: string[] } | Array<{ field: string; equals: string[] }>;
   /** Recomputed from another field until the user edits this one directly. */
   derivedFrom?: { field: string; transform: (value: string) => string };
 };
@@ -41,8 +41,11 @@ const inputClass =
 
 export function isVisible(field: FieldDef, values: FormValues): boolean {
   if (!field.showIf) return true;
-  const current = values[field.showIf.field];
-  return typeof current === "string" && field.showIf.equals.includes(current);
+  const conditions = Array.isArray(field.showIf) ? field.showIf : [field.showIf];
+  return conditions.every((condition) => {
+    const current = values[condition.field];
+    return typeof current === "string" && condition.equals.includes(current);
+  });
 }
 
 export function FieldControl({

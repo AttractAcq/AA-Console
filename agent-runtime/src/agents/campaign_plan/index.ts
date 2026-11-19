@@ -31,6 +31,7 @@ import {
   routeVolumes,
   planSummary,
   resolveNeeds,
+  fixedOperatorModules,
   MAX_CONTENT,
   type CampaignPlan,
 } from "./plan.js";
@@ -391,6 +392,7 @@ ABSOLUTE RULES
     ? "Supply exactly content_count distinct ideas tailored to this campaign, its audience, offer, dates, channels and constraints. An idea is an angle and purpose, not a finished production brief."
     : "Plan the campaign and decide how many content pieces it needs, but do not ideate any content. Do not write titles, angles or concepts. The operator can generate campaign ideas later."}
 - ${isV6 ? "Supply exactly content_count content_spec entries. Each entry fixes its organic or paid route, destination, media type and format. Match each idea in order when ideas are included. Google search ads use only text/single on google_ads. Unsupported destination/format pairs are refused." : "Preserve legacy content routing."}
+- ${campaign.campaign_kind ? `The operator selected these conversion modules: landing page ${campaign.needs_landing_page ? "yes" : "no"}, sales agent ${campaign.needs_sales_agent ? "yes" : "no"}, lead magnet ${campaign.needs_lead_magnet ? "yes" : "no"}. Preserve these exact choices; the planner cannot add an unselected producer.` : "For legacy plans, choose the conversion modules the campaign genuinely needs."}
 - Ask only for what is needed. Every piece of content you request is real work for a real person.
 - Respect anything the offer strategy lists as a limit or a thing that cannot be promised.`;
 
@@ -480,7 +482,7 @@ Call ${submitTool.name} once when you are done.`;
   const template = templateFor(String(campaign.template ?? ""));
 
   const s = (key: string) => String(result.submitted[key] ?? "").trim();
-  const submittedPlan: CampaignPlan = {
+  const submittedPlan: CampaignPlan = fixedOperatorModules(campaign.campaign_kind, campaign, {
     objective: s("objective"),
     audience: s("audience"),
     offer_summary: s("offer_summary"),
@@ -497,7 +499,7 @@ Call ${submitTool.name} once when you are done.`;
       needs_sales_agent: result.submitted.needs_sales_agent,
     }),
     needs_lead_magnet: result.submitted.needs_lead_magnet === true,
-  };
+  });
   if (approvedOffer && !campaign.built_at) {
     // The model may paraphrase its summary; persist the exact signed promise.
     submittedPlan.offer_summary = approvedOffer.promise;

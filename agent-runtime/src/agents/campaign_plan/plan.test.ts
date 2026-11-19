@@ -14,6 +14,7 @@ import {
   routeVolumes,
   planSummary,
   resolveNeeds,
+  fixedOperatorModules,
   MAX_CONTENT,
   type CampaignPlan,
 } from "./plan.js";
@@ -342,6 +343,17 @@ function idea(over: Record<string, unknown> = {}) {
     ...over,
   };
 }
+
+describe("operator-selected campaign modules", () => {
+  it("preserves explicit typed selections even when the planner proposes extra work", () => {
+    const proposal = good({ needs_landing_page: true, needs_sales_agent: true,
+      needs_lead_magnet: true });
+    const selected = { needs_landing_page: false, needs_sales_agent: true,
+      needs_lead_magnet: false };
+    expect(fixedOperatorModules("standalone_paid", selected, proposal)).toMatchObject(selected);
+    expect(fixedOperatorModules(null, selected, proposal)).toEqual(proposal);
+  });
+});
 
 describe("resolveNeeds", () => {
   const model = { needs_landing_page: true, needs_sales_agent: true };
