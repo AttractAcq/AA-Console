@@ -29,6 +29,12 @@ beforeEach(() => {
 });
 
 describe("Meta Ads account view", () => {
+  it("shows the shared account snapshot without a queue action in profile mode", async () => {
+    render(<MetaAdsReadPanel clientId="client-1" readOnly />);
+    expect(await screen.findByText(/Inventory and metrics are unknown/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Read Meta Ads account" })).not.toBeInTheDocument();
+    expect(enqueueAgentJob).not.toHaveBeenCalled();
+  });
   it("shows unknown data and queues only a read job", async () => {
     render(<MetaAdsReadPanel clientId="client-1" />);
     expect(await screen.findByText(/Inventory and metrics are unknown/)).toBeInTheDocument();

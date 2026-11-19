@@ -7,6 +7,7 @@ import { dayOrDash } from "../../lib/contentRecords";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
 import { PROFILE_FIELD_PATCH_HOLD } from "../../../agent-runtime/src/profiles/prewrite-gate.js";
+import { MetaAdsReadPanel } from "./MetaAdsReadPanel";
 
 // The view's historical health_detail and derived blocker can include a raw
 // provider OAuth error. Keep both out of the browser response until a SQL
@@ -79,6 +80,12 @@ function recordedIdentityAlert(identity: Identity, now = Date.now()): string | n
  */
 export function MetaProfilePanel({ tab }: { tab: Tab }) {
   const { clientId } = useParams<{ clientId: string }>();
+  return <MetaProfilePanelForClient key={clientId ?? "no-client"} clientId={clientId} tab={tab} />;
+}
+
+function MetaProfilePanelForClient({ clientId, tab }: {
+  clientId: string | undefined; tab: Tab;
+}) {
   const [identities, setIdentities] = useState<Identity[]>([]);
   const [presence, setPresence] = useState<Presence[]>([]);
   const [changes, setChanges] = useState<ProfileChange[]>([]);
@@ -427,6 +434,14 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
               <span key="w">{dayOrDash(post.published_at ?? post.scheduled_at)}</span>,
             ])}
           />
+          <div className="space-y-2">
+            <h3 className="font-semibold">Paid Meta activity</h3>
+            <p className="text-sm text-muted-foreground">
+              The configured ad account's latest read, shared with Meta Ads Studio.
+              Unknown metrics remain unknown when the provider did not return a row.
+            </p>
+            <MetaAdsReadPanel clientId={clientId} readOnly />
+          </div>
         </div>
       )}
     </div>

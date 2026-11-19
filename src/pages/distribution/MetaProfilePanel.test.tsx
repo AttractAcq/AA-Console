@@ -14,11 +14,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 const { from, rpc, select } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), select: vi.fn() }));
+const clientRef = vi.hoisted(() => ({ id: "client-1" }));
 vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc } }));
 vi.mock("react-router-dom", () => ({
-  useParams: () => ({ clientId: "client-1" }),
+  useParams: () => ({ clientId: clientRef.id }),
   Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
 }));
+vi.mock("./MetaAdsReadPanel", () => ({ MetaAdsReadPanel: ({ clientId, readOnly }: {
+  clientId: string; readOnly: boolean;
+}) => <p>Paid account for {clientId}: {readOnly ? "view only" : "actions"}</p> }));
 
 import { MetaProfilePanel } from "./MetaProfilePanel";
 
@@ -84,6 +88,7 @@ function database(options: { identities?: unknown[]; changes?: unknown[]; presen
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clientRef.id = "client-1";
   database();
 });
 
@@ -321,5 +326,17 @@ describe("presence", () => {
       provider_readback_state: "uncertain", external_id: null, external_url: null })] });
     render(<MetaProfilePanel tab="presence" />);
     expect(await screen.findByText("Provider outcome uncertain; inspect before retry")).toBeInTheDocument();
+  });
+
+  it("shows the paid account read for this client and clears old presence on client change", async () => {
+    database({ presence: [post()] });
+    const view = render(<MetaProfilePanel tab="presence" />);
+    expect(await screen.findByText("Winter garage push")).toBeInTheDocument();
+    expect(screen.getByText("Paid account for client-1: view only")).toBeInTheDocument();
+    clientRef.id = "client-2";
+    database({ presence: [] });
+    view.rerender(<MetaProfilePanel tab="presence" />);
+    expect(screen.queryByText("Winter garage push")).not.toBeInTheDocument();
+    expect(screen.getByText("Paid account for client-2: view only")).toBeInTheDocument();
   });
 });

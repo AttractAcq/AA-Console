@@ -17,11 +17,16 @@ function actionLabels(value: unknown): string {
   }).join(" · ");
 }
 
-export function MetaAdsReadPanel({ clientId }: { clientId: string | undefined }) {
-  return <MetaAdsReadPanelForClient key={clientId ?? "no-client"} clientId={clientId} />;
+export function MetaAdsReadPanel({ clientId, readOnly = false }: {
+  clientId: string | undefined; readOnly?: boolean;
+}) {
+  return <MetaAdsReadPanelForClient key={clientId ?? "no-client"}
+    clientId={clientId} readOnly={readOnly} />;
 }
 
-function MetaAdsReadPanelForClient({ clientId }: { clientId: string | undefined }) {
+function MetaAdsReadPanelForClient({ clientId, readOnly }: {
+  clientId: string | undefined; readOnly: boolean;
+}) {
   const [run, setRun] = useState<Run | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [ads, setAds] = useState<Ad[]>([]);
@@ -86,7 +91,9 @@ function MetaAdsReadPanelForClient({ clientId }: { clientId: string | undefined 
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
     <div className="flex flex-wrap gap-2">
-      <Button disabled={busy || !clientId} onClick={() => void queue()}>Read Meta Ads account</Button>
+      {!readOnly && <Button disabled={busy || !clientId} onClick={() => void queue()}>
+        Read Meta Ads account
+      </Button>}
       <Button disabled={busy || !clientId} onClick={() => void refresh().catch((cause) => setError(String(cause)))}>Refresh view</Button>
     </div>
     {run ? <p className="text-xs text-muted-foreground">Account {run.account_id} · {run.currency} · {run.from_date} to {run.through_date} · fetched {new Date(run.fetched_at).toLocaleString()}</p>
