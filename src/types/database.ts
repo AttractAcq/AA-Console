@@ -44506,6 +44506,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      resolve_proof_placement_readback_v8: {
+        Args: { p_placement_id: string; p_read_id: string }
+        Returns: string
+      }
       resolve_sales_deployment: {
         Args: { p_public_id: string }
         Returns: {

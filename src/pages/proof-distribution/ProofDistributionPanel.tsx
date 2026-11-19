@@ -12,7 +12,7 @@ import {
   LIVE_STATUSES, MODE_HINT,
   createPlacement, fetchClientDestinations, fetchDestinations,
   fetchPlacementDue, fetchPlacements, fetchPlacementEvents, fetchRetractionReceipts,
-  fetchProofProviderReads, requestProofProviderRead,
+  fetchProofProviderReads, requestProofProviderRead, resolveProofProviderRead,
   markPlacedByHand, recordRetracted, auditLegacyRetraction,
   requestApproval, setDestinationEnabled, setProofPublishingEnabled,
   fetchProofSurfaceCoverage,
@@ -406,6 +406,14 @@ function PlacementsTab({
       emptyLabel={loading ? "Loading placements…" : "No placements yet"}
       rows={placements.map((placement) => {
         const blocker = due.get(placement.id)?.blocker ?? null;
+        const latestRead = providerReads.get(placement.id);
+        const exactLiveRead = latestRead?.result === "live_exact_text"
+          && latestRead.provider_state === "LIVE"
+          && latestRead.external_id === placement.external_id
+          && latestRead.payload_hash === placement.payload_hash
+          && Number.isFinite(Date.parse(latestRead.checked_at))
+          && Date.now() - Date.parse(latestRead.checked_at) >= 0
+          && Date.now() - Date.parse(latestRead.checked_at) < 60 * 60 * 1000;
         const mode = modeOf(placement.destination_key);
         return [
           <span key="p">
@@ -496,6 +504,12 @@ function PlacementsTab({
                     onSelect: () => void onAct(placement.id,
                       () => requestProofProviderRead(placement.id),
                       "Read-only provider check requested. Refresh for its result.") }]
+                : []),
+              ...(exactLiveRead && ["uncertain", "placed"].includes(placement.status)
+                ? [{ label: "Confirm provider presence",
+                    onSelect: () => void onAct(placement.id,
+                      () => resolveProofProviderRead(placement.id, latestRead!.id),
+                      "Provider presence reviewed; rights and placement status refreshed.") }]
                 : []),
               ...(placement.status === "drafted"
                 ? [{

@@ -362,9 +362,9 @@ describe("asking for the decision", () => {
     const externalId = "accounts/123/locations/456/localPosts/7";
     state.placements = [placement({ destination_key: "google_business_profile",
       status: "uncertain", external_id: externalId })];
-    state.providerReads = [{ placement_id: "pl1", external_id: externalId,
+    state.providerReads = [{ id: "read-1", placement_id: "pl1", external_id: externalId,
       payload_hash: "a".repeat(64), result: "live_exact_text", provider_state: "LIVE", provider_url: null,
-      checked_at: "2026-11-19T00:00:00Z" }];
+      checked_at: new Date().toISOString() }];
     render(<ProofDistributionPanel tab="placements" />);
     expect(await screen.findByText(/Provider GET: live exact text/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /^Actions for / }));
@@ -374,11 +374,37 @@ describe("asking for the decision", () => {
     expect(rpc).not.toHaveBeenCalledWith("record_proof_placed", expect.anything());
   });
 
+  it("offers human confirmation only for a fresh exact LIVE text read", async () => {
+    const externalId = "accounts/123/locations/456/localPosts/7";
+    state.placements = [placement({ destination_key: "google_business_profile",
+      status: "uncertain", external_id: externalId })];
+    state.providerReads = [{ id: "read-1", placement_id: "pl1", external_id: externalId,
+      payload_hash: "a".repeat(64), result: "live_exact_text", provider_state: "LIVE",
+      provider_url: null, checked_at: new Date().toISOString() }];
+    render(<ProofDistributionPanel tab="placements" />);
+    await userEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Confirm provider presence" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith(
+      "resolve_proof_placement_readback_v8", { p_placement_id: "pl1", p_read_id: "read-1" }));
+  });
+
+  it("keeps a live media read held until its bytes are verified", async () => {
+    const externalId = "accounts/123/locations/456/localPosts/7";
+    state.placements = [placement({ destination_key: "google_business_profile",
+      status: "uncertain", external_id: externalId, asset_id: "media-1", proof_id: null })];
+    state.providerReads = [{ id: "read-1", placement_id: "pl1", external_id: externalId,
+      payload_hash: "a".repeat(64), result: "live_media_unverified", provider_state: "LIVE",
+      provider_url: null, checked_at: new Date().toISOString() }];
+    render(<ProofDistributionPanel tab="placements" />);
+    await userEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
+    expect(screen.queryByRole("menuitem", { name: "Confirm provider presence" })).not.toBeInTheDocument();
+  });
+
   it("does not show an old payload read as current provider evidence", async () => {
     const externalId = "accounts/123/locations/456/localPosts/7";
     state.placements = [placement({ destination_key: "google_business_profile",
       status: "placed", external_id: externalId })];
-    state.providerReads = [{ placement_id: "pl1", external_id: externalId,
+    state.providerReads = [{ id: "read-1", placement_id: "pl1", external_id: externalId,
       payload_hash: "b".repeat(64), result: "live_exact_text", provider_state: "LIVE",
       provider_url: null, checked_at: "2026-11-19T00:00:00Z" }];
     render(<ProofDistributionPanel tab="placements" />);

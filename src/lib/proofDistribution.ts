@@ -120,6 +120,7 @@ export interface RetractionReceipt {
 }
 
 export interface ProofProviderRead {
+  id: string;
   placement_id: string;
   external_id: string;
   payload_hash: string;
@@ -132,7 +133,7 @@ export interface ProofProviderRead {
 
 export async function fetchProofProviderReads(clientId: string): Promise<Map<string, ProofProviderRead>> {
   const { data, error } = await supabase.from("proof_placement_provider_read_latest_v8")
-    .select("placement_id,external_id,payload_hash,result,provider_state,provider_url,checked_at")
+    .select("id,placement_id,external_id,payload_hash,result,provider_state,provider_url,checked_at")
     .eq("client_id", clientId);
   if (error) throw new Error(error.message);
   return new Map(((data ?? []) as ProofProviderRead[]).map((row) => [row.placement_id, row]));
@@ -141,6 +142,13 @@ export async function fetchProofProviderReads(clientId: string): Promise<Map<str
 export async function requestProofProviderRead(placementId: string): Promise<void> {
   const { error } = await supabase.rpc("request_proof_placement_readback_v8", {
     p_placement_id: placementId,
+  } as never);
+  if (error) throw new Error(error.message);
+}
+
+export async function resolveProofProviderRead(placementId: string, readId: string): Promise<void> {
+  const { error } = await supabase.rpc("resolve_proof_placement_readback_v8", {
+    p_placement_id: placementId, p_read_id: readId,
   } as never);
   if (error) throw new Error(error.message);
 }
