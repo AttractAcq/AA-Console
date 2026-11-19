@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { PROVIDER_MEDIA_FETCH_URL_TTL_SECONDS } from "../storage/signed-url-policy.js";
-import { isContentFormat } from "../content/format.js";
+import { formatFitsMedia, isContentFormat, platformAllowsFormat } from "../content/format.js";
 import { isPlatform } from "../content/platform-limits.js";
 import { PublishError } from "./types.js";
 
@@ -46,7 +46,8 @@ function mediaOf(value: unknown, clientId: string): FrozenMedia[] {
     const mime = row?.mime_type;
     if (row?.frozen_bucket !== BUCKET || typeof sha !== "string" || !SHA.test(sha)
       || path !== `${clientId}/${sha}` || typeof source !== "string"
-      || !source.startsWith(`${clientId}/`) || source.includes("..")
+      || !source.startsWith(`${clientId}/`) || source.length <= clientId.length + 1
+      || source.includes("..")
       || typeof size !== "number" || !Number.isSafeInteger(size)
       || size < 1 || size > MAX_BYTES || typeof mime !== "string"
       || !/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/.test(mime)) {
@@ -61,7 +62,8 @@ function mediaOf(value: unknown, clientId: string): FrozenMedia[] {
 export async function verifyFrozenPublicationPackage(
   sb: SupabaseClient,
   raw: unknown,
-  expected: { clientId: string; postId: string; platform: string; scheduledAt: string },
+  expected: { clientId: string; postId: string; platform: string; scheduledAt: string;
+    accountRef?: string; provider?: string; contentFormat?: string | null; mediaType?: string | null },
 ): Promise<VerifiedPublicationPackage> {
   const envelope = object(raw);
   const manifest = object(envelope?.manifest);
@@ -80,16 +82,22 @@ export async function verifyFrozenPublicationPackage(
     || manifest?.client_id !== expected.clientId
     || manifest?.scheduled_post_id !== expected.postId
     || manifest?.platform !== expected.platform
+    || expected.provider !== undefined && manifest?.provider !== expected.provider
     || typeof scheduledAt !== "string"
     || !Number.isFinite(Date.parse(scheduledAt))
     || !Number.isFinite(Date.parse(expected.scheduledAt))
     || Date.parse(scheduledAt) !== Date.parse(expected.scheduledAt)
     || typeof accountRef !== "string" || !accountRef.trim()
+    || expected.accountRef !== undefined && accountRef !== expected.accountRef
     || typeof caption !== "string" || !caption.trim()
     || firstComment !== null && typeof firstComment !== "string"
     || altText !== null && altText !== undefined && typeof altText !== "string"
     || typeof contentFormat !== "string" || !isContentFormat(contentFormat)
     || typeof mediaType !== "string" || !["image", "video"].includes(mediaType)
+    || expected.contentFormat != null && contentFormat !== expected.contentFormat
+    || expected.mediaType != null && mediaType !== expected.mediaType
+    || !platformAllowsFormat(expected.platform, contentFormat)
+    || !formatFitsMedia(contentFormat, mediaType)
     || !isPlatform(expected.platform)
     || !RIGHTS.has(String(rights?.usage_rights))) {
     throw new PublishError("Approved publication package does not match this post.", false);
@@ -109,7 +117,7 @@ export async function verifyFrozenPublicationPackage(
   const mediaUrls: string[] = [];
   for (const item of media) {
     const { data, error } = await sb.storage.from(BUCKET).download(item.frozen_path);
-    if (error || !data) throw new PublishError("Approved frozen media is unavailable.", false);
+    if (error || !data) throw new PublishError(`Approved frozen media frame ${mediaUrls.length + 1} is unavailable.`, true);
     const bytes = Buffer.from(await data.arrayBuffer());
     if (bytes.length !== item.byte_size
       || createHash("sha256").update(bytes).digest("hex") !== item.sha256
@@ -119,7 +127,7 @@ export async function verifyFrozenPublicationPackage(
     const { data: signed, error: signError } = await sb.storage.from(BUCKET)
       .createSignedUrl(item.frozen_path, PROVIDER_MEDIA_FETCH_URL_TTL_SECONDS);
     if (signError || !signed?.signedUrl?.startsWith("https://")) {
-      throw new PublishError("Approved frozen media could not be signed.", false);
+      throw new PublishError(`Approved frozen media frame ${mediaUrls.length + 1} could not be signed.`, true);
     }
     mediaUrls.push(signed.signedUrl);
   }

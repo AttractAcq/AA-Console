@@ -22,6 +22,7 @@ function packet() {
       client_id: expected.clientId,
       scheduled_post_id: expected.postId,
       platform: expected.platform,
+      provider: "instagram",
       account_ref: "instagram-account-1",
       scheduled_at: expected.scheduledAt,
       content_format: "single",
@@ -70,6 +71,14 @@ describe("frozen publication package", () => {
     const raw = packet();
     raw.manifest.scheduled_post_id = "post-2";
     await expect(verifyFrozenPublicationPackage(db.sb, raw, expected)).rejects.toThrow("does not match");
+    expect(db.from).not.toHaveBeenCalled();
+  });
+
+  it("rejects a different provider account before Storage access", async () => {
+    const db = storage();
+    await expect(verifyFrozenPublicationPackage(db.sb, packet(), {
+      ...expected, accountRef: "another-account",
+    })).rejects.toThrow("does not match");
     expect(db.from).not.toHaveBeenCalled();
   });
 

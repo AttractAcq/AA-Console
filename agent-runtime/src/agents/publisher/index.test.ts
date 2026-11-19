@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { RuntimeConfig } from "../../config.js";
@@ -39,6 +40,30 @@ const CAROUSEL: ClaimedPost = {
   frame_paths: ["assets/f1.png", "assets/f2.png", "assets/f3.png"],
 };
 
+function reviewedPacket(post: ClaimedPost) {
+  const paths = post.content_format === "carousel" || post.content_format === "story"
+    ? post.frame_paths ?? [] : [post.media_path ?? ""];
+  const source_paths = paths.map((path) => `${post.client_id}/${path}`);
+  const media = source_paths.map((source_path) => {
+    const bytes = Buffer.from(source_path);
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    return {
+      source_path, frozen_bucket: "publication-media",
+      frozen_path: `${post.client_id}/${sha256}`, sha256,
+      byte_size: bytes.length, mime_type: "image/png",
+    };
+  });
+  return { artifact_hash: "a".repeat(64), manifest: {
+    client_id: post.client_id, scheduled_post_id: post.post_id,
+    platform: post.platform, provider: "instagram", account_ref: "17841400000000000",
+    scheduled_at: post.scheduled_at, content_format: post.content_format,
+    media_type: post.media_type, source_paths, media,
+    provider_copy: { caption: `${post.caption}\n\n#proof`, first_comment: null },
+    copy: { alt_text: post.alt_text, link_url: post.link_url },
+    rights: { usage_rights: "client_owned" },
+  } };
+}
+
 function database(
   options: {
     claimed?: ClaimedPost[];
@@ -59,16 +84,21 @@ function database(
     routeReadError?: string;
     routePostReads?: Array<Record<string, unknown> | null>;
     prewriteDenied?: boolean;
+    prewriteArtifactHashes?: string[];
   } = {},
 ) {
   const events: Record<string, unknown>[] = [];
   const signCalls: Array<{ paths: string[]; ttl: number }> = [];
   let routePostReads = 0;
-  const rpc = vi.fn(async (name: string) => {
+  let prewriteReads = 0;
+  const rpc = vi.fn(async (name: string, args?: { p_post_id?: string }) => {
     if (name === "claim_posts_for_publishing") return { data: options.claimed ?? [POST], error: null };
-    if (name === "require_organic_publication_prewrite_v6") return options.prewriteDenied
-      ? { data: null, error: { message: "Exact Inbox approval missing" } }
-      : { data: { artifact_hash: "a".repeat(64) }, error: null };
+    if (name === "require_organic_publication_prewrite_v6") {
+      if (options.prewriteDenied) return { data: null, error: { message: "Exact Inbox approval missing" } };
+      const packet = reviewedPacket((options.claimed ?? [POST]).find((post) => post.post_id === args?.p_post_id) ?? POST);
+      packet.artifact_hash = options.prewriteArtifactHashes?.[prewriteReads++] ?? packet.artifact_hash;
+      return { data: packet, error: null };
+    }
     if (name === "integration_secret") {
       return { data: "token" in options ? options.token : "a-token", error: null };
     }
@@ -158,10 +188,19 @@ function database(
   });
   const storage = {
     from: () => ({
+      download: async (path: string) => {
+        const packets = (options.claimed ?? [POST]).map(reviewedPacket);
+        const item = packets.flatMap((packet) => packet.manifest.media)
+          .find((entry) => entry.frozen_path === path);
+        return item
+          ? { data: new Blob([Buffer.from(item.source_path)], { type: "image/png" }), error: null }
+          : { data: null, error: { message: "missing frozen media" } };
+      },
       createSignedUrl: async (path: string, ttl: number) => {
         signCalls.push({ paths: [path], ttl });
+        const supplied = options.signedFrames?.[signCalls.length - 1];
         return {
-          data: { signedUrl: "signed" in options ? options.signed : "https://signed.example/a.png" },
+          data: { signedUrl: supplied?.signedUrl ?? ("signed" in options ? options.signed : `https://signed.example/${path}`) },
           error: null,
         };
       },
@@ -244,12 +283,11 @@ describe("the sweep", () => {
   });
 
   it("uses the fixed provider fetch lifetime for a post and every carousel frame", async () => {
-    const { sb, signCalls } = database();
+    const { sb, signCalls } = database({ claimed: [CAROUSEL] });
     await prepare(sb, CAROUSEL);
-    expect(signCalls).toEqual([
-      { paths: ["assets/a.png"], ttl: 3600 },
-      { paths: ["assets/f1.png", "assets/f2.png", "assets/f3.png"], ttl: 3600 },
-    ]);
+    expect(signCalls).toEqual(reviewedPacket(CAROUSEL).manifest.media.map((item) => ({
+      paths: [item.frozen_path], ttl: 3600,
+    })));
   });
 
   it("publishes what it claimed and records it", async () => {
@@ -262,7 +300,7 @@ describe("the sweep", () => {
         postId: "post-1",
         accountId: "17841400000000000",
         accessToken: "a-token",
-        mediaUrl: "https://signed.example/a.png",
+        mediaUrl: `https://signed.example/${reviewedPacket(POST).manifest.media[0]!.frozen_path}`,
         mediaKind: "image",
         caption: "Five steps, one chain.\n\n#proof",
       }),
@@ -361,6 +399,24 @@ describe("what stops a post before anything is sent", () => {
     expect(failureFor(rpc, "post-1")).toMatchObject({ p_retryable: false });
   });
 
+  it("refuses a changed reviewed package at the final prewrite check", async () => {
+    const { sb, rpc } = database({ prewriteArtifactHashes: ["a".repeat(64), "b".repeat(64)] });
+    await runPublisherJob(sb, on, agent, job);
+    expect(publish).not.toHaveBeenCalled();
+    expect(failureFor(rpc, "post-1")?.p_reason).toMatch(/Exact outgoing publication approval/);
+  });
+
+  it("refuses a frozen package for a different provider account", async () => {
+    const { sb, rpc, signCalls } = database({
+      integration: { credential_label: "other-account", meta_page_id: null, ad_account_id: null },
+    });
+    await runPublisherJob(sb, on, agent, job);
+    expect(publish).not.toHaveBeenCalled();
+    expect(rpc.mock.calls.map((call) => call[0])).not.toContain("integration_secret");
+    expect(failureFor(rpc, "post-1")?.p_reason).toMatch(/package does not match/);
+    expect(signCalls).toHaveLength(0);
+  });
+
   it("names a platform with no adapter", async () => {
     vi.spyOn(registry, "adapterFor").mockReturnValue(null);
     const { sb, rpc } = database();
@@ -399,7 +455,7 @@ describe("what stops a post before anything is sent", () => {
   it("refuses an asset with no file", async () => {
     const { sb, rpc } = database({ claimed: [{ ...POST, media_path: null }] });
     await runPublisherJob(sb, on, agent, job);
-    expect(failureFor(rpc, "post-1")!.p_reason).toMatch(/no file to post/);
+    expect(failureFor(rpc, "post-1")!.p_reason).toMatch(/Frozen publication frame/);
   });
 
   it("refuses copy that will not fit rather than truncating it", async () => {
@@ -420,11 +476,9 @@ describe("a shape made of frames", () => {
       frames: Array<{ position: number; mediaUrl: string }>;
     };
     expect(request.contentFormat).toBe("carousel");
-    expect(request.frames).toEqual([
-      { position: 1, mediaUrl: "https://signed.example/assets/f1.png" },
-      { position: 2, mediaUrl: "https://signed.example/assets/f2.png" },
-      { position: 3, mediaUrl: "https://signed.example/assets/f3.png" },
-    ]);
+    expect(request.frames).toEqual(reviewedPacket(CAROUSEL).manifest.media.map((item, index) => ({
+      position: index + 1, mediaUrl: `https://signed.example/${item.frozen_path}`,
+    })));
   });
 
   it("leaves frames off a post that is not made of them", async () => {
@@ -445,7 +499,7 @@ describe("a shape made of frames", () => {
     await runPublisherJob(sb, on, agent, job);
     expect(publish).not.toHaveBeenCalled();
     expect(failureFor(rpc, "post-1")).toMatchObject({
-      p_reason: expect.stringContaining("1 frame to send"),
+      p_reason: expect.stringContaining("frame count is invalid"),
       p_retryable: false,
     });
   });
@@ -474,7 +528,7 @@ describe("a shape made of frames", () => {
     await runPublisherJob(sb, on, agent, job);
     expect(publish).not.toHaveBeenCalled();
     expect(failureFor(rpc, "post-1")).toMatchObject({
-      p_reason: expect.stringContaining('"flipbook"'),
+      p_reason: expect.stringContaining("package does not match"),
       p_retryable: false,
     });
   });

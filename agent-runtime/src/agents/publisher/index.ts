@@ -34,10 +34,10 @@ import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { logger } from "../../logging/logger.js";
 import { isPlatform } from "../../content/platform-limits.js";
-import { MAX_FRAMES, MIN_FRAMES, isContentFormat } from "../../content/format.js";
 import { adapterFor } from "../../publishing/registry.js";
 import { compose } from "../../publishing/caption.js";
-import { PROVIDER_MEDIA_FETCH_URL_TTL_SECONDS, safeProviderErrorMessage } from "../../storage/signed-url-policy.js";
+import { safeProviderErrorMessage } from "../../storage/signed-url-policy.js";
+import { verifyFrozenPublicationPackage } from "../../publishing/frozen-package.js";
 import { requireOrganicRoute } from "./organic-route.js";
 import {
   PublishError,
@@ -47,8 +47,9 @@ import {
   type PublishSuccess,
 } from "../../publishing/types.js";
 
-const MEDIA_BUCKET = "client-media";
 const DEFAULT_BATCH = 5;
+
+type PrewritePackage = { artifact_hash: string; manifest: Record<string, unknown> };
 
 export interface ClaimedPost {
   post_id: string;
@@ -80,17 +81,23 @@ export interface ClaimedPost {
 export async function requireOutgoingPublicationPrewrite(
   sb: SupabaseClient,
   postId: string,
-): Promise<void> {
+  expectedArtifactHash?: string,
+): Promise<PrewritePackage> {
   const { data, error } = await sb.rpc("require_organic_publication_prewrite_v6", {
     p_post_id: postId,
   } as never);
-  const artifactHash = (data as { artifact_hash?: unknown } | null)?.artifact_hash;
-  if (error || typeof artifactHash !== "string" || !/^[0-9a-f]{64}$/.test(artifactHash)) {
+  const packet = data as { artifact_hash?: unknown; manifest?: unknown } | null;
+  const artifactHash = packet?.artifact_hash;
+  if (error || typeof artifactHash !== "string" || !/^[0-9a-f]{64}$/.test(artifactHash)
+    || !packet?.manifest || typeof packet.manifest !== "object"
+    || Array.isArray(packet.manifest) || expectedArtifactHash !== undefined
+    && artifactHash !== expectedArtifactHash) {
     throw new PublishError(
       `Exact outgoing publication approval is unavailable: ${error?.message ?? "no approved package"}`,
       false,
     );
   }
+  return { artifact_hash: artifactHash, manifest: packet.manifest as Record<string, unknown> };
 }
 
 /** Everything that can stop one post, before anything is sent. */
@@ -98,7 +105,7 @@ export async function prepare(
   sb: SupabaseClient,
   post: ClaimedPost,
 ): Promise<PublishRequest> {
-  await requireOutgoingPublicationPrewrite(sb, post.post_id);
+  const approved = await requireOutgoingPublicationPrewrite(sb, post.post_id);
   await requireOrganicRoute(sb, post);
   if (!isPlatform(post.platform)) {
     throw new PublishError(`This post is for "${post.platform}", which has no rules on file.`, false);
@@ -127,6 +134,20 @@ export async function prepare(
     );
   }
 
+  const frozen = await verifyFrozenPublicationPackage(sb, approved, {
+    clientId: post.client_id, postId: post.post_id,
+    platform: post.platform, scheduledAt: post.scheduled_at, accountRef: accountId,
+    provider: adapter.provider, contentFormat: post.content_format, mediaType: post.media_type,
+  });
+  const checkedCopy = compose(post.platform, {
+    caption: frozen.caption, hashtags: null, link_url: null,
+    first_comment: frozen.firstComment,
+  });
+  if (checkedCopy.caption !== frozen.caption
+    || checkedCopy.firstComment !== frozen.firstComment) {
+    throw new PublishError("Approved provider copy changed during validation.", false);
+  }
+
   const { data: token, error: tokenError } = await sb.rpc("integration_secret", {
     p_client_id: post.client_id,
     p_provider: adapter.provider,
@@ -134,83 +155,26 @@ export async function prepare(
   if (tokenError) throw new PublishError(`Could not read the credential: ${tokenError.message}`, true);
   if (!token) throw new PublishError(`No usable ${adapter.provider} credential for this client.`, false);
 
-  const path = (post.media_path ?? "").trim();
-  if (!path) throw new PublishError("The asset has no file to post.", false);
-  const { data: signed, error: signError } = await sb.storage
-    .from(MEDIA_BUCKET)
-    .createSignedUrl(path, PROVIDER_MEDIA_FETCH_URL_TTL_SECONDS);
-  const mediaUrl = signed?.signedUrl?.trim() ?? "";
-  if (signError || !mediaUrl.startsWith("https://")) {
-    // The platform fetches this URL itself, so anything it cannot reach is
-    // a failure before the post rather than a broken post.
-    throw new PublishError(`Could not sign a URL for ${path}.`, true);
-  }
-
-  // The frames, for a shape made of them. The queue has already refused a
-  // carousel with an unsendable number of them (migration 220), so reaching
-  // this with the wrong count means the frames changed between the claim and
-  // now -- worth failing on rather than publishing a shorter carousel than
-  // the one somebody approved.
-  // Deliberately not coerceFormat, which falls back to 'single' when a format
-  // and a media type disagree. That is right for ideation, where losing one
-  // idea's shape beats losing the batch, and precisely wrong here: falling
-  // back to 'single' is how a carousel goes out as one image, which is the
-  // bug this whole path exists to make impossible.
-  const format = post.content_format ?? "single";
-  if (!isContentFormat(format)) {
-    throw new PublishError(`This post is a "${format}", which has no rules on file.`, false);
-  }
-  let frames: PublishFrame[] | undefined;
-  if (format === "carousel" || format === "story") {
-    const paths = (post.frame_paths ?? []).map((value) => value.trim()).filter(Boolean);
-    // A carousel is one post that must hold together, so two is its floor. A
-    // story is a series of posts, and one of them is a story -- short, but
-    // not wrong.
-    const least = format === "carousel" ? MIN_FRAMES : 1;
-    if (paths.length < least || paths.length > MAX_FRAMES) {
-      throw new PublishError(
-        `This ${format} has ${paths.length} frame${paths.length === 1 ? "" : "s"} to send, and a ${format} takes between ${least} and ${MAX_FRAMES}.`,
-        false,
-      );
-    }
-    const { data: signedFrames, error: frameError } = await sb.storage
-      .from(MEDIA_BUCKET)
-      .createSignedUrls(paths, PROVIDER_MEDIA_FETCH_URL_TTL_SECONDS);
-    if (frameError || !signedFrames || signedFrames.length !== paths.length) {
-      throw new PublishError(`Could not sign URLs for this ${format}'s ${paths.length} frames.`, true);
-    }
-    frames = paths.map((path, index) => {
-      const url = signedFrames[index]?.signedUrl?.trim() ?? "";
-      if (!url.startsWith("https://")) {
-        // One unreachable frame is a failure before the post rather than a
-        // carousel with a hole in it.
-        throw new PublishError(`Could not sign a URL for frame ${index + 1} (${path}).`, true);
-      }
-      return { position: index + 1, mediaUrl: url };
-    });
-  }
-
-  const words = compose(post.platform, {
-    caption: post.caption,
-    hashtags: post.hashtags,
-    link_url: post.link_url,
-    first_comment: post.first_comment,
-  });
+  const frames: PublishFrame[] | undefined = ["carousel", "story"].includes(frozen.contentFormat)
+    ? frozen.mediaUrls.map((mediaUrl, index) => ({ position: index + 1, mediaUrl }))
+    : undefined;
 
   return {
     postId: post.post_id,
     clientId: post.client_id,
     platform: post.platform,
+    reviewedArtifactHash: frozen.artifactHash,
     accessToken: String(token),
     accountId,
-    mediaUrl,
-    mediaKind: post.media_type === "video" ? "video" : "image",
-    contentFormat: format,
+    mediaUrl: frozen.mediaUrls[0]!,
+    mediaKind: frozen.mediaType === "video" ? "video" : "image",
+    contentFormat: frozen.contentFormat as PublishRequest["contentFormat"],
     ...(frames ? { frames } : {}),
-    caption: words.caption,
-    firstComment: words.firstComment,
-    altText: post.alt_text,
-    linkUrl: post.link_url,
+    caption: frozen.caption,
+    firstComment: frozen.firstComment,
+    altText: frozen.altText,
+    linkUrl: typeof (approved.manifest.copy as Record<string, unknown> | null)?.link_url === "string"
+      ? (approved.manifest.copy as Record<string, string>).link_url : null,
   };
 }
 
@@ -262,7 +226,7 @@ async function publishStory(
   let sent = 0;
   for (const frame of frames) {
     if (already.has(frame.position)) continue;
-    await requireOutgoingPublicationPrewrite(sb, post.post_id);
+    await requireOutgoingPublicationPrewrite(sb, post.post_id, request.reviewedArtifactHash);
     await requireOrganicRoute(sb, post);
     const result = await adapter.publishFrame(request, frame);
     const { error: frameError } = await sb.rpc("record_frame_published", {
@@ -338,7 +302,7 @@ export async function runPublisherJob(
       if (request.contentFormat === "story") {
         result = await publishStory(sb, adapter, request, post, job.id);
       } else {
-        await requireOutgoingPublicationPrewrite(sb, post.post_id);
+        await requireOutgoingPublicationPrewrite(sb, post.post_id, request.reviewedArtifactHash);
         await requireOrganicRoute(sb, post);
         result = await adapter.publish(request);
       }
