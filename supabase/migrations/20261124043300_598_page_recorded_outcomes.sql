@@ -1,6 +1,8 @@
 -- First-party conversion evidence for landing and offer pages. The source
 -- page is the lead's recorded first source; it is not a page-view count or a
--- claim that this page caused a later sale. Retain archived page rows.
+-- claim that this page caused a later sale. Sale evidence is an explicit sale
+-- stage, positive recorded sale value or positive collected cash. Retain
+-- archived page rows.
 create function public.page_recorded_outcomes_v8(
   p_client_id uuid,p_page_type text,p_days integer default 30)
 returns table(
@@ -23,7 +25,8 @@ begin
     count(l.id)::integer,
     count(l.id) filter(where l.consent_given_at is not null
       and nullif(btrim(l.consent_wording),'') is not null)::integer,
-    count(l.id) filter(where l.stage in ('sale','cash'))::integer,
+    count(l.id) filter(where l.stage in ('sale','cash')
+      or coalesce(l.sale_value,0)>0 or coalesce(l.cash_collected,0)>0)::integer,
     coalesce(sum(l.cash_collected),0)::numeric,max(l.created_at)
   from public.client_pages p
   left join public.client_leads l on l.client_id=p.client_id
@@ -38,5 +41,5 @@ revoke all on function public.page_recorded_outcomes_v8(uuid,text,integer)
 grant execute on function public.page_recorded_outcomes_v8(uuid,text,integer)
   to authenticated,service_role;
 comment on function public.page_recorded_outcomes_v8(uuid,text,integer) is
-  'Recorded first-source page lead, consent, stage and cash associations for a bounded window. Excludes probes; never supplies page visits or causal attribution.';
+  'Recorded first-source page lead, consent, sale-evidence and cash associations for a bounded window. Excludes probes; never supplies page visits or causal attribution.';
 select public.lock_down_definer_functions();
