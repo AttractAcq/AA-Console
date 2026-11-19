@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "493895972ee8d7ed8f813dc7e8723f2f83ef5dc2c594d4a5452f285dc5105faf",
+  "migrationSourceDigest": "35daafc6537a886a018e4904456f6c9093805d773f6df10845af019c674ff8d8",
   "generatedTypesSha256": "3a3c92d2b1fed22b00ebe5b1ee13974b4641d3cd50b9854e0a3882ff79243597",
   "generatedSchemaBodySha256": "b26f0ba49f6de80ba070e72b25c346f6bc421dbb0346e30d21310aab4b72b515",
   "localMigrations": [
@@ -4103,8 +4103,8 @@
       "version": "20261124040400",
       "name": "569_content_archive_metric_coverage",
       "filename": "20261124040400_569_content_archive_metric_coverage.sql",
-      "sha256": "0c7b9f23ee6353081bace7c5dab09704537e2e478b81d94425e5f82a3364ce10",
-      "trimmedMd5": "ce4e64982ef780f73b1fddf59af47b8e"
+      "sha256": "a5c5bbfc66adb8904fc04d35056e4cdaac150b8ef1837da71b591ddce7e65fe1",
+      "trimmedMd5": "ca81dce4fc842dd3df98dc8aeb05f2e6"
     },
     {
       "version": "20261124040500",
@@ -4446,8 +4446,8 @@
       "version": "20261124045300",
       "name": "618_opportunity_aggregate_currency_coverage",
       "filename": "20261124045300_618_opportunity_aggregate_currency_coverage.sql",
-      "sha256": "b9c8ecdc73c8cf3526c5d4b379c15945a6b3849d363602c5cbdf282569d68b9e",
-      "trimmedMd5": "7cbcaa9594853e33552a64de02502b47"
+      "sha256": "bad45f0263c0d21489a51f7c1a73f7ace1400a0f2cb2e562469611f0151dd68f",
+      "trimmedMd5": "3540f7606c7f335a33b640f51692a67c"
     },
     {
       "version": "20261124045400",

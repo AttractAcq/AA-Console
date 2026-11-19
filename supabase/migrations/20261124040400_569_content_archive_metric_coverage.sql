@@ -1,7 +1,6 @@
--- content_attribution is a legacy aggregate. Its zero fallback does not tell
--- an operator whether any provider metric was ingested, and its sum can mix
--- daily observations with cumulative snapshots. Expose the underlying row
--- coverage per asset without changing historical aggregate values.
+-- Expose underlying provider-row coverage per asset. The attribution view
+-- separately uses the latest cumulative snapshot per source and withholds
+-- spend when a paid daily row lacks comparable currency evidence.
 create view public.content_archive_metric_coverage_v8
 with (security_invoker = on)
 as
@@ -15,10 +14,10 @@ select
   count(m.impressions) as impression_rows,
   count(m.reach) as reach_rows,
   count(m.clicks) as click_rows,
-  count(m.spend) as spend_rows,
-  count(distinct nullif(btrim(m.currency), '')) filter (where m.spend is not null) as currency_count,
-  count(m.id) filter (where m.spend is not null and nullif(btrim(m.currency), '') is null) as missing_currency_rows,
-  max(nullif(btrim(m.currency), '')) filter (where m.spend is not null) as currency,
+  count(m.spend) filter (where m.surface='paid' and m.basis='daily') as spend_rows,
+  count(distinct nullif(btrim(m.currency), '')) filter (where m.surface='paid' and m.basis='daily' and m.spend is not null) as currency_count,
+  count(m.id) filter (where m.surface='paid' and m.basis='daily' and m.spend is not null and nullif(btrim(m.currency), '') is null) as missing_currency_rows,
+  max(nullif(btrim(m.currency), '')) filter (where m.surface='paid' and m.basis='daily' and m.spend is not null) as currency,
   min(m.metric_date) as first_metric_date,
   max(m.metric_date) as last_metric_date,
   max(m.fetched_at) as last_fetched_at

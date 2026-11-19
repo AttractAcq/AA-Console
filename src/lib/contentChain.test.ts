@@ -105,9 +105,11 @@ describe("archiveMetricPresentation", () => {
       click_rows: 0, spend_rows: 0 })).impressions).toBe("unknown (no ingested value)");
   });
 
-  it("holds legacy sums when cumulative rows or incompatible currencies are present", () => {
+  it("labels latest cumulative snapshots and holds incompatible spend currencies", () => {
     expect(archiveMetricPresentation(totals, coverage({ cumulative_rows: 1 })).impressions)
-      .toContain("unknown (legacy sum includes cumulative snapshots)");
+      .toContain("daily rows plus latest cumulative snapshot per source");
+    expect(archiveMetricPresentation(totals, coverage({ cumulative_rows: 1 })).spend)
+      .toContain("recorded daily rows");
     expect(archiveMetricPresentation(totals, coverage({ currency_count: 2 })).spend)
       .toBe("unknown (spend currency missing or mixed)");
     expect(archiveMetricPresentation(totals, null).impressions).toBe("unknown");

@@ -28,8 +28,7 @@ select
   d.channels,
   d.first_published,
 
-  -- what attention it got. Zero until metrics exist, never null, so a caller
-  -- cannot mistake "not connected" for "performed badly".
+  -- What attention it got. Missing provider rows remain unknown, not zero.
   att.impressions,
   att.reach,
   att.clicks,
@@ -55,16 +54,31 @@ left join lateral (
          string_agg(distinct sp.channel::text, ', ')  as channels,
          min(sp.published_at)                         as first_published
   from scheduled_posts sp
-  where sp.asset_id = a.id
+  where sp.asset_id = a.id and sp.client_id = a.client_id
 ) d on true
 left join lateral (
-  select coalesce(sum(m.impressions), 0)::bigint as impressions,
-         coalesce(sum(m.reach), 0)::bigint       as reach,
-         coalesce(sum(m.clicks), 0)::bigint      as clicks,
-         coalesce(sum(m.spend), 0)::numeric      as spend
-  from metrics_daily m
-  join scheduled_posts sp on sp.id = m.post_id
-  where sp.asset_id = a.id
+  select sum(m.impressions)::bigint as impressions,
+         sum(m.reach)::bigint       as reach,
+         sum(m.clicks)::bigint      as clicks,
+         case when count(m.id) filter (where m.surface='paid' and m.basis='daily')=0 then null
+              when count(*) filter (where m.surface='paid' and m.basis='daily' and m.spend is null)>0 then null
+              when coalesce(sum(m.spend) filter (where m.surface='paid' and m.basis='daily'),0)=0 then 0
+              when count(*) filter (where m.surface='paid' and m.basis='daily' and m.spend>0 and m.currency is null)=0
+                and count(distinct m.currency) filter (where m.surface='paid' and m.basis='daily' and m.spend>0)=1
+              then sum(m.spend) filter (where m.surface='paid' and m.basis='daily') end::numeric as spend
+  from (
+    select observed.* from (
+      select m.*, row_number() over (
+        partition by m.post_id,m.surface,m.entity_type,m.external_id
+        order by m.metric_date desc,m.fetched_at desc,m.id desc
+      ) as snapshot_rank
+      from metrics_daily m
+      join scheduled_posts sp on sp.id=m.post_id and sp.client_id=a.client_id
+      where sp.asset_id=a.id and m.client_id=a.client_id
+    ) observed
+    where observed.basis='daily'
+       or (observed.basis='cumulative' and observed.snapshot_rank=1)
+  ) m
 ) att on true
 left join lateral (
   select count(*)::int as leads,
@@ -88,9 +102,9 @@ left join lateral (
          count(*) filter (where lead_stage_rank(l.stage) >= 2)::int as followers,
          count(*) filter (where lead_stage_rank(l.stage) >= 3)::int as qualified
   from client_leads l
-  where not coalesce(l.is_probe,false) and (l.source_asset_id = a.id
+  where l.client_id=a.client_id and not coalesce(l.is_probe,false) and (l.source_asset_id = a.id
      -- a lead may name the post rather than the asset; both mean this asset
-     or l.source_post_id in (select sp.id from scheduled_posts sp where sp.asset_id = a.id))
+     or l.source_post_id in (select sp.id from scheduled_posts sp where sp.asset_id = a.id and sp.client_id=a.client_id))
 ) rev on true;
 
 create or replace function top_content_by_revenue(p_client_id uuid, p_limit integer default 10)
@@ -191,7 +205,7 @@ as $$
               when c.sale_unverified=0 and c.sale_currencies=1 then c.sale_value end,
          case when c.cash_collected=0 then 0
               when c.cash_unverified=0 and c.cash_currencies=1 then c.cash_collected end,
-         s.total,
+         case when s.currency_count>1 then null else s.total end,
          case when c.leads > 0 then round(100.0 * c.sales / c.leads, 1) end,
          case when c.leads > 0 and s.total > 0 and s.currency_count=1
               then round(s.total / c.leads, 2) end,
@@ -306,7 +320,7 @@ begin
                             when v_cash_unverified=0 and v_cash_currencies=1 then v_cash end,
       'cash_currency', case when v_cash_unverified=0 and v_cash_currencies=1 then v_cash_currency end,
       'cash_currency_unverified_leads', v_cash_unverified,
-      'spend', v_spend,
+      'spend', case when v_spend_currencies>1 then null else v_spend end,
       'spend_currency', case when v_spend_currencies=1 then v_spend_currency end,
       'lead_to_sale_pct', case when v_leads > 0 then round(100.0 * v_sales / v_leads, 1) end,
       'cost_per_lead', case when v_leads>0 and v_spend>0 and v_spend_currencies=1

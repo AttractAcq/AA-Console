@@ -40,8 +40,8 @@ begin
   insert into public.client_marketing_spend(client_id,spent_on,amount,currency)
   values(cid,current_date,10,'USD');
   select * into v from public.acquisition_funnel(cid,30);
-  if v.cost_per_lead is not null or v.return_on_spend is not null then
-    raise exception 'Mixed spend currencies produced a cost or return'; end if;
+  if v.spend is not null or v.cost_per_lead is not null or v.return_on_spend is not null then
+    raise exception 'Mixed spend currencies produced a total, cost or return'; end if;
 end $checks$;
 -- Simulate a historical unverified amount after the direct-write guard.
 set local session_replication_role = replica;
@@ -55,6 +55,7 @@ begin
   packet:=public.mcp_attribution_conversion_funnel(
     'bot_marketing','b6150000-0000-4000-8000-000000000001',30);
   if packet#>'{funnel,cash_collected}' is distinct from 'null'::jsonb
+     or packet#>'{funnel,spend}' is distinct from 'null'::jsonb
      or packet#>'{funnel,return_on_spend}' is distinct from 'null'::jsonb
      or (packet#>>'{funnel,cash_currency_unverified_leads}')::int<>1 then
     raise exception 'MCP funnel returned unverified cash or return'; end if;

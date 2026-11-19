@@ -7,6 +7,8 @@ insert into public.profiles(id,role,email)
 values ('a6180000-0000-4000-8000-000000000001','admin','opportunity-aggregate@example.invalid');
 insert into public.clients(id,name,initials)
 values ('b6180000-0000-4000-8000-000000000001','Opportunity aggregate fixture','OA');
+insert into public.clients(id,name,initials)
+values ('b6180000-0000-4000-8000-000000000002','Other attribution client','OC');
 insert into public.mcp_bot_clients(bot_id,client_id)
 values ('bot_marketing','b6180000-0000-4000-8000-000000000001');
 insert into public.client_media_assets(id,client_id,media_type,title,storage_path)
@@ -23,6 +25,13 @@ values ('b6180000-0000-4000-8000-000000000001','Comparable','cash',
   'c6180000-0000-4000-8000-000000000001',500,'ZAR',250,'ZAR',200,'ZAR');
 select set_config('request.jwt.claim.role','service_role',true);
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
+-- A legacy wrong-client reference must not enter an agency reader's asset view.
+set local session_replication_role = replica;
+insert into public.client_leads(client_id,name,stage,source_asset_id,
+  opportunity_value,opportunity_currency,cash_collected,cash_currency)
+values ('b6180000-0000-4000-8000-000000000002','Wrong-client source','cash',
+  'c6180000-0000-4000-8000-000000000001',9999,'EUR',9999,'EUR');
+set local session_replication_role = origin;
 do $checks$
 declare cid uuid:='b6180000-0000-4000-8000-000000000001';
   asset uuid:='c6180000-0000-4000-8000-000000000001';
@@ -37,10 +46,42 @@ begin
      or (summary->>'total_opportunity_value')::numeric<>500
      or summary->>'opportunity_currency'<>'ZAR' then
     raise exception 'Comparable MCP pipeline missing'; end if;
-  select opportunity_value,sale_value,cash_collected into v
+  select leads,opportunity_value,sale_value,cash_collected into v
   from public.content_attribution where asset_id=asset;
-  if v.opportunity_value<>500 or v.sale_value<>250 or v.cash_collected<>200 then
+  if v.leads<>1 or v.opportunity_value<>500 or v.sale_value<>250 or v.cash_collected<>200 then
     raise exception 'Comparable asset money missing'; end if;
+  select impressions,reach,clicks,spend into v
+  from public.content_attribution where asset_id=asset;
+  if v.impressions is not null or v.reach is not null or v.clicks is not null
+     or v.spend is not null then
+    raise exception 'Missing provider metrics were reported as observed zero'; end if;
+
+  insert into public.scheduled_posts(id,client_id,asset_id,scheduled_for)
+  values('d6180000-0000-4000-8000-000000000001',cid,asset,current_date);
+  insert into public.metrics_daily(client_id,surface,entity_type,external_id,metric_date,
+    post_id,basis,impressions,spend,currency)
+  values(cid,'paid','post','paid-metric',current_date,
+    'd6180000-0000-4000-8000-000000000001','daily',100,10,'ZAR');
+  insert into public.metrics_daily(client_id,surface,entity_type,external_id,metric_date,
+    post_id,basis,impressions,spend,currency)
+  values('b6180000-0000-4000-8000-000000000002','paid','post','wrong-client-metric',current_date,
+    'd6180000-0000-4000-8000-000000000001','daily',9999,9999,'EUR');
+  insert into public.metrics_daily(client_id,surface,entity_type,external_id,metric_date,
+    post_id,basis,impressions)
+  values(cid,'organic','post','organic-snapshot',current_date-1,
+    'd6180000-0000-4000-8000-000000000001','cumulative',500),
+    (cid,'organic','post','organic-snapshot',current_date,
+    'd6180000-0000-4000-8000-000000000001','cumulative',800);
+  select impressions,spend into v from public.content_attribution where asset_id=asset;
+  if v.impressions<>900 or v.spend<>10 then
+    raise exception 'Daily and latest cumulative metrics were not reconciled'; end if;
+  insert into public.metrics_daily(client_id,surface,entity_type,external_id,metric_date,
+    post_id,basis,impressions,spend,currency)
+  values(cid,'paid','post','other-paid-metric',current_date,
+    'd6180000-0000-4000-8000-000000000001','daily',50,5,'USD');
+  select impressions,spend into v from public.content_attribution where asset_id=asset;
+  if v.impressions<>950 or v.spend is not null then
+    raise exception 'Mixed paid metric currencies returned an asset spend total'; end if;
 
   insert into public.client_leads(client_id,name,stage,source_asset_id,
     opportunity_value,opportunity_currency,sale_value,sale_currency,

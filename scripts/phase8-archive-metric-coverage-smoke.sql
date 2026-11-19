@@ -27,7 +27,7 @@ begin
 
   insert into public.metrics_daily(client_id,surface,entity_type,external_id,metric_date,
     post_id,impressions,clicks,spend,currency,basis)
-    values(cid,'organic','post','fixture-post',current_date,first_post,0,4,12,'ZAR','daily');
+    values(cid,'paid','post','fixture-paid-post',current_date,first_post,0,4,12,'ZAR','daily');
   if not exists (select 1 from public.content_archive_metric_coverage_v8
       where asset_id=measured and linked_posts=2 and posts_with_metrics=1
         and metric_rows=1 and impression_rows=1 and reach_rows=0
@@ -36,11 +36,14 @@ begin
   end if;
 
   insert into public.metrics_daily(client_id,surface,entity_type,external_id,metric_date,
-    post_id,impressions,spend,currency,basis)
-    values(cid,'organic','post','fixture-post',current_date-1,first_post,9,8,'USD','cumulative');
+    post_id,impressions,basis)
+    values(cid,'organic','post','fixture-organic-post',current_date-1,first_post,9,'cumulative');
+  insert into public.metrics_daily(client_id,surface,entity_type,external_id,metric_date,
+    post_id,spend,currency,basis)
+    values(cid,'paid','post','fixture-second-paid-post',current_date-1,first_post,8,'USD','daily');
   if not exists (select 1 from public.content_archive_metric_coverage_v8
-      where asset_id=measured and metric_rows=2 and cumulative_rows=1
-        and currency_count=2 and posts_with_metrics=1) then
+      where asset_id=measured and metric_rows=3 and cumulative_rows=1
+        and spend_rows=2 and currency_count=2 and posts_with_metrics=1) then
     raise exception 'Cumulative or mixed-currency evidence was hidden';
   end if;
 end $checks$;

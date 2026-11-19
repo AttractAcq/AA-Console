@@ -100,7 +100,7 @@ export type ArchiveMetricCoverage = {
   last_fetched_at: string | null;
 };
 
-/** Legacy sums are useful only when their underlying rows are visible. */
+/** Show the current aggregate only alongside its source coverage. */
 export function archiveMetricPresentation(
   totals: { impressions: number | null; reach: number | null; clicks: number | null; spend: number | null },
   coverage: ArchiveMetricCoverage | null,
@@ -112,15 +112,16 @@ export function archiveMetricPresentation(
   const scope = coverage.metric_rows > 0
     ? `${coverage.metric_rows} metric rows on ${coverage.posts_with_metrics}/${coverage.linked_posts} linked posts; ${coverage.first_metric_date ?? "unknown"} to ${coverage.last_metric_date ?? "unknown"}; fetched ${coverage.last_fetched_at ?? "unknown"}; provider completeness unverified`
     : `${coverage.linked_posts} linked posts; no ingested metric rows`;
-  const metric = (value: number | null, observedRows: number) => {
+  const metric = (value: number | null, observedRows: number, cumulativeSensitive = true) => {
     if (observedRows === 0 || value === null) return "unknown (no ingested value)";
-    if (coverage.cumulative_rows > 0) return "unknown (legacy sum includes cumulative snapshots)";
+    if (cumulativeSensitive && coverage.cumulative_rows > 0)
+      return `${value} (daily rows plus latest cumulative snapshot per source; coverage unverified)`;
     return `${value} (recorded daily rows; coverage unverified)`;
   };
   const spend = coverage.spend_rows > 0 &&
     (coverage.currency_count !== 1 || coverage.missing_currency_rows > 0)
     ? "unknown (spend currency missing or mixed)"
-    : metric(totals.spend, coverage.spend_rows);
+    : metric(totals.spend, coverage.spend_rows, false);
   return {
     metric_coverage: scope,
     impressions: metric(totals.impressions, coverage.impression_rows),
