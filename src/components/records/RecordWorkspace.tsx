@@ -36,6 +36,7 @@ type Record_ = {
   status: string;
   edited_at: string | null;
   job_id: string | null;
+  updated_at: string;
 };
 
 type SectionReview = {
@@ -43,6 +44,7 @@ type SectionReview = {
   review_state: string;
   source_ref: string | null;
   observed_on: string | null;
+  confidence: string | null;
   reviewed_at: string | null;
   review_note: string | null;
 };
@@ -97,8 +99,11 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [savedNotice, setSavedNotice] = useState<string | null>(null);
   const [runOpen, setRunOpen] = useState(false);
-  const [editing, setEditing] = useState<{ itemKey: string; title: string; body: string } | null>(
+  const [editing, setEditing] = useState<{
+    itemKey: string; title: string; body: string; recordId: string | null; updatedAt: string | null;
+  } | null>(
     null,
   );
   const [reviewing, setReviewing] = useState<Record_ | null>(null);
@@ -117,7 +122,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
     if (!clientId) return;
     const { data, error } = await supabase
       .from("client_agent_records")
-      .select("id, item_key, item_type, title, body, period, display_order, status, edited_at, job_id")
+      .select("id, item_key, item_type, title, body, period, display_order, status, edited_at, job_id, updated_at")
       .eq("client_id", clientId)
       .eq("domain", domain)
       // Archived models live in the Archive (migration 312). This table holds
@@ -132,7 +137,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
   const loadReviews = useCallback(async () => {
     if (!clientId) return;
     const { data, error } = await supabase.from("model_section_review_state_v7")
-      .select("record_id,review_state,source_ref,observed_on,reviewed_at,review_note")
+      .select("record_id,review_state,source_ref,observed_on,confidence,reviewed_at,review_note")
       .eq("client_id", clientId).eq("domain", domain);
     if (error) throw error;
     setReviews((data ?? []) as SectionReview[]);
@@ -241,6 +246,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
   const editFields: FieldDef[] = [
     { name: "body", label: editing?.title ?? "Content", kind: "textarea", rows: 12, required: true },
   ];
+  const reviewingState = reviews.find((item) => item.record_id === reviewing?.id);
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
   if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void loadAll()}>Retry</button></div>;
@@ -276,6 +282,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
         </p>
       )}
       {actionError && <p role="alert" className="mb-4 text-sm text-destructive">{actionError}</p>}
+      {savedNotice && <p role="status" className="mb-4 text-sm text-brand-strong">{savedNotice}</p>}
 
       {displayTemplates.length === 0 ? (
         <EmptyState label="No template or record defined for this domain" />
@@ -338,7 +345,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
                           : "Not generated"}
                   </span>
                   <div className="flex items-center gap-3">
-                  {record?.body && <button type="button" onClick={() => setReviewing(record)}
+                  {record?.body && <button type="button" onClick={() => { setSavedNotice(null); setReviewing(record); }}
                     className="rounded text-xs font-medium text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     Review source
                   </button>}
@@ -348,13 +355,16 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
                     onError={setActionError} />}
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={() => {
+                      setSavedNotice(null);
                       setEditing({
                         itemKey: t.item_key,
                         title: t.title,
                         body: record?.body ?? "",
-                      })
-                    }
+                        recordId: record?.id ?? null,
+                        updatedAt: record?.updated_at ?? null,
+                      });
+                    }}
                     className="flex items-center gap-1.5 rounded text-xs font-medium text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
@@ -392,7 +402,15 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
             ] },
           { name: "review_note", label: "Correction or review note", kind: "textarea", rows: 4 },
         ]}
-        initialValues={{ source_ref: "", observed_on: "", confidence: "", review_note: "" }}
+        initialValues={{
+          source_ref: reviewingState?.source_ref ?? "",
+          observed_on: reviewingState?.observed_on ?? "",
+          // A changed section needs a fresh confidence decision. Never carry
+          // its previous "supported" decision into a stale review form.
+          confidence: reviewingState?.review_state === "stale"
+            ? "" : reviewingState?.confidence ?? "",
+          review_note: reviewingState?.review_note ?? "",
+        }}
         onSubmit={async (values) => {
           if (!reviewing) throw new Error("Choose a section to review.");
           const { error } = await supabase.rpc("review_model_section_v7", {
@@ -404,7 +422,11 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
           });
           if (error) throw error;
         }}
-        onSaved={loadReviews}
+        onSaved={() => {
+          setSavedNotice(`Source review saved for ${reviewing?.title ?? "section"}.`);
+          void loadReviews().catch((error: unknown) => setActionError(
+            `The source review saved, but the refreshed state could not be loaded: ${error instanceof Error ? error.message : String(error)}`));
+        }}
       />
 
       <FormModal
@@ -417,14 +439,17 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
         onSubmit={async (v) => {
           if (!clientId || !editing) throw new Error("Nothing to save.");
           const body = (v.body as string).trim();
-          const existing = byKey.get(editing.itemKey);
-
-          if (existing) {
-            const { error } = await supabase
+          if (editing.recordId && editing.updatedAt) {
+            const { data, error } = await supabase
               .from("client_agent_records")
               .update({ body })
-              .eq("id", existing.id);
+              .eq("id", editing.recordId)
+              .eq("client_id", clientId)
+              .eq("updated_at", editing.updatedAt)
+              .is("archived_at", null)
+              .select("id").maybeSingle();
             if (error) throw error;
+            if (!data) throw new Error("This section changed while you were editing. Copy your correction, reopen the section and review the latest version.");
             return;
           }
 
@@ -438,10 +463,14 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
             display_order: template.display_order,
             period: activePeriod,
             body,
-          });
+          }).select("id").single();
           if (error) throw error;
         }}
-        onSaved={() => void Promise.all([loadRecords(), loadReviews()])}
+        onSaved={() => {
+          setSavedNotice(`${editing?.title ?? "Section"} saved. Review its source before downstream use.`);
+          void Promise.all([loadRecords(), loadReviews()]).catch((error: unknown) => setActionError(
+            `The section saved, but the refreshed state could not be loaded: ${error instanceof Error ? error.message : String(error)}`));
+        }}
       />
     </div>
   );
