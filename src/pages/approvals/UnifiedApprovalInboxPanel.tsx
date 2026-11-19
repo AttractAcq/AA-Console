@@ -1143,7 +1143,8 @@ function isEngineSlotReady(request: UnifiedApprovalRequest, clientId: string): b
     && typeof videoSeats.manager_user_id === "string" && !!videoSeats.manager_user_id
     && ["owner", "manager", ...(videoSeats.client_user_id ? ["client"] : [])].every((role) =>
       seatSignoffs.some((entry) => entry.role === role
-        && typeof entry.user_id === "string" && !!entry.user_id
+        && typeof entry.user_id === "string"
+        && entry.user_id === videoSeats[`${role}_user_id`]
         && typeof entry.request_id === "string" && !!entry.request_id
         && typeof entry.content_hash === "string"
         && /^[0-9a-f]{64}$/.test(entry.content_hash as string))));

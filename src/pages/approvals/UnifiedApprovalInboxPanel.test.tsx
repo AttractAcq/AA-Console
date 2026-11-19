@@ -1742,6 +1742,14 @@ describe("unified approval inbox", () => {
     let card = await screen.findByRole("article", { name: readyEngineSlot.title });
     expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
     firstView.unmount();
+    requests = [{ ...reel, preview: { exact_package: {
+      ...reel.preview.exact_package,
+      video_seats: { ...seats, manager_user_id: "reassigned-manager" },
+    } } }];
+    const mismatchedView = show();
+    card = await screen.findByRole("article", { name: readyEngineSlot.title });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+    mismatchedView.unmount();
     requests = [reel];
     show();
     card = await screen.findByRole("article", { name: readyEngineSlot.title });

@@ -178,12 +178,27 @@ begin
     where id='22222222-2222-4222-8222-222222222222';
   if post_id is null or public.engine_slot_exact_source_current_v8(post_id) is not true
     or public.organic_creative_source_current_v8(post_id) is not true
-    or public.organic_publication_source_snapshot_v6(post_id) is null then
+    or public.organic_publication_source_snapshot_v6(post_id) is null
+    or public.organic_publication_claim_snapshot_v7(post_id) is null then
     raise exception 'Approved Engine reel has no current publication source'; end if;
+  begin
+    update public.client_assignments set ended_at=now()
+      where member_id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+    if public.engine_slot_exact_source_current_v8(post_id) is true
+      or public.organic_publication_source_snapshot_v6(post_id) is not null
+      or public.organic_publication_claim_snapshot_v7(post_id) is not null then
+      raise exception 'Changed video manager retained Engine publication authority'; end if;
+    raise exception 'rollback temporary manager change';
+  exception when raise_exception then
+    if sqlerrm<>'rollback temporary manager change' then raise; end if;
+  end;
+  if public.engine_slot_exact_source_current_v8(post_id) is not true then
+    raise exception 'Restored video manager did not restore exact Engine source'; end if;
   update storage.objects set version='v2'
     where id='11111111-1111-4111-8111-111111111111';
   if public.engine_slot_exact_source_current_v8(post_id) is true
     or public.organic_publication_source_snapshot_v6(post_id) is not null
+    or public.organic_publication_claim_snapshot_v7(post_id) is not null
     or public.video_signoff_current_v6(asset_id,'owner') is true then
     raise exception 'Changed reel render retained Engine publication authority'; end if;
 end $checks$;
