@@ -14,19 +14,19 @@ insert into public.client_pages(id,client_id,page_type,title,brief,status)
 values ('c8899999-9999-4999-8999-999999999999',
   'b8899999-9999-4999-8999-999999999999','landing','Fixture page','Fixture brief','draft');
 insert into public.client_leads(client_id,name,source_page_id,stage,
-  consent_given_at,consent_wording,sale_value,cash_collected)
+  consent_given_at,consent_wording,sale_value,cash_collected,sale_currency,cash_currency)
 values ('b8899999-9999-4999-8999-999999999999','Recorded lead',
-  'c8899999-9999-4999-8999-999999999999','cash',now(),'I agree',1200,1200),
+  'c8899999-9999-4999-8999-999999999999','cash',now(),'I agree',1200,1200,'ZAR','ZAR'),
   ('b8899999-9999-4999-8999-999999999999','Probe lead',
-  'c8899999-9999-4999-8999-999999999999','cash',now(),'I agree',900,900),
+  'c8899999-9999-4999-8999-999999999999','cash',now(),'I agree',900,900,'ZAR','ZAR'),
   ('b8899999-9999-4999-8999-999999999999','Shown appointment',
-  'c8899999-9999-4999-8999-999999999999','shown',now(),'I agree',0,0),
+  'c8899999-9999-4999-8999-999999999999','shown',now(),'I agree',0,0,'ZAR','ZAR'),
   ('b8899999-9999-4999-8999-999999999999','Shown with recorded sale',
-  'c8899999-9999-4999-8999-999999999999','shown',now(),'I agree',500,0),
+  'c8899999-9999-4999-8999-999999999999','shown',now(),'I agree',500,0,'ZAR','ZAR'),
   ('b8899999-9999-4999-8999-999999999999','Shown with collected cash',
-  'c8899999-9999-4999-8999-999999999999','shown',now(),'I agree',0,150),
+  'c8899999-9999-4999-8999-999999999999','shown',now(),'I agree',0,150,'ZAR','ZAR'),
   ('b8899999-9999-4999-8999-999999999999','Shown after earlier sale',
-  'c8899999-9999-4999-8999-999999999999','shown',now(),'I agree',0,0);
+  'c8899999-9999-4999-8999-999999999999','shown',now(),'I agree',0,0,'ZAR','ZAR');
 insert into public.lead_events(lead_id,client_id,kind,to_stage)
 select id,client_id,'stage_change','sale' from public.client_leads
 where name='Shown after earlier sale';

@@ -16,24 +16,24 @@ insert into public.client_media_assets(id,client_id,media_type,title,storage_pat
 values ('c8999999-9999-4999-8999-999999999999',
   'b8999999-9999-4999-8999-999999999999','image','Source asset','fixture/sale.png');
 insert into public.client_leads(client_id,name,stage,lost_reason,source_channel,
-  source_asset_id,sale_value,cash_collected)
+  source_asset_id,sale_value,cash_collected,sale_currency,cash_currency)
 values
   ('b8999999-9999-4999-8999-999999999999','Shown only','shown',null,'website',
-    'c8999999-9999-4999-8999-999999999999',0,0),
+    'c8999999-9999-4999-8999-999999999999',0,0,'ZAR','ZAR'),
   ('b8999999-9999-4999-8999-999999999999','Shown with sale value','shown',null,'website',
-    'c8999999-9999-4999-8999-999999999999',500,0),
+    'c8999999-9999-4999-8999-999999999999',500,0,'ZAR','ZAR'),
   ('b8999999-9999-4999-8999-999999999999','Shown with cash','shown',null,'website',
-    'c8999999-9999-4999-8999-999999999999',0,150),
+    'c8999999-9999-4999-8999-999999999999',0,150,'ZAR','ZAR'),
   ('b8999999-9999-4999-8999-999999999999','Cash stage','cash',null,'website',
-    'c8999999-9999-4999-8999-999999999999',1200,1200),
+    'c8999999-9999-4999-8999-999999999999',1200,1200,'ZAR','ZAR'),
   ('b8999999-9999-4999-8999-999999999999','Lost after sale','lost','Historical loss','website',
-    'c8999999-9999-4999-8999-999999999999',0,0);
+    'c8999999-9999-4999-8999-999999999999',0,0,'ZAR','ZAR');
 -- A page-health probe can carry apparent sale/cash values. It remains in the
 -- audit trail but must not enter acquisition or Economics reporting.
 insert into public.client_leads(client_id,name,stage,source_channel,
-  source_asset_id,sale_value,cash_collected,is_probe)
+  source_asset_id,sale_value,cash_collected,sale_currency,cash_currency,is_probe)
 values ('b8999999-9999-4999-8999-999999999999','Probe sale','cash','website',
-  'c8999999-9999-4999-8999-999999999999',99999,99999,true);
+  'c8999999-9999-4999-8999-999999999999',99999,99999,'ZAR','ZAR',true);
 insert into public.lead_events(lead_id,client_id,kind,to_stage)
 select id,client_id,'stage_change','sale' from public.client_leads
 where name='Lost after sale';

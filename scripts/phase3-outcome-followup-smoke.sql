@@ -17,8 +17,8 @@ declare lead_id uuid; consent_id uuid; config_id uuid; link_id uuid; event_id uu
   delivery public.proof_request_deliveries%rowtype; review public.proof_delivery_reviews_v6%rowtype;
   preview jsonb; request_id uuid;
 begin
-  insert into public.client_leads(client_id,name,email,stage,sale_value)
-  values('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Customer','customer@example.invalid','lead',1000)
+  insert into public.client_leads(client_id,name,email,stage,sale_value,sale_currency)
+  values('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Customer','customer@example.invalid','lead',1000,'ZAR')
   returning id into lead_id;
   begin
     insert into public.proof_outcome_followup_consents_v7

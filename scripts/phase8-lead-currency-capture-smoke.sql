@@ -13,11 +13,40 @@ values ('b6120000-0000-4000-8000-000000000001','a6120000-0000-4000-8000-00000000
 select set_config('request.jwt.claim.role','service_role',true);
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
 -- Existing money has no known currency; the migration must not invent it.
+-- Simulate a pre-migration legacy row in this disposable rollback transaction.
+set local session_replication_role = replica;
 insert into public.client_leads(id,client_id,name,stage,sale_value,cash_collected)
 values
  ('c6120000-0000-4000-8000-000000000001','b6120000-0000-4000-8000-000000000001','Legacy','shown',100,50),
  ('c6120000-0000-4000-8000-000000000002','b6120000-0000-4000-8000-000000000001','New sale','shown',null,null),
  ('c6120000-0000-4000-8000-000000000003','b6120000-0000-4000-8000-000000000002','Other client','shown',null,null);
+set local session_replication_role = origin;
+insert into public.lead_identities(id,client_id)
+select id,client_id from public.client_leads
+where id in ('c6120000-0000-4000-8000-000000000001',
+             'c6120000-0000-4000-8000-000000000002',
+             'c6120000-0000-4000-8000-000000000003');
+do $direct$
+declare refused boolean; accepted_id uuid;
+begin
+  refused:=false;
+  begin
+    insert into public.client_leads(client_id,name,stage,sale_value)
+      values('b6120000-0000-4000-8000-000000000001','Direct missing currency','shown',10);
+  exception when check_violation then refused:=true; end;
+  if not refused then raise exception 'Direct positive insert without currency passed'; end if;
+  insert into public.client_leads(client_id,name,stage,sale_value,sale_currency)
+    values('b6120000-0000-4000-8000-000000000001','Direct recorded currency','shown',25,'USD')
+    returning id into accepted_id;
+  if not exists (select 1 from public.client_leads
+      where id=accepted_id and sale_value=25 and sale_currency='USD') then
+    raise exception 'Direct positive insert with currency was not recorded'; end if;
+  refused:=false;
+  begin update public.client_leads set sale_value=125
+    where id='c6120000-0000-4000-8000-000000000001';
+  exception when check_violation then refused:=true; end;
+  if not refused then raise exception 'Direct legacy money edit without currency passed'; end if;
+end $direct$;
 
 set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);

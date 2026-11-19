@@ -2,7 +2,7 @@
 
 **Candidate source:** draft [PR #363](https://github.com/AttractAcq/AA-Console/pull/363). The full SHA-256 values below pin the SQL files, not a hosted release. Recheck the PR head and each hash before any apply.
 **Observed hosted baseline:** Production was last reported at `20261124034600` (migration 551). Staging reached a separately amended migration head of 569 with 569 history rows; its added correction is not a candidate migration. Refresh both heads, cron state, parity and deployment identity before any apply. The eight staging migration-history findings are unresolved.
-**Current candidate scope:** 62 ordered, unhosted migration files (552–613). Migration 592 installs an inactive read-only fifteen-minute cron enqueuer; separately review runtime compatibility and provider read access before activation. Candidate hashes below must be regenerated after any further source edit.
+**Current candidate scope:** 63 ordered, unhosted migration files (552–614). Migration 592 installs an inactive read-only fifteen-minute cron enqueuer; separately review runtime compatibility and provider read access before activation. Candidate hashes below must be regenerated after any further source edit.
 
 ## Ordered candidate
 
@@ -70,6 +70,7 @@
 | 611 | `20261124044600_611_engine_reel_source_review.sql` | `d8bacbfa62bf2b4c40bbbd2c8136435a5bd450e1e34cde69f0267e988e25e016` | Bind finished reel bytes and current owner, SMM and requested client seats in the exact Engine packet; require that slot decision for recurring publication and hold after render replacement |
 | 612 | `20261124044700_612_lead_money_currency_capture.sql` | `0370d85fefc096ab7a48607eb0cbf2d1f407632301dbfd00ae16c1de1714b4fa` | Store separate nullable sale and cash currencies; require an explicit currency for a changed positive amount through Sales OS without backfilling legacy values |
 | 613 | `20261124044800_613_recover_lead_generated_columns.sql` | `abec4c9538a33ac20e7d35a77c06246c745b75a1e44af18c01f7a645742322ed` | Restore archived leads while letting Postgres recompute generated dedupe keys, preserving currency fields and historical snapshots |
+| 614 | `20261124044900_614_guard_lead_money_writers.sql` | `55e2af7f0e370d7a2070efcf17c24f1774276543acc8470b099a5cadaf95afb8` | Require explicit sale/cash currency for new direct positive writes; retain legacy nonfinancial edits and exact archived legacy recovery |
 
 **Organic route-package candidate, 19 November 2026:** Both the scheduled snapshot used for review and the claimed snapshot used by final prewrite now include the latest organic route package ID/version. They require an explicitly organic idea, a campaign that runs organic, and a route package matching the current plan fingerprint. This holds paid creative in a coordinated campaign and makes a later route/package revision stale the frozen review. Fifty-four focused runtime/PGlite tests and runtime typecheck passed, including paid-route and stale-plan refusals. A disposable released-to-current upgrade, clean replay, catalog contract, generated types and scoped-read gate passed locally. The publisher claim remains closed, and provider receipt/read-back and real human AAL2 evidence remain open. No hosted change occurred.
 

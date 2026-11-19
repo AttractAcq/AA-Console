@@ -20,9 +20,9 @@ begin
     values(cid,'image','Source asset','fixture/source.png') returning id into asset_id;
   insert into public.client_leads(client_id,name,stage,source_channel,
     source_client_campaign_id,source_page_id,source_asset_id,
-    consent_given_at,consent_wording,sale_value,cash_collected)
+    consent_given_at,consent_wording,sale_value,cash_collected,sale_currency,cash_currency)
     values(cid,'Journey lead','cash','organic',campaign_id,page_id,asset_id,
-      now(),'I agree to be contacted',12000,9000) returning id into lead_id;
+      now(),'I agree to be contacted',12000,9000,'ZAR','ZAR') returning id into lead_id;
   insert into public.lead_events(lead_id,client_id,kind,body,to_stage)
     values(lead_id,cid,'outcome','Cash collected','cash');
   update public.client_campaigns set archived_at=now() where id=campaign_id;
