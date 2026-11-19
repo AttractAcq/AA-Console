@@ -35286,6 +35286,18 @@ export type Database = {
           },
         ]
       }
+      organic_provider_readback_retry_due_v8: {
+        Row: {
+          client_id: string | null
+          expected_account_ref: string | null
+          external_id: string | null
+          frame_position: number | null
+          last_checked_at: string | null
+          platform: string | null
+          post_id: string | null
+        }
+        Relationships: []
+      }
       outbound_message_due: {
         Row: {
           approval_status: string | null
@@ -40782,6 +40794,10 @@ export type Database = {
         Returns: number
       }
       enqueue_organic_package_sweep_v6: { Args: never; Returns: string }
+      enqueue_organic_readback_reconciliation_v8: {
+        Args: never
+        Returns: string
+      }
       enqueue_outbound_sweep: { Args: never; Returns: string }
       enqueue_profile_update_sweep: { Args: never; Returns: string }
       enqueue_proof_placement_sweep: { Args: never; Returns: string }

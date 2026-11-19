@@ -36,6 +36,7 @@ import { runCopywriterJob } from "../agents/copywriter/index.js";
 import { runTokenHealthJob } from "../agents/token_health/index.js";
 import { runQaJob } from "../agents/qa/index.js";
 import { runPublisherJob } from "../agents/publisher/index.js";
+import { runOrganicReadbackReconciliationJob } from "../agents/organic_readback_reconciler/index.js";
 import { runCampaignActionJob } from "../campaigns/actions/executor.js";
 import { runCampaignBudgetReconciliationJob } from "../campaigns/actions/budget-reconciliation-job.js";
 import { runCampaignPageReconciliationJob } from "../campaigns/actions/page-reconciliation-job.js";
@@ -171,6 +172,7 @@ const RUNNERS: Record<string, JobRunner> = {
   // client: two switches, so turning it on for one account is not turning
   // it on for every account.
   publisher: runPublisherJob,
+  organic_readback_reconciler: runOrganicReadbackReconciliationJob,
   // Held before any generic claim. The released SQL claim has no atomic
   // handler-owned action-key filter; a separate registry read can race a
   // support-bit change. CAMPAIGN_ACTIONS_ENABLED does not lift the hold.

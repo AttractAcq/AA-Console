@@ -28,7 +28,8 @@ function safeUrl(value: unknown, platform: string): string | null {
 
 /** A failed read is an unknown provider state; the acknowledged post must not be retried. */
 export async function readMetaPublication(
-  request: PublishRequest, externalId: string, fetchImpl: typeof fetch = fetch,
+  request: Pick<PublishRequest, "platform" | "accountId" | "accessToken">,
+  externalId: string, fetchImpl: typeof fetch = fetch,
 ): Promise<PublicationReadback> {
   const unavailable: PublicationReadback = {
     status: "unavailable", observedAccountRef: null, providerUrl: null,

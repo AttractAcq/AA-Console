@@ -8,13 +8,13 @@ const installed = (): CronCatalogJob[] => Object.entries(EXPECTED_CRON_SCHEDULES
   name, schedule, active: true,
 }));
 
-describe("released cron schedule catalog", () => {
-  it("recognizes the 22 released schedules without claiming run success", () => {
+describe("candidate cron schedule catalog", () => {
+  it("recognizes the 23 candidate schedules without claiming run success", () => {
     const audit = auditCronCatalog(CRON_REGISTRY_HEAD, installed());
     expect(audit).toMatchObject({
-      state: "matches", expectedCount: 22, observedCount: 22, reason: null,
+      state: "matches", expectedCount: 23, observedCount: 23, reason: null,
     });
-    expect(audit.rows).toHaveLength(22);
+    expect(audit.rows).toHaveLength(23);
     expect(audit.rows.every((row) => row.issues.length === 0)).toBe(true);
     expect(audit.rows.find((row) => row.name === "engine-tick")?.expectedSchedule).toBe("7 * * * *");
     expect(audit.rows.find((row) => row.name === "profile-update-sweep")?.expectedSchedule).toBe("5,35 * * * *");
