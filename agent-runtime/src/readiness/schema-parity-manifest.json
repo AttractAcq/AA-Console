@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "b7b691c8461ce167577025c9fd4562b58846bfae613a2bbb419edb25175243f4",
-  "generatedTypesSha256": "62a6cf2c671d650f997b1ebf2a6198e241fa65c8d551502826202d113540dbe6",
-  "generatedSchemaBodySha256": "28a3a819aaaf909e861ab5ee79226dcb398f6e647839fc9da5eabba75385b23b",
+  "migrationSourceDigest": "acd0c1546a7690090f720bf36f5f93f7f7b160bee12e3392a9bd4ad4cff284b7",
+  "generatedTypesSha256": "240dad902b5c1a48903bdb3c5da6e464bca11f15d84fc07a668741848f9e70f4",
+  "generatedSchemaBodySha256": "f35c2315106d94f453bd484ee4c929b802338301eb4f8827c326e443c9751cda",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4553,6 +4553,13 @@
       "filename": "20261124050800_633_historical_coverage_legacy_trace.sql",
       "sha256": "960f6db6dfa8215ca611f5f236c23ae343ffb83c634044c9a00aa86533126cab",
       "trimmedMd5": "ba189eab21985c9b49a6e56a1eafd638"
+    },
+    {
+      "version": "20261124050900",
+      "name": "634_historical_campaign_lead_evidence",
+      "filename": "20261124050900_634_historical_campaign_lead_evidence.sql",
+      "sha256": "5f85e4da82ba3b7b4dabf8f46c2ab09827c47baa4cc7104240406689bac2dc2c",
+      "trimmedMd5": "1246e96f2a30a45b902970128bc995cb"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

@@ -39080,6 +39080,10 @@ export type Database = {
           requirement: string
         }[]
       }
+      campaign_recorded_lead_count_v11: {
+        Args: { p_campaign_id: string; p_client_id: string }
+        Returns: number
+      }
       campaign_sweep_blocker_v6: {
         Args: { p_campaign_id: string }
         Returns: string
