@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "138e80d7902316bf3055bda0575bca10a4700ebae5455a4ffbc3fd36725b70e4",
+  "migrationSourceDigest": "af9773eb3aeb63fcdbc1246ba8ad46cb292bde2440a9519c2927a14f632fb5cd",
   "generatedTypesSha256": "7e6a8706d20136a4896206ff21daf7576ee5c79b1c9c97a7f167f7307b637a87",
   "generatedSchemaBodySha256": "9df07f150573f22c1038a9ff75c97e7422f81d33cee38b04344af8a02929653e",
   "localMigrations": [
@@ -4681,9 +4681,9 @@
       "trimmedMd5": "aaaf32a03b552b93dc60a04687e3d91c"
     },
     {
-      "version": "20261124052800",
-      "name": "653_named_offer_source_build",
-      "filename": "20261124052800_653_named_offer_source_build.sql",
+      "version": "20261124052700",
+      "name": "652_named_offer_source_build",
+      "filename": "20261124052700_652_named_offer_source_build.sql",
       "sha256": "6151421efa0b0b3673154039c69378046bdc008ab69ebb5397639eded15bf4c9",
       "trimmedMd5": "112fc28c0fb1d7f65dfc66881f69a6f3"
     }

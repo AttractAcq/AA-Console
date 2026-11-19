@@ -18,7 +18,7 @@ REPO = Path(__file__).resolve().parents[1]
 MANIFEST = REPO / "docs/client-delivery-pr363-migration-review-2026-11-18.md"
 MIGRATIONS = REPO / "supabase/migrations"
 START = "20261124034600"
-END = "20261124052800"
+END = "20261124052700"
 EXPECTED = 101
 
 
