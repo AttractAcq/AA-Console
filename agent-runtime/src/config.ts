@@ -109,6 +109,8 @@ export interface RuntimeConfig {
    * processing unverifiable events.
    */
   metaAppSecret: string | null;
+  /** Nonsecret app identity required by publication token preflight. */
+  metaAppId: string | null;
   /** The token Meta echoes during the webhook subscription handshake. */
   metaWebhookVerifyToken: string | null;
   /**
@@ -358,6 +360,7 @@ export function loadConfig(): RuntimeConfig {
         : "openai",
     conceptModel: optionalEnv("CREATIVE_CONCEPT_MODEL") ?? "gpt-5.6-sol",
     metaAppSecret: optionalEnv("META_APP_SECRET") ?? null,
+    metaAppId: optionalEnv("META_APP_ID") ?? null,
     metaWebhookVerifyToken: optionalEnv("META_WEBHOOK_VERIFY_TOKEN") ?? null,
     outboundMessagingEnabled: optionalEnv("OUTBOUND_MESSAGING_ENABLED") === "true",
     resendApiKey: optionalEnv("RESEND_API_KEY") ?? null,

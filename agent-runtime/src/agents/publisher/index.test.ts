@@ -11,7 +11,7 @@ import { PublishError } from "../../publishing/types.js";
 
 const agent = { agent_key: "publisher" } as unknown as AgentRow;
 const job = { id: "job-1", params: { limit: 5 } } as unknown as AgentJobRow;
-const on = { publishEnabled: true } as RuntimeConfig;
+const on = { publishEnabled: true, metaAppId: "app-1" } as RuntimeConfig;
 const off = { publishEnabled: false } as RuntimeConfig;
 
 const POST: ClaimedPost = {
@@ -220,6 +220,7 @@ function database(
 }
 
 const publish = vi.fn();
+const preflightOk = vi.fn(async () => {});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -257,10 +258,21 @@ describe("the switch", () => {
 });
 
 describe("the sweep", () => {
+  it("stops before a provider write when live account preflight is refused", async () => {
+    const denied = vi.fn(async () => { throw new PublishError("Publication account mismatch.", false); });
+    const { sb, rpc } = database();
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: denied });
+    expect(denied).toHaveBeenCalledWith(expect.objectContaining({
+      platform: "instagram", accountId: "17841400000000000", expectedAppId: "app-1",
+    }));
+    expect(publish).not.toHaveBeenCalled();
+    expect(failureFor(rpc, POST.post_id)?.p_reason).toMatch(/account mismatch/);
+  });
+
   it("records an ambiguous provider write as uncertain without queueing a retry", async () => {
     publish.mockRejectedValueOnce(new PublishError("Public write outcome uncertain", false, true));
     const { sb, rpc, events } = database();
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(argsOf(rpc, "record_post_publish_uncertain_v7")).toMatchObject({
       p_post_id: POST.post_id,
       p_reason: expect.stringContaining("uncertain"),
@@ -271,7 +283,7 @@ describe("the sweep", () => {
 
   it("stops a legacy claimed Engine post before integration, token, media URL or provider write", async () => {
     const { sb, rpc, signCalls } = database({ prewriteDenied: true });
-    const result = await runPublisherJob(sb, on, agent, job);
+    const result = await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(result.ok).toBe(true);
     expect(rpc).toHaveBeenCalledWith("require_organic_publication_prewrite_v6", {
       p_post_id: POST.post_id,
@@ -292,7 +304,7 @@ describe("the sweep", () => {
 
   it("publishes what it claimed and records it", async () => {
     const { sb, rpc } = database();
-    const result = await runPublisherJob(sb, on, agent, job);
+    const result = await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(result.ok).toBe(true);
 
     expect(publish).toHaveBeenCalledWith(
@@ -313,7 +325,7 @@ describe("the sweep", () => {
 
   it("says so and stops when nothing is due", async () => {
     const { sb, events } = database({ claimed: [] });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(publish).not.toHaveBeenCalled();
     expect(String(events[0]!.description)).toMatch(/Nothing is due/);
   });
@@ -324,7 +336,7 @@ describe("the sweep", () => {
     const second = { ...POST, post_id: "post-2" };
     publish.mockRejectedValueOnce(new PublishError("rate limited", true));
     const { sb, rpc } = database({ claimed: [POST, second] });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
 
     expect(failureFor(rpc, "post-1")).toMatchObject({ p_reason: "rate limited", p_retryable: true });
     expect(rpc).toHaveBeenCalledWith("record_post_published", expect.objectContaining({ p_post_id: "post-2" }));
@@ -333,7 +345,7 @@ describe("the sweep", () => {
   it("carries the adapter's verdict on whether to try again", async () => {
     publish.mockRejectedValueOnce(new PublishError("the token was revoked", false));
     const { sb, rpc } = database();
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(failureFor(rpc, "post-1")!.p_retryable).toBe(false);
   });
 
@@ -342,7 +354,7 @@ describe("the sweep", () => {
       "Bad media https://storage.example/storage/v1/object/sign/client-media/a.png?token=secret", false,
     ));
     const { sb, rpc, events } = database();
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(failureFor(rpc, "post-1")!.p_reason).toContain("details withheld");
     expect(JSON.stringify({ calls: rpc.mock.calls, events })).not.toContain("token=secret");
   });
@@ -350,13 +362,13 @@ describe("the sweep", () => {
   it("treats anything it does not recognise as not worth retrying", async () => {
     publish.mockRejectedValueOnce(new Error("something odd"));
     const { sb, rpc } = database();
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(failureFor(rpc, "post-1")).toMatchObject({ p_retryable: false });
   });
 
   it("records a post it published but could not write down, so a person looks", async () => {
     const { sb, rpc } = database({ recordError: "deadlock" });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     const failure = failureFor(rpc, "post-1")!;
     expect(failure.p_reason).toMatch(/Published, but could not record it/);
     expect(failure.p_retryable).toBe(false);
@@ -374,7 +386,7 @@ describe("what stops a post before anything is sent", () => {
     ["a post no longer claimed", { routePost: { publication_status: "scheduled" } }],
   ])("refuses %s before credentials, Storage or provider access", async (_case, options) => {
     const { sb, rpc, signCalls } = database(options);
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(publish).not.toHaveBeenCalled();
     expect(rpc.mock.calls.map((call) => call[0])).not.toContain("integration_secret");
     expect(signCalls).toEqual([]);
@@ -386,7 +398,7 @@ describe("what stops a post before anything is sent", () => {
 
   it("retries a route read outage without reaching the provider", async () => {
     const { sb, rpc, signCalls } = database({ routeReadError: "unavailable" });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(publish).not.toHaveBeenCalled();
     expect(signCalls).toEqual([]);
     expect(failureFor(rpc, "post-1")).toMatchObject({ p_retryable: true });
@@ -394,14 +406,27 @@ describe("what stops a post before anything is sent", () => {
 
   it("rechecks after preparation, before an ordinary provider write", async () => {
     const { sb, rpc } = database({ routePostReads: [{}, { channel: "paid" }] });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(publish).not.toHaveBeenCalled();
     expect(failureFor(rpc, "post-1")).toMatchObject({ p_retryable: false });
   });
 
+  it("stops before the provider write if live account preflight is refused", async () => {
+    const preflight = vi.fn(async () => {
+      throw new PublishError("The exact destination account was not verified.", false);
+    });
+    const { sb, rpc } = database();
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight });
+    expect(preflight).toHaveBeenCalledWith(expect.objectContaining({
+      platform: "instagram", accountId: "17841400000000000", expectedAppId: "app-1",
+    }));
+    expect(publish).not.toHaveBeenCalled();
+    expect(failureFor(rpc, "post-1")?.p_reason).toMatch(/destination account/);
+  });
+
   it("refuses a changed reviewed package at the final prewrite check", async () => {
     const { sb, rpc } = database({ prewriteArtifactHashes: ["a".repeat(64), "b".repeat(64)] });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(publish).not.toHaveBeenCalled();
     expect(failureFor(rpc, "post-1")?.p_reason).toMatch(/Exact outgoing publication approval/);
   });
@@ -410,7 +435,7 @@ describe("what stops a post before anything is sent", () => {
     const { sb, rpc, signCalls } = database({
       integration: { credential_label: "other-account", meta_page_id: null, ad_account_id: null },
     });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(publish).not.toHaveBeenCalled();
     expect(rpc.mock.calls.map((call) => call[0])).not.toContain("integration_secret");
     expect(failureFor(rpc, "post-1")?.p_reason).toMatch(/package does not match/);
@@ -420,7 +445,7 @@ describe("what stops a post before anything is sent", () => {
   it("names a platform with no adapter", async () => {
     vi.spyOn(registry, "adapterFor").mockReturnValue(null);
     const { sb, rpc } = database();
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(failureFor(rpc, "post-1")).toMatchObject({
       p_reason: expect.stringContaining("no adapter for instagram"),
       p_retryable: false,
@@ -430,7 +455,7 @@ describe("what stops a post before anything is sent", () => {
 
   it("names an integration with no account on it", async () => {
     const { sb, rpc } = database({ integration: { credential_label: null, meta_page_id: null, ad_account_id: null } });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(failureFor(rpc, "post-1")).toMatchObject({
       p_reason: expect.stringContaining("no credential label"),
       p_retryable: false,
@@ -439,7 +464,7 @@ describe("what stops a post before anything is sent", () => {
 
   it("names a missing credential", async () => {
     const { sb, rpc } = database({ token: null });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(failureFor(rpc, "post-1")!.p_reason).toMatch(/No usable instagram credential/);
   });
 
@@ -447,20 +472,20 @@ describe("what stops a post before anything is sent", () => {
     // The platform fetches this URL itself, so an unsigned one is a failure
     // before the post rather than a broken post.
     const { sb, rpc } = database({ signed: null });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(failureFor(rpc, "post-1")).toMatchObject({ p_retryable: true });
     expect(publish).not.toHaveBeenCalled();
   });
 
   it("refuses an asset with no file", async () => {
     const { sb, rpc } = database({ claimed: [{ ...POST, media_path: null }] });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(failureFor(rpc, "post-1")!.p_reason).toMatch(/Frozen publication frame/);
   });
 
   it("refuses copy that will not fit rather than truncating it", async () => {
     const { sb, rpc } = database({ claimed: [{ ...POST, caption: "a".repeat(3000) }] });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(failureFor(rpc, "post-1")!.p_reason).toMatch(/limit is 2200/);
     expect(publish).not.toHaveBeenCalled();
   });
@@ -469,7 +494,7 @@ describe("what stops a post before anything is sent", () => {
 describe("a shape made of frames", () => {
   it("hands the adapter every frame, in order, signed", async () => {
     const { sb } = database({ claimed: [CAROUSEL] });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
 
     const request = publish.mock.calls[0]![0] as {
       contentFormat: string;
@@ -483,7 +508,7 @@ describe("a shape made of frames", () => {
 
   it("leaves frames off a post that is not made of them", async () => {
     const { sb } = database();
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     const request = publish.mock.calls[0]![0] as Record<string, unknown>;
     expect(request.contentFormat).toBe("single");
     expect(request).not.toHaveProperty("frames");
@@ -496,7 +521,7 @@ describe("a shape made of frames", () => {
     const { sb, rpc } = database({
       claimed: [{ ...CAROUSEL, frame_paths: ["assets/only.png"] }],
     });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(publish).not.toHaveBeenCalled();
     expect(failureFor(rpc, "post-1")).toMatchObject({
       p_reason: expect.stringContaining("frame count is invalid"),
@@ -513,7 +538,7 @@ describe("a shape made of frames", () => {
         { signedUrl: "https://signed.example/assets/f3.png" },
       ],
     });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(publish).not.toHaveBeenCalled();
     expect(failureFor(rpc, "post-1")).toMatchObject({
       p_reason: expect.stringContaining("frame 2"),
@@ -525,7 +550,7 @@ describe("a shape made of frames", () => {
     const { sb, rpc } = database({
       claimed: [{ ...POST, content_format: "flipbook" }],
     });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(publish).not.toHaveBeenCalled();
     expect(failureFor(rpc, "post-1")).toMatchObject({
       p_reason: expect.stringContaining("package does not match"),
@@ -573,7 +598,7 @@ describe("a story, which is not one publication", () => {
 
   it("sends every frame as its own post and records each one as it lands", async () => {
     const { sb, rpc } = database({ claimed: [STORY] });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
 
     expect(publishFrame).toHaveBeenCalledTimes(3);
     expect(framesRecorded(rpc)).toEqual([
@@ -591,7 +616,7 @@ describe("a story, which is not one publication", () => {
       claimed: [STORY],
       routePostReads: [{}, {}, { channel: "paid" }],
     });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(publishFrame).toHaveBeenCalledTimes(1);
     expect(framesRecorded(rpc).map((f) => f.p_position)).toEqual([1]);
     expect(failureFor(rpc, "post-1")).toMatchObject({ p_retryable: false });
@@ -605,7 +630,7 @@ describe("a story, which is not one publication", () => {
         { position: 2, external_id: "ig_story_2", external_url: null },
       ],
     });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
 
     // The whole point: a retry does not post the beginning of the story twice.
     expect(publishFrame).toHaveBeenCalledTimes(1);
@@ -619,7 +644,7 @@ describe("a story, which is not one publication", () => {
       .mockResolvedValueOnce({ ok: true, externalId: "ig_story_2", externalUrl: null })
       .mockRejectedValueOnce(new PublishError("The credential needs reconnecting.", false));
     const { sb, rpc } = database({ claimed: [STORY] });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
 
     // Two frames are live on the account, and two rows say so.
     expect(framesRecorded(rpc).map((f) => f.p_position)).toEqual([1, 2]);
@@ -631,7 +656,7 @@ describe("a story, which is not one publication", () => {
 
   it("stops the story when a frame cannot be recorded, rather than widening the gap", async () => {
     const { sb, rpc } = database({ claimed: [STORY], frameRecordError: "write failed" });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     // One frame out, unrecorded, and no second frame sent after it.
     expect(publishFrame).toHaveBeenCalledTimes(1);
     expect(failureFor(rpc, "post-1")).toMatchObject({
@@ -641,7 +666,7 @@ describe("a story, which is not one publication", () => {
 
   it("does not send anything if it cannot find out what already went out", async () => {
     const { sb, rpc } = database({ claimed: [STORY], framesReadError: "unreachable" });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(publishFrame).not.toHaveBeenCalled();
     expect(failureFor(rpc, "post-1")).toMatchObject({ p_retryable: true });
   });
@@ -654,7 +679,7 @@ describe("a story, which is not one publication", () => {
       publish,
     });
     const { sb, rpc } = database({ claimed: [STORY] });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(publish).not.toHaveBeenCalled();
     expect(failureFor(rpc, "post-1")).toMatchObject({
       p_reason: expect.stringContaining("cannot send a story"),
@@ -666,7 +691,7 @@ describe("a story, which is not one publication", () => {
     const { sb, rpc } = database({
       claimed: [{ ...STORY, frame_paths: ["assets/only.png"] }],
     });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(publishFrame).toHaveBeenCalledTimes(1);
     expect(failureFor(rpc, "post-1")).toBeUndefined();
   });
@@ -683,7 +708,7 @@ describe("a story, which is not one publication", () => {
 describe("recording the proof behind a published post", () => {
   it("records it after the publish, not before", async () => {
     const { sb, rpc } = database();
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
 
     const names = rpc.mock.calls.map((c) => c[0]);
     expect(names).toContain("record_proof_placement_for_post_v6");
@@ -697,13 +722,13 @@ describe("recording the proof behind a published post", () => {
   it("does not record it for a post that failed to publish", async () => {
     publish.mockRejectedValueOnce(new Error("Instagram said no"));
     const { sb, rpc } = database();
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
     expect(rpc.mock.calls.map((c) => c[0])).not.toContain("record_proof_placement_for_post_v6");
   });
 
   it("warns but does not fail the post when the lineage row cannot be written", async () => {
     const { sb, rpc, events } = database({ lineageError: "placements are locked" });
-    const result = await runPublisherJob(sb, on, agent, job);
+    const result = await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk });
 
     // The post is out. Failing it here would publish it twice on the retry.
     expect(result.ok).toBe(true);

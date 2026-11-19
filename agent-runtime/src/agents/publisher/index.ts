@@ -38,6 +38,8 @@ import { adapterFor } from "../../publishing/registry.js";
 import { compose } from "../../publishing/caption.js";
 import { safeProviderErrorMessage } from "../../storage/signed-url-policy.js";
 import { verifyFrozenPublicationPackage } from "../../publishing/frozen-package.js";
+import { assertMetaPublishPrerequisites,
+  type PublishPreflightRequest } from "../../publishing/preflight.js";
 import { requireOrganicRoute } from "./organic-route.js";
 import {
   PublishError,
@@ -48,8 +50,19 @@ import {
 } from "../../publishing/types.js";
 
 const DEFAULT_BATCH = 5;
+type Preflight = (input: PublishPreflightRequest) => Promise<void>;
 
 type PrewritePackage = { artifact_hash: string; manifest: Record<string, unknown> };
+
+async function requireProviderPreflight(
+  request: PublishRequest, expectedAppId: string | null, preflight: Preflight,
+): Promise<void> {
+  if (request.platform !== "instagram" && request.platform !== "facebook") {
+    throw new PublishError("No publication preflight exists for this platform.", false);
+  }
+  await preflight({ platform: request.platform, accountId: request.accountId,
+    accessToken: request.accessToken, expectedAppId });
+}
 
 export interface ClaimedPost {
   post_id: string;
@@ -198,6 +211,8 @@ async function publishStory(
   request: PublishRequest,
   post: ClaimedPost,
   jobId: string,
+  expectedAppId: string | null,
+  preflight: Preflight,
 ): Promise<PublishSuccess> {
   if (!adapter.publishFrame) {
     throw new PublishError(`The ${adapter.provider} adapter cannot send a story.`, false);
@@ -226,6 +241,7 @@ async function publishStory(
   let sent = 0;
   for (const frame of frames) {
     if (already.has(frame.position)) continue;
+    await requireProviderPreflight(request, expectedAppId, preflight);
     await requireOutgoingPublicationPrewrite(sb, post.post_id, request.reviewedArtifactHash);
     await requireOrganicRoute(sb, post);
     const result = await adapter.publishFrame(request, frame);
@@ -271,6 +287,8 @@ export async function runPublisherJob(
   runtime: RuntimeConfig,
   agent: AgentRow,
   job: AgentJobRow,
+  _deadlineAt?: number,
+  deps: { preflight?: Preflight } = {},
 ): Promise<JobResult> {
   if (!runtime.publishEnabled) {
     // Successfully nothing. See the header: a dry run that reports success
@@ -293,6 +311,7 @@ export async function runPublisherJob(
 
   let published = 0;
   let failed = 0;
+  const preflight = deps.preflight ?? assertMetaPublishPrerequisites;
 
   for (const post of claimed) {
     try {
@@ -300,8 +319,10 @@ export async function runPublisherJob(
       const adapter = adapterFor(post.platform)!;
       let result: PublishSuccess;
       if (request.contentFormat === "story") {
-        result = await publishStory(sb, adapter, request, post, job.id);
+        result = await publishStory(sb, adapter, request, post, job.id,
+          runtime.metaAppId, preflight);
       } else {
+        await requireProviderPreflight(request, runtime.metaAppId, preflight);
         await requireOutgoingPublicationPrewrite(sb, post.post_id, request.reviewedArtifactHash);
         await requireOrganicRoute(sb, post);
         result = await adapter.publish(request);
