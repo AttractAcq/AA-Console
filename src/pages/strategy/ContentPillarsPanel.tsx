@@ -5,6 +5,7 @@ import { Sparkles } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { Button } from "../../components/Button";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
+import { FormModal } from "../../components/forms/FormModal";
 import {
   MAX_PILLARS,
   MIN_PILLARS,
@@ -33,6 +34,7 @@ export function ContentPillarsPanel() {
   const [pillars, setPillars] = useState<ContentPillar[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -85,13 +87,14 @@ export function ContentPillarsPanel() {
 
   async function patch(id: string, changes: Partial<ContentPillar>) {
     setBusy(true);
+    setActionError(null);
     const { error } = await supabase.from("client_content_pillars").update(changes).eq("id", id);
     setBusy(false);
     if (error) {
-      setLoadError(`Failed to save: ${error.message}`);
-      return;
+      throw new Error(error.message);
     }
-    void refresh();
+    setNotice("Changes saved.");
+    await refresh();
   }
 
   if (loadError) {
@@ -118,6 +121,7 @@ export function ContentPillarsPanel() {
       </div>
 
       {notice && <p className="text-sm text-brand-strong">{notice}</p>}
+      {actionError && <p role="alert" className="text-sm text-destructive">{actionError}</p>}
       {problem && (
         <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
           {problem}
@@ -133,7 +137,8 @@ export function ContentPillarsPanel() {
         <>
           <div className="space-y-3">
             {active.map((p) => (
-              <PillarCard key={`${clientId}:${p.id}`} pillar={p} busy={busy} onPatch={patch} />
+              <PillarCard key={`${clientId}:${p.id}`} pillar={p} busy={busy} onPatch={patch}
+                onRetireError={(cause) => setActionError(`Failed to retire: ${cause instanceof Error ? cause.message : "Unknown error"}`)} />
             ))}
           </div>
           <p className="text-xs text-muted-foreground">{shareHint(pillars)}</p>
@@ -148,7 +153,8 @@ export function ContentPillarsPanel() {
               <button
                 type="button"
                 disabled={busy || active.length >= MAX_PILLARS}
-                onClick={() => void patch(p.id, { active: true })}
+                onClick={() => { void patch(p.id, { active: true }).catch((cause) =>
+                  setActionError(`Failed to reinstate: ${cause instanceof Error ? cause.message : "Unknown error"}`)); }}
                 className="text-xs font-medium text-brand-strong disabled:opacity-50"
               >
                 Reinstate
@@ -181,77 +187,62 @@ function PillarCard({
   pillar,
   busy,
   onPatch,
+  onRetireError,
 }: {
   pillar: ContentPillar;
   busy: boolean;
-  onPatch: (id: string, changes: Partial<ContentPillar>) => void | Promise<void>;
+  onPatch: (id: string, changes: Partial<ContentPillar>) => Promise<void>;
+  onRetireError: (cause: unknown) => void;
 }) {
-  const field = (key: keyof ContentPillar, label: string, rows = 2) => (
-    <label className="block">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      <textarea
-        aria-label={`${label} for ${pillar.name}`}
-        defaultValue={String(pillar[key] ?? "")}
-        rows={rows}
-        disabled={busy}
-        onBlur={(e) => {
-          const next = e.target.value.trim();
-          if (next !== String(pillar[key] ?? "")) void onPatch(pillar.id, { [key]: next });
-        }}
-        className="mt-1 w-full rounded-md border border-input bg-background p-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
-      />
-    </label>
-  );
+  const [editing, setEditing] = useState(false);
 
   return (
-    <CollapsiblePanel title={pillar.name}>
-      <div className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <input
-            aria-label={`Name for ${pillar.name}`}
-            defaultValue={pillar.name}
-            disabled={busy}
-            onBlur={(e) => {
-              const next = e.target.value.trim();
-              if (next && next !== pillar.name) void onPatch(pillar.id, { name: next });
-            }}
-            className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm font-semibold text-card-foreground hover:border-input focus-visible:border-input focus-visible:outline-none"
-          />
-          <label className="flex shrink-0 items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Share</span>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              aria-label={`Target share for ${pillar.name}`}
-              defaultValue={pillar.target_share}
-              disabled={busy}
-              onBlur={(e) => {
-                const next = Number(e.target.value);
-                if (Number.isFinite(next) && next !== pillar.target_share) {
-                  void onPatch(pillar.id, { target_share: Math.max(0, Math.min(100, Math.round(next))) });
-                }
-              }}
-              className="w-16 rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground"
-            />
-            <span className="text-xs text-muted-foreground">%</span>
-          </label>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void onPatch(pillar.id, { active: false })}
-            className="shrink-0 text-xs font-medium text-muted-foreground hover:text-destructive disabled:opacity-50"
-          >
-            Retire
-          </button>
+    <>
+      <CollapsiblePanel title={pillar.name}>
+        <div className="space-y-3 text-sm text-muted-foreground">
+          <p>Target share: {pillar.target_share}%</p>
+          <p>What it argues: {pillar.premise || "Not recorded"}</p>
+          <p>What belongs: {pillar.belongs || "Not recorded"}</p>
+          <p>What does not: {pillar.does_not_belong || "Not recorded"}</p>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" disabled={busy} onClick={() => { void onPatch(pillar.id, { active: false }).catch(onRetireError); }}
+              className="text-xs font-medium text-muted-foreground hover:text-destructive disabled:opacity-50">
+              Retire
+            </button>
+            <button type="button" disabled={busy} onClick={() => setEditing(true)}
+              className="text-xs font-medium text-brand-strong hover:underline disabled:opacity-50">
+              Edit {pillar.name}
+            </button>
+          </div>
         </div>
-
-        {field("premise", "What it argues", 1)}
-        <div className="grid gap-3 sm:grid-cols-2">
-          {field("belongs", "What belongs")}
-          {field("does_not_belong", "What does not")}
-        </div>
-      </div>
-    </CollapsiblePanel>
+      </CollapsiblePanel>
+      <FormModal
+        open={editing}
+        onClose={() => setEditing(false)}
+        title={`Edit ${pillar.name}`}
+        intro="Correct this pillar, then save the revised set. Existing campaign plans keep their captured inputs."
+        fields={[
+          { name: "name", label: "Name", kind: "text", required: true },
+          { name: "target_share", label: "Target share (%)", kind: "text", required: true },
+          { name: "premise", label: "What it argues", kind: "textarea", rows: 2 },
+          { name: "belongs", label: "What belongs", kind: "textarea", rows: 3 },
+          { name: "does_not_belong", label: "What does not", kind: "textarea", rows: 3 },
+        ]}
+        initialValues={{ name: pillar.name, target_share: String(pillar.target_share),
+          premise: pillar.premise, belongs: pillar.belongs, does_not_belong: pillar.does_not_belong }}
+        onSubmit={async (values) => {
+          const share = Number(values.target_share);
+          if (!Number.isInteger(share) || share < 0 || share > 100) {
+            throw new Error("Target share must be a whole percentage from 0 to 100.");
+          }
+          await onPatch(pillar.id, {
+            name: String(values.name).trim(), target_share: share,
+            premise: String(values.premise ?? "").trim(),
+            belongs: String(values.belongs ?? "").trim(),
+            does_not_belong: String(values.does_not_belong ?? "").trim(),
+          });
+        }}
+      />
+    </>
   );
 }
