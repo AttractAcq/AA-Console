@@ -135,6 +135,10 @@ begin
       where s.id='dddddddd-dddd-4ddd-8ddd-dddddddddddd'
         and p.client_id=s.client_id and p.asset_id=s.asset_id)
     then raise exception 'Exact Engine decision did not atomically schedule'; end if;
+  if public.engine_slot_exact_source_state_v6(v_request)<>'source_decided'
+    or public.ordinary_media_signoff_current_v6(
+      'cccccccc-cccc-4ccc-8ccc-cccccccccccc') then
+    raise exception 'Engine approval was not distinct from ordinary-media approval'; end if;
   update storage.objects set version='v2'
     where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
   if public.engine_slot_exact_source_state_v6(v_request)<>'superseded'
