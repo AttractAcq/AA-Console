@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "b5b18eea2680939837869c5b50c906687c80de7ab7fd82e820f41e2345b5a346",
-  "generatedTypesSha256": "f31cdc15b61de8622e33227a5383a6018b9c200be14db591e0ba8fcd4210d596",
-  "generatedSchemaBodySha256": "00089f66645a18dfb9579abb0b30f1b0306ceb6397eed5478e6e1eca260a5137",
+  "migrationSourceDigest": "e1b30cabc4d8cbcf9724968cc6e1641428c6dcc85019550341b0df9fa2b9ab24",
+  "generatedTypesSha256": "462803d037e21a5a5e7d04871c1e3d1a1822fd1dfce349ae0ae2929f1ba7b6d8",
+  "generatedSchemaBodySha256": "c9dd7e6e7b66dfc06dcd3d018e29a1c692e8debe5386096a4655df062a68cd42",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4644,6 +4644,13 @@
       "filename": "20261124052100_646_archived_return_canonical_inbox.sql",
       "sha256": "8d35239d395111c17388b7dc8a29727c3b55e2e0d9161958269d47a6c3ae6bbe",
       "trimmedMd5": "0028a6966278a8b99d45f126bc695462"
+    },
+    {
+      "version": "20261124052200",
+      "name": "647_archived_return_batch_review_packet",
+      "filename": "20261124052200_647_archived_return_batch_review_packet.sql",
+      "sha256": "1ecd805c4ff31a610d6ebc36f4cfb817a15e26a7c7e3cc306e7f4b9ba79edd51",
+      "trimmedMd5": "af81deeb6365c8fa48bf9dc4db59a60b"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

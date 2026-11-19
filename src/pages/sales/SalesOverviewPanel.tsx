@@ -8,6 +8,8 @@ import type { FieldDef } from "../../components/forms/fields";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
+import { fetchArchivedReturnBatchPacket, type ArchivedReturnBatchPacket } from "../../lib/archivedReturnBatch";
+import { ArchivedReturnBatchModal } from "./ArchivedReturnBatchModal";
 import { ArchiveAction } from "../../components/ArchiveAction";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 import { cn } from "../../lib/cn";
@@ -96,6 +98,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
   );
   const [notice, setNotice] = useState<string | null>(null);
   const [returnReview, setReturnReview] = useState<SalesAgentReturnPacket | null>(null);
+  const [batchReview, setBatchReview] = useState<ArchivedReturnBatchPacket | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -686,10 +689,12 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
                                 : ""}</p>
                             <button type="button"
                               className="mt-1 rounded font-medium text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                              onClick={() => void fetchSalesAgentReturnPacket(c.id).then((packet) => {
+                              onClick={() => void (async () => {
+                                const batch = await fetchArchivedReturnBatchPacket(c.archive_match_lead_id!);
                                 setOpenId(null);
-                                setReturnReview(packet);
-                              }).catch((cause: unknown) => setNotice(cause instanceof Error
+                                if (batch.decision_state === "grouped_hold") setBatchReview(batch);
+                                else setReturnReview(await fetchSalesAgentReturnPacket(c.id));
+                              })().catch((cause: unknown) => setNotice(cause instanceof Error
                                 ? cause.message : "Could not load the identity review."))}>
                               Review archived contact
                             </button>
@@ -711,6 +716,8 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
           </div>
         </div>
       )}
+
+      <ArchivedReturnBatchModal packet={batchReview} onClose={() => setBatchReview(null)} />
 
       <FormModal
         open={returnReview !== null}

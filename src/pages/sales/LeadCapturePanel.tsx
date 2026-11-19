@@ -6,6 +6,8 @@ import { DataTable } from "../../components/DataTable";
 import { ActionMenu } from "../../components/ActionMenu";
 import { FormModal } from "../../components/forms/FormModal";
 import { dayOrDash } from "../../lib/contentRecords";
+import { fetchArchivedReturnBatchPacket, type ArchivedReturnBatchPacket } from "../../lib/archivedReturnBatch";
+import { ArchivedReturnBatchModal } from "./ArchivedReturnBatchModal";
 import { supabase } from "../../lib/supabase";
 import {
   CAPTURE_PURPOSES,
@@ -48,6 +50,7 @@ export function LeadCapturePanel() {
   const [opening, setOpening] = useState(false);
   const [issued, setIssued] = useState<string | null>(null);
   const [returnReview, setReturnReview] = useState<ArchivedReturnPacket | null>(null);
+  const [batchReview, setBatchReview] = useState<ArchivedReturnBatchPacket | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -279,8 +282,12 @@ export function LeadCapturePanel() {
               <span key="a">
                 {s.status === "received" && s.archive_match_lead_id && (
                   <Button onClick={() => void act(s.id,
-                    async () => setReturnReview(await fetchArchivedReturnPacket(s.id)),
-                    "Review packet loaded.")}>
+                    async () => {
+                      const batch = await fetchArchivedReturnBatchPacket(s.archive_match_lead_id!);
+                      if (batch.decision_state === "grouped_hold") setBatchReview(batch);
+                      else setReturnReview(await fetchArchivedReturnPacket(s.id));
+                    },
+                    "Identity review loaded.")}>
                     Review return
                   </Button>
                 )}
@@ -289,6 +296,8 @@ export function LeadCapturePanel() {
           />
         </section>
       )}
+
+      <ArchivedReturnBatchModal packet={batchReview} onClose={() => setBatchReview(null)} />
 
       <FormModal
         open={returnReview !== null}

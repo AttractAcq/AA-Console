@@ -229,7 +229,13 @@ describe("sinceLabel", () => {
 
 describe("the overview grid", () => {
   it("shows archived-contact sales conversations awaiting identity review", async () => {
-    rpc.mockImplementation((name: string) => name === "sales_agent_return_review_packet_v11"
+    rpc.mockImplementation((name: string) => name === "archived_return_batch_review_packet_v11"
+      ? Promise.resolve({ data: {
+        archived_lead_id: "archived-1", archived_name: "Archived original",
+        source_hash: "b".repeat(64), source_count: 1, dm_count: 0,
+        decision_state: "single_source", blocker: "One source is pending.", sources: [], dms: [],
+      }, error: null })
+      : name === "sales_agent_return_review_packet_v11"
       ? Promise.resolve({ data: {
         source_hash: "a".repeat(64), conversation_id: "c-1", archived_lead_id: "archived-1",
         archived_name: "Archived original", archived_email: "original@example.invalid",
@@ -256,6 +262,27 @@ describe("the overview grid", () => {
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("resolve_sales_agent_return_v11",
       expect.objectContaining({ p_conversation_id: "c-1", p_action: "recover",
         p_expected_hash: "a".repeat(64) })));
+  });
+  it("shows related arrivals and withholds the sales decision for a grouped return", async () => {
+    rpc.mockImplementation((name: string) => name === "archived_return_batch_review_packet_v11"
+      ? Promise.resolve({ data: {
+        archived_lead_id: "archived-1", archived_name: "Archived original",
+        source_hash: "b".repeat(64), source_count: 2, dm_count: 0,
+        decision_state: "grouped_hold", blocker: "All arrivals need one exact coordinated AAL2 identity decision.",
+        sources: [
+          { kind: "sales_agent", conversation_id: "c-1", current_name: "Updated contact" },
+          { kind: "form", submission_id: "s-2", submitted_name: "Form arrival" },
+        ], dms: [],
+      }, error: null }) : Promise.resolve({ data: null, error: null }));
+    show([built()], [conv({ archive_match_lead_id: "archived-1", lead_id: null,
+      archive_match_snapshot: { contact_name: "Original contact" } })]);
+    await screen.findByText(/1 archived-contact return awaiting identity review/);
+    await userEvent.click(screen.getByRole("button", { name: "Open" }));
+    await userEvent.click(screen.getByRole("button", { name: "Review archived contact" }));
+    expect(await screen.findByRole("dialog", { name: "Related archived-contact arrivals" })).toBeInTheDocument();
+    expect(screen.getByText("Form arrival")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Record AAL2 decision" })).not.toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalledWith("sales_agent_return_review_packet_v11", expect.anything());
   });
   it("shows a card per agent with what it has actually done", async () => {
     show(

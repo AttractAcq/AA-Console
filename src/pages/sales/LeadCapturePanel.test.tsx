@@ -14,12 +14,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   fetchCapturedLeads, fetchEndpoints, fetchSubmissions, createEndpoint, setEndpointEnabled,
-  fetchArchivedReturnPacket, resolveArchivedReturn,
+  fetchArchivedReturnPacket, resolveArchivedReturn, fetchArchivedReturnBatchPacket,
 } = vi.hoisted(() => ({
   fetchCapturedLeads: vi.fn(), fetchEndpoints: vi.fn(), fetchSubmissions: vi.fn(),
   createEndpoint: vi.fn(), setEndpointEnabled: vi.fn(),
   fetchArchivedReturnPacket: vi.fn(), resolveArchivedReturn: vi.fn(),
+  fetchArchivedReturnBatchPacket: vi.fn(),
 }));
+
+vi.mock("../../lib/archivedReturnBatch", () => ({ fetchArchivedReturnBatchPacket }));
 
 vi.mock("../../lib/leadCapture", async () => {
   const actual = await vi.importActual<Record<string, unknown>>("../../lib/leadCapture");
@@ -101,6 +104,11 @@ beforeEach(() => {
     route_package_id: "route-1", click_id: "click-1",
   });
   resolveArchivedReturn.mockResolvedValue("arch-1");
+  fetchArchivedReturnBatchPacket.mockResolvedValue({
+    archived_lead_id: "arch-1", archived_name: "Jay Okafor", source_hash: "b".repeat(64),
+    source_count: 1, dm_count: 0, decision_state: "single_source",
+    blocker: "One source is pending.", sources: [], dms: [],
+  });
 });
 
 describe("who arrived", () => {
@@ -262,5 +270,28 @@ describe("what did not become a lead", () => {
       submissionId: "sub-1", action: "recover", sourceHash: "a".repeat(64),
       reason: "Same continuing customer relationship",
     }));
+  });
+
+  it("holds a form decision when another arrival shares the archived identity", async () => {
+    fetchSubmissions.mockResolvedValue([submission({
+      status: "received", lead_id: null, archive_match_lead_id: "arch-1",
+    })]);
+    fetchArchivedReturnBatchPacket.mockResolvedValue({
+      archived_lead_id: "arch-1", archived_name: "Jay Okafor", source_hash: "c".repeat(64),
+      source_count: 2, dm_count: 1, decision_state: "grouped_hold",
+      blocker: "All arrivals need one exact coordinated AAL2 identity decision.",
+      sources: [
+        { kind: "form", submission_id: "sub-1", submitted_name: "Jay Okafor" },
+        { kind: "sales_agent", conversation_id: "conv-2", current_name: "Jay returns" },
+      ],
+      dms: [{ conversation_id: "dm-3", platform: "instagram", last_inbound_at: null }],
+    });
+    render(<LeadCapturePanel />);
+    await userEvent.click(await screen.findByRole("button", { name: "Review return" }));
+    expect(await screen.findByRole("dialog", { name: "Related archived-contact arrivals" })).toBeInTheDocument();
+    expect(screen.getByText("Jay returns")).toBeInTheDocument();
+    expect(screen.getByText(/Held instagram DM/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Record AAL2 decision" })).not.toBeInTheDocument();
+    expect(fetchArchivedReturnPacket).not.toHaveBeenCalled();
   });
 });

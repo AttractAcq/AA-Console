@@ -38696,6 +38696,10 @@ export type Database = {
         Args: { p_lead_id: string; p_reason?: string }
         Returns: undefined
       }
+      archived_return_batch_review_packet_v11: {
+        Args: { p_archived_lead_id: string }
+        Returns: Json
+      }
       archived_return_inbox_packet_v11: {
         Args: { p_kind: string; p_source_id: string }
         Returns: Json

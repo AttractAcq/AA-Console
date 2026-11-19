@@ -2,7 +2,7 @@
 
 **Candidate source:** draft [PR #363](https://github.com/AttractAcq/AA-Console/pull/363). The full SHA-256 values below pin the SQL files, not a hosted release. Recheck the PR head and each hash before any apply.
 **Observed hosted baseline:** Production was last reported at `20261124034600` (migration 551). Staging reached a separately amended migration head of 569 with 569 history rows; its added correction is not a candidate migration. Refresh both heads, cron state, parity and deployment identity before any apply. The eight staging migration-history findings are unresolved.
-**Current candidate scope:** 95 ordered, unhosted migration files (552–646). Migration 592 installs an inactive read-only fifteen-minute cron enqueuer; separately review runtime compatibility and provider read access before activation. Candidate hashes below must be regenerated after any further source edit.
+**Current candidate scope:** 96 ordered, unhosted migration files (552–647). Migration 592 installs an inactive read-only fifteen-minute cron enqueuer; separately review runtime compatibility and provider read access before activation. Candidate hashes below must be regenerated after any further source edit.
 
 ## Ordered candidate
 
@@ -103,6 +103,7 @@
 | 644 | `20261124051900_644_snapshot_sales_agent_archive_match.sql` | `8f1a51747cf4e0d497f15313362964749ef782a6beb7db57aa384100c443e30e` | Freeze the matched sales conversation's contact, source and transcript digest at hold time; forbid direct candidate rewrite or promotion |
 | 645 | `20261124052000_645_resolve_archived_sales_agent_return.sql` | `e8807206f332170fe3dfd7e5c5e5d16ac1f4ca3e0e4eeb8a8fab8eec22c533b2` | Resolve one exact archived sales-agent contact through AAL2 recover or separate-lead decision; hold direct recovery, stale review and concurrent pending doors |
 | 646 | `20261124052100_646_archived_return_canonical_inbox.sql` | `8d35239d395111c17388b7dc8a29727c3b55e2e0d9161958269d47a6c3ae6bbe` | Register exact form and sales-agent archived-contact holds in the canonical Inbox; stale changed packets and mirror source-owned AAL2 decisions atomically |
+| 647 | `20261124052200_647_archived_return_batch_review_packet.sql` | `1ecd805c4ff31a610d6ebc36f4cfb817a15e26a7c7e3cc306e7f4b9ba79edd51` | Show one exact read-only packet for all held form, sales-agent and DM arrivals against an archived identity; keep grouped decisions held |
 
 **Organic route-package candidate, 19 November 2026:** Both the scheduled snapshot used for review and the claimed snapshot used by final prewrite now include the latest organic route package ID/version. They require an explicitly organic idea, a campaign that runs organic, and a route package matching the current plan fingerprint. This holds paid creative in a coordinated campaign and makes a later route/package revision stale the frozen review. Fifty-four focused runtime/PGlite tests and runtime typecheck passed, including paid-route and stale-plan refusals. A disposable released-to-current upgrade, clean replay, catalog contract, generated types and scoped-read gate passed locally. The publisher claim remains closed, and provider receipt/read-back and real human AAL2 evidence remain open. No hosted change occurred.
 
