@@ -22432,7 +22432,8 @@ export type Database = {
           asset_id: string
           client_id: string
           id: string
-          prior_request_id: string
+          legacy_approved_at: string | null
+          prior_request_id: string | null
           reason: string
           reopened_at: string
           reopened_by: string
@@ -22441,7 +22442,8 @@ export type Database = {
           asset_id: string
           client_id: string
           id?: string
-          prior_request_id: string
+          legacy_approved_at?: string | null
+          prior_request_id?: string | null
           reason: string
           reopened_at?: string
           reopened_by: string
@@ -22450,7 +22452,8 @@ export type Database = {
           asset_id?: string
           client_id?: string
           id?: string
-          prior_request_id?: string
+          legacy_approved_at?: string | null
+          prior_request_id?: string | null
           reason?: string
           reopened_at?: string
           reopened_by?: string
