@@ -139,11 +139,35 @@ begin
     or public.ordinary_media_signoff_current_v6(
       'cccccccc-cccc-4ccc-8ccc-cccccccccccc') then
     raise exception 'Engine approval was not distinct from ordinary-media approval'; end if;
+  if public.organic_creative_source_current_v8(
+      (select scheduled_post_id from public.content_slots
+        where id='dddddddd-dddd-4ddd-8ddd-dddddddddddd')) is not true then
+    raise exception 'Current exact Engine source decision did not authorize its linked post'; end if;
+  if (select current_signoff from public.ordinary_media_current_status_v6
+      where asset_id='cccccccc-cccc-4ccc-8ccc-cccccccccccc') is not true then
+    raise exception 'Assets status hid current exact Engine source approval'; end if;
+  perform set_config('request.jwt.claim.sub','ffffffff-ffff-4fff-8fff-ffffffffffff',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"ffffffff-ffff-4fff-8fff-ffffffffffff","role":"authenticated","aal":"aal2"}',true);
+  if public.organic_creative_source_current_v8(
+      (select scheduled_post_id from public.content_slots
+        where id='dddddddd-dddd-4ddd-8ddd-dddddddddddd')) is true then
+    raise exception 'Another client read Engine source authority'; end if;
+  perform set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
   update storage.objects set version='v2'
     where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
   if public.engine_slot_exact_source_state_v6(v_request)<>'superseded'
     or (select status from public.approval_inbox_v6 where id=v_request)<>'superseded' then
     raise exception 'Changed media bytes left a scheduled Engine approval current';
   end if;
+  if public.organic_creative_source_current_v8(
+      (select scheduled_post_id from public.content_slots
+        where id='dddddddd-dddd-4ddd-8ddd-dddddddddddd')) is true then
+    raise exception 'Changed Engine media left organic source authority current'; end if;
+  if (select current_signoff from public.ordinary_media_current_status_v6
+      where asset_id='cccccccc-cccc-4ccc-8ccc-cccccccccccc') is true then
+    raise exception 'Assets status kept stale Engine source approved'; end if;
 end $checks$;
 rollback;

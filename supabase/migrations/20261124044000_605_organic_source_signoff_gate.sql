@@ -1,6 +1,102 @@
 -- Require current exact source approval when preparing and claiming organic
 -- image/text publication packages. Old human_approved_at alone is insufficient.
 begin;
+create function public.organic_creative_source_current_v8(p_post_id uuid)
+returns boolean language plpgsql stable security definer
+set search_path=pg_catalog,public,storage set timezone='UTC' as $$
+declare p public.scheduled_posts%rowtype;
+  a public.client_media_assets%rowtype;
+  s public.content_slots%rowtype;
+  r public.approval_requests_v6%rowtype;
+  e public.approval_request_evidence_v6%rowtype;
+  d public.approval_decision_events_v6%rowtype;
+  v_package jsonb;
+  v_hash text;
+  v_epoch uuid;
+  v_epoch_count integer;
+begin
+  if auth.role() not in ('authenticated','service_role') then return false; end if;
+  select * into p from public.scheduled_posts where id=p_post_id;
+  if p.id is null or p.client_id is null or p.asset_id is null
+    or p.channel is distinct from 'organic'::public.post_channel
+    or p.publication_status is null
+    or p.publication_status not in ('scheduled','publishing')
+    or p.published_at is not null
+    or (auth.role()='authenticated' and not public.can_access_client(p.client_id))
+    then return false; end if;
+  select * into a from public.client_media_assets
+    where id=p.asset_id and client_id=p.client_id;
+  if a.id is null or a.review_status is distinct from 'approved'::public.review_status
+    or a.human_approved_at is null or a.media_type is null
+    or a.media_type not in ('image','text')
+    or a.content_format is null or a.content_format not in ('single','carousel','story')
+    then return false; end if;
+  if public.ordinary_media_signoff_current_v6(a.id) then return true; end if;
+  -- The Engine owns a different exact AAL2 source decision. It may authorize
+  -- only its own linked post; a human timestamp alone never qualifies.
+  if a.content_format <> 'single' then return false; end if;
+  if (select count(*) from public.content_slots cs
+      where cs.scheduled_post_id=p.id)<>1 then return false; end if;
+  select * into s from public.content_slots
+    where scheduled_post_id=p.id and client_id=p.client_id and asset_id=a.id;
+  if s.id is null or s.stage is distinct from 'scheduled'::public.slot_stage
+    or s.platform is distinct from p.platform
+    or s.scheduled_at is distinct from p.scheduled_at
+    or p.media_type is distinct from a.media_type then return false; end if;
+  select count(*)::integer,min(se.id::text)::uuid into v_epoch_count,v_epoch
+    from public.slot_events se where se.slot_id=s.id
+      and se.to_stage::text='awaiting_approval';
+  if v_epoch_count<>1 then return false; end if;
+  select * into r from public.approval_requests_v6
+    where client_id=p.client_id and source_system='aa_console'
+      and source_kind='engine_slot' and source_id=s.id::text
+      and source_version=v_epoch::text
+    order by requested_at desc,id desc limit 1;
+  if r.id is null or r.scope is distinct from jsonb_build_object(
+      'client_id',s.client_id,'slot_id',s.id,'asset_id',s.asset_id,
+      'platform',s.platform,'scheduled_at',s.scheduled_at,
+      'format',s.format,'approval_entry_id',r.source_version)
+    or exists(select 1 from public.delivery_approval_invalidations_v6 i
+      where i.approval_request_id=r.id) then return false; end if;
+  select * into e from public.approval_request_evidence_v6
+    where request_id=r.id;
+  select * into d from public.approval_decision_events_v6
+    where request_id=r.id order by event_order desc limit 1;
+  v_package:=public.engine_slot_exact_package_v6(s.id);
+  v_hash:=public.engine_slot_exact_hash_v6(s.id);
+  return coalesce(v_package is not null and v_hash is not null
+    and e.id is not null and e.artifact_hash=v_hash
+    and e.preview->'exact_package'=v_package
+    and e.scope=r.scope and e.account_ref=v_package->>'account_ref'
+    and e.destination=r.destination
+    and d.decision='approved' and d.actor_aal='aal2'
+    and d.actor_id is not null and d.artifact_hash=v_hash
+    and d.source_decision_ref='engine_slot:'||r.source_version,false);
+end $$;
+revoke all on function public.organic_creative_source_current_v8(uuid)
+  from public,anon,authenticated,service_role;
+grant execute on function public.organic_creative_source_current_v8(uuid)
+  to authenticated,service_role;
+
+create or replace view public.ordinary_media_current_status_v6
+with (security_invoker=true) as
+select a.client_id,a.id as asset_id,
+  (public.ordinary_media_signoff_current_v6(a.id) is true
+    or exists(select 1 from public.content_slots s
+      where s.asset_id=a.id and s.client_id=a.client_id
+        and s.scheduled_post_id is not null
+        and public.organic_creative_source_current_v8(s.scheduled_post_id) is true))
+    as current_signoff
+from public.client_media_assets a
+where a.media_type in ('image','text')
+  and a.content_format in ('single','carousel','story')
+  and (a.content_format='single' or a.render_path is null)
+  and a.review_status='approved' and a.human_approved_at is not null;
+revoke all on public.ordinary_media_current_status_v6
+  from public,anon,authenticated,service_role;
+grant select on public.ordinary_media_current_status_v6
+  to authenticated,service_role;
+
 create or replace function public.organic_publication_source_snapshot_v6(p_post_id uuid)
 returns jsonb language plpgsql stable security definer
 set search_path = pg_catalog, public set timezone = 'UTC' as $$
@@ -31,7 +127,7 @@ begin
     or v_asset.human_approved_at is null
     or (v_asset.media_type::text in ('image','text')
       and v_asset.content_format in ('single','carousel','story')
-      and public.ordinary_media_signoff_current_v6(v_asset.id) is not true)
+      and public.organic_creative_source_current_v8(p_post_id) is not true)
     or v_asset.content_format is null
     or v_post.media_type is distinct from v_asset.media_type then return null; end if;
   select * into v_brief from public.client_briefs
@@ -154,7 +250,7 @@ begin
     or v_asset.human_approved_at is null
     or (v_asset.media_type::text in ('image','text')
       and v_asset.content_format in ('single','carousel','story')
-      and public.ordinary_media_signoff_current_v6(v_asset.id) is not true)
+      and public.organic_creative_source_current_v8(p_post_id) is not true)
     or v_asset.content_format is null
     or v_post.media_type is distinct from v_asset.media_type then return null; end if;
   select * into v_brief from public.client_briefs

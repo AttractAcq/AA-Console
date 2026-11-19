@@ -48,7 +48,7 @@ beforeAll(async () => {
       $$begin insert into cron.job(jobname) values ($1); return 1; end;$$;
     create type post_platform as enum ('instagram','facebook');
     create type post_channel as enum ('organic','paid');
-    create type media_type as enum ('image','video');
+    create type media_type as enum ('image','text','video');
     create type content_format as enum ('single','carousel','story','reel');
     create type review_status as enum ('pending','approved','rejected');
     create type slot_stage as enum ('planned','awaiting_approval','scheduled');
@@ -69,6 +69,7 @@ beforeAll(async () => {
     create table content_slots(id uuid primary key,client_id uuid,asset_id uuid,
       brief_id uuid,idea_id uuid,platform post_platform,scheduled_post_id uuid,
       scheduled_at timestamptz,stage slot_stage);
+    create table slot_events(id uuid,slot_id uuid,to_stage slot_stage);
     create table client_media_frames(asset_id uuid,position int,storage_path text);
     create table post_copy_effective(scheduled_post_id uuid,platform post_platform,
       caption text,hashtags text[],alt_text text,link_url text,first_comment text);
