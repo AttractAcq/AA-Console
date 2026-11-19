@@ -14,9 +14,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   fetchCapturedLeads, fetchEndpoints, fetchSubmissions, createEndpoint, setEndpointEnabled,
+  fetchArchivedReturnPacket, resolveArchivedReturn,
 } = vi.hoisted(() => ({
   fetchCapturedLeads: vi.fn(), fetchEndpoints: vi.fn(), fetchSubmissions: vi.fn(),
   createEndpoint: vi.fn(), setEndpointEnabled: vi.fn(),
+  fetchArchivedReturnPacket: vi.fn(), resolveArchivedReturn: vi.fn(),
 }));
 
 vi.mock("../../lib/leadCapture", async () => {
@@ -24,6 +26,7 @@ vi.mock("../../lib/leadCapture", async () => {
   return {
     ...actual,
     fetchCapturedLeads, fetchEndpoints, fetchSubmissions, createEndpoint, setEndpointEnabled,
+    fetchArchivedReturnPacket, resolveArchivedReturn,
   };
 });
 vi.mock("../../lib/supabase", () => ({
@@ -87,6 +90,17 @@ beforeEach(() => {
   });
   fetchSubmissions.mockResolvedValue([submission()]);
   createEndpoint.mockResolvedValue({ endpointId: "end-2", token: "f".repeat(64) });
+  fetchArchivedReturnPacket.mockResolvedValue({
+    source_hash: "a".repeat(64), submission_id: "sub-1", archived_lead_id: "arch-1",
+    archived_name: "Jay Okafor", archived_stage: "shown",
+    archived_email: "jay@example.test", archived_phone: null, archived_source: "page_form",
+    archived_at: "2026-10-23T09:00:00Z", submitted_name: "Jay Okafor",
+    submitted_email: "jay@example.test", submitted_phone: null,
+    submitted_at: "2026-10-24T09:14:00Z", consent_wording: "I agree.",
+    source_snapshot: { purpose: "page_form", source_channel: "paid_search" },
+    route_package_id: "route-1", click_id: "click-1",
+  });
+  resolveArchivedReturn.mockResolvedValue("arch-1");
 });
 
 describe("who arrived", () => {
@@ -218,7 +232,7 @@ describe("what did not become a lead", () => {
     ]);
     render(<LeadCapturePanel />);
     expect(
-      await screen.findByText("Came in without creating a lead"),
+      await screen.findByText("Submissions needing attention"),
     ).toBeInTheDocument();
     expect(screen.getByText("No consent given.")).toBeInTheDocument();
   });
@@ -227,7 +241,26 @@ describe("what did not become a lead", () => {
     render(<LeadCapturePanel />);
     await screen.findByText("Jay Okafor");
     expect(
-      screen.queryByText("Came in without creating a lead"),
+      screen.queryByText("Submissions needing attention"),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows the exact archived-return packet and records the selected review", async () => {
+    const user = userEvent.setup();
+    fetchSubmissions.mockResolvedValue([submission({
+      status: "received", lead_id: null, archive_match_lead_id: "arch-1",
+    })]);
+    render(<LeadCapturePanel />);
+    await user.click(await screen.findByRole("button", { name: "Review return" }));
+    expect(await screen.findByText(/Captured source: paid_search/)).toBeInTheDocument();
+    expect(screen.getByText(/Consent: I agree/)).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText(/Reviewed outcome/), "recover");
+    await user.type(screen.getByLabelText(/Reason for this decision/),
+      "Same continuing customer relationship");
+    await user.click(screen.getByRole("button", { name: "Record AAL2 decision" }));
+    await waitFor(() => expect(resolveArchivedReturn).toHaveBeenCalledWith({
+      submissionId: "sub-1", action: "recover", sourceHash: "a".repeat(64),
+      reason: "Same continuing customer relationship",
+    }));
   });
 });

@@ -184,7 +184,7 @@ export async function handlePublicLead(
     return;
   }
 
-  const outcome = (data ?? {}) as { ok?: boolean; reason?: string; lead_id?: string };
+  const outcome = (data ?? {}) as { ok?: boolean; reason?: string; lead_id?: string; pending_review?: boolean };
   if (outcome.ok !== true) {
     // Consent and contactability are the caller's to fix, so those two
     // sentences are passed through. Anything else is the single refusal.
@@ -196,7 +196,11 @@ export async function handlePublicLead(
     return;
   }
 
-  logger.info("lead_captured", { leadId: outcome.lead_id });
+  if (outcome.pending_review) {
+    logger.info("lead_submission_held_for_review", {});
+  } else {
+    logger.info("lead_captured", { leadId: outcome.lead_id });
+  }
   if (isForm) { formResult(200, true); return; }
   // Identical whether a lead was created or merged. Whether an address is
   // already on file is not a public fact.

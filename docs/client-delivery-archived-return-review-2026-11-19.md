@@ -1,0 +1,25 @@
+# Archived returning lead review — 19 November 2026
+
+**Scope:** Draft PR #363, candidate migrations 638–642. Source and local rehearsal only. Neither hosted project nor any outward switch changed. The cash-positive Archive guard remains in place.
+
+## Gap and candidate behavior
+
+The earlier `capture_lead_v6` deduplicated against active `client_leads` only. A consented submission with the same contact as an archived lead therefore created a second active lead without an explicit decision. That split the contact's historical source, consent and outcome path.
+
+Migration 638 retains the new consented submission as `received`, with its exact endpoint source snapshot, route, click/UTM and a same-client durable archived-lead candidate. It does not create or reopen a lead. Older archived JSON without a stored generated dedupe key is matched from the archived email/phone using the current dedupe rule. Contact-level advisory and active-row locks serialize capture with a concurrent archive. The public route still gives the same generic success response as a new or merged capture; its internal log names the review hold without recording contact details.
+
+Migration 639 gives a signed-in client lead manager an exact packet with a source hash and two AAL2 choices: recover the archived identity or start a separate active lead while keeping the archive. The operator records a reason. The database checks that the submission and archived snapshot still match the packet, refuses multiple matching archives or a concurrent active contact, and saves an immutable decision with the resulting identity in the same transaction as promotion. The Sales OS Capture page shows held submissions and this review form. Migration 640 blocks direct archive recovery while an unresolved return is held. Migration 641 freezes held consent/source fields and refuses direct status promotion without the matching AAL2 resolution.
+
+Migration 642 keeps a new inbound Meta DM from an archived identity as an inbound message in a closed conversation. It retains the historical identity link and refuses automatic reopening or reply. This is a holding path; it does not yet create a canonical lead-return review packet for DMs.
+
+## Local evidence
+
+- The rollback fixture checks consent refusal; idempotent hold; archived-history and source preservation; older archive JSON without a stored dedupe key; unprovisioned reviewer, AAL1, stale hash, direct recovery, direct promotion and duplicate-decision refusals; both AAL2 outcomes; and service-role denial of forged review inserts.
+- A two-connection, network-isolated race fixture held the active lead row for archive while a new consented submission waited. After archive committed, the submission entered review with no new active lead. The synthetic client and identity rows were removed. [Protected race result](/Users/alex/.aa-console-evidence/phase8-archive-capture-lock-2026-11-19.json), SHA-256 `fec15030f68de94eb9790079f9aaf8326c556e8ef82ffcf5446bf489af43dc0c`.
+- The isolated staging-data copy reached 659 local history rows/head `20261124051600`. Checked client/Auth IDs, original paused cron definitions, Storage policies/RLS and the `ensure_rls` trigger stayed at the saved local baseline; review RLS was enabled and service-role direct review insertion denied. [Protected incremental result](/Users/alex/.aa-console-evidence/staging-pr363-90-incremental-result-2026-11-19.json), SHA-256 `a4bfc5cada233280a7b7ee339b213f67c8f00a50433e097e23da0457efa272e6`.
+- Full local clean and released-to-current upgrade replay, catalog, generated types, scoped reads and 31 Phase 8 rollback fixtures passed. Focused Sales Capture tests (13), public-route tests (18), TypeScript, lint and frontend build passed. Exact-head CI is a separate gate.
+- Migration 642's archived-DM rollback fixture passed on the network-isolated local staging-data copy. The full clean and released-to-current replay, catalog, generated types, scoped reads and 32 Phase 8 rollback fixtures passed. The copy reached 660 history rows/head `20261124051700`; checked client/Auth IDs, paused cron, Storage policies/RLS and the `ensure_rls` trigger matched the verified local baseline. [Protected incremental result](/Users/alex/.aa-console-evidence/staging-pr363-91-incremental-result-2026-11-19.json), SHA-256 `69484499aad9df38dc72b112c1cf6f26201f7614a69ade643e5741fc4f70f834`.
+
+## Remaining gates
+
+Two or more held submissions for one archived identity currently remain held rather than letting one decision silently dispose of the others. Multiple archived identities with the same dedupe key are also refused at decision time. They need a reviewed batch or manual reconciliation path. The Sales Capture decision is source-specific; it is not yet represented as a canonical Unified Inbox approval class. Sales-agent intake needs its own archived-contact audit; archived DM messages are retained but their manual review workflow is not built. Signed-in AAL2 usability, provider-backed capture, hosted parity and the organic/paid route-to-cash journeys remain unverified. This candidate does not accept Phases 8 or 9.

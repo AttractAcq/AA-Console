@@ -15,6 +15,52 @@ export type CaptureEndpoint = Database["public"]["Tables"]["lead_capture_endpoin
 export type CaptureDue = Database["public"]["Views"]["lead_capture_due"]["Row"];
 export type LeadSubmission = Database["public"]["Tables"]["lead_submissions"]["Row"];
 
+export interface ArchivedReturnPacket {
+  source_hash: string;
+  submission_id: string;
+  archived_lead_id: string;
+  archived_name: string | null;
+  archived_email: string | null;
+  archived_phone: string | null;
+  archived_source: string | null;
+  archived_stage: string;
+  archived_at: string;
+  submitted_name: string | null;
+  submitted_email: string | null;
+  submitted_phone: string | null;
+  submitted_at: string;
+  consent_wording: string;
+  source_snapshot: { purpose?: string; source_channel?: string | null } | null;
+  route_package_id: string | null;
+  click_id: string | null;
+}
+
+export async function fetchArchivedReturnPacket(submissionId: string): Promise<ArchivedReturnPacket> {
+  const { data, error } = await supabase.rpc("archived_return_review_packet_v11", {
+    p_submission_id: submissionId,
+  });
+  if (error) throw new Error(error.message);
+  if (!data || typeof data !== "object") throw new Error("The return review is unavailable.");
+  return data as unknown as ArchivedReturnPacket;
+}
+
+export async function resolveArchivedReturn(args: {
+  submissionId: string;
+  action: "recover" | "new_lead";
+  sourceHash: string;
+  reason: string;
+}): Promise<string> {
+  const { data, error } = await supabase.rpc("resolve_archived_return_v11", {
+    p_submission_id: args.submissionId,
+    p_action: args.action,
+    p_expected_hash: args.sourceHash,
+    p_reason: args.reason.trim(),
+  });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("The return decision did not complete.");
+  return data;
+}
+
 export const CAPTURE_PURPOSES = [
   { value: "page_form", label: "Page form", hint: "A form on a campaign or offer page." },
   { value: "magnet_optin", label: "Magnet opt-in", hint: "Promises a file in return." },

@@ -162,7 +162,7 @@ begin
     raise exception 'Recovery lost dependent history'; end if;
   if (select count(*) from pg_constraint
       where confrelid='public.lead_identities'::regclass
-        and conname like '%identity_fkey_v11')<>12
+        and conname like '%identity_fkey_v11')<>13
      or (select count(*) from pg_trigger
       where tgfoid='public.guard_active_lead_reference_v11()'::regprocedure
         and not tgisinternal)<>12 then

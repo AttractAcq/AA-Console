@@ -18029,6 +18029,98 @@ export type Database = {
           },
         ]
       }
+      lead_return_resolutions_v11: {
+        Row: {
+          action: string
+          archived_lead_id: string
+          client_id: string
+          id: string
+          reason: string
+          resolved_lead_id: string
+          reviewed_at: string
+          reviewer_aal: string
+          reviewer_id: string
+          source_hash: string
+          submission_id: string
+        }
+        Insert: {
+          action: string
+          archived_lead_id: string
+          client_id: string
+          id?: string
+          reason: string
+          resolved_lead_id: string
+          reviewed_at?: string
+          reviewer_aal: string
+          reviewer_id: string
+          source_hash: string
+          submission_id: string
+        }
+        Update: {
+          action?: string
+          archived_lead_id?: string
+          client_id?: string
+          id?: string
+          reason?: string
+          resolved_lead_id?: string
+          reviewed_at?: string
+          reviewer_aal?: string
+          reviewer_id?: string
+          source_hash?: string
+          submission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_return_resolutions_v11_archived_lead_id_client_id_fkey"
+            columns: ["archived_lead_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "lead_return_resolutions_v11_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_return_resolutions_v11_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_return_resolutions_v11_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_return_resolutions_v11_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_return_resolutions_v11_resolved_lead_id_client_id_fkey"
+            columns: ["resolved_lead_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "lead_return_resolutions_v11_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: true
+            referencedRelation: "lead_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_sequence_enrollments: {
         Row: {
           client_id: string
@@ -18136,6 +18228,7 @@ export type Database = {
       }
       lead_submissions: {
         Row: {
+          archive_match_lead_id: string | null
           click_id: string | null
           client_id: string
           consent_evidence: Json
@@ -18156,6 +18249,7 @@ export type Database = {
           utm: Json | null
         }
         Insert: {
+          archive_match_lead_id?: string | null
           click_id?: string | null
           client_id: string
           consent_evidence?: Json
@@ -18176,6 +18270,7 @@ export type Database = {
           utm?: Json | null
         }
         Update: {
+          archive_match_lead_id?: string | null
           click_id?: string | null
           client_id?: string
           consent_evidence?: Json
@@ -18201,6 +18296,13 @@ export type Database = {
             columns: ["route_package_id", "client_id"]
             isOneToOne: false
             referencedRelation: "campaign_route_packages_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "lead_submissions_archive_match_identity_fkey_v11"
+            columns: ["archive_match_lead_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "lead_identities"
             referencedColumns: ["id", "client_id"]
           },
           {
@@ -38489,6 +38591,10 @@ export type Database = {
         Args: { p_lead_id: string; p_reason?: string }
         Returns: undefined
       }
+      archived_return_review_packet_v11: {
+        Args: { p_submission_id: string }
+        Returns: Json
+      }
       assemble_campaign_preparation_package_v7: {
         Args: { p_campaign_id: string }
         Returns: {
@@ -45149,6 +45255,15 @@ export type Database = {
           reason: string
           reservation_id: string
         }[]
+      }
+      resolve_archived_return_v11: {
+        Args: {
+          p_action: string
+          p_expected_hash: string
+          p_reason: string
+          p_submission_id: string
+        }
+        Returns: string
       }
       resolve_booking_link_v6: {
         Args: { p_token: string }

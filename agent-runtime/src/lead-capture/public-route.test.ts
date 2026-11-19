@@ -206,8 +206,10 @@ describe("what a stranger can learn", () => {
   it("answers identically whether a lead was created or merged", async () => {
     const created = await call(database({ ok: true, lead_id: "lead-1", created: true }).sb);
     const merged = await call(database({ ok: true, lead_id: "lead-1", created: false }).sb);
+    const held = await call(database({ ok: true, lead_id: null, pending_review: true }).sb);
     // Whether an address is already on file is not a public fact.
     expect(created.payload).toEqual(merged.payload);
+    expect(created.payload).toEqual(held.payload);
     expect(created.payload).toEqual({ ok: true, message: "Thanks — that is with us." });
   });
 
