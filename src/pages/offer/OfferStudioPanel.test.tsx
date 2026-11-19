@@ -150,10 +150,20 @@ describe("the source-first Build path", () => {
     expect(screen.getByRole("textbox", { name: "Service name" })).toHaveValue("Garage conversion");
     await userEvent.type(screen.getByRole("textbox", { name: "Audience" }), "Homeowners");
     await userEvent.type(screen.getByRole("textbox", { name: "Offer promise" }), "A usable garage gym");
+    await userEvent.type(screen.getByRole("textbox", { name: "Dream outcome" }), "A functional home gym");
+    await userEvent.type(screen.getByRole("textbox", { name: "How this offer strengthens the outcome" }), "Designed around the home");
+    await userEvent.type(screen.getByRole("textbox", { name: "Perceived likelihood of achievement" }), "A measured build plan");
+    await userEvent.type(screen.getByRole("textbox", { name: "Proof or mechanism that raises likelihood" }), "Site survey and plan");
+    await userEvent.type(screen.getByRole("textbox", { name: "Time delay" }), "Four weeks");
+    await userEvent.type(screen.getByRole("textbox", { name: "Steps that reduce delay, one per line" }), "Survey first");
+    await userEvent.type(screen.getByRole("textbox", { name: "Effort and sacrifice" }), "One planning call");
+    await userEvent.type(screen.getByRole("textbox", { name: "Steps that reduce effort, one per line" }), "We handle planning");
     await userEvent.click(screen.getByRole("button", { name: "Save draft version" }));
-    expect(rpc).toHaveBeenCalledWith("create_service_offer_version_v6", expect.objectContaining({
+    expect(rpc).toHaveBeenCalledWith("create_service_offer_version_v9", expect.objectContaining({
       p_offer_id: "offer-1", p_service_name: "Garage conversion",
       p_audience: "Homeowners", p_promise: "A usable garage gym",
+      p_value_equation: expect.objectContaining({ dream_outcome: "A functional home gym",
+        delay_reduction_steps: ["Survey first"], effort_reduction_steps: ["We handle planning"] }),
     }));
   });
 

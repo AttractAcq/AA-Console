@@ -13,11 +13,35 @@ type Form = {
   offerId: string | null; serviceName: string; audience: string; promise: string;
   inclusions: string; exclusions: string; price: string; currency: string;
   deliveryCost: string; claims: string; retainedClaims: Json[];
+  dreamOutcome: string; dreamOutcomeBoost: string; likelihood: string;
+  likelihoodMechanism: string; timeDelay: string; delayReductionSteps: string;
+  effortSacrifice: string; effortReductionSteps: string; riskReversal: string;
+  bonuses: string; scarcity: string; urgency: string; deliveryLimits: string;
 };
 const emptyForm: Form = { offerId: null, serviceName: "", audience: "", promise: "",
   inclusions: "", exclusions: "", price: "", currency: "EUR", deliveryCost: "",
-  claims: "", retainedClaims: [] };
+  claims: "", retainedClaims: [], dreamOutcome: "", dreamOutcomeBoost: "",
+  likelihood: "", likelihoodMechanism: "", timeDelay: "", delayReductionSteps: "",
+  effortSacrifice: "", effortReductionSteps: "", riskReversal: "", bonuses: "",
+  scarcity: "", urgency: "", deliveryLimits: "" };
 const lines = (value: string) => value.split("\n").map((item) => item.trim()).filter(Boolean);
+function valueObject(value: Json | null): Record<string, Json> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, Json> : {};
+}
+function valueText(value: Record<string, Json>, key: string): string {
+  return typeof value[key] === "string" ? value[key] : "";
+}
+function valueLines(value: Record<string, Json>, key: string): string {
+  return Array.isArray(value[key]) ? value[key].filter((item): item is string => typeof item === "string").join("\n") : "";
+}
+function bonusLines(value: Record<string, Json>): string {
+  return Array.isArray(value.bonuses) ? value.bonuses.map((item) => {
+    const bonus = valueObject(item);
+    return [valueText(bonus, "name"), valueText(bonus, "value"), valueText(bonus, "delivery_limit")]
+      .filter(Boolean).join(" | ");
+  }).join("\n") : "";
+}
 function isClaim(value: Json): value is { kind: string; text: string; proof_asset_id?: string } {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     && typeof value.kind === "string" && typeof value.text === "string";
@@ -81,6 +105,7 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
   }
 
   function revise(offer: Offer, version: Version) {
+    const equation = valueObject(version.value_equation);
     setForm({
       offerId: offer.id, serviceName: offer.service_name,
       audience: version.audience, promise: version.promise,
@@ -92,6 +117,19 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
         .map((claim) => claim.text).join("\n") : "",
       retainedClaims: Array.isArray(version.claims) ? version.claims
         .filter(isClaim).filter((claim) => claim.kind === "quantified") : [],
+      dreamOutcome: valueText(equation, "dream_outcome"),
+      dreamOutcomeBoost: valueText(equation, "dream_outcome_boost"),
+      likelihood: valueText(equation, "likelihood"),
+      likelihoodMechanism: valueText(equation, "likelihood_mechanism"),
+      timeDelay: valueText(equation, "time_delay"),
+      delayReductionSteps: valueLines(equation, "delay_reduction_steps"),
+      effortSacrifice: valueText(equation, "effort_sacrifice"),
+      effortReductionSteps: valueLines(equation, "effort_reduction_steps"),
+      riskReversal: valueText(equation, "risk_reversal"),
+      bonuses: bonusLines(equation),
+      scarcity: valueText(equation, "scarcity"),
+      urgency: valueText(equation, "urgency"),
+      deliveryLimits: valueText(equation, "delivery_limits"),
     });
     setDraftKey(crypto.randomUUID());
     document.getElementById("service-offer-editor")?.scrollIntoView({ behavior: "smooth" });
@@ -117,7 +155,32 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
       ...form.retainedClaims,
       ...lines(form.claims).map((text) => ({ kind: "general", text })),
     ];
-    const { error: rpcError } = await supabase.rpc("create_service_offer_version_v6", {
+    const bonuses = lines(form.bonuses).map((row) => row.split("|").map((part) => part.trim()));
+    if (bonuses.length > 5 || bonuses.some((parts) => parts.length < 2 || parts.length > 3
+      || !parts[0] || !parts[1])) {
+      setError("Enter at most five bonuses, each as Name | Value | optional delivery limit.");
+      setBusy(null);
+      return;
+    }
+    const valueEquation: Json = {
+      dream_outcome: form.dreamOutcome.trim(),
+      dream_outcome_boost: form.dreamOutcomeBoost.trim(),
+      likelihood: form.likelihood.trim(),
+      likelihood_mechanism: form.likelihoodMechanism.trim(),
+      time_delay: form.timeDelay.trim(),
+      delay_reduction_steps: lines(form.delayReductionSteps),
+      effort_sacrifice: form.effortSacrifice.trim(),
+      effort_reduction_steps: lines(form.effortReductionSteps),
+      risk_reversal: form.riskReversal.trim(),
+      bonuses: bonuses.map(([name, value, deliveryLimit]) => ({
+        name, value, delivery_limit: deliveryLimit ?? "",
+      })),
+      scarcity: form.scarcity.trim(),
+      urgency: form.urgency.trim(),
+      delivery_limits: form.deliveryLimits.trim(),
+    };
+    const { error: rpcError } = await supabase.rpc("create_service_offer_version_v9", {
+      p_offer_id: selectedOfferId,
       p_client_id: clientId,
       p_service_name: form.serviceName.trim(),
       p_audience: form.audience.trim(),
@@ -132,10 +195,8 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
       p_currency: (price === null ? null : form.currency.trim().toUpperCase()) as unknown as string,
       p_delivery_cost_estimate: deliveryCost as unknown as number,
       p_claims: claims,
+      p_value_equation: valueEquation,
       p_idempotency_key: draftKey,
-      // A first version is not a revision of an existing offer, and that is
-      // what the default says.
-      ...(form.offerId ? { p_offer_id: form.offerId } : {}),
     });
     setBusy(null);
     if (rpcError) { setError(rpcError.message); return; }
@@ -190,6 +251,53 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
       <label className="block text-sm">Offer promise<textarea required rows={3} maxLength={4000} value={form.promise}
         onChange={(event) => update("promise", event.target.value)}
         className="mt-1 w-full rounded-lg border border-border bg-background p-2" /></label>
+      <fieldset className="space-y-4 rounded-lg border border-border p-4">
+        <legend className="px-1 font-medium">Value equation</legend>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="text-sm">Dream outcome<textarea required rows={3} maxLength={2000} value={form.dreamOutcome}
+            onChange={(event) => update("dreamOutcome", event.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-background p-2" /></label>
+          <label className="text-sm">How this offer strengthens the outcome<textarea required rows={3} maxLength={2000} value={form.dreamOutcomeBoost}
+            onChange={(event) => update("dreamOutcomeBoost", event.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-background p-2" /></label>
+          <label className="text-sm">Perceived likelihood of achievement<textarea required rows={3} maxLength={2000} value={form.likelihood}
+            onChange={(event) => update("likelihood", event.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-background p-2" /></label>
+          <label className="text-sm">Proof or mechanism that raises likelihood<textarea required rows={3} maxLength={2000} value={form.likelihoodMechanism}
+            onChange={(event) => update("likelihoodMechanism", event.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-background p-2" /></label>
+          <label className="text-sm">Time delay<textarea required rows={3} maxLength={2000} value={form.timeDelay}
+            onChange={(event) => update("timeDelay", event.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-background p-2" /></label>
+          <label className="text-sm">Steps that reduce delay, one per line<textarea required rows={3} value={form.delayReductionSteps}
+            onChange={(event) => update("delayReductionSteps", event.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-background p-2" /></label>
+          <label className="text-sm">Effort and sacrifice<textarea required rows={3} maxLength={2000} value={form.effortSacrifice}
+            onChange={(event) => update("effortSacrifice", event.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-background p-2" /></label>
+          <label className="text-sm">Steps that reduce effort, one per line<textarea required rows={3} value={form.effortReductionSteps}
+            onChange={(event) => update("effortReductionSteps", event.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-background p-2" /></label>
+          <label className="text-sm">Risk reversal or guarantee<textarea rows={3} maxLength={2000} value={form.riskReversal}
+            onChange={(event) => update("riskReversal", event.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-background p-2" /></label>
+          <label className="text-sm">Bonuses, up to five<textarea rows={3} value={form.bonuses}
+            onChange={(event) => update("bonuses", event.target.value)}
+            aria-describedby="offer-bonus-format"
+            className="mt-1 w-full rounded-lg border border-border bg-background p-2" />
+            <span id="offer-bonus-format" className="text-xs text-muted-foreground">One per line: Name | Value | optional delivery limit</span>
+          </label>
+          <label className="text-sm">Scarcity<textarea rows={2} maxLength={2000} value={form.scarcity}
+            onChange={(event) => update("scarcity", event.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-background p-2" /></label>
+          <label className="text-sm">Urgency<textarea rows={2} maxLength={2000} value={form.urgency}
+            onChange={(event) => update("urgency", event.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-background p-2" /></label>
+          <label className="text-sm sm:col-span-2">Delivery limits<textarea rows={2} maxLength={2000} value={form.deliveryLimits}
+            onChange={(event) => update("deliveryLimits", event.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-background p-2" /></label>
+        </div>
+      </fieldset>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="text-sm">Included, one per line<textarea rows={3} value={form.inclusions}
           onChange={(event) => update("inclusions", event.target.value)}
@@ -296,6 +404,11 @@ export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: strin
                   <p>Limits: {version.exclusions.join("; ") || "None specified"}</p>
                   <pre className="overflow-auto rounded-lg bg-muted p-3 text-xs">{JSON.stringify(version.claims, null, 2)}</pre>
                 </div>
+              </details>
+              <details className="mt-3 text-sm"><summary className="cursor-pointer">Value equation</summary>
+                {version.value_equation === null
+                  ? <p className="mt-2 text-muted-foreground">Legacy version; no structured value equation recorded.</p>
+                  : <pre className="mt-2 overflow-auto rounded-lg bg-muted p-3 text-xs whitespace-pre-wrap">{JSON.stringify(version.value_equation, null, 2)}</pre>}
               </details>
               <div className="mt-4 flex gap-2">
                 {!signed && <Link to={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}

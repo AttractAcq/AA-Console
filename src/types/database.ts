@@ -28244,6 +28244,7 @@ export type Database = {
           offer_id: string
           price_amount: number | null
           promise: string
+          value_equation: Json | null
           version: number
         }
         Insert: {
@@ -28261,6 +28262,7 @@ export type Database = {
           offer_id: string
           price_amount?: number | null
           promise: string
+          value_equation?: Json | null
           version: number
         }
         Update: {
@@ -28278,6 +28280,7 @@ export type Database = {
           offer_id?: string
           price_amount?: number | null
           promise?: string
+          value_equation?: Json | null
           version?: number
         }
         Relationships: [
@@ -40330,6 +40333,45 @@ export type Database = {
           offer_id: string
           price_amount: number | null
           promise: string
+          value_equation: Json | null
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_offer_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_compiled_main_offer_v10: {
+        Args: {
+          p_audience: string
+          p_client_id: string
+          p_exclusions: string[]
+          p_idempotency_key: string
+          p_inclusions: string[]
+          p_job_id: string
+          p_promise: string
+          p_service_name: string
+          p_value_equation: Json
+          p_strategy_snapshot: Json
+        }
+        Returns: {
+          audience: string
+          claims: Json
+          client_id: string
+          content_hash: string
+          created_at: string
+          currency: string | null
+          delivery_cost_estimate: number | null
+          exclusions: string[]
+          id: string
+          idempotency_key: string
+          inclusions: string[]
+          offer_id: string
+          price_amount: number | null
+          promise: string
+          value_equation: Json | null
           version: number
         }
         SetofOptions: {
@@ -40367,6 +40409,46 @@ export type Database = {
           offer_id: string
           price_amount: number | null
           promise: string
+          value_equation: Json | null
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_offer_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_compiled_secondary_offer_v10: {
+        Args: {
+          p_audience: string
+          p_client_id: string
+          p_exclusions: string[]
+          p_idempotency_key: string
+          p_inclusions: string[]
+          p_job_id: string
+          p_opportunity_hash: string
+          p_opportunity_id: string
+          p_promise: string
+          p_service_name: string
+          p_value_equation: Json
+        }
+        Returns: {
+          audience: string
+          claims: Json
+          client_id: string
+          content_hash: string
+          created_at: string
+          currency: string | null
+          delivery_cost_estimate: number | null
+          exclusions: string[]
+          id: string
+          idempotency_key: string
+          inclusions: string[]
+          offer_id: string
+          price_amount: number | null
+          promise: string
+          value_equation: Json | null
           version: number
         }
         SetofOptions: {
@@ -40406,6 +40488,7 @@ export type Database = {
           offer_id: string
           price_amount: number | null
           promise: string
+          value_equation: Json | null
           version: number
         }
         SetofOptions: {
@@ -40978,6 +41061,48 @@ export type Database = {
           offer_id: string
           price_amount: number | null
           promise: string
+          value_equation: Json | null
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_offer_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_service_offer_version_v9: {
+        Args: {
+          p_audience: string
+          p_claims: Json
+          p_client_id: string
+          p_currency: string
+          p_delivery_cost_estimate: number
+          p_exclusions: string[]
+          p_idempotency_key: string
+          p_inclusions: string[]
+          p_offer_id: string
+          p_price_amount: number
+          p_promise: string
+          p_service_name: string
+          p_value_equation: Json
+        }
+        Returns: {
+          audience: string
+          claims: Json
+          client_id: string
+          content_hash: string
+          created_at: string
+          currency: string | null
+          delivery_cost_estimate: number | null
+          exclusions: string[]
+          id: string
+          idempotency_key: string
+          inclusions: string[]
+          offer_id: string
+          price_amount: number | null
+          promise: string
+          value_equation: Json | null
           version: number
         }
         SetofOptions: {
@@ -47233,6 +47358,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      valid_offer_value_equation_v9: {
+        Args: { p_value: Json }
+        Returns: boolean
       }
       video_approval_state: { Args: { p_asset_id: string }; Returns: Json }
       video_client_approval_email_state: {
