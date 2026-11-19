@@ -12,6 +12,7 @@ import {
   LIVE_STATUSES, MODE_HINT,
   createPlacement, fetchClientDestinations, fetchDestinations,
   fetchPlacementDue, fetchPlacements, fetchPlacementEvents, fetchRetractionReceipts,
+  fetchProofProviderReads, requestProofProviderRead,
   markPlacedByHand, recordRetracted, auditLegacyRetraction,
   requestApproval, setDestinationEnabled, setProofPublishingEnabled,
   fetchProofSurfaceCoverage,
@@ -19,6 +20,7 @@ import {
   type ClientDestination, type Destination, type Placement, type PlacementDue,
   type DestinationIntegration,
   type RetractionReceipt, type PlacementEvent,
+  type ProofProviderRead,
   type ProofSurfaceCoverage,
 } from "../../lib/proofDistribution";
 
@@ -85,6 +87,7 @@ function ClientProofDistributionPanel({ clientId, tab }: { clientId: string | un
   const [integrations, setIntegrations] = useState<DestinationIntegration[]>([]);
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [retractionReceipts, setRetractionReceipts] = useState<ReadonlyMap<string, RetractionReceipt>>(new Map());
+  const [providerReads, setProviderReads] = useState<ReadonlyMap<string, ProofProviderRead>>(new Map());
   const [due, setDue] = useState<ReadonlyMap<string, PlacementDue>>(new Map());
   const [proof, setProof] = useState<ProofAsset[]>([]);
   const [publishingOn, setPublishingOn] = useState(false);
@@ -99,11 +102,12 @@ function ClientProofDistributionPanel({ clientId, tab }: { clientId: string | un
       return;
     }
     try {
-      const [all, mine, rows, receipts, blockers, proofRows, settings, connected] = await Promise.all([
+      const [all, mine, rows, receipts, providerReadRows, blockers, proofRows, settings, connected] = await Promise.all([
         fetchDestinations(),
         fetchClientDestinations(clientId),
         fetchPlacements(clientId),
         fetchRetractionReceipts(clientId),
+        fetchProofProviderReads(clientId),
         fetchPlacementDue(clientId),
         fetchProofAssets(clientId),
         supabase.from("client_engine_settings")
@@ -117,6 +121,7 @@ function ClientProofDistributionPanel({ clientId, tab }: { clientId: string | un
       setIntegrations((connected.data ?? []) as DestinationIntegration[]);
       setPlacements(rows);
       setRetractionReceipts(receipts);
+      setProviderReads(providerReadRows);
       setDue(blockers);
       setProof(proofRows);
       setPublishingOn(Boolean((settings.data as { proof_publishing_enabled?: boolean } | null)?.proof_publishing_enabled));
@@ -194,6 +199,7 @@ function ClientProofDistributionPanel({ clientId, tab }: { clientId: string | un
             <PlacementsTab
               placements={placements}
               retractionReceipts={retractionReceipts}
+              providerReads={providerReads}
               due={due}
               destinations={destinations}
               proof={proof}
@@ -349,10 +355,11 @@ function DestinationsTab({
 }
 
 function PlacementsTab({
-  placements, retractionReceipts, due, destinations, proof, titleOf, busy, loading, onAct,
+  placements, retractionReceipts, providerReads, due, destinations, proof, titleOf, busy, loading, onAct,
 }: {
   placements: Placement[];
   retractionReceipts: ReadonlyMap<string, RetractionReceipt>;
+  providerReads: ReadonlyMap<string, ProofProviderRead>;
   due: ReadonlyMap<string, PlacementDue>;
   destinations: Destination[];
   proof: ProofAsset[];
@@ -446,6 +453,14 @@ function PlacementsTab({
               "No external URL"
             )}
             {placement.external_id && <span className="block break-all">ID: {placement.external_id}</span>}
+            {providerReads.get(placement.id) && (
+              <span className="block text-muted-foreground">
+                Provider GET: {providerReads.get(placement.id)?.result.replace(/_/g, " ")}
+                {providerReads.get(placement.id)?.provider_state
+                  ? ` (${providerReads.get(placement.id)?.provider_state})` : ""}
+                {` · ${dayOrDash(providerReads.get(placement.id)?.checked_at ?? null)}`}
+              </span>
+            )}
             <span className="block text-muted-foreground">Placed {dayOrDash(placement.placed_at)} · verified {dayOrDash(placement.verified_at)}</span>
           </span>,
           <span key="r" className="text-xs">
@@ -471,6 +486,14 @@ function PlacementsTab({
             name={`${titleOf(placement.source_proof_id)} at ${labelOf(placement.destination_key)}`}
             busy={busy === placement.id}
             items={[
+              ...(placement.destination_key === "google_business_profile"
+                && placement.external_id
+                && ["uncertain", "placed", "verified"].includes(placement.status)
+                ? [{ label: "Read provider post",
+                    onSelect: () => void onAct(placement.id,
+                      () => requestProofProviderRead(placement.id),
+                      "Read-only provider check requested. Refresh for its result.") }]
+                : []),
               ...(placement.status === "drafted"
                 ? [{
                     label: "Ask for approval",

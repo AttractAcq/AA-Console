@@ -24972,6 +24972,115 @@ export type Database = {
           },
         ]
       }
+      proof_placement_provider_reads_v8: {
+        Row: {
+          account_ref: string
+          checked_at: string
+          client_id: string
+          external_id: string
+          id: string
+          job_id: string
+          observed_summary_sha256: string | null
+          payload_hash: string
+          placement_id: string
+          provider_state: string | null
+          provider_url: string | null
+          result: string
+        }
+        Insert: {
+          account_ref: string
+          checked_at?: string
+          client_id: string
+          external_id: string
+          id?: string
+          job_id: string
+          observed_summary_sha256?: string | null
+          payload_hash: string
+          placement_id: string
+          provider_state?: string | null
+          provider_url?: string | null
+          result: string
+        }
+        Update: {
+          account_ref?: string
+          checked_at?: string
+          client_id?: string
+          external_id?: string
+          id?: string
+          job_id?: string
+          observed_summary_sha256?: string | null
+          payload_hash?: string
+          placement_id?: string
+          provider_state?: string | null
+          provider_url?: string | null
+          result?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_placement_provider_reads_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_provider_reads_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_provider_reads_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placement_provider_reads_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_provider_reads_v8_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placement_provider_reads_v8_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_provider_reads_v8_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_provider_reads_v8_placement_id_fkey"
+            columns: ["placement_id"]
+            isOneToOne: false
+            referencedRelation: "proof_placement_due"
+            referencedColumns: ["placement_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_provider_reads_v8_placement_id_fkey"
+            columns: ["placement_id"]
+            isOneToOne: false
+            referencedRelation: "proof_placements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proof_placement_retraction_receipts_v6: {
         Row: {
           client_id: string
@@ -36136,6 +36245,87 @@ export type Database = {
           },
         ]
       }
+      proof_placement_provider_read_latest_v8: {
+        Row: {
+          account_ref: string | null
+          checked_at: string | null
+          client_id: string | null
+          external_id: string | null
+          id: string | null
+          job_id: string | null
+          observed_summary_sha256: string | null
+          payload_hash: string | null
+          placement_id: string | null
+          provider_state: string | null
+          provider_url: string | null
+          result: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_placement_provider_reads_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_provider_reads_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_provider_reads_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placement_provider_reads_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_provider_reads_v8_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placement_provider_reads_v8_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_provider_reads_v8_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_provider_reads_v8_placement_id_fkey"
+            columns: ["placement_id"]
+            isOneToOne: false
+            referencedRelation: "proof_placement_due"
+            referencedColumns: ["placement_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_provider_reads_v8_placement_id_fkey"
+            columns: ["placement_id"]
+            isOneToOne: false
+            referencedRelation: "proof_placements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proof_production_attempts_v7: {
         Row: {
           asset_id: string | null
@@ -42689,6 +42879,10 @@ export type Database = {
         Returns: string
       }
       proof_placement_preview_v6: { Args: { p_id: string }; Returns: Json }
+      proof_placement_readback_target_v8: {
+        Args: { p_client_id: string; p_job_id: string; p_placement_id: string }
+        Returns: Json
+      }
       proof_placement_scope_v6: { Args: { p_id: string }; Returns: Json }
       proof_placement_source_state_v6: {
         Args: { p_request_id: string }
@@ -43429,6 +43623,21 @@ export type Database = {
         Args: { p_post_id: string }
         Returns: string
       }
+      record_proof_placement_provider_read_v8: {
+        Args: {
+          p_account_ref: string
+          p_client_id: string
+          p_external_id: string
+          p_job_id: string
+          p_observed_summary_sha256: string
+          p_payload_hash: string
+          p_placement_id: string
+          p_provider_state: string
+          p_provider_url: string
+          p_result: string
+        }
+        Returns: string
+      }
       record_proof_placement_uncertain_v8: {
         Args: {
           p_external_id?: string
@@ -44162,6 +44371,10 @@ export type Database = {
         Returns: string
       }
       request_proof_placement_inbox_v6: {
+        Args: { p_placement_id: string }
+        Returns: string
+      }
+      request_proof_placement_readback_v8: {
         Args: { p_placement_id: string }
         Returns: string
       }

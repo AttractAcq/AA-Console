@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "011a04dfd1dc20554e146aec4e41f7e2f46cef8f8b49878208d30fe1b782d54b",
+  "migrationSourceDigest": "85740ef63ba5041ca69183191f74e68224bc0f1242c53fcbef298e2dd089552e",
   "generatedTypesSha256": "68b394f54962bbe9caa80b59a55df80105da809b2c7428461498bdcc6dfe0c65",
   "generatedSchemaBodySha256": "622a0297a3a0fbf47f9f2e94169707861c97fe521945b1ace32efefe47446562",
   "localMigrations": [
@@ -4273,6 +4273,13 @@
       "filename": "20261124042800_593_proof_placement_uncertain_outcome.sql",
       "sha256": "45e91e70f0e224f4d313e5a2b3e4c1467de91c240ba6398e1cafb8b540497f1e",
       "trimmedMd5": "a1b82946925978433cd946a7f42eac2b"
+    },
+    {
+      "version": "20261124042900",
+      "name": "594_proof_placement_provider_readback",
+      "filename": "20261124042900_594_proof_placement_provider_readback.sql",
+      "sha256": "8b5964c925702213bd8ff7d6f206384d7e93e00d19a2b811374772cb0a43bfa4",
+      "trimmedMd5": "5c2dc96a5e86b03bd2b746baf15a7d38"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

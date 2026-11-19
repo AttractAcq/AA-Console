@@ -40,6 +40,7 @@ const state = {
   coverage: [] as Record<string, unknown>[],
   events: [] as Record<string, unknown>[],
   integrations: [] as Record<string, unknown>[],
+  providerReads: [] as Record<string, unknown>[],
   publishing: false,
   placementReadOverride: null as null | ((clientId: string | null) => Promise<{
     data: Record<string, unknown>[]; error: null;
@@ -53,6 +54,7 @@ function result(table: string) {
     case "client_integrations": return { data: state.integrations, error: null };
     case "proof_placements": return { data: state.placements, error: null };
     case "proof_placement_retraction_receipts_v6": return { data: state.retractionReceipts, error: null };
+    case "proof_placement_provider_read_latest_v8": return { data: state.providerReads, error: null };
     case "proof_placement_due": return { data: state.due, error: null };
     case "proof_placement_events": return { data: state.events, error: null };
     case "proof_surface_coverage": return { data: state.coverage, error: null };
@@ -119,6 +121,7 @@ beforeEach(() => {
   state.clientDestinations = [];
   state.events = [];
   state.integrations = [];
+  state.providerReads = [];
   state.publishing = false;
   state.placementReadOverride = null;
 });
@@ -355,6 +358,21 @@ describe("rights", () => {
 });
 
 describe("asking for the decision", () => {
+  it("shows provider GET separately and requests a read only for a known post ID", async () => {
+    const externalId = "accounts/123/locations/456/localPosts/7";
+    state.placements = [placement({ destination_key: "google_business_profile",
+      status: "uncertain", external_id: externalId })];
+    state.providerReads = [{ placement_id: "pl1", external_id: externalId,
+      result: "live_exact_text", provider_state: "LIVE", provider_url: null,
+      checked_at: "2026-11-19T00:00:00Z" }];
+    render(<ProofDistributionPanel tab="placements" />);
+    expect(await screen.findByText(/Provider GET: live exact text/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Actions for / }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Read provider post" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith(
+      "request_proof_placement_readback_v8", { p_placement_id: "pl1" }));
+    expect(rpc).not.toHaveBeenCalledWith("record_proof_placed", expect.anything());
+  });
   it("offers the campaign-level ask only for a placement that belongs to a campaign", async () => {
     state.placements = [placement({ status: "drafted" })];
     render(<ProofDistributionPanel tab="placements" />);

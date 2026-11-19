@@ -41,6 +41,7 @@ import { runCampaignActionJob } from "../campaigns/actions/executor.js";
 import { runCampaignBudgetReconciliationJob } from "../campaigns/actions/budget-reconciliation-job.js";
 import { runCampaignPageReconciliationJob } from "../campaigns/actions/page-reconciliation-job.js";
 import { runProofPlacerJob } from "../proof-distribution/placer.js";
+import { runProofPlacementReadbackJob } from "../proof-distribution/readback-job.js";
 import { runLeadMagnetCourierJob } from "../lead-magnets/courier.js";
 import { runOutboundCourierJob } from "../outbound/courier.js";
 import { runNurtureSequencerJob } from "../outbound/sequencer.js";
@@ -182,6 +183,7 @@ const RUNNERS: Record<string, JobRunner> = {
   // without agreeing to their customer's words going on a third party's
   // profile.
   proof_placer: runProofPlacerJob,
+  proof_placement_reconciler: runProofPlacementReadbackJob,
   // Keeping the one promise this system makes directly to a stranger: the
   // exact file somebody approved, once. Re-hashes the bytes before every
   // send, because a path can be overwritten after it is approved.
