@@ -16,7 +16,7 @@ do $fixture$
 declare cid uuid:='b6380000-0000-4000-8000-000000000001';
   endpoint_id uuid; request_id uuid; review_id uuid; first_id uuid;
   held_id uuid; result jsonb; archived_hash text; packet jsonb;
-  second_id uuid; resolved_id uuid; refused boolean;
+  second_id uuid; resolved_id uuid; canonical_id uuid; refused boolean;
 begin
   select id into endpoint_id from public.create_lead_capture_endpoint_v6(
     cid,'agent_handoff',repeat('f',64),'I agree to a reply',
@@ -75,6 +75,12 @@ begin
         and s.utm->>'utm_source'='fixture-return') then
     raise exception 'Held submission lost consent, source or candidate';
   end if;
+  select id into canonical_id from public.approval_requests_v6
+    where source_kind='archived_form_return' and source_id=held_id::text;
+  if canonical_id is null or
+     public.archived_return_inbox_source_state_v11(canonical_id)<>'pending' then
+    raise exception 'Held form return has no exact canonical Inbox request';
+  end if;
   result:=public.capture_lead_v6(repeat('f',64),'return',
     p_email=>'return@example.invalid',p_consented=>true);
   if result->>'repeat'<>'true'
@@ -107,10 +113,26 @@ begin
 
   perform set_config('request.jwt.claim.role','authenticated',true);
   perform set_config('request.jwt.claim.sub',
+    'a6380000-0000-4000-8000-000000000099',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"a6380000-0000-4000-8000-000000000099","role":"authenticated","aal":"aal2"}',true);
+  execute 'set local role authenticated';
+  if exists(select 1 from public.approval_inbox_v6 where id=canonical_id) then
+    raise exception 'Unprovisioned reviewer read the canonical form card';
+  end if;
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub',
     'a6380000-0000-4000-8000-000000000001',true);
   perform set_config('request.jwt.claims',
     '{"sub":"a6380000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}',true);
   packet:=public.archived_return_review_packet_v11(held_id);
+  execute 'set local role authenticated';
+  if not exists(select 1 from public.approval_inbox_v6 where id=canonical_id) then
+    raise exception 'Provisioned reviewer cannot read the form card';
+  end if;
+  execute 'reset role';
+  if (select status from public.approval_inbox_v6 where id=canonical_id)<>'pending'
+     then raise exception 'Held form return is absent from the pending Inbox'; end if;
   if packet->>'archived_email'<>'return@example.invalid'
      or packet->>'submitted_email'<>'return@example.invalid' then
     raise exception 'Review packet omitted the compared contact'; end if;
@@ -138,6 +160,14 @@ begin
        where submission_id=held_id and action='recover'
          and reviewer_aal='aal2' and source_hash=packet->>'source_hash') then
     raise exception 'Reviewed recovery lost the submission or decision';
+  end if;
+  if public.archived_return_inbox_source_state_v11(canonical_id)<>'source_decided'
+     or (select status from public.approval_inbox_v6 where id=canonical_id)<>'approved'
+     or not exists(select 1 from public.approval_decision_events_v6 d
+       where d.request_id=canonical_id and d.decision='approved'
+         and d.artifact_hash=packet->>'source_hash'
+         and d.actor_aal='aal2') then
+    raise exception 'Form return source decision was not mirrored atomically';
   end if;
   refused:=false;
   begin

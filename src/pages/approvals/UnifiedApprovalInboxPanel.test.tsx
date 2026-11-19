@@ -15,7 +15,6 @@ vi.mock("../../lib/supabase", () => ({ supabase: {
 vi.mock("./ApprovalCoveragePanel", () => ({ ApprovalCoveragePanel: () => null }));
 vi.mock("./ExternalExecutionAlerts", () => ({ ExternalExecutionAlerts: () => null }));
 vi.mock("./HeldExternalJobs", () => ({ HeldExternalJobs: () => null }));
-vi.mock("./ArchivedReturnAlerts", () => ({ ArchivedReturnAlerts: () => null }));
 vi.mock("react-router-dom", async (original) => ({
   ...(await original<typeof import("react-router-dom")>()),
   useParams: () => ({ clientId: "client-1" }),
@@ -2017,6 +2016,29 @@ describe("unified approval inbox", () => {
     }));
     await waitFor(() => expect(screen.getByText("Decision history (1)")).toBeInTheDocument());
     expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+  });
+
+  it("routes a canonical archived-contact card to its source-owned AAL2 review", async () => {
+    requests = [{ ...request,
+      id: "archived-return-card", source_system: "aa_console",
+      source_kind: "archived_form_return", source_id: "form-return-1",
+      source_version: "c".repeat(64), artifact_hash: "c".repeat(64),
+      title: "Review returning form contact", source_state: "pending",
+      expires_at: "2030-01-01T00:00:00Z",
+      preview: { archived_lead_id: "archived-1", source_hash: "c".repeat(64) },
+      scope: { client_id: "client-1", effect: "lead_identity_resolution" },
+      destination: "internal:lead_identity", owner_role: "client_lead_reviewer",
+      owning_path: "/clients/client-1/delivery/sales-os?tab=capture",
+    }];
+    show();
+    const card = await screen.findByRole("article", { name: "Review returning form contact" });
+    expect(within(card).getByRole("link", { name: "View owning source" }))
+      .toHaveAttribute("href", "/clients/client-1/delivery/sales-os?tab=capture");
+    expect(within(card).queryByRole("button", { name: "Approve exact version" }))
+      .not.toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "Reject exact version" }))
+      .not.toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("uses the exact sales revoke source and requires a reason for rejection", async () => {

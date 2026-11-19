@@ -17,6 +17,7 @@ declare cid uuid:='b6450000-0000-4000-8000-000000000001';
   agent_id uuid; archived_id uuid; conversation_id uuid;
   second_archived uuid; second_conversation uuid; second_lead uuid; resolved_id uuid;
   packet jsonb; refreshed jsonb; second_packet jsonb;
+  canonical_id uuid; refreshed_canonical_id uuid;
   refused boolean:=false;
 begin
   insert into public.client_sales_agents(client_id,name,purpose)
@@ -33,6 +34,12 @@ begin
   if public.capture_sales_agent_lead(conversation_id) is not null then
     raise exception 'Archived sales contact was automatically promoted';
   end if;
+  select id into canonical_id from public.approval_requests_v6
+    where source_kind='archived_sales_return' and source_id=conversation_id::text;
+  if canonical_id is null or
+     public.archived_return_inbox_source_state_v11(canonical_id)<>'pending' then
+    raise exception 'Held sales return has no exact canonical Inbox request';
+  end if;
   begin perform public.recover_lead(archived_id);
   exception when check_violation then refused:=true; end;
   if not refused then raise exception 'Direct Archive recovery bypassed sales review'; end if;
@@ -42,6 +49,11 @@ begin
     'a6450000-0000-4000-8000-000000000099',true);
   perform set_config('request.jwt.claims',
     '{"sub":"a6450000-0000-4000-8000-000000000099","role":"authenticated","aal":"aal2"}',true);
+  execute 'set local role authenticated';
+  if exists(select 1 from public.approval_inbox_v6 where id=canonical_id) then
+    raise exception 'Unprovisioned reviewer read the canonical sales card';
+  end if;
+  execute 'reset role';
   refused:=false;
   begin perform public.sales_agent_return_review_packet_v11(conversation_id);
   exception when insufficient_privilege then refused:=true; end;
@@ -51,6 +63,8 @@ begin
   perform set_config('request.jwt.claims',
     '{"sub":"a6450000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}',true);
   packet:=public.sales_agent_return_review_packet_v11(conversation_id);
+  if (select status from public.approval_inbox_v6 where id=canonical_id)<>'pending'
+     then raise exception 'Held sales return is absent from the pending Inbox'; end if;
   if packet->'matched'->>'contact_name'<>'Returned first'
      or packet->>'archived_email'<>'review-one@example.invalid' then
     raise exception 'Sales return packet omitted the compared identities';
@@ -70,6 +84,15 @@ begin
   exception when check_violation then refused:=true; end;
   if not refused then raise exception 'Stale sales review packet was accepted'; end if;
   refreshed:=public.sales_agent_return_review_packet_v11(conversation_id);
+  select id into refreshed_canonical_id from public.approval_requests_v6
+    where source_kind='archived_sales_return'
+      and source_id=conversation_id::text
+      and source_version=refreshed->>'source_hash';
+  if refreshed_canonical_id is null or refreshed_canonical_id=canonical_id
+     or public.archived_return_inbox_source_state_v11(canonical_id)<>'superseded'
+     or public.archived_return_inbox_source_state_v11(refreshed_canonical_id)<>'pending' then
+    raise exception 'Changed sales packet did not stale and refresh its Inbox card';
+  end if;
   if refreshed->'matched'->>'contact_name'<>'Returned first'
      or refreshed->>'current_name'<>'Later agent turn' then
     raise exception 'The frozen match was replaced by current conversation'; end if;
@@ -88,6 +111,15 @@ begin
       exists(select 1 from public.sales_agent_return_resolutions_v11 r
         where r.conversation_id=fixture.conversation_id and r.action='recover'
           and r.reviewer_aal='aal2' and r.source_hash=refreshed->>'source_hash');
+  end if;
+  if public.archived_return_inbox_source_state_v11(refreshed_canonical_id)<>'source_decided'
+     or (select status from public.approval_inbox_v6
+       where id=refreshed_canonical_id)<>'approved'
+     or not exists(select 1 from public.approval_decision_events_v6 d
+       where d.request_id=refreshed_canonical_id and d.decision='approved'
+         and d.artifact_hash=refreshed->>'source_hash'
+         and d.actor_aal='aal2') then
+    raise exception 'Sales return source decision was not mirrored atomically';
   end if;
   refused:=false;
   begin perform public.resolve_sales_agent_return_v11(conversation_id,'recover',

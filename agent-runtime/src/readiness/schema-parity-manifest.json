@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "e36a6fb252b344657cf0e01770a3616466aa518c5ac9a2dd80611741a74244b1",
-  "generatedTypesSha256": "630769d84869e97ed6ee1b73157ce5d781d55ff79c6e7e23f894cfca25697f26",
-  "generatedSchemaBodySha256": "3233d93562694faa35bf53488a43825ab105ce18c3154f7bda4e8e5d5fb26de5",
+  "migrationSourceDigest": "b5b18eea2680939837869c5b50c906687c80de7ab7fd82e820f41e2345b5a346",
+  "generatedTypesSha256": "f31cdc15b61de8622e33227a5383a6018b9c200be14db591e0ba8fcd4210d596",
+  "generatedSchemaBodySha256": "00089f66645a18dfb9579abb0b30f1b0306ceb6397eed5478e6e1eca260a5137",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4637,6 +4637,13 @@
       "filename": "20261124052000_645_resolve_archived_sales_agent_return.sql",
       "sha256": "e8807206f332170fe3dfd7e5c5e5d16ac1f4ca3e0e4eeb8a8fab8eec22c533b2",
       "trimmedMd5": "fd5cc341608c576d3997d451956c2a20"
+    },
+    {
+      "version": "20261124052100",
+      "name": "646_archived_return_canonical_inbox",
+      "filename": "20261124052100_646_archived_return_canonical_inbox.sql",
+      "sha256": "8d35239d395111c17388b7dc8a29727c3b55e2e0d9161958269d47a6c3ae6bbe",
+      "trimmedMd5": "0028a6966278a8b99d45f126bc695462"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

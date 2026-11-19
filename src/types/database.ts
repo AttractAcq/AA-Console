@@ -38696,6 +38696,14 @@ export type Database = {
         Args: { p_lead_id: string; p_reason?: string }
         Returns: undefined
       }
+      archived_return_inbox_packet_v11: {
+        Args: { p_kind: string; p_source_id: string }
+        Returns: Json
+      }
+      archived_return_inbox_source_state_v11: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       archived_return_review_packet_v11: {
         Args: { p_submission_id: string }
         Returns: Json
@@ -44671,6 +44679,10 @@ export type Database = {
       }
       register_approval_request_v6: {
         Args: { p_request: Json }
+        Returns: string
+      }
+      register_archived_return_inbox_v11: {
+        Args: { p_kind: string; p_source_id: string }
         Returns: string
       }
       register_delivery_asset_bytes_v6: {

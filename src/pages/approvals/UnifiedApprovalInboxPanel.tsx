@@ -11,11 +11,10 @@ import type { Database } from "../../types/database";
 import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 import { ExternalExecutionAlerts } from "./ExternalExecutionAlerts";
 import { HeldExternalJobs } from "./HeldExternalJobs";
-import { ArchivedReturnAlerts } from "./ArchivedReturnAlerts";
 
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
-  "activation_switch", "campaign_action", "campaign_idea", "client_authority_assignment", "client_sales_entitlement", "creative_requirement", "engine_slot",
+  "activation_switch", "archived_form_return", "archived_sales_return", "campaign_action", "campaign_idea", "client_authority_assignment", "client_sales_entitlement", "creative_requirement", "engine_slot",
   "gateway_tool", "global_engine_activation", "global_video_owner", "google_profile_change", "google_review_reply", "integration_grant", "lead_magnet", "message_template", "meta_profile_change", "metrics_backfill", "motion_render", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "organic_publication", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer", "video_seat",
 ] as const;
 type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
@@ -1366,7 +1365,9 @@ function RequestCard({ request, history, gatewayOutcome, executionEvidence, clie
   const canReject = !salesManagerCard && isRejectionReady(request, clientId);
   const canApprove = !salesManagerCard && isApprovalReady(request, clientId);
   const canRevoke = !manager && isGatewayToolRevocable(request, clientId);
-  const decisionLabel = request.source_kind === "google_review_reply"
+  const decisionLabel = request.source_kind === "archived_form_return"
+    ? "Returning form contact" : request.source_kind === "archived_sales_return"
+      ? "Returning sales-agent contact" : request.source_kind === "google_review_reply"
     ? "Google review reply" : request.source_kind === "recruitment_brief"
       ? "Recruitment brief" : request.source_kind === "client_sales_entitlement"
         ? "Sales access" : request.source_kind === "organic_publication"
@@ -2103,7 +2104,6 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
       {global && <ApprovalCoveragePanel />}
       <ExternalExecutionAlerts clientId={multiClient ? undefined : clientId} />
       <HeldExternalJobs clientId={multiClient ? undefined : clientId} />
-      {!multiClient && clientId && <ArchivedReturnAlerts clientId={clientId} />}
 
       <div className="flex flex-wrap gap-3 rounded-xl border border-border bg-card p-4">
         <label className="min-w-40 flex-1 text-sm font-medium">Status
