@@ -42293,6 +42293,10 @@ export type Database = {
         Args: { p_asset_id: string }
         Returns: boolean
       }
+      organic_publication_claim_snapshot_v7: {
+        Args: { p_post_id: string }
+        Returns: Json
+      }
       organic_publication_package_candidates_v6: {
         Args: { p_limit?: number }
         Returns: {

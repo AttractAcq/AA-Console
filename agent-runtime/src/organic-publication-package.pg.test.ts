@@ -296,4 +296,72 @@ describe("held exact organic publication package", () => {
       "select organic_publication_source_state_v6($1) as state", [requestId])).state)
       .toBe("superseded");
   });
+
+  it("attests only a current claimed post with the exact AAL2 decision while claim stays closed", async () => {
+    await db.exec(`
+      update post_copy_effective set caption='The exact caption'
+        where scheduled_post_id='${POST}';
+      alter table approval_decision_events_v6
+        add column actor_aal text,
+        add column artifact_hash text,
+        add column source_decision_ref text;
+    `);
+    const migration = await readFile(new URL(
+      "../../supabase/migrations/20261124042200_587_organic_publication_claimed_prewrite.sql",
+      import.meta.url,
+    ), "utf8");
+    await db.exec(migration);
+    const row = await one<{ id: string; artifact_hash: string; request_id: string }>(`
+      select p.id,p.artifact_hash,q.id as request_id
+      from organic_publication_packages_v6 p
+      join approval_requests_v6 q on q.source_id=p.id::text
+      where p.scheduled_post_id='${POST}'
+      order by q.requested_at desc limit 1`);
+    await expect(db.query(`select require_organic_publication_prewrite_v6('${POST}')`))
+      .rejects.toThrow(/no current organic publication claim/);
+    await db.exec(`update scheduled_posts set publication_status='publishing',
+      publish_claimed_at=now(),publish_attempts=1 where id='${POST}'`);
+    expect((await one<{ payload: unknown }>(
+      `select organic_publication_source_snapshot_v6('${POST}') as payload`)).payload)
+      .toBeNull();
+    expect((await one<{ payload: unknown }>(
+      `select organic_publication_claim_snapshot_v7('${POST}') as payload`)).payload)
+      .not.toBeNull();
+    await expect(db.query(`select require_organic_publication_prewrite_v6('${POST}')`))
+      .rejects.toThrow(/AAL2 publication approval/);
+    await db.query(`insert into approval_decision_events_v6
+      (request_id,event_order,decision,actor_aal,artifact_hash,source_decision_ref)
+      values ($1,1,'approved','aal2',$2,$3)`,
+      [row.request_id,row.artifact_hash,`organic_publication_packages_v6:${row.id}`]);
+    const approved = await one<{ packet: { artifact_hash: string; manifest: { scheduled_post_id: string } } }>(
+      `select require_organic_publication_prewrite_v6('${POST}') as packet`);
+    expect(approved.packet.artifact_hash).toBe(row.artifact_hash);
+    expect(approved.packet.manifest.scheduled_post_id).toBe(POST);
+    expect((await db.query("select * from claim_posts_for_publishing(5)")).rows)
+      .toHaveLength(0);
+    await db.exec(`update client_engine_settings set publishing_enabled=false
+      where client_id='${CLIENT}'`);
+    await expect(db.query(`select require_organic_publication_prewrite_v6('${POST}')`))
+      .rejects.toThrow(/switch is off/);
+    await db.exec(`update client_engine_settings set publishing_enabled=true
+      where client_id='${CLIENT}';
+      update post_copy_effective set caption='Changed after approval'
+      where scheduled_post_id='${POST}'`);
+    await expect(db.query(`select require_organic_publication_prewrite_v6('${POST}')`))
+      .rejects.toThrow(/frozen package is missing, stale or unlicensed/);
+    await db.exec(`update post_copy_effective set caption='The exact caption'
+      where scheduled_post_id='${POST}';
+      update approval_requests_v6 set expires_at=now()-interval '1 second'
+      where id='${row.request_id}'`);
+    await expect(db.query(`select require_organic_publication_prewrite_v6('${POST}')`))
+      .rejects.toThrow(/review is stale or expired/);
+    await db.exec(`update approval_requests_v6 set expires_at=now()+interval '1 day'
+      where id='${row.request_id}'`);
+    await db.query(`insert into approval_decision_events_v6
+      (request_id,event_order,decision,actor_aal,artifact_hash,source_decision_ref)
+      values ($1,2,'revoked','aal2',$2,$3)`,
+      [row.request_id,row.artifact_hash,`organic_publication_packages_v6:${row.id}`]);
+    await expect(db.query(`select require_organic_publication_prewrite_v6('${POST}')`))
+      .rejects.toThrow(/AAL2 publication approval/);
+  });
 });
