@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { rpc, useParams } = vi.hoisted(() => ({ rpc: vi.fn(), useParams: vi.fn() }));
 vi.mock("../../lib/supabase", () => ({ supabase: { rpc } }));
+vi.mock("./BusinessProfileCoverage", () => ({ BusinessProfileCoverage: () => null }));
 vi.mock("react-router-dom", () => ({
   useParams,
   // Link renders as an anchor so tests can still find navigation by role.

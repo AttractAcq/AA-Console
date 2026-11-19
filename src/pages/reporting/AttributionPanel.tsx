@@ -4,6 +4,7 @@ import { DataTable } from "../../components/DataTable";
 import { EmptyState } from "../../components/EmptyState";
 import { supabase } from "../../lib/supabase";
 import { cn } from "../../lib/cn";
+import { BusinessProfileCoverage } from "./BusinessProfileCoverage";
 
 type Funnel = {
   leads: number;
@@ -220,6 +221,7 @@ function ClientAttributionPanel({ clientId }: { clientId: string | undefined }) 
         <p>{coverage.spend_rows} spend ledger entries{coverage.spend_currency ? ` in ${coverage.spend_currency}` : ""}; latest {coverage.latest_spend_date ?? "unknown"}.</p>
         <p>Paid metric dates: {coverage.paid_metric_days}; latest {coverage.latest_paid_metric_date ?? "unknown"}. These rows do not by themselves prove an account read.</p>
         <p>Current Meta account read: {coverage.latest_meta_read_at ? new Date(coverage.latest_meta_read_at).toLocaleString() : "none"}. Current Google Ads read: {coverage.latest_google_read_at ? new Date(coverage.latest_google_read_at).toLocaleString() : "none"}.</p>
+        <BusinessProfileCoverage key={clientId} clientId={clientId} />
       </section>}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
