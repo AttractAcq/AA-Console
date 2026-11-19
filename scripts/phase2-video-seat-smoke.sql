@@ -34,6 +34,35 @@ values ('ffffffff-ffff-4fff-8fff-ffffffffffff','dddddddd-dddd-4ddd-8ddd-dddddddd
 insert into storage.objects(id,bucket_id,name,version)
 values ('11111111-1111-4111-8111-111111111111','client-media',
  'dddddddd-dddd-4ddd-8ddd-dddddddddddd/render.mp4','v1');
+insert into public.post_copy(asset_id,platform,caption) values
+ ('ffffffff-ffff-4fff-8fff-ffffffffffff','instagram','Finished reel');
+set local session_replication_role='replica';
+insert into public.client_integrations
+ (client_id,provider,credential_label,credential_secret_id,status)
+values ('dddddddd-dddd-4ddd-8ddd-dddddddddddd','instagram','17890000000000001',
+ vault.create_secret('disposable-video-fixture-token'),'connected');
+set local session_replication_role='origin';
+insert into public.content_slots
+ (id,client_id,platform,scheduled_at,stage,asset_id,format)
+values ('22222222-2222-4222-8222-222222222222',
+ 'dddddddd-dddd-4ddd-8ddd-dddddddddddd','instagram',now()+interval '2 days',
+ 'awaiting_approval','ffffffff-ffff-4fff-8fff-ffffffffffff','reel');
+insert into public.client_ideas(id,client_id,title,source,status,slot_id)
+values ('33333333-3333-4333-8333-333333333333',
+ 'dddddddd-dddd-4ddd-8ddd-dddddddddddd','Recurring reel','auto','draft',
+ '22222222-2222-4222-8222-222222222222');
+insert into public.client_briefs(id,client_id,source_idea_id,title)
+values ('44444444-4444-4444-8444-444444444444',
+ 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+ '33333333-3333-4333-8333-333333333333','Recurring reel brief');
+update public.client_media_assets set brief_id='44444444-4444-4444-8444-444444444444'
+ where id='ffffffff-ffff-4fff-8fff-ffffffffffff';
+update public.content_slots set
+ idea_id='33333333-3333-4333-8333-333333333333',
+ brief_id='44444444-4444-4444-8444-444444444444'
+ where id='22222222-2222-4222-8222-222222222222';
+insert into public.slot_events(slot_id,from_stage,to_stage,actor)
+values ('22222222-2222-4222-8222-222222222222','qa','awaiting_approval','engine');
 select set_config('request.jwt.claim.role','service_role',true);
 do $attest$
 declare i jsonb;
@@ -50,6 +79,7 @@ select set_config('request.jwt.claims',
 do $checks$
 declare asset_id uuid:='ffffffff-ffff-4fff-8fff-ffffffffffff';
  owner_request uuid; manager_request uuid; client_request uuid; review_id uuid;
+ engine_request uuid; post_id uuid; packet jsonb;
 begin
  begin
   perform public.sign_video_approval(asset_id,'owner');
@@ -126,16 +156,35 @@ begin
  perform public.decide_video_seat_inbox_v6(review_id,client_request,true);
  if not public.video_signoff_current_v6(asset_id,'client') then
   raise exception 'Exact client signoff was not current'; end if;
- perform set_config('request.jwt.claim.sub','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',true);
- perform set_config('request.jwt.claims',
-  '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated","aal":"aal2"}',true);
- perform public.review_media_asset(asset_id,'approved'::public.review_status);
- if (select human_approved_at from public.client_media_assets where id=asset_id) is null
-  or not public.video_signoff_current_v6(asset_id,'client') then
-  raise exception 'All exact seats did not permit finalization'; end if;
- perform set_config('request.jwt.claim.role','service_role',true);
- update storage.objects set version='v2' where id='11111111-1111-4111-8111-111111111111';
- if public.video_signoff_current_v6(asset_id,'owner') then
-  raise exception 'Changed render object retained owner approval'; end if;
+ -- The Engine decision is the final human approval for this recurring reel.
+  perform set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
+  perform set_config('request.jwt.claims',
+   '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  packet:=public.engine_slot_exact_package_v6('22222222-2222-4222-8222-222222222222');
+  if packet is null or packet->'video_seats'->>'client_user_id'
+     is distinct from 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    or jsonb_array_length(packet->'video_seats'->'signoffs')<>3
+    or packet->'asset'->>'render_path'
+      is distinct from 'dddddddd-dddd-4ddd-8ddd-dddddddddddd/render.mp4' then
+    raise exception 'Engine reel packet lost exact render or video seats'; end if;
+  engine_request:=public.request_engine_slot_exact_review_v6(
+    '22222222-2222-4222-8222-222222222222');
+  perform public.decide_engine_slot_inbox_v6(
+    '22222222-2222-4222-8222-222222222222',engine_request,true);
+  if (select human_approved_at from public.client_media_assets where id=asset_id) is null
+    or public.video_signoff_current_v6(asset_id,'client') is not true then
+    raise exception 'Engine reel did not finalize with all exact video seats'; end if;
+  select scheduled_post_id into post_id from public.content_slots
+    where id='22222222-2222-4222-8222-222222222222';
+  if post_id is null or public.engine_slot_exact_source_current_v8(post_id) is not true
+    or public.organic_creative_source_current_v8(post_id) is not true
+    or public.organic_publication_source_snapshot_v6(post_id) is null then
+    raise exception 'Approved Engine reel has no current publication source'; end if;
+  update storage.objects set version='v2'
+    where id='11111111-1111-4111-8111-111111111111';
+  if public.engine_slot_exact_source_current_v8(post_id) is true
+    or public.organic_publication_source_snapshot_v6(post_id) is not null
+    or public.video_signoff_current_v6(asset_id,'owner') is true then
+    raise exception 'Changed reel render retained Engine publication authority'; end if;
 end $checks$;
 rollback;

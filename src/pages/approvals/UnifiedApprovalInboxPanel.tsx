@@ -1131,6 +1131,22 @@ function isEngineSlotReady(request: UnifiedApprovalRequest, clientId: string): b
   const storage = packet.storage as Record<string, unknown>;
   const framed = asset.content_format === "carousel" || asset.content_format === "story";
   const frames = packet.frames;
+  const reel = asset.media_type === "video" && asset.content_format === "reel";
+  const videoSeats = packet.video_seats && typeof packet.video_seats === "object"
+    && !Array.isArray(packet.video_seats) ? packet.video_seats as Record<string, unknown> : null;
+  const seatSignoffs = Array.isArray(videoSeats?.signoffs)
+    ? videoSeats.signoffs as Record<string, unknown>[] : [];
+  const videoSeatsReady = !reel || (!!videoSeats
+    && typeof asset.render_path === "string" && !!asset.render_path
+    && asset.edit_stage === "review_ready"
+    && typeof videoSeats.owner_user_id === "string" && !!videoSeats.owner_user_id
+    && typeof videoSeats.manager_user_id === "string" && !!videoSeats.manager_user_id
+    && ["owner", "manager", ...(videoSeats.client_user_id ? ["client"] : [])].every((role) =>
+      seatSignoffs.some((entry) => entry.role === role
+        && typeof entry.user_id === "string" && !!entry.user_id
+        && typeof entry.request_id === "string" && !!entry.request_id
+        && typeof entry.content_hash === "string"
+        && /^[0-9a-f]{64}$/.test(entry.content_hash as string))));
   const framesReady = !framed || (Array.isArray(frames)
     && frames.length >= (asset.content_format === "story" ? 1 : 2)
     && frames.length <= 10
@@ -1156,8 +1172,8 @@ function isEngineSlotReady(request: UnifiedApprovalRequest, clientId: string): b
     && slot.format === scope.format && slot.format === asset.content_format
     && packet.client_id === clientId && asset.client_id === clientId
     && scope.client_id === clientId
-    && (asset.content_format === "single" || framed) && framesReady
-    && (asset.media_type === "image" || asset.media_type === "text")
+    && (asset.content_format === "single" || framed || reel) && framesReady && videoSeatsReady
+    && (asset.media_type === "image" || asset.media_type === "text" || reel)
     && typeof asset.storage_path === "string" && !!asset.storage_path
     && typeof asset.file_sha256 === "string"
     && /^[0-9a-f]{64}$/.test(asset.file_sha256)
@@ -1332,7 +1348,9 @@ function RequestCard({ request, history, gatewayOutcome, executionEvidence, clie
     && !Array.isArray(creativeSource)
     ? creativeSource as Record<string, unknown> : null;
   const creativePath = creativeAsset && (request.source_kind === "video_seat"
-    || request.source_kind === "motion_render" || (request.source_kind === "ordinary_media"
+    || request.source_kind === "motion_render"
+    || (request.source_kind === "engine_slot" && creativeAsset.media_type === "video")
+    || (request.source_kind === "ordinary_media"
       || request.source_kind === "engine_slot")
       && (creativeAsset.content_format ?? "single") === "single" && creativeAsset.render_path
     ? creativeAsset.render_path : creativeAsset.storage_path);

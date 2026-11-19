@@ -2,7 +2,7 @@
 
 **Candidate source:** draft [PR #363](https://github.com/AttractAcq/AA-Console/pull/363). The full SHA-256 values below pin the SQL files, not a hosted release. Recheck the PR head and each hash before any apply.
 **Observed hosted baseline:** Production was last reported at `20261124034600` (migration 551). Staging reached a separately amended migration head of 569 with 569 history rows; its added correction is not a candidate migration. Refresh both heads, cron state, parity and deployment identity before any apply. The eight staging migration-history findings are unresolved.
-**Current candidate scope:** 59 ordered, unhosted migration files (552–610). Migration 592 installs an inactive read-only fifteen-minute cron enqueuer; separately review runtime compatibility and provider read access before activation. Candidate hashes below must be regenerated after any further source edit.
+**Current candidate scope:** 60 ordered, unhosted migration files (552–611). Migration 592 installs an inactive read-only fifteen-minute cron enqueuer; separately review runtime compatibility and provider read access before activation. Candidate hashes below must be regenerated after any further source edit.
 
 ## Ordered candidate
 
@@ -67,6 +67,7 @@
 | 608 | `20261124044300_608_engine_finished_render_review.sql` | `40634abf4192ee76e4e6dc628e782be9ab511a362a2f72e1d7a8ce26401b28a6` | Bind a finished single-file Engine render in the exact slot packet and decision-time Storage lock while preserving source-only packet hashes |
 | 609 | `20261124044400_609_recurring_engine_publication_source.sql` | `1463384a7f30cabb0dc2a555a0957da5facff4fc6ab0c1b4e7768a36ae1ea608` | Allow a campaign-free recurring Engine post with a matching slot-bound idea and current exact source decision to prepare scheduled and claimed snapshots; retain campaign route packets unchanged |
 | 610 | `20261124044500_610_engine_framed_source_review.sql` | `59d3e80f2c9a50532689c6b44c680e31381a84a36d32556913295de4502ae5bc` | Bind every attested carousel/story frame in the exact Engine review; lock frame and Storage rows through decision and require that decision for recurring publication snapshots |
+| 611 | `20261124044600_611_engine_reel_source_review.sql` | `d8bacbfa62bf2b4c40bbbd2c8136435a5bd450e1e34cde69f0267e988e25e016` | Bind finished reel bytes and current owner, SMM and requested client seats in the exact Engine packet; require that slot decision for recurring publication and hold after render replacement |
 
 **Organic route-package candidate, 19 November 2026:** Both the scheduled snapshot used for review and the claimed snapshot used by final prewrite now include the latest organic route package ID/version. They require an explicitly organic idea, a campaign that runs organic, and a route package matching the current plan fingerprint. This holds paid creative in a coordinated campaign and makes a later route/package revision stale the frozen review. Fifty-four focused runtime/PGlite tests and runtime typecheck passed, including paid-route and stale-plan refusals. A disposable released-to-current upgrade, clean replay, catalog contract, generated types and scoped-read gate passed locally. The publisher claim remains closed, and provider receipt/read-back and real human AAL2 evidence remain open. No hosted change occurred.
 

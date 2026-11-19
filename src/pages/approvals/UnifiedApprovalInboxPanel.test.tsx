@@ -1718,6 +1718,41 @@ describe("unified approval inbox", () => {
     expect(downloadVerifiedCreativeFile).toHaveBeenNthCalledWith(2, frames[1].storage_path, frames[1].file_sha256);
   });
 
+  it("reviews a finished Engine reel only with exact video seats", async () => {
+    const seats = { owner_user_id: "video-owner", manager_user_id: "video-manager",
+      client_user_id: null, signoffs: [
+        { role: "owner", user_id: "video-owner", request_id: "owner-request",
+          content_hash: "a".repeat(64) },
+        { role: "manager", user_id: "video-manager", request_id: "manager-request",
+          content_hash: "b".repeat(64) },
+      ] };
+    const reel = { ...readyEngineSlot, scope: { ...readyEngineSlot.scope, format: "reel" },
+      preview: { exact_package: { ...readyEngineSlot.preview.exact_package,
+        slot: { ...readyEngineSlot.preview.exact_package.slot, format: "reel" },
+        asset: { ...readyEngineSlot.preview.exact_package.asset,
+          media_type: "video", content_format: "reel", edit_stage: "review_ready",
+          render_path: "client-1/finished-reel.mp4" },
+        video_seats: seats,
+      } } };
+    requests = [{ ...reel, preview: { exact_package: {
+      ...reel.preview.exact_package,
+      video_seats: { ...seats, signoffs: seats.signoffs.slice(0, 1) },
+    } } }];
+    const firstView = show();
+    let card = await screen.findByRole("article", { name: readyEngineSlot.title });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+    firstView.unmount();
+    requests = [reel];
+    show();
+    card = await screen.findByRole("article", { name: readyEngineSlot.title });
+    const approve = within(card).getByRole("button", { name: "Approve exact version" });
+    expect(approve).toBeDisabled();
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify creative file" }));
+    await waitFor(() => expect(approve).toBeEnabled());
+    expect(downloadVerifiedCreativeFile).toHaveBeenCalledWith("client-1/finished-reel.mp4", mediaFileHash);
+  });
+
   it("rejects an offer with a reason", async () => {
     const user = userEvent.setup();
     requests = [readyOffer];
