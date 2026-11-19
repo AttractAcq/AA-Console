@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "528721122d4c5475d2e51568306b5517e21dfb810777ea3f7ab36d982f67214d",
+  "migrationSourceDigest": "2c59d5d18e42ec4c6b4d2c11b6871a1f5f0317d6ba18d7c2fa19e683da64f403",
   "generatedTypesSha256": "1ac293323ee5cce9f4a381fca6ead1988a9109213cd0386f1ff7c64aa4662c1c",
   "generatedSchemaBodySha256": "5dcf3504027a0ab44b15e6381b9b3aff814fed0e5fbde645317d0119e0590870",
   "localMigrations": [
@@ -4700,6 +4700,13 @@
       "filename": "20261124052900_654_offer_archive_and_empty_draft_delete.sql",
       "sha256": "86f6c4d6c4db5f3841f896f9ba079631a14fa8208ebefa0354e3c3e55b38a749",
       "trimmedMd5": "3ab688c5534f243b0c0c693f8e79265a"
+    },
+    {
+      "version": "20261124053000",
+      "name": "655_revoke_link_delivery_current_source_v6_execute",
+      "filename": "20261124053000_655_revoke_link_delivery_current_source_v6_execute.sql",
+      "sha256": "c01f2eedb636252fa28bb90169be4b01c8f4d057116584ab4e71aa2b4e662a0a",
+      "trimmedMd5": "894c2faf8edf4b5820cf9dafa72597a1"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
