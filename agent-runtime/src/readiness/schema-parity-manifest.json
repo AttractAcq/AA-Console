@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "66eed60dcbee3fcdf793982e6e07201442979769d939439588dae6a53f627535",
-  "generatedTypesSha256": "e001c5774578104239374f7468a20baa56d5d84f8509d29cb11d55bf0c87926d",
-  "generatedSchemaBodySha256": "e5ba27a052e1983dacc4dff038491d14b55f38f9f24b2020006f87900cbbb058",
+  "migrationSourceDigest": "b7b691c8461ce167577025c9fd4562b58846bfae613a2bbb419edb25175243f4",
+  "generatedTypesSha256": "62a6cf2c671d650f997b1ebf2a6198e241fa65c8d551502826202d113540dbe6",
+  "generatedSchemaBodySha256": "28a3a819aaaf909e861ab5ee79226dcb398f6e647839fc9da5eabba75385b23b",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4546,6 +4546,13 @@
       "filename": "20261124050700_632_historical_page_outcomes_currency.sql",
       "sha256": "816ae9e5c481f0fc6f15af6eac92075be29a214073066375a77b88ef4ea145eb",
       "trimmedMd5": "8533c3e9e59f32f470b45667e702d875"
+    },
+    {
+      "version": "20261124050800",
+      "name": "633_historical_coverage_legacy_trace",
+      "filename": "20261124050800_633_historical_coverage_legacy_trace.sql",
+      "sha256": "960f6db6dfa8215ca611f5f236c23ae343ffb83c634044c9a00aa86533126cab",
+      "trimmedMd5": "ba189eab21985c9b49a6e56a1eafd638"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

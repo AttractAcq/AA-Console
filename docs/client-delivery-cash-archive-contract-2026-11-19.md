@@ -12,6 +12,8 @@ Migration 630 moves the bot-scoped MCP conversion funnel onto the historical sou
 
 Migration 632 moves landing and offer page first-source outcome reads onto archived-aware sources. The new v9 RPC returns cash currency coverage and withholds a mixed or unknown total; v8 delegates to it so older callers cannot continue summing incompatible currencies. The Console now displays the recorded code or an explicit unknown cash total. The page fixture checked known USD and mixed USD/EUR cases before/archive/recovery. Other operational claims and the coordinated cash archive/recover gate remain open.
 
+Migration 633 moves Dashboard source/consent coverage and the legacy v8 journey RPC onto archived-aware reads. The v9 active-journey dependency now calls a separate active-only helper, so v8 can delegate to v10 without recursion. A rollback fixture confirmed equal coverage and journey output before archive, while archived and after recovery, and that an archived lead leaves the operating pipeline. Campaign live-evidence counts and operational claims still need classification and coordinated cross-surface tests; positive-cash archiving remains guarded.
+
 ## Present behavior and gap
 
 `archive_lead` snapshots a lead and its events into `archived_leads`, then deletes the active `client_leads` row. It refuses a lead with positive `cash_collected` because current revenue reports read active leads and would lose that cash. Migration 621 makes archived snapshots visible in the scoped journey trace. Migration 622 preserves **new** promoted-submission links through the durable same-client `lead_identities` key. Neither change makes archived cash part of live revenue aggregates, and previously nulled submission links remain unknown.
