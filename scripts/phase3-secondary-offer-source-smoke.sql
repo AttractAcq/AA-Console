@@ -29,7 +29,20 @@ declare o public.market_opportunities%rowtype;
   atomic_revision public.client_campaigns%rowtype;
   clone_id uuid; revision_id uuid; legacy_id uuid; unsourced_id uuid;
   approval_id uuid; request_id uuid; rights_request uuid; rights_id uuid;
-  h text; job_id uuid;
+  unsupported_version public.service_offer_versions%rowtype;
+  unsupported_request_id uuid; h text; job_id uuid;
+  equation jsonb:=jsonb_build_object(
+    'dream_outcome','A garage ready for training',
+    'dream_outcome_boost','Insulation makes winter training practical',
+    'likelihood','A scoped conversion based on the garage survey',
+    'likelihood_mechanism','Survey and measured installation plan',
+    'time_delay','Schedule after survey and materials confirmation',
+    'delay_reduction_steps',jsonb_build_array('Survey before final quote'),
+    'effort_sacrifice','The owner must clear the garage',
+    'effort_reduction_steps',jsonb_build_array('Provide a clearing checklist'),
+    'risk_reversal','Written scope before deposit',
+    'bonuses','[]'::jsonb,'scarcity','','urgency','',
+    'delivery_limits','Subject to a completed survey');
   mcp_created jsonb;
 begin
   insert into public.market_opportunities(client_id,name,micro_market,buying_situation,
@@ -70,23 +83,34 @@ begin
   select id into rights_id from public.proof_rights_requests_v6
     where canonical_request_id=rights_request;
   perform public.approve_proof_rights_v6(rights_id,rights_request);
+  unsupported_version := public.create_service_offer_version_v9(offer.id,o.client_id,
+    'New secondary offer','Homeowners with unused garages','A garage ready for training',
+    array['Insulation'],array['Gym equipment'],null,null,null,
+    jsonb_build_array(jsonb_build_object('kind','quantified',
+      'text','Completed within the agreed period','proof_asset_id',claim_proof.id)),
+    equation,'unsupported-secondary-offer-version');
+  select id into unsupported_request_id from public.approval_requests_v6
+    where source_kind='service_offer' and source_id=unsupported_version.id::text;
+  if public.service_offer_source_state_v6(unsupported_request_id)<>'source_held' then
+    raise exception 'Mismatched proof claim reached offer review'; end if;
+  begin
+    perform public.approve_service_offer_version_v6(unsupported_version.id);
+    raise exception 'Mismatched proof claim was signed off';
+  exception when check_violation then null; end;
+  insert into public.client_proof_assets(client_id,media_type,title,body,source,claim,evidence)
+    values(o.client_id,'text','Garage outcome exact','Completed within the agreed period',
+      'Customer interview','Completed within the agreed period','Signed handover note')
+    returning * into claim_proof;
+  rights_request:=public.request_proof_rights_v6(claim_proof.id,'Signed quote release');
+  select id into rights_id from public.proof_rights_requests_v6
+    where canonical_request_id=rights_request;
+  perform public.approve_proof_rights_v6(rights_id,rights_request);
   v := public.create_service_offer_version_v9(offer.id,o.client_id,'New secondary offer',
     'Homeowners with unused garages','A garage ready for training',
     array['Insulation'],array['Gym equipment'],null,null,null,
     jsonb_build_array(jsonb_build_object('kind','quantified',
       'text','Completed within the agreed period','proof_asset_id',claim_proof.id)),
-    jsonb_build_object(
-      'dream_outcome','A garage ready for training',
-      'dream_outcome_boost','Insulation makes winter training practical',
-      'likelihood','A scoped conversion based on the garage survey',
-      'likelihood_mechanism','Survey and measured installation plan',
-      'time_delay','Schedule after survey and materials confirmation',
-      'delay_reduction_steps',jsonb_build_array('Survey before final quote'),
-      'effort_sacrifice','The owner must clear the garage',
-      'effort_reduction_steps',jsonb_build_array('Provide a clearing checklist'),
-      'risk_reversal','Written scope before deposit',
-      'bonuses','[]'::jsonb,'scarcity','','urgency','',
-      'delivery_limits','Subject to a completed survey'),
+    equation,
     'secondary-offer-version');
   select id into request_id from public.approval_requests_v6
     where source_kind='service_offer' and source_id=v.id::text;
