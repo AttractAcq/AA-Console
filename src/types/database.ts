@@ -44702,6 +44702,57 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      reporting_lead_rows_v10: {
+        Args: { p_client_id: string }
+        Returns: {
+          appointment_at: string | null
+          appointment_outcome: string | null
+          cash_collected: number | null
+          cash_currency: string | null
+          client_id: string
+          consent_evidence: Json | null
+          consent_given_at: string | null
+          consent_wording: string | null
+          contact: string | null
+          created_at: string
+          created_by: string | null
+          dedupe_key: string | null
+          email: string | null
+          id: string
+          is_probe: boolean
+          lost_reason: string | null
+          name: string | null
+          next_action: string | null
+          next_action_due: string | null
+          notes: string | null
+          opportunity_currency: string | null
+          opportunity_value: number | null
+          owner_member_id: string | null
+          phone: string | null
+          pipeline_stage: Database["public"]["Enums"]["pipeline_stage"]
+          sale_currency: string | null
+          sale_value: number | null
+          source: string | null
+          source_asset_id: string | null
+          source_campaign_id: string | null
+          source_channel: string | null
+          source_click_id: string | null
+          source_client_campaign_id: string | null
+          source_page_id: string | null
+          source_post_id: string | null
+          source_sales_agent_id: string | null
+          source_utm: Json | null
+          stage: Database["public"]["Enums"]["lead_stage"]
+          stage_at: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "client_leads"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       repurpose_asset: {
         Args: { p_asset_id: string; p_formats: string[] }
         Returns: string
