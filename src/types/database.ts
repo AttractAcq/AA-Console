@@ -43872,6 +43872,10 @@ export type Database = {
         Args: { p_sequence_id: string }
         Returns: boolean
       }
+      offer_quantified_claims_current_v11: {
+        Args: { p_version_id: string }
+        Returns: boolean
+      }
       opportunity_activation_current_v6: {
         Args: { p_opportunity_id: string }
         Returns: boolean
