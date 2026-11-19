@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -68,6 +68,48 @@ describe("the chain", () => {
     show();
     expect(await screen.findByText("The photo nobody shows you")).toBeInTheDocument();
     expect(screen.getByText("Show the ordinary one")).toBeInTheDocument();
+  });
+});
+
+describe("client boundary", () => {
+  function response(name: string, clientId: string) {
+    return { data: name === "acquisition_funnel" ? [funnel()]
+      : name === "acquisition_coverage_v8" ? [coverage()]
+        : name === "lead_journey_trace_v9" ? []
+          : [content({ hook: `Hook for ${clientId}` })], error: null };
+  }
+
+  it("clears the previous client's figures before the next read completes", async () => {
+    let releaseNext!: () => void;
+    const nextGate = new Promise<void>((resolve) => { releaseNext = resolve; });
+    rpc.mockImplementation((name: string, args: { p_client_id: string }) =>
+      args.p_client_id === "client-2"
+        ? nextGate.then(() => response(name, args.p_client_id))
+        : Promise.resolve(response(name, args.p_client_id)));
+    const view = render(<AttributionPanel />);
+    expect(await screen.findByText("Hook for client-1")).toBeInTheDocument();
+    useParams.mockReturnValue({ clientId: "client-2" });
+    view.rerender(<AttributionPanel />);
+    expect(screen.queryByText("Hook for client-1")).not.toBeInTheDocument();
+    expect(screen.getByText("Loading attribution…")).toBeInTheDocument();
+    await act(async () => { releaseNext(); });
+    expect(await screen.findByText("Hook for client-2")).toBeInTheDocument();
+  });
+
+  it("ignores an old client's response after the new client has loaded", async () => {
+    let releaseOld!: () => void;
+    const oldGate = new Promise<void>((resolve) => { releaseOld = resolve; });
+    rpc.mockImplementation((name: string, args: { p_client_id: string }) =>
+      args.p_client_id === "client-1"
+        ? oldGate.then(() => response(name, args.p_client_id))
+        : Promise.resolve(response(name, args.p_client_id)));
+    const view = render(<AttributionPanel />);
+    useParams.mockReturnValue({ clientId: "client-2" });
+    view.rerender(<AttributionPanel />);
+    expect(await screen.findByText("Hook for client-2")).toBeInTheDocument();
+    await act(async () => { releaseOld(); });
+    await waitFor(() => expect(screen.getByText("Hook for client-2")).toBeInTheDocument());
+    expect(screen.queryByText("Hook for client-1")).not.toBeInTheDocument();
   });
 });
 

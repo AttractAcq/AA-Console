@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { DataTable } from "../../components/DataTable";
 import { EmptyState } from "../../components/EmptyState";
@@ -88,6 +88,10 @@ const money = (v: number | null) => (v === null ? "—" : `R${Number(v).toLocale
  */
 export function AttributionPanel() {
   const { clientId } = useParams<{ clientId: string }>();
+  return <ClientAttributionPanel key={clientId ?? "no-client"} clientId={clientId} />;
+}
+
+function ClientAttributionPanel({ clientId }: { clientId: string | undefined }) {
   const [days, setDays] = useState(30);
   const [funnel, setFunnel] = useState<Funnel | null>(null);
   const [top, setTop] = useState<TopContent[]>([]);
@@ -95,19 +99,24 @@ export function AttributionPanel() {
   const [journeys, setJourneys] = useState<Journey[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestGeneration = useRef(0);
+  const activeVisit = useRef(true);
 
   const refresh = useCallback(async () => {
+    const generation = ++requestGeneration.current;
+    const isCurrent = () => activeVisit.current && generation === requestGeneration.current;
     if (!clientId) {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
       return;
     }
-    setLoading(true);
+    if (isCurrent()) setLoading(true);
     const [f, t, c, j] = await Promise.all([
       supabase.rpc("acquisition_funnel", { p_client_id: clientId, p_days: days }),
       supabase.rpc("top_content_by_revenue", { p_client_id: clientId, p_limit: 10 }),
       supabase.rpc("acquisition_coverage_v8", { p_client_id: clientId, p_days: days }),
       supabase.rpc("lead_journey_trace_v9", { p_client_id: clientId, p_days: days, p_limit: 50 }),
     ]);
+    if (!isCurrent()) return;
     if (f.error || t.error || c.error || j.error || !f.data?.[0] || !c.data?.[0]) {
       setError(f.error?.message ?? t.error?.message ?? c.error?.message ?? j.error?.message
         ?? "Attribution data is unavailable.");
@@ -123,10 +132,18 @@ export function AttributionPanel() {
   }, [clientId, days]);
 
   useEffect(() => {
+    activeVisit.current = true;
+    let cancelled = false;
     void refresh().catch((cause) => {
+      if (cancelled || !activeVisit.current) return;
       setError(cause instanceof Error ? cause.message : "Attribution data is unavailable.");
       setLoading(false);
     });
+    return () => {
+      cancelled = true;
+      activeVisit.current = false;
+      requestGeneration.current += 1;
+    };
   }, [refresh]);
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading attribution…</p>;
