@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "d3015727224d75c0c43f53e4ec282579ea06e89f3ffaa24466253801a0c26e6d",
-  "generatedTypesSha256": "deffa06da62121a5a52b458d69c774918d633c423b21bf374019313c85bc07cd",
-  "generatedSchemaBodySha256": "2cd425bfec908b07a80842449dc99c390a796abab9197d136461eaa5ac9508fc",
+  "migrationSourceDigest": "a8d95229c62bd5bf587a73bbe114ad56804f9ae5ffc7d3cbcb2b012daf54c5b4",
+  "generatedTypesSha256": "0af3d6cd830d104d730478c2558e8e70b26bd055601b05d05615884592e50a35",
+  "generatedSchemaBodySha256": "988528babc43162c841d4b2e181825476a0b5caa42865e5249e41a8ccb5ab041",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4399,6 +4399,20 @@
       "filename": "20261124044600_611_engine_reel_source_review.sql",
       "sha256": "d8bacbfa62bf2b4c40bbbd2c8136435a5bd450e1e34cde69f0267e988e25e016",
       "trimmedMd5": "2a1e07fb227e260265ff171a543e6d66"
+    },
+    {
+      "version": "20261124044700",
+      "name": "612_lead_money_currency_capture",
+      "filename": "20261124044700_612_lead_money_currency_capture.sql",
+      "sha256": "0370d85fefc096ab7a48607eb0cbf2d1f407632301dbfd00ae16c1de1714b4fa",
+      "trimmedMd5": "94b5229e0edd8732c097c42b1581b013"
+    },
+    {
+      "version": "20261124044800",
+      "name": "613_recover_lead_generated_columns",
+      "filename": "20261124044800_613_recover_lead_generated_columns.sql",
+      "sha256": "abec4c9538a33ac20e7d35a77c06246c745b75a1e44af18c01f7a645742322ed",
+      "trimmedMd5": "281fcf2313025ef19e03d6f3ca63676a"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

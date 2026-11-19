@@ -13,8 +13,8 @@ import { ProspectsLeadsPanel } from "./ProspectsLeadsPanel";
 const lead = (over: Record<string, unknown> = {}) => ({
   id: "lead-1", name: "Naledi K", contact: null, email: "naledi@example.com", phone: null,
   stage: "conversation", stage_at: "2026-09-01T00:00:00Z", next_action: "Send quote",
-  next_action_due: "2026-09-30", opportunity_value: 12000, sale_value: null,
-  cash_collected: null, source_channel: "Instagram reel", owner_member_id: null,
+  next_action_due: "2026-09-30", opportunity_value: 12000, sale_value: null, sale_currency: null,
+  cash_collected: null, cash_currency: null, source_channel: "Instagram reel", owner_member_id: null,
   appointment_at: null, appointment_outcome: null, ...over,
 });
 
@@ -94,6 +94,20 @@ describe("AA lead funnel", () => {
     expect(screen.getByRole("button", { name: "Archive (1)" })).toBeInTheDocument();
   });
 
+  it("shows cash only with a single recorded currency and does not invent an opportunity currency", async () => {
+    show([lead({ cash_collected: 100, cash_currency: "USD" })]);
+    expect(await screen.findByText("USD 100")).toBeInTheDocument();
+    expect(screen.getByText(/Opportunity values have no recorded currency/)).toBeInTheDocument();
+    expect(screen.queryByText("R12,000")).not.toBeInTheDocument();
+  });
+
+  it("holds a cash total when a legacy amount has no currency", async () => {
+    show([lead({ cash_collected: 100, cash_currency: "USD" }),
+      lead({ id: "lead-2", name: "Legacy", cash_collected: 50, cash_currency: null })]);
+    expect(await screen.findByText(/Mixed or unverified cash currencies/)).toBeInTheDocument();
+    expect(screen.queryByText("USD 150")).not.toBeInTheDocument();
+  });
+
   it("opens the same editor from the button and the card", async () => {
     show();
     await userEvent.click(await screen.findByRole("button", { name: "Edit Naledi K" }));
@@ -126,6 +140,20 @@ describe("AA lead funnel", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save details" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("update_lead", {
       p_lead_id: "lead-1", p_fields: { next_action: "Call tomorrow" },
+    }));
+  });
+
+  it("holds a positive sale edit until its currency is entered", async () => {
+    show([lead({ stage: "shown" })]);
+    await userEvent.click(await screen.findByRole("button", { name: "Edit Naledi K" }));
+    await userEvent.type(screen.getByLabelText("Sale value"), "3000");
+    await userEvent.click(screen.getByRole("button", { name: "Save details" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/sale currency is required/i);
+    expect(rpc).not.toHaveBeenCalledWith("update_lead", expect.anything());
+    await userEvent.type(screen.getByLabelText("Sale currency (ISO)"), "usd");
+    await userEvent.click(screen.getByRole("button", { name: "Save details" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("update_lead", {
+      p_lead_id: "lead-1", p_fields: { sale_value: 3000, sale_currency: "USD" },
     }));
   });
 

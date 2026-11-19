@@ -8378,6 +8378,7 @@ export type Database = {
           appointment_at: string | null
           appointment_outcome: string | null
           cash_collected: number | null
+          cash_currency: string | null
           client_id: string
           consent_evidence: Json | null
           consent_given_at: string | null
@@ -8398,6 +8399,7 @@ export type Database = {
           owner_member_id: string | null
           phone: string | null
           pipeline_stage: Database["public"]["Enums"]["pipeline_stage"]
+          sale_currency: string | null
           sale_value: number | null
           source: string | null
           source_asset_id: string | null
@@ -8417,6 +8419,7 @@ export type Database = {
           appointment_at?: string | null
           appointment_outcome?: string | null
           cash_collected?: number | null
+          cash_currency?: string | null
           client_id: string
           consent_evidence?: Json | null
           consent_given_at?: string | null
@@ -8437,6 +8440,7 @@ export type Database = {
           owner_member_id?: string | null
           phone?: string | null
           pipeline_stage?: Database["public"]["Enums"]["pipeline_stage"]
+          sale_currency?: string | null
           sale_value?: number | null
           source?: string | null
           source_asset_id?: string | null
@@ -8456,6 +8460,7 @@ export type Database = {
           appointment_at?: string | null
           appointment_outcome?: string | null
           cash_collected?: number | null
+          cash_currency?: string | null
           client_id?: string
           consent_evidence?: Json | null
           consent_given_at?: string | null
@@ -8476,6 +8481,7 @@ export type Database = {
           owner_member_id?: string | null
           phone?: string | null
           pipeline_stage?: Database["public"]["Enums"]["pipeline_stage"]
+          sale_currency?: string | null
           sale_value?: number | null
           source?: string | null
           source_asset_id?: string | null

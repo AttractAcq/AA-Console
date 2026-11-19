@@ -20,3 +20,9 @@
 ## Implementation boundary
 
 This needs a new, hash-pinned migration after candidate 611, generated types, frontend and MCP changes, and clean/upgrade plus rollback-fixture replay. The 17 November local staging checkpoint has five Auth identities with a known fallback-password predicate and is not a substitute for current hosted verification. The eight staging migration-history findings, hosted Storage/tenant behaviour, provider receipts and the two live journeys remain separate blockers. Do not call Phases 8 or 9 accepted from a currency fixture.
+
+## Candidate source checkpoint
+
+Migrations 612 and 613 now store separate nullable sale/cash currencies, validate new positive Sales OS money edits, and fix `recover_lead` so PostgreSQL recomputes its generated `dedupe_key` instead of rejecting the restore. The browser editor requires a currency for a changed positive amount; the pipeline displays a cash total only when all positive rows share one recorded currency. Existing lead money remains unverified. A rollback fixture covers legacy unrelated edits, invalid and missing currencies, separate sale/cash currencies, cross-client denial, and archive/recovery. Clean and upgrade replay, generated types, nine Phase 8 fixtures, scoped read gates, 21 focused browser tests and frontend build passed locally.
+
+This is a **partial currency contract**. Direct service/database writers can still insert a positive amount without currency, and migration 599's aggregate/MCP/Finance Controller return expressions still need comparable-currency coverage and per-currency output. `opportunity_value` also has no currency. No hosted schema, Auth, provider account or outward switch changed. Keep Phase 8 and 9 acceptance open.

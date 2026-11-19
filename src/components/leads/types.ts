@@ -12,7 +12,9 @@ export type Lead = {
   next_action_due: string | null;
   opportunity_value: number | null;
   sale_value: number | null;
+  sale_currency: string | null;
   cash_collected: number | null;
+  cash_currency: string | null;
   source_channel: string | null;
   owner_member_id: string | null;
   appointment_at: string | null;
