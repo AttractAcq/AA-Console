@@ -12,7 +12,7 @@ type Funnel = {
   appointments: number;
   sales: number;
   lost: number;
-  pipeline_value: number;
+  pipeline_value: number | null;
   sale_value: number | null;
   cash_collected: number | null;
   spend: number;
@@ -29,7 +29,7 @@ type TopContent = {
   content_territory: string | null;
   leads: number;
   sales: number;
-  cash_collected: number;
+  cash_collected: number | null;
   spend: number;
   impressions: number;
 };
@@ -190,7 +190,7 @@ function ClientAttributionPanel({ clientId }: { clientId: string | undefined }) 
 
       <section>
         <h2 className="mb-2 text-sm font-semibold text-foreground">Recorded lead journeys</h2>
-        <p className="mb-3 text-xs text-muted-foreground">Latest 50 non-test leads in this window. Route IDs record capture doors, not which route caused a sale or whether a provider action ran. Unknown links remain unknown; archived source records remain traceable. Lead sale and cash amounts have no stored currency.</p>
+        <p className="mb-3 text-xs text-muted-foreground">Latest 50 non-test leads in this window. Route IDs record capture doors, not which route caused a sale or whether a provider action ran. Unknown links remain unknown; archived source records remain traceable. Lead money currencies are stored separately but are not shown in this journey view.</p>
         <DataTable columns={["Lead", "Source / route", "Campaign", "Opportunity / offer", "Asset / page / agent", "Outcome", "Recorded sale / cash"]}
           emptyLabel="No recorded lead journeys in this window."
           rows={journeys.map((j) => [
@@ -229,7 +229,7 @@ function ClientAttributionPanel({ clientId }: { clientId: string | undefined }) 
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Cash collected · currency unrecorded</p>
+          <p className="text-sm text-muted-foreground">Cash collected · currency not shown</p>
           <p className="mt-1 text-2xl font-semibold text-card-foreground">
             {amount(funnel?.cash_collected ?? null)}
           </p>
@@ -256,7 +256,7 @@ function ClientAttributionPanel({ clientId }: { clientId: string | undefined }) 
           <p className="mt-1 text-2xl font-semibold text-card-foreground">
             —
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">Lead cash has no recorded currency, so it cannot be compared with spend.</p>
+          <p className="mt-1 text-xs text-muted-foreground">This view does not expose lead cash currency coverage, so it cannot display a verified return against spend.</p>
         </div>
       </div>
 

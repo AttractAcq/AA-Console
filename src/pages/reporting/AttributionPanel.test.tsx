@@ -192,10 +192,10 @@ describe("ratios that are unknown rather than zero", () => {
   it("shows spend-only cost in its currency but holds return without lead cash currency", async () => {
     show(funnel({ cost_per_lead: 1500, return_on_spend: 5 }), [content()],
       coverage({ spend_rows: 1, spend_currencies: 1, spend_currency: "USD" }));
-    expect(await screen.findByText(/Lead cash has no recorded currency/)).toBeInTheDocument();
+    expect(await screen.findByText(/does not expose lead cash currency coverage/)).toBeInTheDocument();
     expect(within(screen.getByText("Cost per lead").parentElement as HTMLElement).getByText("USD 1,500")).toBeInTheDocument();
     expect(within(screen.getByText("Return on spend").parentElement as HTMLElement).getByText("—")).toBeInTheDocument();
-    expect(within(screen.getByText("Cash collected · currency unrecorded").parentElement as HTMLElement).getByText("45,000")).toBeInTheDocument();
+    expect(within(screen.getByText("Cash collected · currency not shown").parentElement as HTMLElement).getByText("45,000")).toBeInTheDocument();
     expect(screen.queryByText("5×")).not.toBeInTheDocument();
   });
 
