@@ -295,6 +295,20 @@ describe("campaign pages", () => {
     expect(screen.getByText(/Standalone campaign. No market opportunity is required/)).toBeInTheDocument();
   });
 
+  it("opens paid production and the exact operator export from a typed campaign", async () => {
+    fetchCampaignOrigins.mockResolvedValue(new Map());
+    show([planned({ campaign_kind: "standalone_paid", acquisition_mode: "paid",
+      paid_platform: "meta", needs_landing_page: false, needs_sales_agent: false,
+      needs_lead_magnet: false })]);
+    expect(await screen.findByRole("heading", { name: "Winter full-arch push" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Paid" }));
+    expect(screen.getByRole("region", { name: "Campaign production work" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Paid operator pack" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Launch" }));
+    expect(screen.getByRole("region", { name: "Launch paid operator pack" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Freeze operator bundle" })).toBeInTheDocument();
+  });
+
   it("shows route and artifact blockers while keeping a planned campaign's edit form to its name", async () => {
     show([planned({ acquisition_mode: "paid", paid_platform: "meta" })], NOT_READY);
     expect(await screen.findByRole("region", { name: "Readiness and blockers" })).toHaveTextContent("0 of 2 pieces ready");
