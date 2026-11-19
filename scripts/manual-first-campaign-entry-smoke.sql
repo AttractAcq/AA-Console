@@ -18,6 +18,8 @@ do $checks$
 declare organic public.client_campaigns%rowtype;
   replayed public.client_campaigns%rowtype;
   paid public.client_campaigns%rowtype;
+  organic_revision public.client_campaigns%rowtype;
+  replayed_revision public.client_campaigns%rowtype;
   organic_manifest public.campaign_manifest_versions%rowtype;
   paid_manifest public.campaign_manifest_versions%rowtype;
   readiness jsonb;
@@ -105,5 +107,29 @@ begin
       where manifest_id=paid_manifest.id and item_key='distribution'
         and module_key='meta_ads_studio' and required) then
     raise exception 'Standalone paid manifest did not match selected producers'; end if;
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  organic_revision:=public.create_typed_campaign_revision_v11(
+    organic.id,organic.name,'Now include a service page',null,null,
+    true,false,false,'organic-revision-request');
+  replayed_revision:=public.create_typed_campaign_revision_v11(
+    organic.id,organic.name,'Now include a service page',null,null,
+    true,false,false,'organic-revision-request');
+  if organic_revision.id is distinct from replayed_revision.id
+    or organic_revision.id=organic.id
+    or organic_revision.cloned_from_campaign_id is distinct from organic.id
+    or organic_revision.campaign_kind<>'standalone_organic'
+    or not organic_revision.needs_landing_page
+    or organic.needs_landing_page
+    or exists(select 1 from public.opportunity_links
+      where campaign_id=organic_revision.id)
+    or (select count(*) from public.agent_jobs
+      where input_table='client_campaigns' and input_id=organic_revision.id)<>1 then
+    raise exception 'Standalone revision did not preserve source and selected modules'; end if;
+  begin
+    perform public.create_typed_campaign_revision_v11(
+      organic.id,organic.name,'Now include a service page',null,null,
+      false,false,false,'organic-revision-request');
+    raise exception 'Changed revision reused an existing key';
+  exception when check_violation then null; end;
 end $checks$;
 rollback;

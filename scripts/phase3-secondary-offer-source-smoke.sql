@@ -27,6 +27,7 @@ declare o public.market_opportunities%rowtype;
   campaign public.client_campaigns%rowtype;
   manual_campaign public.client_campaigns%rowtype;
   atomic_revision public.client_campaigns%rowtype;
+  typed_revision public.client_campaigns%rowtype;
   clone_id uuid; revision_id uuid; legacy_id uuid; unsourced_id uuid;
   approval_id uuid; request_id uuid; rights_request uuid; rights_id uuid;
   unsupported_version public.service_offer_versions%rowtype;
@@ -191,11 +192,14 @@ begin
       values(o.client_id,'Unbound revision','Bad revision','organic',true,false,campaign.id);
     raise exception 'A sourced revision accepted no signed offer';
   exception when check_violation then null; end;
-  manual_campaign:=public.create_sourced_campaign_plan_v7(
+  manual_campaign:=public.create_opportunity_campaign_plan_v11(
     o.client_id,o.id,v.id,'Combined garage launch','Focus on winter appointments',
-    'both',false,'meta','P3','{}'::uuid[]);
+    'both',false,'meta','P3','{}'::uuid[],true,false,true);
   if manual_campaign.offer_version_id is distinct from v.id
     or manual_campaign.acquisition_mode<>'both'
+    or manual_campaign.campaign_kind<>'opportunity_campaign'
+    or not manual_campaign.needs_landing_page or manual_campaign.needs_sales_agent
+    or not manual_campaign.needs_lead_magnet
     or manual_campaign.template::text<>'P3'
     or manual_campaign.ideate_on_plan
     or position('Operator direction:' in manual_campaign.brief)=0
@@ -212,6 +216,23 @@ begin
     or not exists(select 1 from public.agent_jobs j
       where j.agent_key='campaign_plan' and j.input_id=atomic_revision.id) then
     raise exception 'Atomic plan revision lost source lineage or planner job'; end if;
+  typed_revision:=public.create_typed_campaign_revision_v11(
+    manual_campaign.id,manual_campaign.name,'Use an agent instead of the page',
+    v.id::text,'P3',false,true,false,'typed-opportunity-revision');
+  if typed_revision.id=manual_campaign.id
+    or typed_revision.cloned_from_campaign_id is distinct from manual_campaign.id
+    or typed_revision.campaign_kind<>'opportunity_campaign'
+    or typed_revision.needs_landing_page or not typed_revision.needs_sales_agent
+    or typed_revision.needs_lead_magnet
+    or not exists(select 1 from public.opportunity_links l
+      where l.campaign_id=typed_revision.id and l.opportunity_id=o.id and l.role='campaign')
+    or (select count(*) from public.agent_jobs j
+      where j.agent_key='campaign_plan' and j.input_id=typed_revision.id)<>1
+    or (public.create_typed_campaign_revision_v11(
+      manual_campaign.id,manual_campaign.name,'Use an agent instead of the page',
+      v.id::text,'P3',false,true,false,'typed-opportunity-revision')).id
+      is distinct from typed_revision.id then
+    raise exception 'Typed opportunity revision lost modules, source or idempotency'; end if;
   if has_table_privilege('authenticated','public.client_campaigns','INSERT') then
     raise exception 'Authenticated callers can still bypass sourced campaign insertion'; end if;
   insert into public.client_campaigns(client_id,name,brief)

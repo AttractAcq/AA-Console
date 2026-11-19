@@ -361,6 +361,30 @@ describe("campaign pages", () => {
     })));
   });
 
+  it("revises a standalone plan with changed producer choices and no invented opportunity", async () => {
+    const navigate = vi.fn();
+    useNavigate.mockReturnValue(navigate);
+    fetchCampaignOrigins.mockResolvedValue(new Map());
+    show([planned({ campaign_kind: "standalone_organic", acquisition_mode: "organic",
+      offer_version_id: null, needs_landing_page: false, needs_sales_agent: false,
+      needs_lead_magnet: false })], READY);
+    rpc.mockImplementation((name: string) => name === "create_typed_campaign_revision_v11"
+      ? Promise.resolve({ data: { id: "typed-revision-1" }, error: null })
+      : Promise.resolve({ data: READY, error: null }));
+    await screen.findByRole("heading", { name: "Winter full-arch push" });
+    await userEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Edit and regenerate plan" }));
+    await userEvent.click(dialog.getByRole("checkbox", { name: "Build landing page" }));
+    await userEvent.click(dialog.getByRole("button", { name: "Save and regenerate" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_typed_campaign_revision_v11",
+      expect.objectContaining({
+        p_campaign_id: "camp-1", p_offer_version_id: "",
+        p_needs_landing_page: true, p_needs_sales_agent: false,
+        p_needs_lead_magnet: false, p_idempotency_key: expect.any(String),
+      })));
+    expect(navigate).toHaveBeenCalledWith("/clients/client-1/delivery/campaign-factory/typed-revision-1");
+  });
+
   it("clones a legacy campaign into an explicit route without reusing its activation", async () => {
     show();
     rpc.mockImplementation((name: string) => name === "clone_campaign_for_route"

@@ -110,6 +110,7 @@ export function FieldControl({
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <input
             id={id}
+            aria-label={field.label}
             aria-describedby={hintId}
             aria-required={field.required || undefined}
             type="checkbox"

@@ -273,6 +273,7 @@ function CampaignExecutionPanelContent() {
   }), [aiDraft]);
   const [editing, setEditing] = useState<Campaign | null>(null);
   const [editingPlan, setEditingPlan] = useState<Campaign | null>(null);
+  const revisionKeys = useRef(new Map<string, string>());
   const [metaToolsOpenFor, setMetaToolsOpenFor] = useState<string | null>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [rowActions, setRowActions] = useState<string | null>(null);
@@ -464,7 +465,7 @@ function CampaignExecutionPanelContent() {
   }, [newOpen, clientId, newOpportunityId]);
 
   useEffect(() => {
-    if (!newOpen || !clientId) return;
+    if ((!newOpen && !editingPlan?.campaign_kind?.startsWith("standalone_")) || !clientId) return;
     let cancelled = false;
     setNewStandaloneOfferError(null);
     void Promise.all([
@@ -491,7 +492,7 @@ function CampaignExecutionPanelContent() {
       if (!cancelled) setNewStandaloneOfferError(cause instanceof Error ? cause.message : "Approved offers could not be loaded.");
     });
     return () => { cancelled = true; };
-  }, [newOpen, clientId]);
+  }, [newOpen, editingPlan, clientId]);
 
   useEffect(() => {
     if (!editingPlan || !clientId) return;
@@ -673,8 +674,44 @@ function CampaignExecutionPanelContent() {
 
   /** A planned campaign can have approved creative and an immutable v6 package.
    * Regeneration therefore makes a linked revision and preserves the source. */
-  const createPlanRevision = async (campaign: Campaign, brief: string, changes?: { template: string; offerVersionId: string | null }) => {
+  const createPlanRevision = async (campaign: Campaign, brief: string, changes?: {
+    template: string; offerVersionId: string | null;
+    needsLandingPage?: boolean; needsSalesAgent?: boolean; needsLeadMagnet?: boolean;
+  }) => {
     if (!clientId) throw new Error("No client selected.");
+    if (campaign.campaign_kind) {
+      const standalone = campaign.campaign_kind.startsWith("standalone_");
+      const offerVersionId = changes ? changes.offerVersionId : campaign.offer_version_id;
+      if (!standalone && !offerVersionId) {
+        throw new Error("An opportunity campaign needs its current signed secondary offer version.");
+      }
+      if (offerVersionId && offerVersionId !== campaign.offer_version_id) {
+        const choices = standalone ? newStandaloneOfferChoices : approvedOfferChoices;
+        if ((standalone ? newStandaloneOfferError : offersFailed)
+          || !choices.some((offer) => offer.id === offerVersionId)) {
+          throw new Error("Choose a current approved offer version for this campaign.");
+        }
+      }
+      const template = standalone ? null : changes?.template ?? campaign.template;
+      if (template && !templateFor(template)) throw new Error("Choose a valid campaign template.");
+      const requestKey = revisionKeys.current.get(campaign.id) ?? crypto.randomUUID();
+      revisionKeys.current.set(campaign.id, requestKey);
+      const { data, error } = await supabase.rpc("create_typed_campaign_revision_v11", {
+        p_campaign_id: campaign.id,
+        p_name: campaign.name,
+        p_brief: brief,
+        p_offer_version_id: offerVersionId ?? "",
+        p_template: template ?? "",
+        p_needs_landing_page: changes?.needsLandingPage ?? campaign.needs_landing_page,
+        p_needs_sales_agent: changes?.needsSalesAgent ?? campaign.needs_sales_agent,
+        p_needs_lead_magnet: changes?.needsLeadMagnet ?? campaign.needs_lead_magnet,
+        p_idempotency_key: requestKey,
+      });
+      if (error) throw error;
+      revisionKeys.current.delete(campaign.id);
+      navigate(`/clients/${clientId}/delivery/campaign-factory/${data.id}`);
+      return;
+    }
     if (changes && changes.offerVersionId !== campaign.offer_version_id && offersFailed)
       throw new Error("Signed secondary offers for this opportunity could not be loaded.");
     if (changes?.offerVersionId && changes.offerVersionId !== campaign.offer_version_id
@@ -1211,11 +1248,21 @@ function CampaignExecutionPanelContent() {
         open={editingPlan !== null}
         onClose={() => setEditingPlan(null)}
         title="Edit and regenerate plan"
-        intro="Saving creates a new campaign revision and asks the planner to apply these directions. Review the generated plan before building; existing assets and approvals stay with the original campaign. Select a different approved offer or Meta template here when that binding must change."
+        intro="Saving creates a new campaign revision and asks the planner to apply these directions. Review the generated plan before building; existing assets and approvals stay with the original campaign."
         fields={[
           { name: "brief", label: "Campaign brief", kind: "textarea", rows: 4, required: true },
-          ...(editingPlan?.acquisition_mode === "paid" && editingPlan.paid_platform === "meta" ? [{ name: "template", label: "Meta template", kind: "select", options: templateOptions() } as FieldDef] : []),
-          { name: "offer_version_id", label: "Signed secondary offer for this opportunity", kind: "select", options: approvedOfferChoices.map((offer) => ({ value: offer.id, label: offer.label })) },
+          ...(editingPlan?.campaign_kind?.startsWith("standalone_") ? []
+            : editingPlan?.acquisition_mode === "paid" && editingPlan.paid_platform === "meta"
+              ? [{ name: "template", label: "Meta template", kind: "select", options: templateOptions() } as FieldDef] : []),
+          { name: "offer_version_id", label: editingPlan?.campaign_kind?.startsWith("standalone_")
+            ? "Approved offer version (optional)" : "Signed secondary offer for this opportunity",
+          kind: "select", options: (editingPlan?.campaign_kind?.startsWith("standalone_")
+            ? newStandaloneOfferChoices : approvedOfferChoices).map((offer) => ({ value: offer.id, label: offer.label })) },
+          ...(editingPlan?.campaign_kind ? [
+            { name: "needs_landing_page", label: "Build landing page", kind: "toggle" } as FieldDef,
+            { name: "needs_sales_agent", label: "Build sales agent", kind: "toggle" } as FieldDef,
+            { name: "needs_lead_magnet", label: "Build lead magnet", kind: "toggle" } as FieldDef,
+          ] : []),
           { name: "objective", label: "Objective", kind: "textarea", rows: 2 },
           { name: "audience", label: "Audience", kind: "textarea", rows: 2 },
           { name: "offer_summary", label: "Offer", kind: "textarea", rows: 2 },
@@ -1230,6 +1277,9 @@ function CampaignExecutionPanelContent() {
         ]}
         initialValues={editingPlan ? {
           brief: editingPlan.brief, template: editingPlan.template ?? "", offer_version_id: editingPlan.offer_version_id ?? "", objective: editingPlan.objective, audience: editingPlan.audience,
+          needs_landing_page: editingPlan.needs_landing_page,
+          needs_sales_agent: editingPlan.needs_sales_agent,
+          needs_lead_magnet: editingPlan.needs_lead_magnet,
           offer_summary: editingPlan.offer_summary, core_message: editingPlan.core_message,
           channels: editingPlan.channels?.join(", ") ?? "", budget: editingPlan.budget?.toString() ?? "",
           starts_on: editingPlan.starts_on, ends_on: editingPlan.ends_on,
@@ -1252,6 +1302,9 @@ function CampaignExecutionPanelContent() {
           await createPlanRevision(editingPlan, `${brief}\n\nRequested plan direction:\n${planInstructions.join("\n")}`, {
             template: String(values.template ?? editingPlan.template ?? ""),
             offerVersionId: String(values.offer_version_id ?? "") || null,
+            needsLandingPage: Boolean(values.needs_landing_page),
+            needsSalesAgent: Boolean(values.needs_sales_agent),
+            needsLeadMagnet: Boolean(values.needs_lead_magnet),
           });
         }}
         onSaved={() => setEditingPlan(null)}
