@@ -455,9 +455,12 @@ function PlacementsTab({
             {placement.external_id && <span className="block break-all">ID: {placement.external_id}</span>}
             {providerReads.get(placement.id) && (
               <span className="block text-muted-foreground">
-                Provider GET: {providerReads.get(placement.id)?.result.replace(/_/g, " ")}
-                {providerReads.get(placement.id)?.provider_state
-                  ? ` (${providerReads.get(placement.id)?.provider_state})` : ""}
+                {providerReads.get(placement.id)?.external_id !== placement.external_id
+                  || providerReads.get(placement.id)?.payload_hash !== placement.payload_hash
+                  ? "Provider GET: stale observation for an earlier ID or payload"
+                  : `Provider GET: ${providerReads.get(placement.id)?.result.replace(/_/g, " ")}${
+                    providerReads.get(placement.id)?.provider_state
+                      ? ` (${providerReads.get(placement.id)?.provider_state})` : ""}`}
                 {` · ${dayOrDash(providerReads.get(placement.id)?.checked_at ?? null)}`}
               </span>
             )}

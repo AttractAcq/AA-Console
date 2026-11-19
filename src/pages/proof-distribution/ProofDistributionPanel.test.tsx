@@ -363,7 +363,7 @@ describe("asking for the decision", () => {
     state.placements = [placement({ destination_key: "google_business_profile",
       status: "uncertain", external_id: externalId })];
     state.providerReads = [{ placement_id: "pl1", external_id: externalId,
-      result: "live_exact_text", provider_state: "LIVE", provider_url: null,
+      payload_hash: "a".repeat(64), result: "live_exact_text", provider_state: "LIVE", provider_url: null,
       checked_at: "2026-11-19T00:00:00Z" }];
     render(<ProofDistributionPanel tab="placements" />);
     expect(await screen.findByText(/Provider GET: live exact text/)).toBeInTheDocument();
@@ -372,6 +372,18 @@ describe("asking for the decision", () => {
     await waitFor(() => expect(rpc).toHaveBeenCalledWith(
       "request_proof_placement_readback_v8", { p_placement_id: "pl1" }));
     expect(rpc).not.toHaveBeenCalledWith("record_proof_placed", expect.anything());
+  });
+
+  it("does not show an old payload read as current provider evidence", async () => {
+    const externalId = "accounts/123/locations/456/localPosts/7";
+    state.placements = [placement({ destination_key: "google_business_profile",
+      status: "placed", external_id: externalId })];
+    state.providerReads = [{ placement_id: "pl1", external_id: externalId,
+      payload_hash: "b".repeat(64), result: "live_exact_text", provider_state: "LIVE",
+      provider_url: null, checked_at: "2026-11-19T00:00:00Z" }];
+    render(<ProofDistributionPanel tab="placements" />);
+    expect(await screen.findByText(/Provider GET: stale observation/)).toBeInTheDocument();
+    expect(screen.queryByText(/Provider GET: live exact text/)).not.toBeInTheDocument();
   });
   it("offers the campaign-level ask only for a placement that belongs to a campaign", async () => {
     state.placements = [placement({ status: "drafted" })];

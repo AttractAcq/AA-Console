@@ -122,6 +122,7 @@ export interface RetractionReceipt {
 export interface ProofProviderRead {
   placement_id: string;
   external_id: string;
+  payload_hash: string;
   result: "live_exact_text" | "live_media_unverified" | "nonlive" |
     "mismatch" | "not_found" | "unavailable";
   provider_state: string | null;
@@ -131,7 +132,7 @@ export interface ProofProviderRead {
 
 export async function fetchProofProviderReads(clientId: string): Promise<Map<string, ProofProviderRead>> {
   const { data, error } = await supabase.from("proof_placement_provider_read_latest_v8")
-    .select("placement_id,external_id,result,provider_state,provider_url,checked_at")
+    .select("placement_id,external_id,payload_hash,result,provider_state,provider_url,checked_at")
     .eq("client_id", clientId);
   if (error) throw new Error(error.message);
   return new Map(((data ?? []) as ProofProviderRead[]).map((row) => [row.placement_id, row]));
