@@ -75,6 +75,7 @@ describe('staging reconciliation workspace', () => {
       assert.equal(correctionOnly.length, 278)
       assert.equal(through279.length, 297)
       assert.equal(through568.length, 569)
+      assert.equal(through568.some(name => name.includes('_552_')), false)
       assert.equal(manifest.selectedMigrations.length, 13)
       assert.equal(manifest.through279.selectedMigrations.length, 7)
       assert.equal(manifest.through568.selectedMigrations.length, 272)
