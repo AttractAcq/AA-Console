@@ -43429,6 +43429,15 @@ export type Database = {
         Args: { p_post_id: string }
         Returns: string
       }
+      record_proof_placement_uncertain_v8: {
+        Args: {
+          p_external_id?: string
+          p_external_url?: string
+          p_placement_id: string
+          p_reason: string
+        }
+        Returns: undefined
+      }
       record_proof_retracted_v6: {
         Args: { p_detail?: string; p_placement_id: string }
         Returns: undefined

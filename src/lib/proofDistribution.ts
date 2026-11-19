@@ -32,7 +32,7 @@ export const MODE_HINT: Record<string, string> = {
 export const PLACEMENT_STATUSES = [
   "drafted", "awaiting_approval", "approved", "queued", "placing",
   "awaiting_manual_placement", "bound", "placed", "verified",
-  "failed", "rejected", "retraction_required", "retracted",
+  "failed", "uncertain", "rejected", "retraction_required", "retracted",
 ] as const;
 export type PlacementStatus = (typeof PLACEMENT_STATUSES)[number];
 

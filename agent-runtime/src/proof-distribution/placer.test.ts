@@ -45,6 +45,7 @@ function database(
     status?: number;
     body?: unknown;
     recordError?: string;
+    eventThrowOnPlaced?: boolean;
     effectAllowed?: boolean;
   } = {},
 ) {
@@ -71,6 +72,8 @@ function database(
     if (table === "agent_job_events") {
       return {
         insert: vi.fn(async (row: Record<string, unknown>) => {
+          if (options.eventThrowOnPlaced && String(row.description).endsWith(": placed."))
+            throw new Error("job event transport failed");
           events.push(row);
           return { error: null };
         }),
@@ -91,7 +94,7 @@ function database(
     return chain;
   });
   const fetchImpl = vi.fn(async () =>
-    new Response(JSON.stringify(options.body ?? { name: "accounts/1/locations/2/localPosts/3" }), {
+    new Response(JSON.stringify(options.body ?? { name: "accounts/123/locations/456/localPosts/3" }), {
       status: options.status ?? 200,
     }),
   );
@@ -156,7 +159,7 @@ describe("the exact version, re-checked at the write", () => {
     expect(callsTo(calls, "record_proof_placed")).toEqual([
       {
         p_placement_id: "pl-1",
-        p_external_id: "accounts/1/locations/2/localPosts/3",
+        p_external_id: "accounts/123/locations/456/localPosts/3",
         p_external_url: null,
       },
     ]);
@@ -236,13 +239,34 @@ describe("what stops a placement before the transport", () => {
 });
 
 describe("placed but not recorded", () => {
-  it("says the post may be live, and does not offer a retry", async () => {
+  it("holds the acknowledged post with its external ID instead of retrying", async () => {
     const { sb, calls } = database({ recordError: "deadlock detected" });
     await runProofPlacerJob(sb, on, agent, job);
 
-    const failure = callsTo(calls, "record_proof_placement_failure")[0]!;
-    expect(String(failure.p_reason)).toContain("Placed, but could not record it");
-    expect(failure.p_retryable).toBe(false);
+    expect(callsTo(calls, "record_proof_placement_failure")).toHaveLength(0);
+    expect(callsTo(calls, "record_proof_placement_uncertain_v8")[0]).toMatchObject({
+      p_placement_id: "pl-1", p_external_id: "accounts/123/locations/456/localPosts/3",
+    });
+  });
+
+  it("holds an ambiguous provider response without another POST", async () => {
+    const { sb, calls, fetchImpl } = database({ status: 503, body: "server failed" });
+    await runProofPlacerJob(sb, on, agent, job);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(callsTo(calls, "record_proof_placement_failure")).toHaveLength(0);
+    expect(callsTo(calls, "record_proof_placement_uncertain_v8")[0]).toMatchObject({
+      p_placement_id: "pl-1", p_external_id: null,
+    });
+  });
+
+  it("keeps a recorded placement placed when only the job event fails", async () => {
+    const { sb, calls, fetchImpl } = database({ eventThrowOnPlaced: true });
+    const result = await runProofPlacerJob(sb, on, agent, job);
+    expect(result.ok).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(callsTo(calls, "record_proof_placed")).toHaveLength(1);
+    expect(callsTo(calls, "record_proof_placement_failure")).toHaveLength(0);
+    expect(callsTo(calls, "record_proof_placement_uncertain_v8")).toHaveLength(0);
   });
 });
 

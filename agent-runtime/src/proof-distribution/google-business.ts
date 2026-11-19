@@ -41,6 +41,9 @@ export class PlacementTransportError extends Error {
   constructor(
     message: string,
     readonly retryable: boolean = false,
+    /** A public POST may have taken effect; never queue another POST automatically. */
+    readonly uncertain: boolean = false,
+    readonly externalId: string | null = null,
   ) {
     super(message);
     this.name = "PlacementTransportError";
@@ -75,6 +78,17 @@ export interface LocalPostResult {
 
 /** `accounts/123/locations/456`, and nothing else. */
 const ACCOUNT_REF = /^accounts\/[A-Za-z0-9_-]+\/locations\/[A-Za-z0-9_-]+$/;
+
+function safeSearchUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:"
+      && (url.hostname === "google.com" || url.hostname.endsWith(".google.com")
+        || url.hostname === "g.co" || url.hostname === "g.page")
+      ? url.href : null;
+  } catch { return null; }
+}
 
 export async function createLocalPost(request: LocalPostRequest): Promise<LocalPostResult> {
   const accountRef = (request.accountRef ?? "").trim();
@@ -123,13 +137,13 @@ export async function createLocalPost(request: LocalPostRequest): Promise<LocalP
       body: JSON.stringify(body),
       signal: controller.signal,
     });
-  } catch (thrown) {
-    // No response at all. The request may or may not have reached Google,
-    // and an aborted call is the one case where trying again is the lesser
-    // risk: a local post is created with a server-assigned name, so a
-    // duplicate is visible on the profile rather than silently merged.
-    const reason = thrown instanceof Error ? thrown.message : String(thrown);
-    throw new PlacementTransportError(`Could not reach the Business Profile API: ${reason}`, true);
+  } catch {
+    // No response is not evidence that the POST failed. A retry can create a
+    // second public post with a new server-assigned ID.
+    throw new PlacementTransportError(
+      "Business Profile POST outcome is unknown; inspect the location before another attempt.",
+      false, true,
+    );
   } finally {
     clearTimeout(timer);
   }
@@ -137,12 +151,14 @@ export async function createLocalPost(request: LocalPostRequest): Promise<LocalP
   const text = await response.text().catch(() => "");
   if (!response.ok) {
     const detail = (text || "no body").slice(0, 500);
-    // 408 and 429 are the API saying "not now"; 5xx is it failing on its own
-    // side. Everything else is a decision it made.
-    const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+    // A timeout, rate limit or server failure after a POST is not proof that
+    // no object was created. Explicit other 4xx refusals are known failures.
+    const uncertain = response.status === 408 || response.status === 429 || response.status >= 500;
     throw new PlacementTransportError(
-      `Google Business Profile refused the post (${response.status}): ${detail}`,
-      retryable,
+      uncertain
+        ? `Business Profile POST returned HTTP ${response.status}; inspect the location before another attempt.`
+        : `Google Business Profile refused the post (${response.status}): ${detail}`,
+      false, uncertain,
     );
   }
 
@@ -159,10 +175,18 @@ export async function createLocalPost(request: LocalPostRequest): Promise<LocalP
     // message says to go and look.
     throw new PlacementTransportError(
       "The post was accepted but came back with no id, so there is nothing to record or retract. Check the profile.",
-      false,
+      false, true,
     );
   }
-  return { externalId: name, externalUrl: parsed?.searchUrl?.trim() || null };
+  if (!new RegExp(`^${accountRef}/localPosts/[A-Za-z0-9_-]+$`).test(name)) {
+    throw new PlacementTransportError(
+      "Business Profile returned a post outside the expected location; inspect the provider account.",
+      false, true,
+      /^accounts\/[A-Za-z0-9_-]+\/locations\/[A-Za-z0-9_-]+\/localPosts\/[A-Za-z0-9_-]+$/.test(name)
+        ? name : null,
+    );
+  }
+  return { externalId: name, externalUrl: safeSearchUrl(parsed?.searchUrl) };
 }
 
 /**

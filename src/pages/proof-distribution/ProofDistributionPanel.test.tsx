@@ -392,6 +392,17 @@ describe("asking for the decision", () => {
     expect(await screen.findByText(/refused the post \(403\)/)).toBeInTheDocument();
     expect(screen.queryByText("Nothing")).not.toBeInTheDocument();
   });
+
+  it("shows an uncertain provider outcome as an inspection hold", async () => {
+    state.placements = [placement({ status: "uncertain",
+      destination_key: "google_business_profile", attempts: 1,
+      last_error: "Business Profile POST outcome is unknown; inspect the location before another attempt.",
+    })];
+    render(<ProofDistributionPanel tab="placements" />);
+    expect(await screen.findByText(/POST outcome is unknown/)).toBeInTheDocument();
+    expect(screen.getByText("uncertain")).toBeInTheDocument();
+    expect(screen.queryByText("Nothing")).not.toBeInTheDocument();
+  });
 });
 
 

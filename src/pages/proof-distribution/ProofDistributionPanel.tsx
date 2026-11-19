@@ -429,8 +429,10 @@ function PlacementsTab({
                 last_error. Showing "Nothing" there said the opposite of the
                 truth. */}
             {blocker ??
-              (placement.status === "failed" && placement.last_error
-                ? placement.last_error
+              (placement.status === "uncertain"
+                ? placement.last_error ?? "Provider outcome unknown. Inspect the destination before another attempt."
+                : placement.status === "failed" && placement.last_error
+                  ? placement.last_error
                 : LIVE_STATUSES.has(placement.status)
                   ? "Live"
                   : "Nothing")}
