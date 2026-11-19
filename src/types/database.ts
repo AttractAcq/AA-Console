@@ -41520,6 +41520,31 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_typed_campaign_manifest_v11: {
+        Args: {
+          p_campaign_id: string
+          p_idempotency_key: string
+          p_needs_lead_magnet: boolean
+        }
+        Returns: {
+          acquisition_mode: string
+          campaign_id: string
+          client_id: string
+          created_at: string
+          id: string
+          idempotency_key: string
+          paid_platform: string | null
+          plan_hash: string
+          plan_snapshot: Json
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_manifest_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_video_repurpose_idea: {
         Args: {
           p_candidate_index: number

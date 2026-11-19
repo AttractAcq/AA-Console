@@ -18,6 +18,8 @@ do $checks$
 declare organic public.client_campaigns%rowtype;
   replayed public.client_campaigns%rowtype;
   paid public.client_campaigns%rowtype;
+  organic_manifest public.campaign_manifest_versions%rowtype;
+  paid_manifest public.campaign_manifest_versions%rowtype;
   readiness jsonb;
 begin
   organic:=public.create_standalone_campaign_plan_v11(
@@ -69,5 +71,39 @@ begin
     or not paid.needs_lead_magnet
     or exists(select 1 from public.opportunity_links where campaign_id=paid.id) then
     raise exception 'Standalone paid channel or module selection was not stored'; end if;
+  update public.client_campaigns set built_at=now(),objective='Reach local homeowners',
+    audience='Local homeowners' where id in (organic.id,paid.id);
+  perform set_config('request.jwt.claim.role','service_role',true);
+  select * into organic_manifest from public.create_typed_campaign_manifest_v11(
+    organic.id,'organic-package',false);
+  if organic_manifest.plan_snapshot->>'campaign_kind'<>'standalone_organic'
+    or exists(select 1 from public.campaign_manifest_items
+      where manifest_id=organic_manifest.id and item_key in (
+        'offer','website','sales_path','lead_magnet','proof','proof_distribution')
+        and required)
+    or not exists(select 1 from public.campaign_manifest_items
+      where manifest_id=organic_manifest.id and item_key='distribution'
+        and module_key='content_distribution' and required) then
+    raise exception 'Standalone organic manifest invented an unselected module'; end if;
+  if (select id from public.create_typed_campaign_manifest_v11(
+      organic.id,'organic-package',false)) is distinct from organic_manifest.id then
+    raise exception 'Typed manifest retry created a duplicate version'; end if;
+  begin
+    perform public.create_typed_campaign_manifest_v11(organic.id,'wrong-magnet',true);
+    raise exception 'Typed manifest accepted a changed magnet selection';
+  exception when check_violation then null; end;
+  select * into paid_manifest from public.create_typed_campaign_manifest_v11(
+    paid.id,'paid-package',true);
+  if paid_manifest.plan_snapshot->>'campaign_kind'<>'standalone_paid'
+    or not exists(select 1 from public.campaign_manifest_items
+      where manifest_id=paid_manifest.id and item_key='website' and required)
+    or not exists(select 1 from public.campaign_manifest_items
+      where manifest_id=paid_manifest.id and item_key='lead_magnet' and required)
+    or exists(select 1 from public.campaign_manifest_items
+      where manifest_id=paid_manifest.id and item_key='sales_path' and required)
+    or not exists(select 1 from public.campaign_manifest_items
+      where manifest_id=paid_manifest.id and item_key='distribution'
+        and module_key='meta_ads_studio' and required) then
+    raise exception 'Standalone paid manifest did not match selected producers'; end if;
 end $checks$;
 rollback;

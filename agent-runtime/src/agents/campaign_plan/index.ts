@@ -181,9 +181,11 @@ export function savedPlanNeedsFinalization(campaign: {
 async function finalizeV6CampaignPackage(
   sb: SupabaseClient, campaignId: string, jobId: string,
   intelligenceSnapshotId: string, offerVersionId: string | null,
-  needsLeadMagnet: boolean,
+  needsLeadMagnet: boolean, campaignKind: string | null,
 ): Promise<void> {
-  const { data: manifest, error } = await sb.rpc("create_campaign_manifest_v6", {
+  const manifestWriter = campaignKind
+    ? "create_typed_campaign_manifest_v11" : "create_campaign_manifest_v6";
+  const { data: manifest, error } = await sb.rpc(manifestWriter, {
     p_campaign_id: campaignId,
     p_idempotency_key: `campaign-plan:${jobId}`,
     p_needs_lead_magnet: needsLeadMagnet,
@@ -265,7 +267,7 @@ export async function runCampaignPlanJob(
       }
       await finalizeV6CampaignPackage(
         sb, campaign.id, job.id, snapshot.id, campaign.offer_version_id ?? null,
-        campaign.needs_lead_magnet === true);
+        campaign.needs_lead_magnet === true, campaign.campaign_kind ?? null);
     }
     return { ok: true, retryable: false };
   }
@@ -610,7 +612,7 @@ Call ${submitTool.name} once when you are done.`;
     }
     await finalizeV6CampaignPackage(
       sb, campaign.id, job.id, intelligenceSnapshotId, approvedOffer?.id ?? null,
-      plan.needs_lead_magnet === true);
+      plan.needs_lead_magnet === true, campaign.campaign_kind ?? null);
   }
 
   await appendEvent(sb, job.id, `Planned "${campaign.name}".\n\n${planSummary(plan)}`, "info", {
