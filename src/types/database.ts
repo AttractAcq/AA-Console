@@ -34412,6 +34412,8 @@ export type Database = {
           post_id: string | null
           proof_asset_id: string | null
           proof_title: string | null
+          provider_readback_at: string | null
+          provider_readback_state: string | null
           publication_status: string | null
           published_at: string | null
           scheduled_at: string | null

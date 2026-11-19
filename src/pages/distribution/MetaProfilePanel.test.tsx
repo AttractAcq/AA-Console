@@ -45,7 +45,8 @@ const post = (over: Record<string, unknown> = {}) => ({
   published_at: "2026-10-20T18:00:00Z", scheduled_at: "2026-10-20T18:00:00Z",
   asset_id: "asset-1", campaign_id: "camp-1", campaign_name: "Winter garage push",
   proof_asset_id: "proof-1", proof_title: "Four-day conversion",
-  carries_placed_proof: true, ...over,
+  carries_placed_proof: true, provider_readback_state: "missing",
+  provider_readback_at: null, ...over,
 });
 
 function database(options: { identities?: unknown[]; changes?: unknown[]; presence?: unknown[];
@@ -293,14 +294,32 @@ describe("presence", () => {
     expect((await screen.findAllByText("Winter garage push")).length).toBe(2);
     // Only one carries placed proof, and those are the ones that come down if
     // permission ends.
-    expect(screen.getByText("placed proof")).toBeInTheDocument();
+    expect(screen.getByText("proof placement recorded")).toBeInTheDocument();
     expect(screen.getByText("none")).toBeInTheDocument();
   });
 
-  it("presents itself as a mirror of what Content Distribution published", async () => {
+  it("separates a local publication row from verified provider presence", async () => {
     database({ presence: [post()] });
     render(<MetaProfilePanel tab="presence" />);
     expect(await screen.findByText(/Content Distribution owns publishing/)).toBeInTheDocument();
+    expect(screen.getByText("Provider read missing; presence unknown")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Publish/i })).not.toBeInTheDocument();
+  });
+
+  it("labels exact-account verification and incomplete story coverage", async () => {
+    database({ presence: [
+      post({ provider_readback_state: "verified", provider_readback_at: "2026-11-19T10:00:00Z" }),
+      post({ post_id: "post-2", provider_readback_state: "partial" }),
+    ] });
+    render(<MetaProfilePanel tab="presence" />);
+    expect(await screen.findByText("Verified on the exact provider account")).toBeInTheDocument();
+    expect(screen.getByText("Story frame acknowledgement incomplete")).toBeInTheDocument();
+  });
+
+  it("does not treat an uncertain provider effect as a post that never went out", async () => {
+    database({ presence: [post({ publication_status: "uncertain",
+      provider_readback_state: "uncertain", external_id: null, external_url: null })] });
+    render(<MetaProfilePanel tab="presence" />);
+    expect(await screen.findByText("Provider outcome uncertain; inspect before retry")).toBeInTheDocument();
   });
 });

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "d9925b459af0d1f4ec2854bcfa9bbcb1ae8693aa7a30de38ca462f6924ef20bd",
-  "generatedTypesSha256": "2481d6e132e935592811ebfc125424e59ace32128144a826ba0bd804c9a318fb",
-  "generatedSchemaBodySha256": "1d40395e803b4171070db9f8d208e50b64556fc34e8e8eafc3ded9883be198d8",
+  "migrationSourceDigest": "7149c713c7232b40fd4001309e836d633cfb4e44234060371b3da3c9c06268b3",
+  "generatedTypesSha256": "c15ee31993eea4de0e705e01eb2e982be5f13854dfa66a970f789b3b521a0a79",
+  "generatedSchemaBodySha256": "bba19f6ca2fb7ba92371fc1b4836c14a64c02a333444e113648d1e5ff01a0ef2",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4287,6 +4287,13 @@
       "filename": "20261124043000_595_proof_placement_readback_human_resolution.sql",
       "sha256": "73abdf7aa7f85b53b1f81ebfbf5124347c5cba09e0511b879fef6c66d60d58df",
       "trimmedMd5": "f96278344f6548176adbe55e0134ee3e"
+    },
+    {
+      "version": "20261124043100",
+      "name": "596_meta_profile_presence_readback",
+      "filename": "20261124043100_596_meta_profile_presence_readback.sql",
+      "sha256": "d1eeeebe905899d8aa01cf678b6c354f8766595c5130553992aca55eed1fa2ca",
+      "trimmedMd5": "41dfe806be80d1159a2adce3c514e464"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
