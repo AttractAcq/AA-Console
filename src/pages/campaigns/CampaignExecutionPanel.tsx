@@ -881,7 +881,7 @@ function CampaignExecutionPanelContent() {
             </section>
             {clientId && c.acquisition_mode !== "legacy" &&
               <CampaignPackageReadiness campaignId={c.id} clientId={clientId} />}
-            {clientId && c.acquisition_mode !== "legacy" &&
+            {clientId && !c.campaign_kind && c.acquisition_mode !== "legacy" &&
               <CampaignSweepWork clientId={clientId} campaignId={c.id} />}
             {clientId && !c.campaign_kind && c.acquisition_mode !== "legacy"
               && (c.needs_landing_page || c.needs_sales_agent || c.needs_lead_magnet) &&
@@ -983,9 +983,16 @@ function CampaignExecutionPanelContent() {
                 </div>
               )}
             </section>}
-            {v2Tab === "launch" && (launchDue.get(c.id)
-              ? <section className="py-4" aria-label="Launch"><CampaignLaunchGate due={launchDue.get(c.id)!} /></section>
-              : <section className="py-4"><p className="text-sm text-muted-foreground">No launch verdict yet. A campaign needs a package before there is anything to launch.</p></section>)}
+            {v2Tab === "launch" && <>
+              {launchDue.get(c.id)
+                ? <section className="py-4" aria-label="Launch"><CampaignLaunchGate due={launchDue.get(c.id)!} /></section>
+                : <section className="py-4"><p className="text-sm text-muted-foreground">No launch verdict yet. A campaign needs a package before there is anything to launch.</p></section>}
+              {c.campaign_kind && paid && clientId
+                && (c.paid_platform === "meta" || c.paid_platform === "google") && (
+                <section className="py-4" aria-label="Launch paid operator pack">
+                  <PaidOperatorBundles clientId={clientId} platform={c.paid_platform} campaignId={c.id} />
+                </section>)}
+            </>}
             {v2Tab === "content" && clientId && <CampaignContentPanel key={`${clientId}:${c.id}:v2`} clientId={clientId} campaignId={c.id} contentCount={c.content_count} builtAt={c.built_at} contentIdeasGeneratedAt={c.content_ideas_generated_at} template={c.template} mirrorsTemplate={c.mirrors_template} onChanged={refresh} refreshToken={campaigns} layout="v2" />}
             {c.campaign_kind && (v2Tab === "paid" || v2Tab === "organic") && clientId && (
               contentSpec ? <CampaignContentPanel key={`${clientId}:${c.id}:${v2Tab}`} clientId={clientId}
@@ -995,6 +1002,8 @@ function CampaignExecutionPanelContent() {
                 template={c.template} mirrorsTemplate={c.mirrors_template} onChanged={refresh}
                 refreshToken={campaigns} layout="v2" />
                 : <p className="py-4 text-sm text-muted-foreground">The route content specification is awaiting the planner.</p>)}
+            {c.campaign_kind && (v2Tab === "paid" || v2Tab === "organic") && clientId && (
+              <CampaignSweepWork clientId={clientId} campaignId={c.id} route={v2Tab} />)}
             {c.campaign_kind && v2Tab === "paid" && paid && clientId
               && (c.paid_platform === "meta" || c.paid_platform === "google") && (
               <section className="py-4" aria-label="Paid operator pack">

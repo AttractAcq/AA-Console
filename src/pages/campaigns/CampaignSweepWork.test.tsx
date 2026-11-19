@@ -65,6 +65,27 @@ it("shows current route work and retries only its blocked step", async () => {
   expect(await screen.findByRole("status")).toHaveTextContent("Retry requested for piece1 motion");
 });
 
+it("keeps paid and organic producer work in their selected campaign tabs", async () => {
+  from.mockImplementation((table: string) => {
+    if (table === "campaign_route_packages_v6") return rows([
+      { id: "organic-v1", route: "organic", version: 1 },
+      { id: "paid-v1", route: "paid", version: 1 },
+    ]);
+    if (table === "delivery_work_effective_v6") return rows([
+      { id: "organic-work", route_package_id: "organic-v1", item_key: "content_piece1",
+        state: "held", blocker: "Organic render failed", qa_state: "not_run", expected_output: {} },
+      { id: "paid-work", route_package_id: "paid-v1", item_key: "content_piece2",
+        state: "held", blocker: "Paid render failed", qa_state: "not_run", expected_output: {} },
+    ]);
+    return rows([]);
+  });
+  render(<CampaignSweepWork clientId="client-1" campaignId="campaign-1" route="paid" />);
+  expect(await screen.findByText(/content piece2 · paid v1/i)).toBeInTheDocument();
+  expect(screen.getByText("Paid render failed")).toBeInTheDocument();
+  expect(screen.queryByText(/content piece1 · organic v1/i)).not.toBeInTheDocument();
+  expect(screen.queryByText("Organic render failed")).not.toBeInTheDocument();
+});
+
 it("labels internal QA as review pending", async () => {
   from.mockImplementation((table: string) => {
     if (table === "campaign_route_packages_v6") return rows([
