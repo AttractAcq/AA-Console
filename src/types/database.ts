@@ -39600,6 +39600,15 @@ export type Database = {
         Args: { p_recipient_id: string }
         Returns: string
       }
+      client_money_currency_breakdown: {
+        Args: { p_client_id: string; p_since: string; p_until: string }
+        Returns: {
+          amount: number
+          currency: string
+          kind: string
+          record_count: number
+        }[]
+      }
       client_runtime_controls_v6: {
         Args: { p_client_id: string }
         Returns: Json

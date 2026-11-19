@@ -60,10 +60,11 @@ const campaignRows = [
   { campaign_id: "c1", campaign_ref: "HD-C002", spend: 6000, leads: 2, customers: 1, revenue: 30000, cash_collected: 20000, cpl: 3000, cac: 6000, roas: 5 },
 ];
 
-function show(totals: Eco | null = healthy(), ch: Eco[] = channels, cp: Eco[] = campaignRows) {
+function show(totals: Eco | null = healthy(), ch: Eco[] = channels, cp: Eco[] = campaignRows, mr: Eco[] = []) {
   rpc.mockImplementation((name: string) => {
     if (name === "client_economics") return Promise.resolve({ data: totals ? [totals] : [], error: null });
     if (name === "client_economics_by_channel") return Promise.resolve({ data: ch, error: null });
+    if (name === "client_money_currency_breakdown") return Promise.resolve({ data: mr, error: null });
     return Promise.resolve({ data: cp, error: null });
   });
   insert.mockResolvedValue({ error: null });
@@ -190,6 +191,22 @@ describe("mixed currency", () => {
   });
 });
 
+describe("recorded currency breakdown", () => {
+  it("keeps ZAR, USD and unverified cash in separate rows", async () => {
+    show(healthy({ cash_collected: null, cash_roas: null }), channels, campaignRows, [
+      { kind: "cash", currency: "ZAR", record_count: 1, amount: 200 },
+      { kind: "cash", currency: "USD", record_count: 1, amount: 50 },
+      { kind: "cash", currency: null, record_count: 1, amount: 20 },
+    ]);
+    const section = (await screen.findByText("Money by recorded currency")).parentElement as HTMLElement;
+    expect(within(section).getByText("R200")).toBeInTheDocument();
+    expect(within(section).getByText("$50")).toBeInTheDocument();
+    expect(within(section).getByText("Unverified")).toBeInTheDocument();
+    expect(within(section).getByText("20")).toBeInTheDocument();
+    expect(within(figure("Cash collected")).getByText("—")).toBeInTheDocument();
+  });
+});
+
 describe("date window", () => {
   it("defaults to last 30 days and re-queries when the window changes", async () => {
     show();
@@ -215,11 +232,12 @@ describe("recording spend", () => {
     show();
     await userEvent.click(await screen.findByRole("button", { name: /record spend/i }));
     await userEvent.type(screen.getByLabelText(/amount/i), "2500");
+    await userEvent.type(screen.getByLabelText(/Spend currency/), "usd");
     await userEvent.type(screen.getByLabelText(/date spent/i), "2026-09-10");
     await userEvent.click(screen.getByRole("button", { name: "Record" }));
 
     expect(insert).toHaveBeenCalledWith(
-      expect.objectContaining({ client_id: "client-1", amount: 2500, source: "manual" }),
+      expect.objectContaining({ client_id: "client-1", amount: 2500, currency: "USD", source: "manual" }),
     );
   });
 });

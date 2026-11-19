@@ -35,6 +35,7 @@ type ChannelRow = {
 type CampaignRow = ChannelRow & { campaign_id: string | null; campaign_ref: string };
 
 type CampaignOption = { id: string; campaign_ref: string };
+type MoneyRow = { kind: "opportunity" | "sale" | "cash" | "spend"; currency: string | null; record_count: number; amount: number };
 
 /** One headline figure, or the reason there isn't one. */
 function Figure({ label, shown, hint }: { label: string; shown: Shown; hint?: string }) {
@@ -63,6 +64,7 @@ export function ClientEconomicsPanel() {
   const [totals, setTotals] = useState<Economics | null>(null);
   const [byChannel, setByChannel] = useState<ChannelRow[]>([]);
   const [byCampaign, setByCampaign] = useState<CampaignRow[]>([]);
+  const [moneyRows, setMoneyRows] = useState<MoneyRow[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [spendOpen, setSpendOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -77,17 +79,19 @@ export function ClientEconomicsPanel() {
       return;
     }
     const args = { p_client_id: clientId, p_since: range.since, p_until: range.until };
-    const [t, ch, cp, cam] = await Promise.all([
+    const [t, ch, cp, mr, cam] = await Promise.all([
       supabase.rpc("client_economics", args),
       supabase.rpc("client_economics_by_channel", args),
       supabase.rpc("client_economics_by_campaign", args),
+      supabase.rpc("client_money_currency_breakdown", args),
       supabase.from("campaigns").select("id, campaign_ref").eq("client_id", clientId),
     ]);
-    const failure = t.error ?? ch.error ?? cp.error ?? cam.error;
+    const failure = t.error ?? ch.error ?? cp.error ?? mr.error ?? cam.error;
     setProblem(failure ? `Failed to load economics: ${failure.message}` : null);
     setTotals(((t.data as Economics[] | null) ?? [])[0] ?? null);
     setByChannel((ch.data as ChannelRow[] | null) ?? []);
     setByCampaign((cp.data as CampaignRow[] | null) ?? []);
+    setMoneyRows((mr.data as MoneyRow[] | null) ?? []);
     setCampaigns((cam.data as CampaignOption[] | null) ?? []);
     setLoading(false);
   }, [clientId, range]);
@@ -98,6 +102,7 @@ export function ClientEconomicsPanel() {
 
   const fields: FieldDef[] = [
     { name: "amount", label: "Amount", kind: "number", required: true },
+    { name: "currency", label: "Spend currency code", kind: "text", required: true, placeholder: "ZAR", hint: "Record the three-letter currency code actually spent; no conversion is applied." },
     { name: "spent_on", label: "Date spent", kind: "date", required: true },
     {
       name: "channel",
@@ -157,7 +162,7 @@ export function ClientEconomicsPanel() {
           spend for a client in one currency.
         </p>
       )}
-      <p className="mb-4 text-xs text-muted-foreground">Lead money totals require one recorded currency for every positive amount. Return multiples also require that currency to match spend. This view does not display lead currency, so return multiples remain hidden here.</p>
+      <p className="mb-4 text-xs text-muted-foreground">Lead money totals require one recorded currency for every positive amount. Return multiples also require that currency to match spend. Review the currency breakdown below; return multiples remain hidden in this summary.</p>
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
@@ -207,6 +212,21 @@ export function ClientEconomicsPanel() {
                   : showRatio(totals.cash_roas, totals.spend, totals.cash_collected)}
               hint="Cash ÷ spend"
             />
+          </div>
+
+          <div>
+            <h2 className="mb-3 text-sm font-semibold text-foreground">Money by recorded currency</h2>
+            <DataTable
+              columns={["Measure", "Currency", "Records", "Amount"]}
+              emptyLabel="No positive lead money or spend recorded in this window"
+              rows={moneyRows.map((row) => [
+                { opportunity: "Opportunity", sale: "Sale", cash: "Cash", spend: "Spend" }[row.kind],
+                row.currency ?? "Unverified",
+                String(row.record_count),
+                money(Number(row.amount), row.currency),
+              ])}
+            />
+            <p className="mt-2 text-xs text-muted-foreground">Each currency is separate; unverified amounts have no assigned currency. Lead rows cover current, non-test leads acquired in this window. Archived leads are not included. Spend rows use their recorded spend date.</p>
           </div>
 
           <div>
@@ -285,9 +305,12 @@ export function ClientEconomicsPanel() {
         submitLabel="Record"
         onSubmit={async (v) => {
           if (!clientId) throw new Error("No client selected.");
+          const currency = String(v.currency ?? "").trim().toUpperCase();
+          if (!/^[A-Z]{3}$/.test(currency)) throw new Error("Spend currency must be a three-letter code.");
           const { error } = await supabase.from("client_marketing_spend").insert({
             client_id: clientId,
             amount: Number(v.amount),
+            currency,
             spent_on: v.spent_on as string,
             channel: ((v.channel as string) || "").trim() || null,
             campaign_id: (v.campaign_id as string) || null,
