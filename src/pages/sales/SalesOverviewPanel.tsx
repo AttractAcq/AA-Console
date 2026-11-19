@@ -66,6 +66,7 @@ type Conversation = {
   outcome: string | null;
   lead_id: string | null;
   archive_match_lead_id: string | null;
+  archive_match_snapshot: { contact_name?: string | null; contact_email?: string | null; contact_phone?: string | null } | null;
   started_at: string;
 };
 
@@ -116,7 +117,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
       supabase
         .from("sales_agent_conversations")
         .select(
-          "id, sales_agent_id, contact_name, contact_email, contact_phone, qualified, handed_over, outcome, lead_id, archive_match_lead_id, started_at",
+          "id, sales_agent_id, contact_name, contact_email, contact_phone, qualified, handed_over, outcome, lead_id, archive_match_lead_id, archive_match_snapshot, started_at",
         )
         .eq("client_id", clientId)
         .order("started_at", { ascending: false }),
@@ -671,6 +672,14 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
                         </p>
                         {c.outcome && (
                           <p className="mt-1 text-xs text-muted-foreground">{c.outcome}</p>
+                        )}
+                        {c.archive_match_lead_id && !c.lead_id && c.archive_match_snapshot && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Match-time contact: {c.archive_match_snapshot.contact_name ?? "Unnamed"}
+                            {c.archive_match_snapshot.contact_email || c.archive_match_snapshot.contact_phone
+                              ? ` · ${c.archive_match_snapshot.contact_email ?? c.archive_match_snapshot.contact_phone}`
+                              : ""}
+                          </p>
                         )}
                       </li>
                     ))}

@@ -41,6 +41,7 @@ type Conv = Partial<{
   outcome: string | null;
   lead_id: string | null;
   archive_match_lead_id: string | null;
+  archive_match_snapshot: { contact_name?: string | null; contact_email?: string | null; contact_phone?: string | null } | null;
   started_at: string;
 }>;
 
@@ -82,6 +83,7 @@ const conv = (over: Conv = {}): Conv => ({
   outcome: null,
   lead_id: null,
   archive_match_lead_id: null,
+  archive_match_snapshot: null,
   started_at: new Date().toISOString(),
   ...over,
 });
@@ -227,10 +229,13 @@ describe("sinceLabel", () => {
 
 describe("the overview grid", () => {
   it("shows archived-contact sales conversations awaiting identity review", async () => {
-    show([built()], [conv({ archive_match_lead_id: "archived-1", lead_id: null })]);
+    show([built()], [conv({ archive_match_lead_id: "archived-1", lead_id: null,
+      contact_name: "Updated contact",
+      archive_match_snapshot: { contact_name: "Original contact", contact_email: "original@example.invalid" } })]);
     expect(await screen.findByText(/1 archived-contact return awaiting identity review/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Open" }));
     expect(screen.getByText(/archived contact — identity review needed/)).toBeInTheDocument();
+    expect(screen.getByText(/Match-time contact: Original contact/)).toHaveTextContent("original@example.invalid");
   });
   it("shows a card per agent with what it has actually done", async () => {
     show(

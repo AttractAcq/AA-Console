@@ -2,7 +2,7 @@
 
 **Candidate source:** draft [PR #363](https://github.com/AttractAcq/AA-Console/pull/363). The full SHA-256 values below pin the SQL files, not a hosted release. Recheck the PR head and each hash before any apply.
 **Observed hosted baseline:** Production was last reported at `20261124034600` (migration 551). Staging reached a separately amended migration head of 569 with 569 history rows; its added correction is not a candidate migration. Refresh both heads, cron state, parity and deployment identity before any apply. The eight staging migration-history findings are unresolved.
-**Current candidate scope:** 92 ordered, unhosted migration files (552–643). Migration 592 installs an inactive read-only fifteen-minute cron enqueuer; separately review runtime compatibility and provider read access before activation. Candidate hashes below must be regenerated after any further source edit.
+**Current candidate scope:** 93 ordered, unhosted migration files (552–644). Migration 592 installs an inactive read-only fifteen-minute cron enqueuer; separately review runtime compatibility and provider read access before activation. Candidate hashes below must be regenerated after any further source edit.
 
 ## Ordered candidate
 
@@ -100,6 +100,7 @@
 | 641 | `20261124051600_641_freeze_archived_return_submission.sql` | `9e652a3f25fbd5d8fa7ad012444ac648a7c80b81bdb89cc6b050278adf8d9b0e` | Freeze held consent/source fields and allow promotion only through the matching AAL2 resolution |
 | 642 | `20261124051700_642_hold_archived_inbound_dm.sql` | `44167339ab3989dedef6290085dfad8927eaac4bf22a5f8efa33b3f46082fe0f` | Store inbound DM from an archived contact once, preserve its historical identity and keep the conversation closed for review |
 | 643 | `20261124051800_643_hold_archived_sales_agent_capture.sql` | `4874e74e616da22eeacc0976ee3ca4d25339a00d154bfa441e4632e18df8cbcd` | Scope the existing durable sales conversation lead link to its client; join an active matching contact or hold a new archived-contact conversation without a duplicate lead |
+| 644 | `20261124051900_644_snapshot_sales_agent_archive_match.sql` | `8f1a51747cf4e0d497f15313362964749ef782a6beb7db57aa384100c443e30e` | Freeze the matched sales conversation's contact, source and transcript digest at hold time; forbid direct candidate rewrite or promotion |
 
 **Organic route-package candidate, 19 November 2026:** Both the scheduled snapshot used for review and the claimed snapshot used by final prewrite now include the latest organic route package ID/version. They require an explicitly organic idea, a campaign that runs organic, and a route package matching the current plan fingerprint. This holds paid creative in a coordinated campaign and makes a later route/package revision stale the frozen review. Fifty-four focused runtime/PGlite tests and runtime typecheck passed, including paid-route and stale-plan refusals. A disposable released-to-current upgrade, clean replay, catalog contract, generated types and scoped-read gate passed locally. The publisher claim remains closed, and provider receipt/read-back and real human AAL2 evidence remain open. No hosted change occurred.
 

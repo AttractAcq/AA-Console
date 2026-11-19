@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "40cd9952f7d4faff5bd1379b08893143113276a9f38981b3c36060f07e1f5d7c",
-  "generatedTypesSha256": "6cb647f09955789575d913780c52dfc8a968f6e59164f9aeb467e6d655e9e197",
-  "generatedSchemaBodySha256": "85441fc0c12879bc475152bd70d13b83fc4d02844b5ca67b0f61f8c3f5563bdc",
+  "migrationSourceDigest": "b37e1ab8fc41362f16d9f9487a43ede723bb150535353184536303c62989c38d",
+  "generatedTypesSha256": "c878bbb8b5387dff30c76c2016522bf25546fca9e73cdf66510e37dfc507d408",
+  "generatedSchemaBodySha256": "77107197fe2eac500bd19b00ba10b738d7fba082b7e5154d5898f08f1f15f1f6",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4623,6 +4623,13 @@
       "filename": "20261124051800_643_hold_archived_sales_agent_capture.sql",
       "sha256": "4874e74e616da22eeacc0976ee3ca4d25339a00d154bfa441e4632e18df8cbcd",
       "trimmedMd5": "400e5cc037f197a8c6d4cde2214e585d"
+    },
+    {
+      "version": "20261124051900",
+      "name": "644_snapshot_sales_agent_archive_match",
+      "filename": "20261124051900_644_snapshot_sales_agent_archive_match.sql",
+      "sha256": "8f1a51747cf4e0d497f15313362964749ef782a6beb7db57aa384100c443e30e",
+      "trimmedMd5": "c40b3b18d648fe0174bb0b41ac9cc1c6"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

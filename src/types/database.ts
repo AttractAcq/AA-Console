@@ -27263,6 +27263,7 @@ export type Database = {
       sales_agent_conversations: {
         Row: {
           archive_match_lead_id: string | null
+          archive_match_snapshot: Json | null
           client_id: string
           contact_email: string | null
           contact_name: string | null
@@ -27281,6 +27282,7 @@ export type Database = {
         }
         Insert: {
           archive_match_lead_id?: string | null
+          archive_match_snapshot?: Json | null
           client_id: string
           contact_email?: string | null
           contact_name?: string | null
@@ -27299,6 +27301,7 @@ export type Database = {
         }
         Update: {
           archive_match_lead_id?: string | null
+          archive_match_snapshot?: Json | null
           client_id?: string
           contact_email?: string | null
           contact_name?: string | null
