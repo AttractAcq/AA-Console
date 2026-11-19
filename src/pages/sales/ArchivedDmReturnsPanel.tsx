@@ -43,18 +43,22 @@ export function ArchivedDmReturnsPanel({ clientId }: { clientId: string }) {
     setReview(null);
     setError(null);
     setLoading(true);
-    void supabase.rpc("list_archived_dm_returns_v11", { p_client_id: clientId })
-      .then(({ data, error: readError }) => {
+    void (async () => {
+      try {
+        const { data, error: readError } = await supabase.rpc(
+          "list_archived_dm_returns_v11", { p_client_id: clientId },
+        );
         if (!current) return;
         if (readError || !Array.isArray(data))
           setError("Archived DM returns could not be loaded. Review the owning queue.");
         else setRows(data as DueDm[]);
-        setLoading(false);
-      }).catch(() => {
+      } catch {
         if (!current) return;
         setError("Archived DM returns could not be loaded. Review the owning queue.");
-        setLoading(false);
-      });
+      } finally {
+        if (current) setLoading(false);
+      }
+    })();
     return () => { current = false; };
   }, [clientId]);
 
