@@ -3521,18 +3521,11 @@ export type Database = {
             referencedColumns: ["execution_id"]
           },
           {
-            foreignKeyName: "campaign_lead_enrolment_items_v6_lead_id_fkey"
-            columns: ["lead_id"]
+            foreignKeyName: "campaign_lead_enrolment_items_v6_lead_id_identity_fkey_v11"
+            columns: ["lead_id", "client_id"]
             isOneToOne: false
-            referencedRelation: "client_leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "campaign_lead_enrolment_items_v6_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "lead_progress"
-            referencedColumns: ["lead_id"]
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
           },
         ]
       }
@@ -4426,18 +4419,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "campaign_page_publications_probe_lead_id_fkey"
-            columns: ["probe_lead_id"]
+            foreignKeyName: "campaign_page_publications_probe_lead_id_identity_fkey_v11"
+            columns: ["probe_lead_id", "client_id"]
             isOneToOne: false
-            referencedRelation: "client_leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "campaign_page_publications_probe_lead_id_fkey"
-            columns: ["probe_lead_id"]
-            isOneToOne: false
-            referencedRelation: "lead_progress"
-            referencedColumns: ["lead_id"]
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
           },
           {
             foreignKeyName: "campaign_page_publications_revision_id_fkey"
@@ -5583,18 +5569,11 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
-            foreignKeyName: "client_appointments_lead_id_fkey"
-            columns: ["lead_id"]
+            foreignKeyName: "client_appointments_lead_id_identity_fkey_v11"
+            columns: ["lead_id", "client_id"]
             isOneToOne: false
-            referencedRelation: "client_leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "client_appointments_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "lead_progress"
-            referencedColumns: ["lead_id"]
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
           },
         ]
       }
@@ -13643,18 +13622,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "dm_conversations_lead_id_fkey"
-            columns: ["lead_id"]
+            foreignKeyName: "dm_conversations_lead_id_identity_fkey_v11"
+            columns: ["lead_id", "client_id"]
             isOneToOne: false
-            referencedRelation: "client_leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "dm_conversations_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "lead_progress"
-            referencedColumns: ["lead_id"]
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
           },
         ]
       }
@@ -13719,18 +13691,11 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
-            foreignKeyName: "dm_identities_lead_id_fkey"
-            columns: ["lead_id"]
+            foreignKeyName: "dm_identities_lead_id_identity_fkey_v11"
+            columns: ["lead_id", "client_id"]
             isOneToOne: false
-            referencedRelation: "client_leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "dm_identities_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "lead_progress"
-            referencedColumns: ["lead_id"]
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
           },
         ]
       }
@@ -17584,18 +17549,11 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
-            foreignKeyName: "lead_magnet_deliveries_lead_id_fkey"
-            columns: ["lead_id"]
+            foreignKeyName: "lead_magnet_deliveries_lead_id_identity_fkey_v11"
+            columns: ["lead_id", "client_id"]
             isOneToOne: false
-            referencedRelation: "client_leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "lead_magnet_deliveries_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "lead_progress"
-            referencedColumns: ["lead_id"]
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
           },
           {
             foreignKeyName: "lead_magnet_deliveries_magnet_version_id_fkey"
@@ -18154,18 +18112,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "lead_sequence_enrollments_lead_id_fkey"
-            columns: ["lead_id"]
+            foreignKeyName: "lead_sequence_enrollments_lead_id_identity_fkey_v11"
+            columns: ["lead_id", "client_id"]
             isOneToOne: false
-            referencedRelation: "client_leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "lead_sequence_enrollments_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "lead_progress"
-            referencedColumns: ["lead_id"]
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
           },
           {
             foreignKeyName: "lead_sequence_enrollments_sequence_id_fkey"
@@ -23496,18 +23447,11 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
-            foreignKeyName: "outbound_messages_lead_id_fkey"
-            columns: ["lead_id"]
+            foreignKeyName: "outbound_messages_lead_id_identity_fkey_v11"
+            columns: ["lead_id", "client_id"]
             isOneToOne: false
-            referencedRelation: "client_leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "outbound_messages_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "lead_progress"
-            referencedColumns: ["lead_id"]
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
           },
           {
             foreignKeyName: "outbound_messages_template_version_id_fkey"
@@ -25166,18 +25110,11 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
-            foreignKeyName: "proof_outcome_followup_consents_v7_lead_id_fkey"
-            columns: ["lead_id"]
+            foreignKeyName: "proof_outcome_followup_consents_v7_lead_id_identity_fkey_v11"
+            columns: ["lead_id", "client_id"]
             isOneToOne: false
-            referencedRelation: "client_leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "proof_outcome_followup_consents_v7_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "lead_progress"
-            referencedColumns: ["lead_id"]
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
           },
           {
             foreignKeyName: "proof_outcome_followup_consents_v7_recorded_by_fkey"
@@ -26417,18 +26354,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "proof_request_deliveries_outcome_lead_id_fkey"
-            columns: ["outcome_lead_id"]
+            foreignKeyName: "proof_request_deliveries_outcome_lead_id_identity_fkey_v11"
+            columns: ["outcome_lead_id", "client_id"]
             isOneToOne: false
-            referencedRelation: "client_leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "proof_request_deliveries_outcome_lead_id_fkey"
-            columns: ["outcome_lead_id"]
-            isOneToOne: false
-            referencedRelation: "lead_progress"
-            referencedColumns: ["lead_id"]
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
           },
         ]
       }
@@ -26896,18 +26826,11 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
-            foreignKeyName: "proof_service_outcomes_v7_lead_id_fkey"
-            columns: ["lead_id"]
+            foreignKeyName: "proof_service_outcomes_v7_lead_id_identity_fkey_v11"
+            columns: ["lead_id", "client_id"]
             isOneToOne: false
-            referencedRelation: "client_leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "proof_service_outcomes_v7_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "lead_progress"
-            referencedColumns: ["lead_id"]
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
           },
           {
             foreignKeyName: "proof_service_outcomes_v7_recorded_by_fkey"
@@ -30177,18 +30100,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "workflow_lead_attribution_lead_id_fkey"
+            foreignKeyName: "workflow_lead_attribution_lead_identity_fkey_v11"
             columns: ["lead_id"]
             isOneToOne: false
-            referencedRelation: "client_leads"
+            referencedRelation: "lead_identities"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_lead_attribution_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "lead_progress"
-            referencedColumns: ["lead_id"]
           },
           {
             foreignKeyName: "workflow_lead_attribution_run_id_fkey"
@@ -33428,18 +33344,11 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
-            foreignKeyName: "dm_conversations_lead_id_fkey"
-            columns: ["lead_id"]
+            foreignKeyName: "dm_conversations_lead_id_identity_fkey_v11"
+            columns: ["lead_id", "client_id"]
             isOneToOne: false
-            referencedRelation: "client_leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "dm_conversations_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "lead_progress"
-            referencedColumns: ["lead_id"]
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
           },
         ]
       }
@@ -34431,18 +34340,11 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
-            foreignKeyName: "lead_magnet_deliveries_lead_id_fkey"
-            columns: ["lead_id"]
+            foreignKeyName: "lead_magnet_deliveries_lead_id_identity_fkey_v11"
+            columns: ["lead_id", "client_id"]
             isOneToOne: false
-            referencedRelation: "client_leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "lead_magnet_deliveries_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "lead_progress"
-            referencedColumns: ["lead_id"]
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
           },
           {
             foreignKeyName: "lead_magnet_deliveries_magnet_version_id_fkey"
@@ -36123,18 +36025,11 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
-            foreignKeyName: "outbound_messages_lead_id_fkey"
-            columns: ["lead_id"]
+            foreignKeyName: "outbound_messages_lead_id_identity_fkey_v11"
+            columns: ["lead_id", "client_id"]
             isOneToOne: false
-            referencedRelation: "client_leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "outbound_messages_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "lead_progress"
-            referencedColumns: ["lead_id"]
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
           },
         ]
       }
@@ -36725,18 +36620,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "proof_request_deliveries_outcome_lead_id_fkey"
-            columns: ["lead_id"]
+            foreignKeyName: "proof_request_deliveries_outcome_lead_id_identity_fkey_v11"
+            columns: ["lead_id", "client_id"]
             isOneToOne: false
-            referencedRelation: "client_leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "proof_request_deliveries_outcome_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "lead_progress"
-            referencedColumns: ["lead_id"]
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id", "client_id"]
           },
         ]
       }

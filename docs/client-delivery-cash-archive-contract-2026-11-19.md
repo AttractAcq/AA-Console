@@ -42,3 +42,5 @@ Operational consumers include capture and deduplication, booking, outbound claim
 5. Gate release on a rollback fixture that checks pre-archive, archived and restored report values across every listed public/MCP surface, plus mixed/unknown currencies, duplicate submissions, cross-client denial, archived action suppression and a live readback after deployment. Keep the archive restriction in place if any surface diverges.
 
 This contract is preparatory evidence for the full Archive behavior. It does not accept Phases 8/9 or authorize a hosted change.
+
+**Migration 636 candidate:** The 12 non-event direct lead references identified in the dependent-record audit now point to durable lead identities, with active-lead guards on new or retargeted writes. Archive blocks unfinished downstream work; a local rollback fixture retained representative dependent IDs across archive/recovery, and a separate concurrent-write fixture confirmed the active-lead lock fails closed. The positive-cash guard is unchanged. Hosted parity, status-reactivation and remaining claim paths, returning capture and a full signed-in source-to-cash archive journey are still open.
