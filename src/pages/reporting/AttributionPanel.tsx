@@ -13,8 +13,8 @@ type Funnel = {
   sales: number;
   lost: number;
   pipeline_value: number;
-  sale_value: number;
-  cash_collected: number;
+  sale_value: number | null;
+  cash_collected: number | null;
   spend: number;
   lead_to_sale_pct: number | null;
   cost_per_lead: number | null;
