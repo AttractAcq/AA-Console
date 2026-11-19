@@ -362,6 +362,35 @@ function isPaidOperatorBundleReady(request: UnifiedApprovalRequest, clientId: st
     && request.owner_role === "admin_or_active_client_manager";
 }
 
+function isOrganicPublicationReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "organic_publication"
+    || request.client_id !== clientId || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || request.source_version !== request.artifact_hash
+    || !request.artifact_hash || !/^[0-9a-f]{64}$/.test(request.artifact_hash)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  const rights = preview.rights as Record<string, unknown> | undefined;
+  const copy = preview.provider_copy as Record<string, unknown> | undefined;
+  const media = preview.media;
+  return scope.client_id === clientId && scope.scheduled_post_id === preview.scheduled_post_id
+    && scope.slot_id === preview.slot_id
+    && /^[0-9a-f]{64}$/.test(String(scope.source_snapshot_hash ?? ""))
+    && preview.client_id === clientId
+    && request.destination === `organic:${preview.platform}`
+    && request.account_ref === preview.account_ref
+    && request.owner_role === "client_media_reviewer"
+    && typeof preview.scheduled_at === "string" && !!preview.scheduled_at
+    && !!rights && ["client_owned", "licensed", "agency_owned"].includes(String(rights.usage_rights))
+    && !!copy && typeof copy.caption === "string" && !!copy.caption.trim()
+    && Array.isArray(media) && media.length > 0 && media.length <= 10
+    && media.every((item) => item && typeof item === "object"
+      && (item as Record<string, unknown>).frozen_bucket === "publication-media"
+      && /^[0-9a-f]{64}$/.test(String((item as Record<string, unknown>).sha256 ?? "")));
+}
+
 function isLeadMagnetApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   if (request.source_system !== "aa_console" || request.source_kind !== "lead_magnet"
     || request.client_id !== clientId || request.status !== "pending"
@@ -1105,6 +1134,7 @@ function isEngineSlotReady(request: UnifiedApprovalRequest, clientId: string): b
 
 function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignPreparationReady(request, clientId)
+    || isOrganicPublicationReady(request, clientId)
     || isPaidOperatorBundleReady(request, clientId)
     || isGoogleSearchCopyReady(request, clientId)
     || isGoogleOperatorBundleReady(request, clientId)
@@ -1141,6 +1171,7 @@ function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): bo
 
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignPreparationReady(request, clientId)
+    || isOrganicPublicationReady(request, clientId)
     || isPaidOperatorBundleReady(request, clientId)
     || isGoogleSearchCopyReady(request, clientId)
     || isGoogleOperatorBundleReady(request, clientId)
@@ -1274,7 +1305,8 @@ function RequestCard({ request, history, gatewayOutcome, executionEvidence, clie
   const decisionLabel = request.source_kind === "google_review_reply"
     ? "Google review reply" : request.source_kind === "recruitment_brief"
       ? "Recruitment brief" : request.source_kind === "client_sales_entitlement"
-        ? "Sales access" : request.source_kind === "campaign_preparation_package"
+        ? "Sales access" : request.source_kind === "organic_publication"
+        ? "Organic publication package" : request.source_kind === "campaign_preparation_package"
         ? "Campaign preparation package" : request.source_kind === "paid_operator_bundle"
           ? "Paid operator bundle" : request.source_kind === "google_search_copy"
           ? "Google search copy" : request.source_kind === "google_operator_bundle"
@@ -1709,6 +1741,12 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
           })
         : request.source_kind === "campaign_preparation_package"
           ? await supabase.rpc("decide_campaign_preparation_package_v7", {
+            p_package_id: request.source_id, p_request_id: request.id,
+            p_approved: decision === "approved",
+            ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+          })
+        : request.source_kind === "organic_publication"
+          ? await supabase.rpc("decide_organic_publication_v7", {
             p_package_id: request.source_id, p_request_id: request.id,
             p_approved: decision === "approved",
             ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),

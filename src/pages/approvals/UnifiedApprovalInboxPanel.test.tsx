@@ -187,6 +187,23 @@ const readyGoogleOperator = {
 
 const paidBundleId = "77777777-7777-4777-8777-777777777777";
 const paidBundleHash = "7".repeat(64);
+const organicPackageId = "88888888-8888-4888-8888-888888888888";
+const organicPackageHash = "8".repeat(64);
+const readyOrganicPublication = {
+  ...request, id: "organic-publication-inbox-1", source_system: "aa_console",
+  source_kind: "organic_publication", source_id: organicPackageId,
+  source_version: organicPackageHash, artifact_hash: organicPackageHash,
+  title: "Organic publication: instagram", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", destination: "organic:instagram",
+  account_ref: "ig-account-1", owner_role: "client_media_reviewer",
+  preview: { client_id: "client-1", scheduled_post_id: "post-1", slot_id: "slot-1",
+    platform: "instagram", account_ref: "ig-account-1",
+    scheduled_at: "2026-11-20T12:00:00Z", rights: { usage_rights: "client_owned" },
+    provider_copy: { caption: "Approved exact caption" },
+    media: [{ frozen_bucket: "publication-media", sha256: "a".repeat(64) }] },
+  scope: { client_id: "client-1", scheduled_post_id: "post-1", slot_id: "slot-1",
+    source_snapshot_hash: "b".repeat(64) },
+};
 const readyPaidOperator = {
   ...request, id: "paid-operator-inbox-1", source_system: "aa_console",
   source_kind: "paid_operator_bundle", source_id: paidBundleId,
@@ -1152,6 +1169,25 @@ describe("unified approval inbox", () => {
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_paid_operator_bundle_v7", {
       p_bundle_id: paidBundleId, p_request_id: readyPaidOperator.id, p_approved: true,
     }));
+  });
+
+  it("reviews the frozen organic publication package through its exact decision RPC", async () => {
+    requests = [readyOrganicPublication];
+    show();
+    const card = await screen.findByRole("article", { name: readyOrganicPublication.title });
+    expect(within(card).getByText("Organic publication package decision")).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_organic_publication_v7", {
+      p_package_id: organicPackageId, p_request_id: readyOrganicPublication.id, p_approved: true,
+    }));
+  });
+
+  it("holds an organic package with missing media rights", async () => {
+    requests = [{ ...readyOrganicPublication,
+      preview: { ...readyOrganicPublication.preview, rights: { usage_rights: null } } }];
+    show();
+    const card = await screen.findByRole("article", { name: readyOrganicPublication.title });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).toBeNull();
   });
 
   it("reviews exact Google search copy through its paid-route decision RPC", async () => {

@@ -40201,6 +40201,15 @@ export type Database = {
         }
         Returns: string
       }
+      decide_organic_publication_v7: {
+        Args: {
+          p_approved: boolean
+          p_package_id: string
+          p_reason?: string
+          p_request_id: string
+        }
+        Returns: string
+      }
       decide_opportunity_activation_inbox_v6: {
         Args: {
           p_activation_id: string
