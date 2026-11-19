@@ -99,10 +99,9 @@ describe("Offer Strategy belongs to Strategy, not Offer Studio", () => {
     const offerStudio = v6ModuleNodes.find((node) => node.id === "offer-studio");
     expect(intelligence?.tabs?.map((tab) => tab.id)).toContain("offer-strategy");
     expect(offerStudio?.tabs?.map((tab) => tab.id)).not.toContain("offer-strategy");
-    // Offer Studio is now Offers (the single operating page) plus Versions,
-    // which keeps the existing version and claims form reachable. Live use
-    // folded into the Offers rows.
-    expect(offerStudio?.tabs?.map((tab) => tab.id)).toEqual(["offers", "versions"]);
+    // Build keeps the existing version and claims form reachable, while
+    // live-use drift remains visible in the Offers rows.
+    expect(offerStudio?.tabs?.map((tab) => tab.id)).toEqual(["offers", "build"]);
   });
 });
 

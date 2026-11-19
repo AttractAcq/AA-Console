@@ -40729,6 +40729,38 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_named_main_offer_v9: {
+        Args: { p_client_id: string; p_service_name: string }
+        Returns: {
+          client_id: string
+          created_at: string
+          id: string
+          kind: string
+          service_name: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_offers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_named_secondary_offer_v9: {
+        Args: { p_opportunity_id: string; p_service_name: string }
+        Returns: {
+          client_id: string
+          created_at: string
+          id: string
+          kind: string
+          service_name: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_offers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_nurture_sequence_v6: {
         Args: {
           p_campaign_id: string
@@ -45453,6 +45485,15 @@ export type Database = {
       }
       request_motion_render_review_v6: {
         Args: { p_candidate_id: string }
+        Returns: string
+      }
+      request_named_offer_compile_v9: {
+        Args: {
+          p_client_id: string
+          p_kind: string
+          p_opportunity_id: string
+          p_service_name: string
+        }
         Returns: string
       }
       request_nurture_sequence_review_v6: {

@@ -6,12 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * Offer Studio as one page.
  *
- * The notes ask for a table of every offer, click-through detail, and two
- * buttons: one for a main offer, one for a secondary one. Nothing in the schema
- * distinguished those two until migration 303, so the properties worth pinning
- * are that each button writes its own kind, and that the question the old Live
- * use tab existed to answer still gets answered -- on the offer it belongs to,
- * rather than in a list somebody has to go and look at.
+ * Offers is the read/review table. Build chooses a source before exposing
+ * manual or agent drafting. Source binding still happens in the database.
  */
 const { from, insert, rpc } = vi.hoisted(() => ({
   from: vi.fn(), insert: vi.fn(), rpc: vi.fn(),
@@ -74,12 +70,24 @@ function database(data: {
   });
 }
 
-function show() {
+function show(view: "offers" | "build" = "offers", entry = "/") {
   return render(
-    <MemoryRouter initialEntries={["/"]}>
-      <OfferStudioPanel />
+    <MemoryRouter initialEntries={[entry]}>
+      <OfferStudioPanel view={view} />
     </MemoryRouter>,
   );
+}
+
+async function selectBaseline() {
+  await userEvent.click(await screen.findByRole("radio", { name: "Baseline service" }));
+}
+
+async function selectOpportunity() {
+  await userEvent.click(await screen.findByRole("radio", { name: "Approved opportunity" }));
+}
+
+async function nameService() {
+  await userEvent.type(screen.getByRole("textbox", { name: "Business service" }), "Garage conversion");
 }
 
 vi.mock("react-router-dom", async (importOriginal) => ({
@@ -92,36 +100,71 @@ beforeEach(() => {
   rpc.mockResolvedValue({ error: null });
 });
 
-describe("the two buttons the notes ask for", () => {
+describe("the source-first Build path", () => {
   it("creates a main offer as main", async () => {
     database({ offers: [] });
-    show();
-    await userEvent.click(await screen.findByRole("button", { name: "New main offer" }));
-    expect(rpc).toHaveBeenCalledWith("create_main_offer_v7", { p_client_id: "client-1" });
+    show("build");
+    await selectBaseline();
+    await userEvent.type(screen.getByRole("textbox", { name: "Business service" }), "Garage conversion");
+    await userEvent.click(screen.getByRole("button", { name: "Create manual draft" }));
+    expect(rpc).toHaveBeenCalledWith("create_named_main_offer_v9", {
+      p_client_id: "client-1", p_service_name: "Garage conversion",
+    });
     expect(insert).not.toHaveBeenCalled();
   });
 
   it("creates a secondary offer as secondary", async () => {
     database({ offers: [], opportunities: [{ id: "opp-1", name: "Winter garage gym", micro_market: "Unused garages" }],
       approvals: [{ opportunity_id: "opp-1", approval_current: true }] });
-    show();
-    await userEvent.click(await screen.findByRole("button", { name: "New secondary offer" }));
-    expect(rpc).toHaveBeenCalledWith("create_secondary_offer_v7", { p_opportunity_id: "opp-1" });
+    show("build");
+    await selectOpportunity();
+    await userEvent.type(screen.getByRole("textbox", { name: "Business service" }), "Garage conversion");
+    await userEvent.click(screen.getByRole("button", { name: "Create manual draft" }));
+    expect(rpc).toHaveBeenCalledWith("create_named_secondary_offer_v9", {
+      p_opportunity_id: "opp-1", p_service_name: "Garage conversion",
+    });
     expect(insert).not.toHaveBeenCalled();
   });
 
   it("holds secondary actions until an opportunity has current approval", async () => {
     database({ offers: [], opportunities: [{ id: "opp-1", name: "Winter garage gym", micro_market: "Unused garages" }],
       approvals: [{ opportunity_id: "opp-1", approval_current: false }] });
-    show();
-    expect(await screen.findByRole("button", { name: "New secondary offer" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Compile a secondary offer" })).toBeDisabled();
+    show("build");
+    await selectOpportunity();
+    await userEvent.type(screen.getByRole("textbox", { name: "Business service" }), "Garage conversion");
+    expect(screen.getByRole("button", { name: "Create manual draft" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Draft with agent" })).toBeDisabled();
   });
 
   it("says what to do when there is nothing yet, naming both kinds", async () => {
     database({ offers: [] });
     show();
-    expect(await screen.findByText(/Create a main offer for the business/)).toBeInTheDocument();
+    expect(await screen.findByText(/Open Build to make a baseline service/)).toBeInTheDocument();
+  });
+
+  it("opens a selected source-bound offer for an exact draft version", async () => {
+    database({ offers: [offer()] });
+    show("build", "/?tab=build&offer=offer-1");
+    expect(await screen.findByRole("heading", { name: "New offer version" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Service name" })).toHaveValue("Garage conversion");
+    await userEvent.type(screen.getByRole("textbox", { name: "Audience" }), "Homeowners");
+    await userEvent.type(screen.getByRole("textbox", { name: "Offer promise" }), "A usable garage gym");
+    await userEvent.click(screen.getByRole("button", { name: "Save draft version" }));
+    expect(rpc).toHaveBeenCalledWith("create_service_offer_version_v6", expect.objectContaining({
+      p_offer_id: "offer-1", p_service_name: "Garage conversion",
+      p_audience: "Homeowners", p_promise: "A usable garage gym",
+    }));
+  });
+
+  it("keeps versions for another offer out of the selected Build editor", async () => {
+    database({
+      offers: [offer(), offer({ id: "offer-2", service_name: "Roof repair" })],
+      versions: [version(), version({ id: "ver-3", offer_id: "offer-2", promise: "A repaired roof" })],
+    });
+    show("build", "/?tab=build&offer=offer-1");
+    expect(await screen.findByRole("heading", { name: "Garage conversion versions" })).toBeInTheDocument();
+    expect(screen.getByText("Version 2 · Draft")).toBeInTheDocument();
+    expect(screen.queryByText("A repaired roof")).toBeNull();
   });
 });
 
@@ -224,7 +267,7 @@ describe("the detail", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Show Garage conversion" }));
     expect(screen.getByRole("link", { name: "Edit versions and claims" })).toHaveAttribute(
       "href",
-      "/clients/client-1/delivery/offer-studio?tab=versions&offer=offer-1",
+      "/clients/client-1/delivery/offer-studio?tab=build&offer=offer-1",
     );
   });
 });
@@ -233,8 +276,10 @@ describe("compiling an offer instead of writing one", () => {
   it("shows a completed compile and asks for draft review", async () => {
     database({ offers: [], jobs: [{ id: "job-1", status: "completed", terminal: true, error: null }] });
     rpc.mockResolvedValueOnce({ data: "job-1", error: null });
-    show();
-    await userEvent.click(await screen.findByRole("button", { name: "Compile a main offer" }));
+    show("build");
+    await selectBaseline();
+    await nameService();
+    await userEvent.click(screen.getByRole("button", { name: "Draft with agent" }));
     expect(await screen.findByRole("status")).toHaveTextContent(/Review the draft version/);
     expect(from).toHaveBeenCalledWith("agent_jobs");
   });
@@ -244,23 +289,28 @@ describe("compiling an offer instead of writing one", () => {
       opportunities: [{ id: "opp-1", name: "Winter garage gym", micro_market: "Unused garages" }],
       approvals: [{ opportunity_id: "opp-1", approval_current: true }] });
     rpc.mockResolvedValueOnce({ data: "job-2", error: null });
-    show();
-    await userEvent.click(await screen.findByRole("button", { name: "Compile a secondary offer" }));
+    show("build");
+    await selectOpportunity();
+    await nameService();
+    await userEvent.click(screen.getByRole("button", { name: "Draft with agent" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/Version writer refused the draft/);
   });
 
   it("asks the compiler for a main or a secondary offer", async () => {
     database({ offers: [], opportunities: [{ id: "opp-1", name: "Winter garage gym", micro_market: "Unused garages" }],
       approvals: [{ opportunity_id: "opp-1", approval_current: true }] });
-    show();
-    await userEvent.click(await screen.findByRole("button", { name: "Compile a main offer" }));
-    expect(rpc).toHaveBeenCalledWith("request_offer_compile_v6", {
-      p_client_id: "client-1", p_kind: "main", p_source: "strategy", p_opportunity_id: undefined,
+    show("build");
+    await selectBaseline();
+    await nameService();
+    await userEvent.click(screen.getByRole("button", { name: "Draft with agent" }));
+    expect(rpc).toHaveBeenCalledWith("request_named_offer_compile_v9", {
+      p_client_id: "client-1", p_kind: "main", p_opportunity_id: null, p_service_name: "Garage conversion",
     });
 
-    await userEvent.click(screen.getByRole("button", { name: "Compile a secondary offer" }));
-    expect(rpc).toHaveBeenCalledWith("request_offer_compile_v6", {
-      p_client_id: "client-1", p_kind: "secondary", p_source: "micro_niche", p_opportunity_id: "opp-1",
+    await selectOpportunity();
+    await userEvent.click(screen.getByRole("button", { name: "Draft with agent" }));
+    expect(rpc).toHaveBeenCalledWith("request_named_offer_compile_v9", {
+      p_client_id: "client-1", p_kind: "secondary", p_opportunity_id: "opp-1", p_service_name: "Garage conversion",
     });
   });
 
@@ -268,8 +318,10 @@ describe("compiling an offer instead of writing one", () => {
     // Compiling must not also insert an empty offer row. Two offers from one
     // click is the bug a shared busy flag invites.
     database({ offers: [] });
-    show();
-    await userEvent.click(await screen.findByRole("button", { name: "Compile a main offer" }));
+    show("build");
+    await selectBaseline();
+    await nameService();
+    await userEvent.click(screen.getByRole("button", { name: "Draft with agent" }));
     expect(insert).not.toHaveBeenCalled();
   });
 
@@ -280,8 +332,10 @@ describe("compiling an offer instead of writing one", () => {
     rpc.mockResolvedValue({
       error: { message: "This client has no offer strategy yet." },
     });
-    show();
-    await userEvent.click(await screen.findByRole("button", { name: "Compile a main offer" }));
+    show("build");
+    await selectBaseline();
+    await nameService();
+    await userEvent.click(screen.getByRole("button", { name: "Draft with agent" }));
     expect(await screen.findByRole("alert"))
       .toHaveTextContent("This client has no offer strategy yet.");
   });
@@ -289,8 +343,10 @@ describe("compiling an offer instead of writing one", () => {
   it("confirms what was queued when it works", async () => {
     database({ offers: [], opportunities: [{ id: "opp-1", name: "Winter garage gym", micro_market: "Unused garages" }],
       approvals: [{ opportunity_id: "opp-1", approval_current: true }] });
-    show();
-    await userEvent.click(await screen.findByRole("button", { name: "Compile a secondary offer" }));
+    show("build");
+    await selectOpportunity();
+    await nameService();
+    await userEvent.click(screen.getByRole("button", { name: "Draft with agent" }));
     expect(await screen.findByRole("status"))
       .toHaveTextContent(/drafting a secondary offer from the selected approved opportunity/);
   });

@@ -18,8 +18,8 @@ REPO = Path(__file__).resolve().parents[1]
 MANIFEST = REPO / "docs/client-delivery-pr363-migration-review-2026-11-18.md"
 MIGRATIONS = REPO / "supabase/migrations"
 START = "20261124034600"
-END = "20261124052600"
-EXPECTED = 100
+END = "20261124052800"
+EXPECTED = 101
 
 
 def docker(container: str, *args: str, input_bytes: bytes | None = None,
@@ -48,9 +48,18 @@ def pinned_files() -> list[tuple[Path, str]]:
         match = re.search(r"\|\s*\d+\s*\|\s*`([^`]+\.sql)`\s*\|\s*`([0-9a-f]{64})`", line)
         if match:
             pins[match.group(1)] = match.group(2)
-    files = [p for p in sorted(MIGRATIONS.glob("*.sql")) if START < p.name[:14] <= END]
-    if len(files) != EXPECTED or len(pins) != EXPECTED or len({p.name[:14] for p in files}) != EXPECTED:
+    files = [MIGRATIONS / name for name in sorted(pins)]
+    if len(files) != EXPECTED or len({p.name[:14] for p in files}) != EXPECTED:
         raise RuntimeError("Candidate file count, manifest count or migration versions differ; stopped")
+    present = [p for p in MIGRATIONS.glob("*.sql") if START < p.name[:14] <= END]
+    extras = [p for p in present if p.name not in pins]
+    if extras:
+        tracked = subprocess.run(["git", "ls-files", "--cached", "--", *map(str, extras)],
+                                 cwd=REPO, capture_output=True, text=True, check=True).stdout.strip()
+        if tracked:
+            raise RuntimeError("A tracked candidate migration is not pinned; stopped")
+        print("Ignoring untracked local SQL outside the reviewed manifest: "
+              + ", ".join(p.name for p in extras), flush=True)
     for p in files:
         if pins.get(p.name) != hashlib.sha256(p.read_bytes()).hexdigest():
             raise RuntimeError(f"Manifest hash mismatch for {p.name}; stopped")
@@ -148,7 +157,7 @@ def main() -> None:
     state["after"] = after
     state["history"] = final_history
     state["old_cron_digest_after"] = old_cron_digest(args.container, baseline["cron_max_id"])
-    state["verified"] = (final_history == f"669|{END}"
+    state["verified"] = (final_history == f"670|{END}"
                          and after["clients"] == baseline["clients"]
                          and after["auth_users"] == baseline["auth_users"]
                          and after["storage_policies"] == baseline["storage_policies"]

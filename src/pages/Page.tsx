@@ -31,7 +31,6 @@ import { CampaignInputsPanel } from "./intelligence/CampaignInputsPanel";
 import { BrandingStrategyPanel } from "./strategy/BrandingStrategyPanel";
 import { ContentPillarsPanel } from "./strategy/ContentPillarsPanel";
 import { OfferStrategyPanel } from "./strategy/OfferStrategyPanel";
-import { ServiceOffersPanel } from "./offer/ServiceOffersPanel";
 import { MoneyModelStrategyPanel } from "./strategy/MoneyModelStrategyPanel";
 import { GenerationPanel } from "./ideation/GenerationPanel";
 import { DailyProductionOverview } from "./ideation/DailyProductionOverview";
@@ -154,8 +153,8 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     reporting: () => <OrganicReportingPanel />,
   },
   "offer-studio": {
-    offers: () => <OfferStudioPanel />,
-    versions: () => <ServiceOffersPanel />,
+    offers: () => <OfferStudioPanel view="offers" />,
+    build: () => <OfferStudioPanel view="build" />,
   },
   "website-studio": {
     sites: () => <SitesPanel />,
@@ -296,7 +295,8 @@ function PageContent({ node, clientId }: { node: NavNode; clientId: string | und
     : node.tabs;
   const requestedTab = searchParams.get("tab");
   const resolvedTab = node.id === "proof-distribution" && requestedTab === "rights"
-    ? "placements" : requestedTab;
+    ? "placements" : node.id === "offer-studio" && requestedTab === "versions"
+      ? "build" : requestedTab;
   const assetLibrary = node.id === "content-production-factory"
     && requestedTab !== null && LEGACY_LIBRARY_TABS.has(requestedTab);
   const activeTab =

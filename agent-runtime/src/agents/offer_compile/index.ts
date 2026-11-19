@@ -207,6 +207,11 @@ export async function runOfferCompileJob(
     return { ok: false, retryable: false, failureMessage: asked.error };
   }
   const { kind, source } = asked;
+  const rawNamedService = job.params?.service_name;
+  const namedService = typeof rawNamedService === "string" ? rawNamedService.trim() : null;
+  if (rawNamedService !== undefined && (!namedService || namedService.length > MAX_NAME)) {
+    return { ok: false, retryable: false, failureMessage: "The chosen business service is missing or too long." };
+  }
   let sourceBlock = "";
   let reviewedStrategyFingerprint = "";
   let strategySnapshot: StrategySection[] | null = null;
@@ -291,6 +296,7 @@ Do not invent statistics, timescales, guarantees or results. If the source does 
 
 Call submit_offer once.`,
       prompt: `Compile the ${kind} offer.
+${namedService ? `The operator selected this business service: ${namedService}. Build the offer for that service. Keep it as the service name.` : ""}
 
 ${sourceBlock}
 ${existingLines.length > 0 ? `\nWHAT THIS BUSINESS ALREADY SELLS\n${existingLines.join("\n")}\nDo not restate one of these under a new name.` : ""}`,
@@ -345,7 +351,7 @@ ${existingLines.length > 0 ? `\nWHAT THIS BUSINESS ALREADY SELLS\n${existingLine
       p_opportunity_id: job.input_id,
       p_opportunity_hash: sourceHash,
       p_job_id: job.id,
-      p_service_name: checked.serviceName,
+      p_service_name: namedService ?? checked.serviceName,
       p_audience: checked.audience,
       p_promise: checked.promise,
       p_inclusions: checked.inclusions,
@@ -356,7 +362,7 @@ ${existingLines.length > 0 ? `\nWHAT THIS BUSINESS ALREADY SELLS\n${existingLine
       p_client_id: job.client_id,
       p_strategy_snapshot: strategySnapshot,
       p_job_id: job.id,
-      p_service_name: checked.serviceName,
+      p_service_name: namedService ?? checked.serviceName,
       p_audience: checked.audience,
       p_promise: checked.promise,
       p_inclusions: checked.inclusions,

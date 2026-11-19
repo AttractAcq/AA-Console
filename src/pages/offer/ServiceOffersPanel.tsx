@@ -23,7 +23,7 @@ function isClaim(value: Json): value is { kind: string; text: string; proof_asse
     && typeof value.kind === "string" && typeof value.text === "string";
 }
 
-export function ServiceOffersPanel() {
+export function ServiceOffersPanel({ selectedOfferId }: { selectedOfferId: string }) {
   const { clientId } = useParams<{ clientId: string }>();
   const [offers, setOffers] = useState<Offer[]>([]);
   const [versions, setVersions] = useState<Version[]>([]);
@@ -67,6 +67,14 @@ export function ServiceOffersPanel() {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  useEffect(() => {
+    const selected = offers.find((offer) => offer.id === selectedOfferId);
+    if (!selected) return;
+    setForm((current) => current.offerId === selected.id ? current : {
+      ...emptyForm, offerId: selected.id, serviceName: selected.service_name,
+    });
+  }, [offers, selectedOfferId]);
+
   function update(field: Exclude<keyof Form, "offerId" | "retainedClaims">, value: string) {
     setForm((prior) => ({ ...prior, [field]: value }));
     setDraftKey(crypto.randomUUID());
@@ -92,6 +100,10 @@ export function ServiceOffersPanel() {
   async function create(event: FormEvent) {
     event.preventDefault();
     if (!clientId || busy) return;
+    if (form.offerId !== selectedOfferId) {
+      setError("Choose a source-bound offer in Build before saving a version.");
+      return;
+    }
     setBusy("create"); setError(null);
     const price = form.price.trim() ? Number(form.price) : null;
     const deliveryCost = form.deliveryCost.trim() ? Number(form.deliveryCost) : null;
@@ -127,7 +139,7 @@ export function ServiceOffersPanel() {
     });
     setBusy(null);
     if (rpcError) { setError(rpcError.message); return; }
-    setForm(emptyForm);
+    setForm({ ...emptyForm, offerId: selectedOfferId, serviceName: form.serviceName });
     setDraftKey(crypto.randomUUID());
     await refresh();
   }
@@ -149,11 +161,16 @@ export function ServiceOffersPanel() {
     !manifests.some((other) => other.campaign_id === manifest.campaign_id
       && other.version > manifest.version));
   const approvedVersions = versions.filter((version) =>
-    signoffs.some((signoff) => signoff.offer_version_id === version.id));
+    version.offer_id === selectedOfferId
+      && signoffs.some((signoff) => signoff.offer_version_id === version.id));
+  const selectedOffer = offers.find((offer) => offer.id === selectedOfferId);
+  const selectedVersions = versions.filter((version) => version.offer_id === selectedOfferId);
+  const selectedVersionIds = new Set(selectedVersions.map((version) => version.id));
+  const selectedLinks = manifestOffers.filter((link) => selectedVersionIds.has(link.offer_version_id));
 
   return <div className="space-y-6">
     <div>
-      <h2 className="text-xl font-semibold">Service offers</h2>
+      <h2 className="text-xl font-semibold">{selectedOffer?.service_name ?? "Selected offer"} versions</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         Draft a service-specific offer with its promise, inclusions, limits and economics.
         Each revision is a new version. Quantified claims require current, cleared proof before human sign-off.
@@ -161,7 +178,7 @@ export function ServiceOffersPanel() {
     </div>
     {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
     <form id="service-offer-editor" onSubmit={(event) => void create(event)} className="space-y-4 rounded-xl border border-border bg-card p-5">
-      <h3 className="font-semibold">{form.offerId ? "New offer version" : "New service offer"}</h3>
+      <h3 className="font-semibold">New offer version</h3>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="text-sm">Service name<input required maxLength={200} disabled={Boolean(form.offerId)}
           value={form.serviceName} onChange={(event) => update("serviceName", event.target.value)}
@@ -200,7 +217,8 @@ export function ServiceOffersPanel() {
       </p>}
       <div className="flex gap-2">
         <button type="submit" disabled={Boolean(busy)} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">Save draft version</button>
-        {form.offerId && <button type="button" onClick={() => { setForm(emptyForm); setDraftKey(crypto.randomUUID()); }}
+        {form.offerId && <button type="button" onClick={() => { setForm({ ...emptyForm, offerId: selectedOfferId,
+          serviceName: offers.find((offer) => offer.id === selectedOfferId)?.service_name ?? "" }); setDraftKey(crypto.randomUUID()); }}
           className="rounded-lg border border-border px-4 py-2 text-sm">Cancel revision</button>}
       </div>
     </form>
@@ -240,8 +258,8 @@ export function ServiceOffersPanel() {
           Link offer
         </button>
       </form>}
-      {manifestOffers.length > 0 && <div className="space-y-1 text-sm">
-        {manifestOffers.map((link) => {
+      {selectedLinks.length > 0 && <div className="space-y-1 text-sm">
+        {selectedLinks.map((link) => {
           const manifest = manifests.find((item) => item.id === link.manifest_id);
           const version = versions.find((item) => item.id === link.offer_version_id);
           const offer = offers.find((item) => item.id === version?.offer_id);
@@ -253,11 +271,11 @@ export function ServiceOffersPanel() {
         })}
       </div>}
     </section>
-    {loading ? <p className="text-sm text-muted-foreground">Loading offers…</p>
-      : offers.length === 0 ? <p className="text-sm text-muted-foreground">No service offers have been drafted yet.</p>
-        : offers.map((offer) => <section key={offer.id} className="space-y-3">
-          <h3 className="text-lg font-semibold">{offer.service_name}</h3>
-          {versions.filter((version) => version.offer_id === offer.id).map((version) => {
+    {loading ? <p className="text-sm text-muted-foreground">Loading offer versions…</p>
+      : !selectedOffer ? <p className="text-sm text-muted-foreground">This offer is unavailable. Choose an offer from Offers.</p>
+        : <section key={selectedOffer.id} className="space-y-3">
+          <h3 className="text-lg font-semibold">{selectedOffer.service_name}</h3>
+          {selectedVersions.map((version) => {
             const signed = signoffs.some((signoff) => signoff.offer_version_id === version.id);
             const margin = version.price_amount !== null && version.delivery_cost_estimate !== null
               ? version.price_amount - version.delivery_cost_estimate : null;
@@ -282,11 +300,11 @@ export function ServiceOffersPanel() {
               <div className="mt-4 flex gap-2">
                 {!signed && <Link to={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}
                   className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Review in Approval Inbox</Link>}
-                <button type="button" onClick={() => revise(offer, version)}
+                <button type="button" onClick={() => revise(selectedOffer, version)}
                   className="rounded-lg border border-border px-4 py-2 text-sm">Create revision</button>
               </div>
             </article>;
           })}
-        </section>)}
+        </section>}
   </div>;
 }

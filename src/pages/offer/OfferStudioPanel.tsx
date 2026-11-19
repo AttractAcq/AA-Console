@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { Button } from "../../components/Button";
 import { IndexDetail, type IndexColumn } from "../../components/index-detail/IndexDetail";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
+import { ServiceOffersPanel } from "./ServiceOffersPanel";
 
 type Offer = Database["public"]["Tables"]["service_offers"]["Row"];
 type Version = Database["public"]["Tables"]["service_offer_versions"]["Row"];
@@ -14,42 +15,12 @@ type Opportunity = Pick<Database["public"]["Tables"]["market_opportunities"]["Ro
 type SecondarySource = Database["public"]["Tables"]["secondary_offer_sources_v7"]["Row"];
 type MainSource = Database["public"]["Tables"]["main_offer_sources_v7"]["Row"];
 
-/**
- * Offer Studio, as one page.
- *
- * The notes: "There should just be a single page, where we can see all of the
- * offers, and then two buttons, one to create a main offer and one to create a
- * secondary offer ... The page should display all offers in a simple table
- * format with the ability to click on the offer to see more information as well
- * as actions to archive, edit, etc."
- *
- * Three tabs became one table. It uses the shared index-and-detail pattern, so
- * this page looks and behaves like Website Studio, Lead Magnet Studio, Sales OS
- * and Market Opportunities will.
- *
- * WHAT THE TWO BUTTONS WRITE
- *
- * A main offer is the business's own, compiled from offer strategy. A secondary
- * offer targets one micro-niche, compiled from that market opportunity. Nothing
- * in the schema distinguished them until migration 303, so the buttons had
- * nothing to say; they now set `kind`.
- *
- * WHAT STAYED
- *
- * The old Live use tab existed to answer one question: where is a superseded
- * version still live? That is a real question -- a client reprices, every new
- * asset is correct, and a PDF quoting last year's figure keeps going out -- so
- * it is not dropped. It moves into the row, where a drifting offer is named on
- * the offer it belongs to rather than in a separate list, and into the detail
- * for the specifics.
- *
- * The version form still lives in Service Offers, linked from the detail. The
- * compile agent the notes ask for -- one that assembles an offer from strategy
- * or from a micro-niche -- is runtime work and is not here yet, so for now the
- * inputs remain manual, which is what the notes call the suggested path anyway.
- */
-export function OfferStudioPanel() {
+/** Offers lists existing versions and live-use drift. Build starts from a
+ * reviewed baseline strategy or an approved opportunity, then uses the same
+ * version and approval records for manual and agent-generated drafts. */
+export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build" }) {
   const { clientId } = useParams<{ clientId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [offers, setOffers] = useState<Offer[]>([]);
   const [versions, setVersions] = useState<Version[]>([]);
   const [signoffs, setSignoffs] = useState<Signoff[]>([]);
@@ -58,6 +29,8 @@ export function OfferStudioPanel() {
   const [sources, setSources] = useState<SecondarySource[]>([]);
   const [mainSources, setMainSources] = useState<MainSource[]>([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState("");
+  const [buildSource, setBuildSource] = useState<"baseline" | "opportunity" | null>(null);
+  const [serviceName, setServiceName] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -144,21 +117,35 @@ export function OfferStudioPanel() {
 
   async function create(kind: "main" | "secondary") {
     if (!clientId) return;
+    if (!serviceName.trim()) { setError("Name the business service before creating a manual draft."); return; }
     setBusy(kind);
     setError(null);
-    const { error: insertError } = kind === "secondary"
-      ? await supabase.rpc("create_secondary_offer_v7", { p_opportunity_id: selectedOpportunity })
-      : await supabase.rpc("create_main_offer_v7", { p_client_id: clientId });
+    const { data: created, error: insertError } = kind === "secondary"
+      ? await supabase.rpc("create_named_secondary_offer_v9", {
+        p_opportunity_id: selectedOpportunity, p_service_name: serviceName.trim(),
+      })
+      : await supabase.rpc("create_named_main_offer_v9", {
+        p_client_id: clientId, p_service_name: serviceName.trim(),
+      });
     setBusy(null);
     if (insertError) {
       setError(insertError.message);
       return;
     }
     await refresh();
+    if (created?.id) {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set("tab", "build");
+        next.set("offer", created.id);
+        return next;
+      });
+      setNotice("Source-bound offer created. Complete its draft version below, then request exact review.");
+    }
   }
 
   /**
-   * Ask the Offer Compiler for one instead of writing it yourself.
+ * Ask the Offer Compiler to draft the chosen service instead of writing it yourself.
    *
    * Main offers use Offer Strategy. Secondary offers use the selected approved
    * opportunity and are bound to its exact evidence version.
@@ -170,13 +157,16 @@ export function OfferStudioPanel() {
    */
   async function compile(kind: "main" | "secondary") {
     if (!clientId) return;
+    if (!serviceName.trim()) { setError("Name the business service before drafting with the agent."); return; }
     setBusy(`compile-${kind}`);
     setError(null);
-    const { data: jobId, error: rpcError } = await supabase.rpc("request_offer_compile_v6", {
+    const { data: jobId, error: rpcError } = await supabase.rpc("request_named_offer_compile_v9", {
       p_client_id: clientId,
       p_kind: kind,
-      p_source: kind === "main" ? "strategy" : "micro_niche",
-      p_opportunity_id: kind === "secondary" ? selectedOpportunity : undefined,
+      // The SQL function requires an explicit nullable UUID argument; generated
+      // RPC types represent that position as a non-null string.
+      p_opportunity_id: (kind === "secondary" ? selectedOpportunity : null) as unknown as string,
+      p_service_name: serviceName.trim(),
     });
     setBusy(null);
     if (rpcError) {
@@ -227,6 +217,48 @@ export function OfferStudioPanel() {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
   }
 
+  const selectedBuildOffer = offers.find((offer) => offer.id === searchParams.get("offer"));
+  if (view === "build") {
+    const kind = buildSource === "opportunity" ? "secondary" : "main";
+    return <div className="space-y-4">
+      {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      <section className="space-y-4 rounded-lg border border-border bg-card p-5">
+        <h2 className="font-semibold">Build an offer</h2>
+        <p className="text-sm text-muted-foreground">Choose the source first. The draft remains proposed until its exact version is approved.</p>
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">Offer source</legend>
+          <label className="flex items-center gap-2 text-sm"><input type="radio" name="offer-source" checked={buildSource === "opportunity"}
+            onChange={() => setBuildSource("opportunity")} />Approved opportunity</label>
+          <label className="flex items-center gap-2 text-sm"><input type="radio" name="offer-source" checked={buildSource === "baseline"}
+            onChange={() => setBuildSource("baseline")} />Baseline service</label>
+        </fieldset>
+        {buildSource === "opportunity" && <label className="block text-sm">Approved opportunity
+          <select className="mt-1 block w-full rounded border border-border bg-background px-2 py-1" value={selectedOpportunity}
+            onChange={(event) => setSelectedOpportunity(event.target.value)}>
+            {approvedOpportunities.length === 0 && <option value="">No currently approved opportunity</option>}
+            {approvedOpportunities.map((opportunity) => <option key={opportunity.id} value={opportunity.id}>
+              {opportunity.name} — {opportunity.micro_market}</option>)}
+          </select>
+        </label>}
+        {buildSource === "baseline" && <p className="text-sm text-muted-foreground">Uses the current reviewed Offer Strategy. The chosen service stays bound to this offer's versions.</p>}
+        {buildSource && <label className="block text-sm">Business service
+          <input className="mt-1 block w-full rounded border border-border bg-background px-2 py-1"
+            maxLength={200} value={serviceName} onChange={(event) => setServiceName(event.target.value)}
+            placeholder="Name the service this offer sells" />
+        </label>}
+        <div className="flex flex-wrap gap-2">
+          <Button disabled={busy !== null || buildSource === null || !serviceName.trim() || (kind === "secondary" && !selectedOpportunity)}
+            onClick={() => void create(kind)}>{busy === kind ? "Creating…" : "Create manual draft"}</Button>
+          <Button disabled={busy !== null || buildSource === null || !serviceName.trim() || (kind === "secondary" && !selectedOpportunity)}
+            onClick={() => void compile(kind)} className="bg-muted text-foreground hover:bg-muted">
+            {busy === `compile-${kind}` ? "Queueing…" : "Draft with agent"}</Button>
+        </div>
+      </section>
+      {selectedBuildOffer && <ServiceOffersPanel selectedOfferId={selectedBuildOffer.id} />}
+    </div>;
+  }
+
   return (
     <div className="space-y-3">
       {notice && (
@@ -244,45 +276,10 @@ export function OfferStudioPanel() {
         items={offers}
         columns={columns}
         paramKey="offer"
-        emptyLabel="No offers yet. Create a main offer for the business, or a secondary one for a micro-niche."
+        emptyLabel="No offers yet. Open Build to make a baseline service or approved-opportunity offer."
         nameOf={(offer) => offer.service_name}
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="text-sm" htmlFor="secondary-offer-opportunity">Secondary offer opportunity</label>
-            <select id="secondary-offer-opportunity" className="rounded border border-border bg-background px-2 py-1 text-sm"
-              value={selectedOpportunity} onChange={(event) => setSelectedOpportunity(event.target.value)}>
-              {approvedOpportunities.length === 0 && <option value="">No currently approved opportunity</option>}
-              {approvedOpportunities.map((opportunity) => <option key={opportunity.id} value={opportunity.id}>{opportunity.name} — {opportunity.micro_market}</option>)}
-            </select>
-            <Button disabled={busy !== null} onClick={() => void create("main")}>
-              {busy === "main" ? "…" : "New main offer"}
-            </Button>
-            {/* Button is one style by design, so the secondary action is
-                distinguished with className rather than by widening a
-                component used across the console. */}
-            <Button
-              disabled={busy !== null || !selectedOpportunity}
-              onClick={() => void create("secondary")}
-              className="bg-muted text-foreground hover:bg-muted"
-            >
-              {busy === "secondary" ? "…" : "New secondary offer"}
-            </Button>
-            <Button
-              disabled={busy !== null}
-              onClick={() => void compile("main")}
-              className="bg-muted text-foreground hover:bg-muted"
-            >
-              {busy === "compile-main" ? "…" : "Compile a main offer"}
-            </Button>
-            <Button
-              disabled={busy !== null || !selectedOpportunity}
-              onClick={() => void compile("secondary")}
-              className="bg-muted text-foreground hover:bg-muted"
-            >
-              {busy === "compile-secondary" ? "…" : "Compile a secondary offer"}
-            </Button>
-          </div>
-        }
+        action={<Link to={`/clients/${clientId}/delivery/offer-studio?tab=build`}
+          className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">Build offer</Link>}
         detail={(offer) => {
           const all = versionsFor(offer);
           const stale = driftingFor(offer);
@@ -356,7 +353,7 @@ export function OfferStudioPanel() {
 
               <p>
                 <Link
-                  to={`/clients/${clientId}/delivery/offer-studio?tab=versions&offer=${offer.id}`}
+                  to={`/clients/${clientId}/delivery/offer-studio?tab=build&offer=${offer.id}`}
                   className="text-brand-strong underline-offset-2 hover:underline"
                 >
                   Edit versions and claims

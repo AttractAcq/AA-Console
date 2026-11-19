@@ -481,12 +481,10 @@ export const v6ModuleNodes: NavNode[] = [
     ] },
   { id: "offer-studio", label: "Offer Studio", path: "offer-studio", icon: Target,
     capability: "expanding", tabs: [
-      // One operating page, per the notes: a table of every offer with
-      // click-through detail and two create buttons. Live use folded into the
-      // rows, where a superseded-but-live version is named on its own offer.
-      // Versions keeps the existing version and claims form reachable.
+      // The source choice and version editor live in Build. Existing
+      // ?tab=versions links are resolved to Build by Page.
       { id: "offers", label: "Offers" },
-      { id: "versions", label: "Versions" },
+      { id: "build", label: "Build" },
       // Offer Strategy moved to Intelligence OS, Strategy half.
     ] },
   { id: "website-studio", label: "Website Studio", path: "website-studio", icon: Globe,
