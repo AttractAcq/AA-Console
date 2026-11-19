@@ -37,8 +37,14 @@ insert into storage.objects(id,bucket_id,name,version) values
 insert into public.post_copy(asset_id,platform,caption) values
   ('cccccccc-cccc-4ccc-8ccc-cccccccccccc','instagram','Exact caption'),
   ('cccccccc-cccc-4ccc-8ccc-cccccccccccd','instagram','Finished render caption');
-insert into public.client_integrations(client_id,provider,credential_label,status)
-values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','instagram','17890000000000000','connected');
+-- Seed a disposable already-granted integration; production writes require
+-- the exact access-grant path and cannot create this state directly.
+set local session_replication_role='replica';
+insert into public.client_integrations
+  (client_id,provider,credential_label,credential_secret_id,status)
+values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','instagram','17890000000000000',
+  vault.create_secret('disposable-engine-fixture-token'),'connected');
+set local session_replication_role='origin';
 insert into public.content_slots
   (id,client_id,platform,scheduled_at,stage,asset_id)
 values ('dddddddd-dddd-4ddd-8ddd-dddddddddddd',
@@ -49,6 +55,20 @@ insert into public.content_slots
 values ('dddddddd-dddd-4ddd-8ddd-ddddddddddde',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','instagram',now()+interval '3 days',
   'awaiting_approval','cccccccc-cccc-4ccc-8ccc-cccccccccccd');
+insert into public.client_ideas(id,client_id,title,source,status,slot_id)
+values ('11111111-1111-4111-8111-111111111111',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Recurring Engine idea','auto','draft',
+  'dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+insert into public.client_briefs(id,client_id,source_idea_id,title)
+values ('22222222-2222-4222-8222-222222222222',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  '11111111-1111-4111-8111-111111111111','Recurring Engine brief');
+update public.client_media_assets set brief_id='22222222-2222-4222-8222-222222222222'
+  where id='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+update public.content_slots set
+  idea_id='11111111-1111-4111-8111-111111111111',
+  brief_id='22222222-2222-4222-8222-222222222222'
+  where id='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 insert into public.slot_events(slot_id,from_stage,to_stage,actor)
 values ('dddddddd-dddd-4ddd-8ddd-dddddddddddd','qa','awaiting_approval','engine'),
   ('dddddddd-dddd-4ddd-8ddd-ddddddddddde','qa','awaiting_approval','engine');
@@ -167,6 +187,16 @@ begin
       (select scheduled_post_id from public.content_slots
         where id='dddddddd-dddd-4ddd-8ddd-dddddddddddd')) is not true then
     raise exception 'Current exact Engine source decision did not authorize its linked post'; end if;
+  if (select source_mode from jsonb_to_record(public.organic_publication_source_snapshot_v6(
+      (select scheduled_post_id from public.content_slots
+        where id='dddddddd-dddd-4ddd-8ddd-dddddddddddd')))
+      as x(source_mode text)) is distinct from 'recurring_engine' then
+    raise exception 'Recurring Engine slot did not produce a publication source snapshot'; end if;
+  if (select source_mode from jsonb_to_record(public.organic_publication_claim_snapshot_v7(
+      (select scheduled_post_id from public.content_slots
+        where id='dddddddd-dddd-4ddd-8ddd-dddddddddddd')))
+      as x(source_mode text)) is distinct from 'recurring_engine' then
+    raise exception 'Recurring Engine slot did not produce a claimed prewrite snapshot'; end if;
   if (select current_signoff from public.ordinary_media_current_status_v6
       where asset_id='cccccccc-cccc-4ccc-8ccc-cccccccccccc') is not true then
     raise exception 'Assets status hid current exact Engine source approval'; end if;
