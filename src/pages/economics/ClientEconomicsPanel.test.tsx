@@ -176,8 +176,13 @@ describe("breakdowns", () => {
 
 describe("mixed currency", () => {
   it("refuses the ratios and says so loudly", async () => {
-    show(healthy({ mixed_currency: true, currency: null, roas: null, cash_roas: null, cac: null, cpl: null }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/mixes more than one currency/i);
+    show(healthy({ spend: null, mixed_currency: true, currency: null, roas: null, cash_roas: null, cac: null, cpl: null }),
+      [{ ...channels[0], spend: null, cpl: null }],
+      [{ ...campaignRows[0], spend: null, cpl: null }]);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/mixes more than one spend currency/i);
+    expect(within(figure("Spend")).getByText(/spend currencies are mixed/i)).toBeInTheDocument();
+    expect(within(figure("CAC")).getByText(/spend currencies are mixed/i)).toBeInTheDocument();
+    expect(screen.queryByText("NaN")).not.toBeInTheDocument();
   });
 
   it("does not render a missing lead currency total as zero or NaN", async () => {

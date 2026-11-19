@@ -84,17 +84,24 @@ begin
     raise exception 'Mixed lead currencies returned Finance Controller money'; end if;
   insert into public.client_marketing_spend(client_id,campaign_id,channel,spent_on,amount,currency)
   values(cid,'c6160000-0000-4000-8000-000000000001','website',current_date,20,'USD');
+  select * into v from public.client_economics(cid,current_date-1,current_date+1);
+  if v.spend is not null or not v.mixed_currency then
+    raise exception 'Mixed spend currencies returned Economics total'; end if;
   select * into v from public.client_economics_by_channel(cid,current_date-1,current_date+1)
     where channel='website';
-  if v.cpl is not null or v.cac is not null or v.roas is not null then
+  if v.spend is not null or v.cpl is not null or v.cac is not null or v.roas is not null then
     raise exception 'Mixed spend currencies returned channel costs'; end if;
   select * into v from public.client_economics_by_campaign(cid,current_date-1,current_date+1)
     where campaign_id='c6160000-0000-4000-8000-000000000001';
-  if v.cpl is not null or v.cac is not null or v.roas is not null then
+  if v.spend is not null or v.cpl is not null or v.cac is not null or v.roas is not null then
     raise exception 'Mixed spend currencies returned campaign costs'; end if;
+  packet:=mcp_internal.cohort_economics(cid,current_date-1,current_date+1);
+  if packet->'spend' is distinct from 'null'::jsonb or packet->>'mixed_currency'<>'true' then
+    raise exception 'Mixed spend currencies returned Finance Controller total'; end if;
   rows:=mcp_internal.cohort_economics_by_campaign(cid,current_date-1,current_date+1,
     'c6160000-0000-4000-8000-000000000001',25);
-  if rows->0->>'cpl' is not null or rows->0->>'cac' is not null then
+  if rows->0->'spend' is distinct from 'null'::jsonb
+     or rows->0->>'cpl' is not null or rows->0->>'cac' is not null then
     raise exception 'Mixed spend currencies returned Finance Controller costs'; end if;
 end $checks$;
 -- Historical positive amounts can lack currency; never infer it from spend.

@@ -12,7 +12,7 @@
 // 0.00 reads as "this failed" when the truth is "nothing has landed yet".
 
 export type Economics = {
-  spend: number;
+  spend: number | null;
   leads: number;
   qualified_leads: number;
   appointments: number;
@@ -65,7 +65,8 @@ export function showCost(value: number | null, currency: string | null, stage: s
  * revenue yet means the cohort has not matured. Saying which is the difference
  * between a reader believing the campaign failed and knowing it is early.
  */
-export function showRatio(value: number | null, spend: number, revenue: number): Shown {
+export function showRatio(value: number | null, spend: number | null, revenue: number): Shown {
+  if (spend === null) return { unavailable: "Spend currencies are mixed" };
   if (spend === 0) return { unavailable: "No spend recorded in this period" };
   if (revenue === 0) return { unavailable: "No revenue from this cohort yet" };
   if (value === null) return { unavailable: "Not calculable" };

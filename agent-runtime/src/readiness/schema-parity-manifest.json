@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "724c82672c3b34e57c0d18a1b504b6a30d8f023cc0b06c2948ec0623a2e98dfa",
+  "migrationSourceDigest": "a3fa5bbd39c275c431f6e8bb902721907639b2852d25f6336be8dba0ef172488",
   "generatedTypesSha256": "0a0aa8af22037d5baadc692c280bbf4f1e2776b8b2098101ed836f8a2efb0744",
   "generatedSchemaBodySha256": "3ce8b68fa55f58bd7ba99f196188e95bd1c0ec67cb153ea6ced7f5b421d2a8fa",
   "localMigrations": [
@@ -4432,8 +4432,8 @@
       "version": "20261124045100",
       "name": "616_economics_currency_comparability",
       "filename": "20261124045100_616_economics_currency_comparability.sql",
-      "sha256": "aec079506755f701fac98bb7ee6b35a2fc1ae7fcfe69eb2ff7b431fa0162d41d",
-      "trimmedMd5": "e3e12c8a0a7e7a483b642efe7edac18e"
+      "sha256": "c89cb5e3109b6fa4990cf5af6846637e6cb260b499a250be4180c056efa46893",
+      "trimmedMd5": "ba2caa516f5990a07641a17df67389af"
     },
     {
       "version": "20261124045200",

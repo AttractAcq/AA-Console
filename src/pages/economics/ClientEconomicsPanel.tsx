@@ -22,7 +22,7 @@ import {
 
 type ChannelRow = {
   channel: string;
-  spend: number;
+  spend: number | null;
   leads: number;
   customers: number;
   revenue: number | null;
@@ -158,8 +158,8 @@ export function ClientEconomicsPanel() {
       )}
       {totals?.mixed_currency && (
         <p role="alert" className="mb-4 text-sm text-destructive">
-          This window mixes more than one currency, so the ratios below cannot be calculated. Record
-          spend for a client in one currency.
+          This window mixes more than one spend currency. Combined spend and return ratios are unavailable;
+          review the separate currency amounts below.
         </p>
       )}
       <p className="mb-4 text-xs text-muted-foreground">Lead money totals require one recorded currency for every positive amount. Return multiples also require that currency to match spend. Review the currency breakdown below; return multiples remain hidden in this summary.</p>
@@ -171,7 +171,9 @@ export function ClientEconomicsPanel() {
       ) : (
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
-            <Figure label="Spend" shown={{ value: money(totals.spend, cur) }} hint="Recorded in this window" />
+            <Figure label="Spend" shown={totals.spend === null
+              ? { unavailable: "Spend currencies are mixed; see the currency breakdown" }
+              : { value: money(totals.spend, cur) }} hint="Recorded in this window" />
             <Figure
               label="Revenue"
               shown={
@@ -193,7 +195,9 @@ export function ClientEconomicsPanel() {
                   : { unavailable: "No cash collected yet" }
               }
             />
-            <Figure label="CAC" shown={showCost(totals.cac, cur, "customers")} hint="Spend per customer" />
+            <Figure label="CAC" shown={totals.mixed_currency
+              ? { unavailable: "Spend currencies are mixed" }
+              : showCost(totals.cac, cur, "customers")} hint="Spend per customer" />
             <Figure
               label="ROAS"
               shown={totals.revenue === null
@@ -235,10 +239,10 @@ export function ClientEconomicsPanel() {
               columns={["Stage", "Count", "Cost each"]}
               emptyLabel="No funnel data in this window"
               rows={[
-                ["Leads acquired", String(totals.leads), showCost(totals.cpl, cur, "leads")],
-                ["Qualified", String(totals.qualified_leads), showCost(totals.cpql, cur, "qualified leads")],
-                ["Appointments", String(totals.appointments), showCost(totals.cpa, cur, "appointments")],
-                ["Customers", String(totals.customers), showCost(totals.cac, cur, "customers")],
+                ["Leads acquired", String(totals.leads), totals.mixed_currency ? { unavailable: "Spend currencies are mixed" } : showCost(totals.cpl, cur, "leads")],
+                ["Qualified", String(totals.qualified_leads), totals.mixed_currency ? { unavailable: "Spend currencies are mixed" } : showCost(totals.cpql, cur, "qualified leads")],
+                ["Appointments", String(totals.appointments), totals.mixed_currency ? { unavailable: "Spend currencies are mixed" } : showCost(totals.cpa, cur, "appointments")],
+                ["Customers", String(totals.customers), totals.mixed_currency ? { unavailable: "Spend currencies are mixed" } : showCost(totals.cac, cur, "customers")],
               ].map(([stage, count, cost]) => [
                 stage as string,
                 count as string,
@@ -266,11 +270,11 @@ export function ClientEconomicsPanel() {
               emptyLabel="No spend or leads in this window"
               rows={byChannel.map((r) => [
                 r.channel,
-                money(Number(r.spend), cur),
+                r.spend === null || totals.mixed_currency ? "—" : money(r.spend, cur),
                 String(r.leads),
                 String(r.customers),
                 r.revenue === null ? "—" : money(Number(r.revenue), null),
-                r.cpl === null ? "—" : money(Number(r.cpl), cur),
+                r.cpl === null || totals.mixed_currency ? "—" : money(Number(r.cpl), cur),
                 "—",
               ])}
             />
@@ -283,11 +287,11 @@ export function ClientEconomicsPanel() {
               emptyLabel="No spend or leads in this window"
               rows={byCampaign.map((r) => [
                 r.campaign_ref,
-                money(Number(r.spend), cur),
+                r.spend === null || totals.mixed_currency ? "—" : money(r.spend, cur),
                 String(r.leads),
                 String(r.customers),
                 r.revenue === null ? "—" : money(Number(r.revenue), null),
-                r.cpl === null ? "—" : money(Number(r.cpl), cur),
+                r.cpl === null || totals.mixed_currency ? "—" : money(Number(r.cpl), cur),
                 "—",
               ])}
             />

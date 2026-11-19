@@ -93,7 +93,7 @@ begin
     and p.created_at <  p_until::timestamptz;
 
   return query select
-    v_spend,
+    case when v_mixed then null else v_spend end,
     v_leads, v_qual, v_appts, v_custs,
     case when v_rev=0 then 0
          when v_sale_missing=0 and v_sale_currencies=1 then v_rev end,
@@ -187,7 +187,7 @@ begin
     group by 1
   )
   select coalesce(s.k, l.k),
-         coalesce(s.spend, 0),
+         case when s.currency_count>1 then null else coalesce(s.spend, 0) end,
          coalesce(l.leads, 0),
          coalesce(l.customers, 0),
          case when coalesce(l.revenue,0)=0 then 0
@@ -270,7 +270,7 @@ begin
   )
   select coalesce(s.k, l.k),
          coalesce(c.campaign_ref, '(unattributed)'),
-         coalesce(s.spend, 0),
+         case when s.currency_count>1 then null else coalesce(s.spend, 0) end,
          coalesce(l.leads, 0),
          coalesce(l.customers, 0),
          case when coalesce(l.revenue,0)=0 then 0
@@ -350,7 +350,7 @@ begin
   ) p;
 
   return jsonb_build_object(
-    'spend', v_spend,
+    'spend', case when v_mixed then null else v_spend end,
     'leads', v_leads,
     'qualified_leads', v_qual,
     'appointments', v_appts,
@@ -390,7 +390,7 @@ begin
   select coalesce(jsonb_agg(to_jsonb(x) order by x.spend desc, x.campaign_ref),'[]') into items from (
     select coalesce(s.k, l.k) as campaign_id,
            coalesce(c.campaign_ref, '(unattributed)') as campaign_ref,
-           coalesce(s.spend, 0) as spend,
+           case when s.currency_count>1 then null else coalesce(s.spend, 0) end as spend,
            coalesce(l.leads, 0) as leads,
            coalesce(l.customers, 0) as customers,
            case when coalesce(l.revenue,0)=0 then 0
