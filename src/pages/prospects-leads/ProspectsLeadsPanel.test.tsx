@@ -213,6 +213,8 @@ describe("AA lead funnel", () => {
     }]);
     await userEvent.click(await screen.findByRole("button", { name: "Archive (1)" }));
     expect(screen.getByText("Old prospect")).toBeInTheDocument();
+    expect(screen.getByText("500 (currency unrecorded)")).toBeInTheDocument();
+    expect(screen.queryByText("R500")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "View" }));
     expect(screen.getByText("Called")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Archive list/ }));
