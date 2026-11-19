@@ -92,10 +92,33 @@ begin
     or (select status from public.approval_inbox_v6 where id=request_id)='approved'
     then raise exception 'Storage replacement left creative approval current'; end if;
   begin
+    perform public.review_media_asset(v_asset_id,'approved'::public.review_status);
+    raise exception 'Direct repeat approval bypassed stale exact decision';
+  exception when insufficient_privilege then null; end;
+  begin
     perform public.schedule_asset(v_asset_id,current_date+1);
     raise exception 'Stale creative scheduled';
   exception when SQLSTATE 'P0001' then
     if SQLERRM not like '%exact creative signoff is missing or stale%' then raise; end if;
   end;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform public.attest_creative_storage_bytes_v6(
+    v_asset_id,'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/creative.png',repeat('b',64),15,
+    'dddddddd-dddd-4ddd-8ddd-dddddddddddd','v2',
+    (select updated_at from storage.objects where id='dddddddd-dddd-4ddd-8ddd-dddddddddddd'));
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  request_id:=public.request_ordinary_media_review_v6(v_asset_id);
+  select id into review_id from public.ordinary_media_review_requests_v6
+    where canonical_request_id=request_id;
+  if (select count(*) from public.ordinary_media_reopen_events_v8 where asset_id=v_asset_id)<>1
+    or (select count(*) from public.ordinary_media_signoffs_v6 where asset_id=v_asset_id)<>1
+    or (select human_approved_at from public.client_media_assets where id=v_asset_id) is not null
+    or public.ordinary_media_review_source_state_v6(request_id)<>'pending' then
+    raise exception 'Stale creative did not reopen while preserving prior signoff'; end if;
+  perform public.approve_ordinary_media_inbox_v6(review_id,request_id);
+  if (select count(*) from public.ordinary_media_signoffs_v6 where asset_id=v_asset_id)<>2
+    or not public.ordinary_media_signoff_current_v6(v_asset_id)
+    or (select status from public.approval_inbox_v6 where id=request_id)<>'approved' then
+    raise exception 'New exact approval did not replace stale authority'; end if;
 end $checks$;
 rollback;

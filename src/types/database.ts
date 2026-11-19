@@ -22427,6 +22427,177 @@ export type Database = {
         }
         Relationships: []
       }
+      ordinary_media_reopen_events_v8: {
+        Row: {
+          asset_id: string
+          client_id: string
+          id: string
+          prior_request_id: string
+          reason: string
+          reopened_at: string
+          reopened_by: string
+        }
+        Insert: {
+          asset_id: string
+          client_id: string
+          id?: string
+          prior_request_id: string
+          reason: string
+          reopened_at?: string
+          reopened_by: string
+        }
+        Update: {
+          asset_id?: string
+          client_id?: string
+          id?: string
+          prior_request_id?: string
+          reason?: string
+          reopened_at?: string
+          reopened_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_presence"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_prior_request_id_fkey"
+            columns: ["prior_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_prior_request_id_fkey"
+            columns: ["prior_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_prior_request_id_fkey"
+            columns: ["prior_request_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_approval_execution_evidence_v6"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_reopen_events_v8_reopened_by_fkey"
+            columns: ["reopened_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ordinary_media_review_requests_v6: {
         Row: {
           asset_id: string
@@ -22655,6 +22826,7 @@ export type Database = {
           approved_request_id: string
           asset_id: string
           client_id: string
+          id: string
         }
         Insert: {
           approved_at?: string
@@ -22663,6 +22835,7 @@ export type Database = {
           approved_request_id: string
           asset_id: string
           client_id: string
+          id?: string
         }
         Update: {
           approved_at?: string
@@ -22671,6 +22844,7 @@ export type Database = {
           approved_request_id?: string
           asset_id?: string
           client_id?: string
+          id?: string
         }
         Relationships: [
           {
@@ -22760,84 +22934,84 @@ export type Database = {
           {
             foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
             columns: ["asset_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "approval_inbox"
             referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
             columns: ["asset_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "approval_queue_slots"
             referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
             columns: ["asset_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "approvals_queue"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
             columns: ["asset_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "client_media_assets"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
             columns: ["asset_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "content_archive_metric_coverage_v8"
             referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
             columns: ["asset_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
             columns: ["asset_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "meta_profile_presence"
             referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
             columns: ["asset_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "ordinary_media_current_status_v6"
             referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
             columns: ["asset_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
           },
           {
             foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
             columns: ["asset_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "recruitment_media_ready_v6"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
             columns: ["asset_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
             columns: ["asset_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
           },

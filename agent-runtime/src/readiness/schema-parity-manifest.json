@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "4ef7143e7c5818d474c1bd535f8aa6ce0c940645b1dda3be2816c7ef3a435d7f",
-  "generatedTypesSha256": "8fca847562ecad6fedb524d155c3fddbda856876dbac65b7cfb41edf3281dda1",
-  "generatedSchemaBodySha256": "71f8208e3518271e801b92f54c3c90b854cc36329e791132baf1de9766668637",
+  "migrationSourceDigest": "dd57860aa28247cf98caf5bc53aa2da6f055938834e0b201d0fc3a2491d215fd",
+  "generatedTypesSha256": "66c2aea6db24ce89cd2913deabe5f794df727969d2723775f04f7cfcd00a0327",
+  "generatedSchemaBodySha256": "541573b8f8611eddf5e2b2affffcdb34ce9a147120e7392fdbc00601350000bd",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4329,6 +4329,13 @@
       "filename": "20261124043600_601_creative_frame_byte_evidence.sql",
       "sha256": "f1b2f5da9c38d93e1d29eafaf70cd29cd30a822bf9f09262eeca5ff2028100aa",
       "trimmedMd5": "760ef0d026c8833f620653cefd028505"
+    },
+    {
+      "version": "20261124043700",
+      "name": "602_ordinary_media_rereview",
+      "filename": "20261124043700_602_ordinary_media_rereview.sql",
+      "sha256": "cb422db6b0aae76eab69241b2dc3f73671d92172e9942eabe88d79289d0daa88",
+      "trimmedMd5": "b6d248044c32e1d73b4acf01670c207b"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
