@@ -13,7 +13,7 @@ import { ProspectsLeadsPanel } from "./ProspectsLeadsPanel";
 const lead = (over: Record<string, unknown> = {}) => ({
   id: "lead-1", name: "Naledi K", contact: null, email: "naledi@example.com", phone: null,
   stage: "conversation", stage_at: "2026-09-01T00:00:00Z", next_action: "Send quote",
-  next_action_due: "2026-09-30", opportunity_value: 12000, sale_value: null, sale_currency: null,
+  next_action_due: "2026-09-30", opportunity_value: 12000, opportunity_currency: null, sale_value: null, sale_currency: null,
   cash_collected: null, cash_currency: null, source_channel: "Instagram reel", owner_member_id: null,
   appointment_at: null, appointment_outcome: null, ...over,
 });
@@ -62,11 +62,24 @@ describe("AA lead funnel", () => {
     await userEvent.type(within(dialog).getByLabelText(/^Name/), "New Prospect");
     await userEvent.type(within(dialog).getByLabelText("Email"), "new@example.com");
     await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_manual_lead", {
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_manual_lead_with_currency", {
       p_client_id: "client-1", p_name: "New Prospect", p_email: "new@example.com",
       p_phone: undefined, p_owner_member_id: undefined, p_next_action: undefined,
-      p_next_action_due: undefined, p_opportunity_value: undefined,
+      p_next_action_due: undefined, p_opportunity_value: undefined, p_opportunity_currency: undefined,
     }));
+  });
+
+  it("records an explicit currency with a new positive opportunity value", async () => {
+    show();
+    await screen.findByText("Naledi K");
+    await userEvent.click(screen.getByRole("button", { name: "Add Lead" }));
+    const dialog = screen.getByRole("dialog", { name: "Add Lead" });
+    await userEvent.type(within(dialog).getByLabelText(/^Name/), "Currency buyer");
+    await userEvent.type(within(dialog).getByLabelText("Opportunity value"), "250");
+    await userEvent.type(within(dialog).getByLabelText(/Opportunity currency/), "USD");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_manual_lead_with_currency",
+      expect.objectContaining({ p_opportunity_value: 250, p_opportunity_currency: "USD" })));
   });
 
   it("renders the nine stages in order and keeps Lost collapsed", async () => {
@@ -97,8 +110,15 @@ describe("AA lead funnel", () => {
   it("shows cash only with a single recorded currency and does not invent an opportunity currency", async () => {
     show([lead({ cash_collected: 100, cash_currency: "USD" })]);
     expect(await screen.findByText("USD 100")).toBeInTheDocument();
-    expect(screen.getByText(/Opportunity values have no recorded currency/)).toBeInTheDocument();
+    expect(screen.getByText(/Mixed or unverified opportunity currencies/)).toBeInTheDocument();
     expect(screen.queryByText("R12,000")).not.toBeInTheDocument();
+  });
+
+  it("sums open opportunity values only when their currencies match", async () => {
+    show([lead({ opportunity_currency: "USD" }),
+      lead({ id: "lead-2", name: "Second", opportunity_value: 300, opportunity_currency: "USD" })]);
+    expect(await screen.findByText("USD 12,300")).toBeInTheDocument();
+    expect(screen.getByText(/USD 12,000/)).toBeInTheDocument();
   });
 
   it("holds a cash total when a legacy amount has no currency", async () => {

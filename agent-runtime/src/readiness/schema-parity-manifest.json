@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "5464457def93c05e6bcf5f691fff2f92cc414da3bfeaddbaf14782453dea0fec",
-  "generatedTypesSha256": "0af3d6cd830d104d730478c2558e8e70b26bd055601b05d05615884592e50a35",
-  "generatedSchemaBodySha256": "988528babc43162c841d4b2e181825476a0b5caa42865e5249e41a8ccb5ab041",
+  "migrationSourceDigest": "b33d069dbf26c7f11b054629e359b15474581a0c13f22e958ada5dc7908f7227",
+  "generatedTypesSha256": "48aa5e51da896818715cd8444829e0e2953a0b24383a0aef97ca654c21a6a484",
+  "generatedSchemaBodySha256": "b8a33e7a545d77d84d88cc166241806c566c09527ae3ee015a8d073722fdca90",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4434,6 +4434,13 @@
       "filename": "20261124045100_616_economics_currency_comparability.sql",
       "sha256": "aec079506755f701fac98bb7ee6b35a2fc1ae7fcfe69eb2ff7b431fa0162d41d",
       "trimmedMd5": "e3e12c8a0a7e7a483b642efe7edac18e"
+    },
+    {
+      "version": "20261124045200",
+      "name": "617_opportunity_currency_capture",
+      "filename": "20261124045200_617_opportunity_currency_capture.sql",
+      "sha256": "515034e06cb516a04be4191c2d692f35c35d97c4c262617a563ed2059a9a65f9",
+      "trimmedMd5": "4cd1c29702cd184984e843fadfb7e523"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

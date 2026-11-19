@@ -6,7 +6,7 @@ import type { Lead } from "./types";
 const lead: Lead = {
   id: "lead-1", name: "Sam", contact: "sam@example.test", email: "sam@example.test",
   phone: null, stage: "shown", stage_at: "2026-11-19T08:00:00Z",
-  next_action: null, next_action_due: null, opportunity_value: 5000,
+  next_action: null, next_action_due: null, opportunity_value: 5000, opportunity_currency: null,
   sale_value: 3000, sale_currency: null, cash_collected: 1000, cash_currency: null, source_channel: "website",
   owner_member_id: "owner-1", appointment_at: null, appointment_outcome: null,
 };
@@ -32,5 +32,8 @@ describe("lead detail changes", () => {
     expect(changedLeadFieldsPayload({ ...baseline, sale_value: "4000", sale_currency: "usd" }, baseline))
       .toEqual({ sale_value: 4000, sale_currency: "USD" });
     expect(() => changedLeadFieldsPayload({ ...baseline, cash_currency: "US" }, baseline)).toThrow(/three-letter ISO currency/i);
+    expect(() => changedLeadFieldsPayload({ ...baseline, opportunity_value: "6000" }, baseline)).toThrow(/opportunity currency is required/i);
+    expect(changedLeadFieldsPayload({ ...baseline, opportunity_value: "6000", opportunity_currency: "eur" }, baseline))
+      .toEqual({ opportunity_value: 6000, opportunity_currency: "EUR" });
   });
 });

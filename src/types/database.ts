@@ -8395,6 +8395,7 @@ export type Database = {
           next_action: string | null
           next_action_due: string | null
           notes: string | null
+          opportunity_currency: string | null
           opportunity_value: number | null
           owner_member_id: string | null
           phone: string | null
@@ -8436,6 +8437,7 @@ export type Database = {
           next_action?: string | null
           next_action_due?: string | null
           notes?: string | null
+          opportunity_currency?: string | null
           opportunity_value?: number | null
           owner_member_id?: string | null
           phone?: string | null
@@ -8477,6 +8479,7 @@ export type Database = {
           next_action?: string | null
           next_action_due?: string | null
           notes?: string | null
+          opportunity_currency?: string | null
           opportunity_value?: number | null
           owner_member_id?: string | null
           phone?: string | null
@@ -40288,6 +40291,20 @@ export type Database = {
           p_name: string
           p_next_action?: string
           p_next_action_due?: string
+          p_opportunity_value?: number
+          p_owner_member_id?: string
+          p_phone?: string
+        }
+        Returns: string
+      }
+      create_manual_lead_with_currency: {
+        Args: {
+          p_client_id: string
+          p_email?: string
+          p_name: string
+          p_next_action?: string
+          p_next_action_due?: string
+          p_opportunity_currency?: string
           p_opportunity_value?: number
           p_owner_member_id?: string
           p_phone?: string
