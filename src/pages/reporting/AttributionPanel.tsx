@@ -77,7 +77,10 @@ const WINDOWS = [
   { days: 90, label: "90 days" },
 ];
 
-const money = (v: number | null) => (v === null ? "—" : `R${Number(v).toLocaleString()}`);
+const amount = (v: number | null) => (v === null ? "—" : Number(v).toLocaleString());
+const spendMoney = (v: number | null, currency: string | null) =>
+  v === null ? "—" : currency === "ZAR" ? `R${Number(v).toLocaleString()}`
+    : `${currency ?? "currency unknown"} ${Number(v).toLocaleString()}`;
 
 /**
  * What caused what.
@@ -162,8 +165,8 @@ function ClientAttributionPanel({ clientId }: { clientId: string | undefined }) 
   const attributed = top.filter((r) => r.leads > 0).length;
   const noSpendRows = coverage?.spend_rows === 0;
   const mixedCurrencies = (coverage?.spend_currencies ?? 0) > 1;
-  const spendComparable = !!coverage && coverage.spend_rows > 0
-    && coverage.spend_currencies === 1 && coverage.spend_currency === "ZAR";
+  const singleSpendCurrency = !!coverage && coverage.spend_rows > 0
+    && coverage.spend_currencies === 1 && !!coverage.spend_currency;
 
   return (
     <div className="space-y-6">
@@ -226,9 +229,9 @@ function ClientAttributionPanel({ clientId }: { clientId: string | undefined }) 
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Cash collected</p>
+          <p className="text-sm text-muted-foreground">Cash collected · currency unrecorded</p>
           <p className="mt-1 text-2xl font-semibold text-card-foreground">
-            {money(funnel?.cash_collected ?? null)}
+            {amount(funnel?.cash_collected ?? null)}
           </p>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
@@ -245,17 +248,15 @@ function ClientAttributionPanel({ clientId }: { clientId: string | undefined }) 
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-sm text-muted-foreground">Cost per lead</p>
           <p className="mt-1 text-2xl font-semibold text-card-foreground">
-            {spendComparable ? money(funnel?.cost_per_lead ?? null) : "—"}
+            {singleSpendCurrency ? spendMoney(funnel?.cost_per_lead ?? null, coverage?.spend_currency ?? null) : "—"}
           </p>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-sm text-muted-foreground">Return on spend</p>
           <p className="mt-1 text-2xl font-semibold text-card-foreground">
-            {!spendComparable || funnel?.return_on_spend === null || funnel?.return_on_spend === undefined
-              ? "—"
-              : `${funnel.return_on_spend}×`}
+            —
           </p>
-          {spendComparable && <p className="mt-1 text-xs text-muted-foreground">Recorded cash divided by recorded spend in this window; this does not prove which ad caused a sale.</p>}
+          <p className="mt-1 text-xs text-muted-foreground">Lead cash has no recorded currency, so it cannot be compared with spend.</p>
         </div>
       </div>
 
@@ -266,9 +267,7 @@ function ClientAttributionPanel({ clientId }: { clientId: string | undefined }) 
           No spend ledger entries are recorded in this window. Cost per lead and return on spend are unknown until spend coverage is checked; paid impressions are tracked separately. Connect Meta or Google Ads under Account → Integrations and reconcile provider results with the spend ledger. The recorded revenue above does not depend on an ads connection.
         </p>
       )}
-      {mixedCurrencies && <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">Spend entries use more than one currency. Cost per lead and return on spend are hidden until amounts are converted to one reviewed currency.</p>}
-      {coverage && coverage.spend_rows > 0 && !mixedCurrencies && coverage.spend_currency !== "ZAR"
-        && <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">Spend is recorded in {coverage.spend_currency ?? "an unknown currency"}; lead revenue has no stored currency. Cost per lead and return on spend are hidden until the amounts can be compared.</p>}
+      {mixedCurrencies && <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">Spend entries use more than one currency. Cost per lead is hidden until spend is converted to one reviewed currency; return on spend also needs a recorded cash currency.</p>}
 
       <div>
         <h2 className="mb-3 text-sm font-semibold text-foreground">
@@ -287,7 +286,7 @@ function ClientAttributionPanel({ clientId }: { clientId: string | undefined }) 
                 r.idea_title ?? "—",
                 String(r.leads),
                 String(r.sales),
-                money(r.cash_collected),
+                amount(r.cash_collected),
               ])}
             />
             <p className="mt-2 text-xs text-muted-foreground">

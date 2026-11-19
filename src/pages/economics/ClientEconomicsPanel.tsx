@@ -157,6 +157,7 @@ export function ClientEconomicsPanel() {
           spend for a client in one currency.
         </p>
       )}
+      <p className="mb-4 text-xs text-muted-foreground">Lead revenue and cash have no stored currency. Their amounts below are currency-unverified; return multiples are hidden until the currency is recorded and comparable with spend.</p>
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
@@ -170,28 +171,32 @@ export function ClientEconomicsPanel() {
               label="Revenue"
               shown={
                 totals.revenue > 0
-                  ? { value: money(totals.revenue, cur) }
+                  ? { value: money(totals.revenue, null) }
                   : { unavailable: "No revenue from this cohort yet" }
               }
-              hint="From leads acquired in this window"
+              hint="From leads acquired in this window · currency unrecorded"
             />
             <Figure
               label="Cash collected"
               shown={
                 totals.cash_collected > 0
-                  ? { value: money(totals.cash_collected, cur) }
+                  ? { value: money(totals.cash_collected, null) }
                   : { unavailable: "No cash collected yet" }
               }
             />
             <Figure label="CAC" shown={showCost(totals.cac, cur, "customers")} hint="Spend per customer" />
             <Figure
               label="ROAS"
-              shown={showRatio(totals.roas, totals.spend, totals.revenue)}
+              shown={totals.revenue > 0
+                ? { unavailable: "Lead revenue currency is not recorded" }
+                : showRatio(totals.roas, totals.spend, totals.revenue)}
               hint="Revenue ÷ spend"
             />
             <Figure
               label="Cash ROAS"
-              shown={showRatio(totals.cash_roas, totals.spend, totals.cash_collected)}
+              shown={totals.cash_collected > 0
+                ? { unavailable: "Lead cash currency is not recorded" }
+                : showRatio(totals.cash_roas, totals.spend, totals.cash_collected)}
               hint="Cash ÷ spend"
             />
           </div>
@@ -229,16 +234,16 @@ export function ClientEconomicsPanel() {
           <div>
             <h2 className="mb-3 text-sm font-semibold text-foreground">By channel</h2>
             <DataTable
-              columns={["Channel", "Spend", "Leads", "Customers", "Revenue", "CPL", "ROAS"]}
+              columns={["Channel", "Spend", "Leads", "Customers", "Revenue (currency unrecorded)", "CPL", "ROAS"]}
               emptyLabel="No spend or leads in this window"
               rows={byChannel.map((r) => [
                 r.channel,
                 money(Number(r.spend), cur),
                 String(r.leads),
                 String(r.customers),
-                money(Number(r.revenue), cur),
+                money(Number(r.revenue), null),
                 r.cpl === null ? "—" : money(Number(r.cpl), cur),
-                Number(r.revenue) > 0 && r.roas !== null ? `${Number(r.roas).toFixed(2)}×` : "—",
+                "—",
               ])}
             />
           </div>
@@ -246,16 +251,16 @@ export function ClientEconomicsPanel() {
           <div>
             <h2 className="mb-3 text-sm font-semibold text-foreground">By ad spend tracker (legacy)</h2>
             <DataTable
-              columns={["Ad spend tracker", "Spend", "Leads", "Customers", "Revenue", "CPL", "ROAS"]}
+              columns={["Ad spend tracker", "Spend", "Leads", "Customers", "Revenue (currency unrecorded)", "CPL", "ROAS"]}
               emptyLabel="No spend or leads in this window"
               rows={byCampaign.map((r) => [
                 r.campaign_ref,
                 money(Number(r.spend), cur),
                 String(r.leads),
                 String(r.customers),
-                money(Number(r.revenue), cur),
+                money(Number(r.revenue), null),
                 r.cpl === null ? "—" : money(Number(r.cpl), cur),
-                Number(r.revenue) > 0 && r.roas !== null ? `${Number(r.roas).toFixed(2)}×` : "—",
+                "—",
               ])}
             />
           </div>

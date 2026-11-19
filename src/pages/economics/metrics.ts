@@ -3,8 +3,8 @@
 //
 // Pure and separate from the panel so these rules can be tested and mutated
 // without rendering anything. They are display rules, not maths: the database
-// returns the mathematically correct value and this decides what a person
-// should be shown.
+// returns arithmetic values, but lead revenue lacks a stored currency and
+// cannot yet be compared with the spend ledger.
 //
 // The distinction that matters: a spend of zero is a fact and shows as 0. A
 // ratio whose denominator is zero is unknown and shows as "—". And a ratio of

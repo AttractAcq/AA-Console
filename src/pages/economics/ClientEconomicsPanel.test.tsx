@@ -79,7 +79,7 @@ function show(totals: Eco | null = healthy(), ch = channels, cp = campaignRows) 
 }
 
 const figure = (label: string) =>
-  screen.getByText(label).closest("div")?.parentElement as HTMLElement;
+  screen.getByRole("heading", { name: label }).closest("section") as HTMLElement;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -87,12 +87,15 @@ beforeEach(() => {
 });
 
 describe("headline economics", () => {
-  it("shows spend, revenue and the two return multiples", async () => {
+  it("shows spend in its currency without assigning that currency to lead revenue", async () => {
     show();
     expect(await screen.findByText("R10,000")).toBeInTheDocument();
-    expect(screen.getByText("R40,000")).toBeInTheDocument();
-    expect(screen.getByText("4.00×")).toBeInTheDocument();
-    expect(screen.getByText("2.00×")).toBeInTheDocument();
+    expect(within(figure("Revenue")).getByText("40,000")).toBeInTheDocument();
+    expect(within(figure("ROAS")).getByText("—")).toBeInTheDocument();
+    expect(within(figure("Cash ROAS")).getByText("—")).toBeInTheDocument();
+    expect(screen.queryByText("4.00×")).not.toBeInTheDocument();
+    expect(screen.queryByText("2.00×")).not.toBeInTheDocument();
+    expect(screen.getByText(/Lead revenue and cash have no stored currency/)).toBeInTheDocument();
     // R5,000 is CAC in the headline and also the Customers cost in the funnel
     // table below — both are correct, so scope to the headline panel.
     expect(within(figure("CAC")).getByText("R5,000")).toBeInTheDocument();
@@ -159,12 +162,13 @@ describe("breakdowns", () => {
     expect(await screen.findByText("(unattributed)")).toBeInTheDocument();
   });
 
-  it("does not print a ROAS for a bucket with no revenue", async () => {
+  it("does not print a ROAS for any bucket while lead revenue currency is unknown", async () => {
     show();
     await screen.findByText("(unattributed)");
     const table = screen.getByText("(unattributed)").closest("table") as HTMLElement;
-    // instagram has 5.00×; the unattributed row must not claim 0.00×.
-    expect(within(table).getByText("5.00×")).toBeInTheDocument();
+    expect(within(table).queryByText("5.00×")).not.toBeInTheDocument();
+    expect(within(table).getByText("30,000")).toBeInTheDocument();
+    expect(within(table).queryByText("R30,000")).not.toBeInTheDocument();
     expect(within(table).queryByText("0.00×")).not.toBeInTheDocument();
   });
 });
