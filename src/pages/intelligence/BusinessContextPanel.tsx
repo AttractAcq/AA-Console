@@ -9,6 +9,7 @@ import type { FieldDef, FormValues } from "../../components/forms/fields";
 import { supabase } from "../../lib/supabase";
 import { OnboardingSource } from "../../components/OnboardingSource";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
+import type { Database } from "../../types/database";
 
 /**
  * The root of the whole application. Every agent reads this, and the four
@@ -31,7 +32,11 @@ const FIELDS: FieldDef[] = [
   { name: "target_revenue", label: "Target revenue", kind: "text" },
 ];
 
-const CARDS: Array<{ key: string; label: string; hero?: boolean }> = [
+type ContextField = "business_overview" | "ideal_customer" | "main_offer" | "competitors"
+  | "brand_voice" | "proof_testimonials" | "current_marketing" | "sales_process"
+  | "current_revenue" | "target_revenue";
+
+const CARDS: Array<{ key: ContextField; label: string; hero?: boolean }> = [
   { key: "business_overview", label: "Business Overview", hero: true },
   { key: "current_revenue", label: "Current Revenue" },
   { key: "target_revenue", label: "Target Revenue" },
@@ -58,8 +63,8 @@ export function BusinessContextPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [row, setRow] = useState<ContextRow | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [savedKey, setSavedKey] = useState<string | null>(null);
+  const [editingKey, setEditingKey] = useState<ContextField | null>(null);
+  const [savedKey, setSavedKey] = useState<ContextField | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) return;
@@ -135,8 +140,10 @@ export function BusinessContextPanel() {
         onSubmit={async (values) => {
           if (!clientId || !editingKey) throw new Error("No business field selected.");
           const value = String(values[editingKey] ?? "").trim();
+          const payload: Database["public"]["Tables"]["client_business_context"]["Insert"] = { client_id: clientId };
+          payload[editingKey] = value || null;
           const { error } = await supabase.from("client_business_context")
-            .upsert({ client_id: clientId, [editingKey]: value || null }, { onConflict: "client_id" });
+            .upsert(payload, { onConflict: "client_id" });
           if (error) throw error;
         }}
         onSaved={() => {
