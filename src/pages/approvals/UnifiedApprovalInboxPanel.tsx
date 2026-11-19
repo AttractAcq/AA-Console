@@ -15,7 +15,7 @@ import { HeldExternalJobs } from "./HeldExternalJobs";
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
   "activation_switch", "campaign_action", "campaign_idea", "client_authority_assignment", "client_sales_entitlement", "creative_requirement", "engine_slot",
-  "gateway_tool", "global_engine_activation", "global_video_owner", "google_profile_change", "google_review_reply", "integration_grant", "lead_magnet", "message_template", "meta_profile_change", "metrics_backfill", "motion_render", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer", "video_seat",
+  "gateway_tool", "global_engine_activation", "global_video_owner", "google_profile_change", "google_review_reply", "integration_grant", "lead_magnet", "message_template", "meta_profile_change", "metrics_backfill", "motion_render", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "organic_publication", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer", "video_seat",
 ] as const;
 type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
 
