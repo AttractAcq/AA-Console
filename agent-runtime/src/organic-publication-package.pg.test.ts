@@ -409,4 +409,55 @@ describe("held exact organic publication package", () => {
     expect(claimed.packet.route_package_id).toBe(source.packet.route_package_id);
     expect((await db.query("select * from claim_posts_for_publishing(5)")).rows).toHaveLength(0);
   });
+
+  it("leases only an exact approved package and rolls back a stale claim", async () => {
+    await db.exec(`
+      create table delivery_approval_invalidations_v6(
+        approval_request_id uuid primary key,invalidated_at timestamptz default now());
+      alter table scheduled_posts add column updated_at timestamptz default now();
+      update scheduled_posts set publication_status='scheduled',publish_claimed_at=null
+        where id='${POST}';
+    `);
+    const migration = await readFile(new URL(
+      "../../supabase/migrations/20261124042400_589_organic_publication_approved_claim.sql",
+      import.meta.url,
+    ), "utf8");
+    await db.exec(migration);
+    const candidate = await one<{ source_snapshot_hash: string }>(
+      "select source_snapshot_hash from organic_publication_package_candidates_v6(5)");
+    const media = [{ source_path: SOURCE, frozen_bucket: "publication-media",
+      frozen_path: FROZEN, sha256: SHA, byte_size: 123, mime_type: "image/png" }];
+    const { id: packageId } = await one<{ id: string }>(
+      "select register_organic_publication_package_v6($1,$2,$3::jsonb,$4::jsonb) as id",
+      [POST, candidate.source_snapshot_hash, JSON.stringify(media),
+        JSON.stringify({ caption: "The exact caption\n\n#proof", first_comment: null })]);
+    const { id: requestId, artifact_hash: artifactHash } = await one<{
+      id: string; artifact_hash: string;
+    }>("select id,artifact_hash from approval_requests_v6 where source_id=$1", [packageId]);
+    expect((await one<{ blocker: string }>(
+      `select blocker from publish_due where post_id='${POST}'`)).blocker)
+      .toMatch(/no current exact AAL2 approval/);
+    expect((await db.query("select * from claim_posts_for_publishing(5)")).rows).toHaveLength(0);
+    await db.query(`insert into approval_decision_events_v6
+      (request_id,event_order,decision,actor_aal,artifact_hash,source_decision_ref)
+      values ($1,1,'approved','aal2',$2,$3)`,
+      [requestId,artifactHash,`organic_publication_packages_v6:${packageId}`]);
+    expect((await one<{ blocker: string | null }>(
+      `select blocker from publish_due where post_id='${POST}'`)).blocker).toBeNull();
+    await db.exec("select set_config('request.jwt.claim.role','authenticated',false)");
+    await expect(db.query("select * from claim_posts_for_publishing(5)"))
+      .rejects.toThrow(/Posts are claimed by the publisher/);
+    await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
+    const claims = (await db.query<{ post_id: string; attempt: number }>(
+      "select * from claim_posts_for_publishing(5)")).rows;
+    expect(claims).toMatchObject([{ post_id: POST, attempt: 2 }]);
+    expect((await db.query("select * from claim_posts_for_publishing(5)")).rows).toHaveLength(0);
+    await db.query("insert into delivery_approval_invalidations_v6(approval_request_id) values ($1)",
+      [requestId]);
+    await expect(db.query(`select require_organic_publication_prewrite_v6('${POST}')`))
+      .rejects.toThrow(/approval was invalidated/);
+    await db.exec(`update scheduled_posts set publication_status='scheduled',
+      publish_claimed_at=null where id='${POST}'`);
+    expect((await db.query("select * from claim_posts_for_publishing(5)")).rows).toHaveLength(0);
+  });
 });

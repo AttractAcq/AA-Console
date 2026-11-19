@@ -42308,6 +42308,10 @@ export type Database = {
           source_snapshot_hash: string
         }[]
       }
+      organic_publication_scheduled_authority_v8: {
+        Args: { p_post_id: string }
+        Returns: boolean
+      }
       organic_publication_source_snapshot_v6: {
         Args: { p_post_id: string }
         Returns: Json

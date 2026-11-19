@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "943de8dd2237d16a93bfefa13c79ce4ae6ccc1b3493e046344c8561dd8f28498",
-  "generatedTypesSha256": "b2c942d6d751a398c6b2f3b15d6c10047f389046526ea9dede9d4ce49603315e",
-  "generatedSchemaBodySha256": "1ea62a175a152cff4f26bc3a75e2249ea2684b24626c9999eec1c5c7b13bbea5",
+  "migrationSourceDigest": "a18092a1408236a5b360c22ab494ccdba8f4837a80b9ab0045a2a768a2d1eafb",
+  "generatedTypesSha256": "93c8d4082d7f3cc769be5e649a85c5aec168196c8b74d7695dee5354b5dd1e60",
+  "generatedSchemaBodySha256": "5eb03cfd23d7705045fda2fac7a67161f9846263072c73ea4fc881648d1c1857",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4238,6 +4238,13 @@
       "filename": "20261124042300_588_organic_publication_route_package.sql",
       "sha256": "d514fa71180fd30fa18648f21329a0d5797aa1812e7ad9eaa2882b70565a998a",
       "trimmedMd5": "39b4be0dcb05078022661a09562dafaa"
+    },
+    {
+      "version": "20261124042400",
+      "name": "589_organic_publication_approved_claim",
+      "filename": "20261124042400_589_organic_publication_approved_claim.sql",
+      "sha256": "aadbb1461f93628628e3afeacf518430808db993864c5f2755ec625fce762193",
+      "trimmedMd5": "cba033f6ab6c5b0edb3b23e58fb02968"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
