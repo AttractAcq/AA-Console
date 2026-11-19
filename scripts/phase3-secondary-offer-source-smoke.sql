@@ -122,6 +122,16 @@ begin
   perform public.approve_service_offer_version_v6(v.id);
   if not exists(select 1 from public.service_offer_signoffs where offer_version_id=v.id)
     then raise exception 'Offer approval did not sign off exact version'; end if;
+  update public.client_proof_assets set claim='A different garage outcome'
+    where id=claim_proof.id;
+  begin
+    perform public.create_campaign_from_opportunity_v7(o.id,v.id,'organic');
+    raise exception 'A signed offer with changed proof claim entered a new campaign';
+  exception when check_violation then
+    if SQLERRM not like '%offer claim no longer matches%' then raise; end if;
+  end;
+  update public.client_proof_assets set claim='Completed within the agreed period'
+    where id=claim_proof.id;
   other_offer := public.create_secondary_offer_v7(o.id);
   other_version := public.create_service_offer_version_v6(o.client_id,'New secondary offer',
     'Homeowners with unused garages','A second garage offer',
