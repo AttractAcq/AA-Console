@@ -52,15 +52,15 @@ async function downloadCreative(file: CreativeFile): Promise<void> {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-export function PaidOperatorBundles({ clientId, platform }: {
-  clientId: string | undefined; platform: "meta" | "google";
+export function PaidOperatorBundles({ clientId, platform, campaignId }: {
+  clientId: string | undefined; platform: "meta" | "google"; campaignId?: string;
 }) {
-  return <PaidOperatorBundlesForClient key={`${clientId ?? "no-client"}:${platform}`}
-    clientId={clientId} platform={platform} />;
+  return <PaidOperatorBundlesForClient key={`${clientId ?? "no-client"}:${platform}:${campaignId ?? "all"}`}
+    clientId={clientId} platform={platform} campaignId={campaignId} />;
 }
 
-function PaidOperatorBundlesForClient({ clientId, platform }: {
-  clientId: string | undefined; platform: "meta" | "google";
+function PaidOperatorBundlesForClient({ clientId, platform, campaignId }: {
+  clientId: string | undefined; platform: "meta" | "google"; campaignId?: string;
 }) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
@@ -99,13 +99,15 @@ function PaidOperatorBundlesForClient({ clientId, platform }: {
           .eq("client_id", clientId).limit(50) : Promise.resolve({ data: [], error: null }),
       ]);
       for (const result of [c, p, b, e, m, metaAccount]) if (result.error) throw result.error;
-      const campaigns = (c.data ?? []) as Campaign[];
+      const campaigns = ((c.data ?? []) as Campaign[]).filter((row) =>
+        !campaignId || row.id === campaignId);
       const campaignIds = new Set(campaigns.map((item) => item.id));
       const latest = new Map<string, Package>();
       for (const row of (p.data ?? []) as Package[]) {
         if (campaignIds.has(row.campaign_id) && !latest.has(row.campaign_id)) latest.set(row.campaign_id, row);
       }
-      const visibleBundles = (b.data ?? []) as Bundle[];
+      const visibleBundles = ((b.data ?? []) as Bundle[]).filter((row) =>
+        !campaignId || row.campaign_id === campaignId);
       const checks = await Promise.all(visibleBundles.map(async (row) => {
         const [source, decision] = await Promise.all([
           supabase.rpc("paid_operator_bundle_current_v7", { p_bundle_id: row.id }),
@@ -129,7 +131,7 @@ function PaidOperatorBundlesForClient({ clientId, platform }: {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not load operator bundles.");
     }
-  }, [clientId, platform]);
+  }, [clientId, platform, campaignId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 

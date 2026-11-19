@@ -33,12 +33,37 @@ vi.mock("../../lib/supabase", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   rows.client_campaigns = [{ id: "campaign-1", name: "Local offer", paid_platform: "meta" }];
+  rows.campaign_preparation_packages_v7 = [{ id: "package-1", campaign_id: "campaign-1",
+    version: 1, assembled_at: "2026-11-16T00:00:00Z" }];
   rows.paid_operator_bundles_v7 = [];
   rows.paid_operator_events_v7 = [];
   rows.paid_operator_metric_match_v7 = [];
   rows.paid_google_operator_account_match_v7 = [];
   rows.meta_operator_account_match_v7 = [];
   rpc.mockResolvedValue({ data: true, error: null });
+});
+
+it("shows only the selected campaign's operator pack inside Campaign Factory", async () => {
+  rows.client_campaigns = [
+    { id: "campaign-1", name: "Selected campaign", paid_platform: "meta" },
+    { id: "campaign-2", name: "Another client campaign", paid_platform: "meta" },
+  ];
+  rows.campaign_preparation_packages_v7 = [
+    { id: "package-1", campaign_id: "campaign-1", version: 1, assembled_at: "2026-11-16T00:00:00Z" },
+    { id: "package-2", campaign_id: "campaign-2", version: 1, assembled_at: "2026-11-17T00:00:00Z" },
+  ];
+  rows.paid_operator_bundles_v7 = [
+    { id: "bundle-1", campaign_id: "campaign-1", platform: "meta", version: 1,
+      snapshot_hash: "a".repeat(64), snapshot: { source: { campaign_name: "Selected campaign" } },
+      created_at: "2026-11-16T00:00:00Z" },
+    { id: "bundle-2", campaign_id: "campaign-2", platform: "meta", version: 1,
+      snapshot_hash: "b".repeat(64), snapshot: { source: { campaign_name: "Another client campaign" } },
+      created_at: "2026-11-17T00:00:00Z" },
+  ];
+  render(<PaidOperatorBundles clientId="client-1" platform="meta" campaignId="campaign-1" />);
+  await screen.findByRole("option", { name: /Selected campaign · v1/ });
+  expect(screen.queryByText(/Another client campaign/)).not.toBeInTheDocument();
+  expect(screen.getByText(/Selected campaign · v1 · approved and current/)).toBeInTheDocument();
 });
 
 it("requires an exact reviewed package and operator instructions before freezing", async () => {

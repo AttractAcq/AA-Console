@@ -29,6 +29,7 @@ import { useCampaignV2Package } from "./useCampaignV2Package";
 import { CampaignSweepWork } from "./CampaignSweepWork";
 import { CampaignConversionWork } from "./CampaignConversionWork";
 import { CampaignPackageReadiness } from "./CampaignPackageReadiness";
+import { PaidOperatorBundles } from "../distribution/PaidOperatorBundles";
 
 type ContentSpecPiece = { route: string; platform: string; media_type: string; content_format: string };
 type PlannedIdea = { id: string; campaign_position: number | null; title: string; body: string | null };
@@ -994,6 +995,11 @@ function CampaignExecutionPanelContent() {
                 template={c.template} mirrorsTemplate={c.mirrors_template} onChanged={refresh}
                 refreshToken={campaigns} layout="v2" />
                 : <p className="py-4 text-sm text-muted-foreground">The route content specification is awaiting the planner.</p>)}
+            {c.campaign_kind && v2Tab === "paid" && paid && clientId
+              && (c.paid_platform === "meta" || c.paid_platform === "google") && (
+              <section className="py-4" aria-label="Paid operator pack">
+                <PaidOperatorBundles clientId={clientId} platform={c.paid_platform} campaignId={c.id} />
+              </section>)}
             {v2Tab === "landing-page" && clientId && (c.campaign_kind ? c.needs_landing_page : paid) && <>
               {c.campaign_kind && <CampaignConversionWork clientId={clientId} campaignId={c.id}
                 needsPage needsAgent={false} visibleModule="page" />}
