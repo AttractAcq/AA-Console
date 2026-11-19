@@ -780,7 +780,8 @@ const readyEngineSlot = {
     post_copy: [{ platform: "instagram", caption: "Exact caption" }],
     account_ref: "17890000000000000" } },
   scope: { client_id: "client-1", slot_id: engineSlotId, asset_id: mediaAssetId,
-    platform: "instagram", scheduled_at: engineTime, approval_entry_id: engineEntryId },
+    platform: "instagram", scheduled_at: engineTime, format: "single",
+    approval_entry_id: engineEntryId },
   owning_path: "/clients/client-1/delivery/approval-inbox?tab=engine",
 };
 
@@ -1689,6 +1690,32 @@ describe("unified approval inbox", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Download and verify creative file" }));
     await waitFor(() => expect(downloadVerifiedCreativeFile).toHaveBeenCalledWith(
       "client-1/finished.png", mediaFileHash));
+  });
+
+  it("verifies every ordered Engine carousel frame before approval", async () => {
+    const frames = [
+      { frame_id: "engine-frame-1", position: 1, storage_path: "client-1/image.png",
+        file_sha256: mediaFileHash, file_bytes: 12, object_id: "storage-object-1",
+        object_version: "v1", object_updated_at: "2026-11-19T00:00:00Z" },
+      { frame_id: "engine-frame-2", position: 2, storage_path: "client-1/second.png",
+        file_sha256: "b".repeat(64), file_bytes: 16, object_id: "storage-object-2",
+        object_version: "v1", object_updated_at: "2026-11-19T00:00:00Z" },
+    ];
+    requests = [{ ...readyEngineSlot, scope: { ...readyEngineSlot.scope, format: "carousel" },
+      preview: { exact_package: { ...readyEngineSlot.preview.exact_package,
+        slot: { ...readyEngineSlot.preview.exact_package.slot, format: "carousel" },
+        asset: { ...readyEngineSlot.preview.exact_package.asset, content_format: "carousel" },
+        frames,
+      } } }];
+    show();
+    const card = await screen.findByRole("article", { name: readyEngineSlot.title });
+    const approve = within(card).getByRole("button", { name: "Approve exact version" });
+    expect(approve).toBeDisabled();
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify every frame" }));
+    await waitFor(() => expect(approve).toBeEnabled());
+    expect(downloadVerifiedCreativeFile).toHaveBeenNthCalledWith(1, frames[0].storage_path, frames[0].file_sha256);
+    expect(downloadVerifiedCreativeFile).toHaveBeenNthCalledWith(2, frames[1].storage_path, frames[1].file_sha256);
   });
 
   it("rejects an offer with a reason", async () => {

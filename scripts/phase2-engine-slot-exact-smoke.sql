@@ -27,16 +27,33 @@ values ('cccccccc-cccc-4ccc-8ccc-cccccccccccd',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','image','single','Finished Engine image',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/source.png',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/finished.png','agency_owned');
+insert into public.client_media_assets
+  (id,client_id,media_type,content_format,title,storage_path,usage_rights)
+values ('cccccccc-cccc-4ccc-8ccc-ccccccccccce',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','image','carousel','Engine carousel',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/carousel-1.png','agency_owned');
+insert into public.client_media_frames(id,asset_id,position,storage_path,caption) values
+  ('44444444-4444-4444-8444-444444444441',
+    'cccccccc-cccc-4ccc-8ccc-ccccccccccce',1,
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/carousel-1.png','Open'),
+  ('44444444-4444-4444-8444-444444444442',
+    'cccccccc-cccc-4ccc-8ccc-ccccccccccce',2,
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/carousel-2.png','Close');
 insert into storage.objects(id,bucket_id,name,version) values
   ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','client-media',
    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/engine.png','v1'),
   ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeed','client-media',
    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/source.png','v1'),
   ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeef','client-media',
-   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/finished.png','v1');
+   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/finished.png','v1'),
+  ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeea','client-media',
+   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/carousel-1.png','v1'),
+  ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeeb','client-media',
+   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/carousel-2.png','v1');
 insert into public.post_copy(asset_id,platform,caption) values
   ('cccccccc-cccc-4ccc-8ccc-cccccccccccc','instagram','Exact caption'),
-  ('cccccccc-cccc-4ccc-8ccc-cccccccccccd','instagram','Finished render caption');
+  ('cccccccc-cccc-4ccc-8ccc-cccccccccccd','instagram','Finished render caption'),
+  ('cccccccc-cccc-4ccc-8ccc-ccccccccccce','instagram','Ordered carousel caption');
 -- Seed a disposable already-granted integration; production writes require
 -- the exact access-grant path and cannot create this state directly.
 set local session_replication_role='replica';
@@ -55,6 +72,11 @@ insert into public.content_slots
 values ('dddddddd-dddd-4ddd-8ddd-ddddddddddde',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','instagram',now()+interval '3 days',
   'awaiting_approval','cccccccc-cccc-4ccc-8ccc-cccccccccccd');
+insert into public.content_slots
+  (id,client_id,platform,scheduled_at,stage,asset_id,format)
+values ('dddddddd-dddd-4ddd-8ddd-dddddddddddf',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','instagram',now()+interval '4 days',
+  'awaiting_approval','cccccccc-cccc-4ccc-8ccc-ccccccccccce','carousel');
 insert into public.client_ideas(id,client_id,title,source,status,slot_id)
 values ('11111111-1111-4111-8111-111111111111',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Recurring Engine idea','auto','draft',
@@ -69,9 +91,24 @@ update public.content_slots set
   idea_id='11111111-1111-4111-8111-111111111111',
   brief_id='22222222-2222-4222-8222-222222222222'
   where id='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+insert into public.client_ideas(id,client_id,title,source,status,slot_id)
+values ('11111111-1111-4111-8111-111111111112',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Recurring carousel idea','auto','draft',
+  'dddddddd-dddd-4ddd-8ddd-dddddddddddf');
+insert into public.client_briefs(id,client_id,source_idea_id,title)
+values ('22222222-2222-4222-8222-222222222223',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  '11111111-1111-4111-8111-111111111112','Recurring carousel brief');
+update public.client_media_assets set brief_id='22222222-2222-4222-8222-222222222223'
+  where id='cccccccc-cccc-4ccc-8ccc-ccccccccccce';
+update public.content_slots set
+  idea_id='11111111-1111-4111-8111-111111111112',
+  brief_id='22222222-2222-4222-8222-222222222223'
+  where id='dddddddd-dddd-4ddd-8ddd-dddddddddddf';
 insert into public.slot_events(slot_id,from_stage,to_stage,actor)
 values ('dddddddd-dddd-4ddd-8ddd-dddddddddddd','qa','awaiting_approval','engine'),
-  ('dddddddd-dddd-4ddd-8ddd-ddddddddddde','qa','awaiting_approval','engine');
+  ('dddddddd-dddd-4ddd-8ddd-ddddddddddde','qa','awaiting_approval','engine'),
+  ('dddddddd-dddd-4ddd-8ddd-dddddddddddf','qa','awaiting_approval','engine');
 select set_config('request.jwt.claim.role','service_role',true);
 select public.attest_creative_storage_bytes_v6(
   'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
@@ -83,6 +120,21 @@ select public.attest_creative_storage_bytes_v6(
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/finished.png',repeat('b',64),21,
   'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeef','v1',
   (select updated_at from storage.objects where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeef'));
+select public.attest_creative_storage_bytes_v6(
+  'cccccccc-cccc-4ccc-8ccc-ccccccccccce',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/carousel-1.png',repeat('c',64),24,
+  'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeea','v1',
+  (select updated_at from storage.objects where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeea'));
+select public.attest_creative_frame_bytes_v8(
+  'cccccccc-cccc-4ccc-8ccc-ccccccccccce','44444444-4444-4444-8444-444444444441',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/carousel-1.png',repeat('c',64),24,
+  'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeea','v1',
+  (select updated_at from storage.objects where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeea'));
+select public.attest_creative_frame_bytes_v8(
+  'cccccccc-cccc-4ccc-8ccc-ccccccccccce','44444444-4444-4444-8444-444444444442',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/carousel-2.png',repeat('d',64),27,
+  'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeeb','v1',
+  (select updated_at from storage.objects where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeeb'));
 select set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claims',
@@ -91,6 +143,8 @@ do $checks$
 declare v_request uuid;
   v_render_request uuid;
   v_render_preview jsonb;
+  v_carousel_request uuid;
+  v_carousel_preview jsonb;
 begin
   begin
     update public.client_media_assets set usage_rights=null
@@ -233,6 +287,36 @@ begin
       (select scheduled_post_id from public.content_slots
         where id='dddddddd-dddd-4ddd-8ddd-ddddddddddde')) is true then
     raise exception 'Changed Engine render retained source authority'; end if;
+  v_carousel_request:=public.request_engine_slot_exact_review_v6(
+    'dddddddd-dddd-4ddd-8ddd-dddddddddddf');
+  select e.preview->'exact_package' into v_carousel_preview
+    from public.approval_request_evidence_v6 e where e.request_id=v_carousel_request;
+  if jsonb_array_length(v_carousel_preview->'frames')<>2
+    or v_carousel_preview#>>'{frames,1,file_sha256}'<>repeat('d',64)
+    or public.engine_slot_exact_source_state_v6(v_carousel_request)<>'pending' then
+    raise exception 'Engine carousel packet did not bind both ordered frames'; end if;
+  perform public.decide_engine_slot_inbox_v6(
+    'dddddddd-dddd-4ddd-8ddd-dddddddddddf',v_carousel_request,true);
+  if public.engine_slot_exact_source_current_v8(
+      (select scheduled_post_id from public.content_slots
+        where id='dddddddd-dddd-4ddd-8ddd-dddddddddddf')) is not true
+    or public.organic_publication_source_snapshot_v6(
+      (select scheduled_post_id from public.content_slots
+        where id='dddddddd-dddd-4ddd-8ddd-dddddddddddf'))#>>'{source_mode}'
+      is distinct from 'recurring_engine'
+    or public.organic_publication_claim_snapshot_v7(
+      (select scheduled_post_id from public.content_slots
+        where id='dddddddd-dddd-4ddd-8ddd-dddddddddddf')) is null then
+    raise exception 'Reviewed Engine carousel cannot enter publication preparation'; end if;
+  update storage.objects set version='v2'
+    where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeeb';
+  if public.engine_slot_exact_source_current_v8(
+      (select scheduled_post_id from public.content_slots
+        where id='dddddddd-dddd-4ddd-8ddd-dddddddddddf')) is true
+    or public.organic_publication_source_snapshot_v6(
+      (select scheduled_post_id from public.content_slots
+        where id='dddddddd-dddd-4ddd-8ddd-dddddddddddf')) is not null then
+    raise exception 'Changed second Engine frame retained source authority'; end if;
   update storage.objects set version='v2'
     where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
   if public.engine_slot_exact_source_state_v6(v_request)<>'superseded'

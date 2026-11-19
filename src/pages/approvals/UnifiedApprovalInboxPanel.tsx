@@ -1129,14 +1129,34 @@ function isEngineSlotReady(request: UnifiedApprovalRequest, clientId: string): b
   const slot = packet.slot as Record<string, unknown>;
   const asset = packet.asset as Record<string, unknown>;
   const storage = packet.storage as Record<string, unknown>;
+  const framed = asset.content_format === "carousel" || asset.content_format === "story";
+  const frames = packet.frames;
+  const framesReady = !framed || (Array.isArray(frames)
+    && frames.length >= (asset.content_format === "story" ? 1 : 2)
+    && frames.length <= 10
+    && frames.every((entry, index) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
+      const frame = entry as Record<string, unknown>;
+      return frame.position === index + 1 && typeof frame.frame_id === "string"
+        && typeof frame.storage_path === "string" && !!frame.storage_path
+        && typeof frame.file_sha256 === "string" && /^[0-9a-f]{64}$/.test(frame.file_sha256)
+        && typeof frame.file_bytes === "number" && frame.file_bytes > 0
+        && typeof frame.object_id === "string" && !!frame.object_id
+        && (frame.object_version === null || typeof frame.object_version === "string")
+        && typeof frame.object_updated_at === "string";
+    }) && (frames[0] as Record<string, unknown>).storage_path === asset.storage_path
+    && (frames[0] as Record<string, unknown>).file_sha256 === asset.file_sha256
+    && new Set(frames.map((entry) => (entry as Record<string, unknown>).storage_path)).size === frames.length);
   return typeof request.artifact_hash === "string"
     && /^[0-9a-f]{64}$/.test(request.artifact_hash)
     && request.source_version === scope.approval_entry_id
     && request.source_id === slot.id && slot.id === scope.slot_id
     && slot.asset_id === asset.id && asset.id === scope.asset_id
     && slot.platform === scope.platform && slot.scheduled_at === scope.scheduled_at
+    && slot.format === scope.format && slot.format === asset.content_format
     && packet.client_id === clientId && asset.client_id === clientId
-    && scope.client_id === clientId && asset.content_format === "single"
+    && scope.client_id === clientId
+    && (asset.content_format === "single" || framed) && framesReady
     && (asset.media_type === "image" || asset.media_type === "text")
     && typeof asset.storage_path === "string" && !!asset.storage_path
     && typeof asset.file_sha256 === "string"
@@ -1319,10 +1339,10 @@ function RequestCard({ request, history, gatewayOutcome, executionEvidence, clie
   const creativeDownloadable = !!creativeAsset
     && typeof creativePath === "string" && !!creativePath
     && typeof creativeAsset.file_sha256 === "string";
-  const ordinaryFrames = request.source_kind === "ordinary_media"
+  const creativeFrames = (request.source_kind === "ordinary_media" || request.source_kind === "engine_slot")
     && (creativeAsset?.content_format === "carousel" || creativeAsset?.content_format === "story")
-    && Array.isArray(creativePreview?.frames)
-    ? creativePreview.frames as Record<string, unknown>[] : null;
+    && Array.isArray(request.source_kind === "engine_slot" ? creativePacket?.frames : creativePreview?.frames)
+    ? (request.source_kind === "engine_slot" ? creativePacket?.frames : creativePreview?.frames) as Record<string, unknown>[] : null;
   const canReject = !salesManagerCard && isRejectionReady(request, clientId);
   const canApprove = !salesManagerCard && isApprovalReady(request, clientId);
   const canRevoke = !manager && isGatewayToolRevocable(request, clientId);
@@ -1468,11 +1488,11 @@ function RequestCard({ request, history, gatewayOutcome, executionEvidence, clie
 
       {creativeDownloadable && <div className="mt-4">
         <p className="mb-2 text-xs text-muted-foreground">
-          {ordinaryFrames ? `Download and inspect all ${ordinaryFrames.length} ordered frames to unlock approval.`
+          {creativeFrames ? `Download and inspect all ${creativeFrames.length} ordered frames to unlock approval.`
             : "Download and inspect the exact creative file to unlock approval."}
         </p>
-        {ordinaryFrames && <ol className="mb-3 list-inside list-decimal space-y-1 text-xs">
-          {ordinaryFrames.map((frame) => <li key={String(frame.frame_id)}>
+        {creativeFrames && <ol className="mb-3 list-inside list-decimal space-y-1 text-xs">
+          {creativeFrames.map((frame) => <li key={String(frame.frame_id)}>
             <span className="font-medium">{String(frame.caption ?? `Frame ${frame.position}`)}</span>
             <span className="ml-2 break-all font-mono text-muted-foreground">{String(frame.storage_path)} · {String(frame.file_sha256)}</span>
           </li>)}
@@ -1482,8 +1502,8 @@ function RequestCard({ request, history, gatewayOutcome, executionEvidence, clie
             setDownloadedCreativeHash(null);
             setDownloadError(null);
             void (async () => {
-              if (ordinaryFrames) {
-                for (const frame of ordinaryFrames) {
+              if (creativeFrames) {
+                for (const frame of creativeFrames) {
                   await downloadVerifiedCreativeFile(frame.storage_path as string, frame.file_sha256 as string);
                 }
               } else {
@@ -1493,10 +1513,10 @@ function RequestCard({ request, history, gatewayOutcome, executionEvidence, clie
             })().catch((cause: unknown) => setDownloadError(
               cause instanceof Error ? cause.message : "Could not verify the creative file."));
           }}>
-          {ordinaryFrames ? "Download and verify every frame" : "Download and verify creative file"}
+          {creativeFrames ? "Download and verify every frame" : "Download and verify creative file"}
         </button>
         {downloadedCreativeHash === `${request.id}:${request.artifact_hash}` && <p role="status" className="mt-2 text-xs">
-          {ordinaryFrames ? "Every downloaded frame matched its byte hash and order on this card. Review the full sequence before approval."
+          {creativeFrames ? "Every downloaded frame matched its byte hash and order on this card. Review the full sequence before approval."
             : "The downloaded creative matched the byte hash on this card. Review its content before approval."}
         </p>}
         {downloadError && <p role="alert" className="mt-2 text-xs text-destructive">{downloadError}</p>}

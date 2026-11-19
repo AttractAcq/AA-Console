@@ -41473,6 +41473,10 @@ export type Database = {
         Args: { p_slot_id: string }
         Returns: Json
       }
+      engine_slot_exact_source_current_v8: {
+        Args: { p_post_id: string }
+        Returns: boolean
+      }
       engine_slot_exact_source_state_v6: {
         Args: { p_request_id: string }
         Returns: string
