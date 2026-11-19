@@ -25,8 +25,8 @@ type ChannelRow = {
   spend: number;
   leads: number;
   customers: number;
-  revenue: number;
-  cash_collected: number;
+  revenue: number | null;
+  cash_collected: number | null;
   cpl: number | null;
   cac: number | null;
   roas: number | null;
@@ -157,7 +157,7 @@ export function ClientEconomicsPanel() {
           spend for a client in one currency.
         </p>
       )}
-      <p className="mb-4 text-xs text-muted-foreground">Lead revenue and cash have no stored currency. Their amounts below are currency-unverified; return multiples are hidden until the currency is recorded and comparable with spend.</p>
+      <p className="mb-4 text-xs text-muted-foreground">Lead money totals require one recorded currency for every positive amount. Return multiples also require that currency to match spend. This view does not display lead currency, so return multiples remain hidden here.</p>
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
@@ -170,16 +170,20 @@ export function ClientEconomicsPanel() {
             <Figure
               label="Revenue"
               shown={
-                totals.revenue > 0
+                totals.revenue === null
+                  ? { unavailable: "Lead revenue currency coverage is incomplete" }
+                  : totals.revenue > 0
                   ? { value: money(totals.revenue, null) }
                   : { unavailable: "No revenue from this cohort yet" }
               }
-              hint="From leads acquired in this window · currency unrecorded"
+              hint="From leads acquired in this window · currency not shown"
             />
             <Figure
               label="Cash collected"
               shown={
-                totals.cash_collected > 0
+                totals.cash_collected === null
+                  ? { unavailable: "Lead cash currency coverage is incomplete" }
+                  : totals.cash_collected > 0
                   ? { value: money(totals.cash_collected, null) }
                   : { unavailable: "No cash collected yet" }
               }
@@ -187,16 +191,20 @@ export function ClientEconomicsPanel() {
             <Figure label="CAC" shown={showCost(totals.cac, cur, "customers")} hint="Spend per customer" />
             <Figure
               label="ROAS"
-              shown={totals.revenue > 0
-                ? { unavailable: "Lead revenue currency is not recorded" }
-                : showRatio(totals.roas, totals.spend, totals.revenue)}
+              shown={totals.revenue === null
+                ? { unavailable: "Lead revenue currency coverage is incomplete" }
+                : totals.revenue > 0
+                  ? { unavailable: "Lead revenue currency is not displayed here" }
+                  : showRatio(totals.roas, totals.spend, totals.revenue)}
               hint="Revenue ÷ spend"
             />
             <Figure
               label="Cash ROAS"
-              shown={totals.cash_collected > 0
-                ? { unavailable: "Lead cash currency is not recorded" }
-                : showRatio(totals.cash_roas, totals.spend, totals.cash_collected)}
+              shown={totals.cash_collected === null
+                ? { unavailable: "Lead cash currency coverage is incomplete" }
+                : totals.cash_collected > 0
+                  ? { unavailable: "Lead cash currency is not displayed here" }
+                  : showRatio(totals.cash_roas, totals.spend, totals.cash_collected)}
               hint="Cash ÷ spend"
             />
           </div>
@@ -234,14 +242,14 @@ export function ClientEconomicsPanel() {
           <div>
             <h2 className="mb-3 text-sm font-semibold text-foreground">By channel</h2>
             <DataTable
-              columns={["Channel", "Spend", "Leads", "Customers", "Revenue (currency unrecorded)", "CPL", "ROAS"]}
+              columns={["Channel", "Spend", "Leads", "Customers", "Revenue (currency not shown)", "CPL", "ROAS"]}
               emptyLabel="No spend or leads in this window"
               rows={byChannel.map((r) => [
                 r.channel,
                 money(Number(r.spend), cur),
                 String(r.leads),
                 String(r.customers),
-                money(Number(r.revenue), null),
+                r.revenue === null ? "—" : money(Number(r.revenue), null),
                 r.cpl === null ? "—" : money(Number(r.cpl), cur),
                 "—",
               ])}
@@ -251,14 +259,14 @@ export function ClientEconomicsPanel() {
           <div>
             <h2 className="mb-3 text-sm font-semibold text-foreground">By ad spend tracker (legacy)</h2>
             <DataTable
-              columns={["Ad spend tracker", "Spend", "Leads", "Customers", "Revenue (currency unrecorded)", "CPL", "ROAS"]}
+              columns={["Ad spend tracker", "Spend", "Leads", "Customers", "Revenue (currency not shown)", "CPL", "ROAS"]}
               emptyLabel="No spend or leads in this window"
               rows={byCampaign.map((r) => [
                 r.campaign_ref,
                 money(Number(r.spend), cur),
                 String(r.leads),
                 String(r.customers),
-                money(Number(r.revenue), null),
+                r.revenue === null ? "—" : money(Number(r.revenue), null),
                 r.cpl === null ? "—" : money(Number(r.cpl), cur),
                 "—",
               ])}

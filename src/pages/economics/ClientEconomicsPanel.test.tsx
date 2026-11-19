@@ -60,7 +60,7 @@ const campaignRows = [
   { campaign_id: "c1", campaign_ref: "HD-C002", spend: 6000, leads: 2, customers: 1, revenue: 30000, cash_collected: 20000, cpl: 3000, cac: 6000, roas: 5 },
 ];
 
-function show(totals: Eco | null = healthy(), ch = channels, cp = campaignRows) {
+function show(totals: Eco | null = healthy(), ch: Eco[] = channels, cp: Eco[] = campaignRows) {
   rpc.mockImplementation((name: string) => {
     if (name === "client_economics") return Promise.resolve({ data: totals ? [totals] : [], error: null });
     if (name === "client_economics_by_channel") return Promise.resolve({ data: ch, error: null });
@@ -95,7 +95,7 @@ describe("headline economics", () => {
     expect(within(figure("Cash ROAS")).getByText("—")).toBeInTheDocument();
     expect(screen.queryByText("4.00×")).not.toBeInTheDocument();
     expect(screen.queryByText("2.00×")).not.toBeInTheDocument();
-    expect(screen.getByText(/Lead revenue and cash have no stored currency/)).toBeInTheDocument();
+    expect(screen.getByText(/Lead money totals require one recorded currency/)).toBeInTheDocument();
     // R5,000 is CAC in the headline and also the Customers cost in the funnel
     // table below — both are correct, so scope to the headline panel.
     expect(within(figure("CAC")).getByText("R5,000")).toBeInTheDocument();
@@ -177,6 +177,16 @@ describe("mixed currency", () => {
   it("refuses the ratios and says so loudly", async () => {
     show(healthy({ mixed_currency: true, currency: null, roas: null, cash_roas: null, cac: null, cpl: null }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/mixes more than one currency/i);
+  });
+
+  it("does not render a missing lead currency total as zero or NaN", async () => {
+    show(healthy({ revenue: null, cash_collected: null, roas: null, cash_roas: null }),
+      [{ ...channels[0], revenue: null, cash_collected: null, roas: null }],
+      [{ ...campaignRows[0], revenue: null, cash_collected: null, roas: null }]);
+    await screen.findByText("R10,000");
+    expect(within(figure("Revenue")).getByText(/currency coverage is incomplete/i)).toBeInTheDocument();
+    expect(within(figure("Cash collected")).getByText(/currency coverage is incomplete/i)).toBeInTheDocument();
+    expect(screen.queryByText("NaN")).not.toBeInTheDocument();
   });
 });
 

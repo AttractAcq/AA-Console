@@ -1,10 +1,9 @@
 // How an economics figure is presented, and when it must refuse to show a
 // number at all.
 //
-// Pure and separate from the panel so these rules can be tested and mutated
-// without rendering anything. They are display rules, not maths: the database
-// returns arithmetic values, but lead revenue lacks a stored currency and
-// cannot yet be compared with the spend ledger.
+// Pure and separate from the panel so these rules can be tested without
+// rendering anything. The database withholds money totals when positive lead
+// amounts have missing or mixed currencies.
 //
 // The distinction that matters: a spend of zero is a fact and shows as 0. A
 // ratio whose denominator is zero is unknown and shows as "—". And a ratio of
@@ -18,8 +17,8 @@ export type Economics = {
   qualified_leads: number;
   appointments: number;
   customers: number;
-  revenue: number;
-  cash_collected: number;
+  revenue: number | null;
+  cash_collected: number | null;
   cpl: number | null;
   cpql: number | null;
   cpa: number | null;

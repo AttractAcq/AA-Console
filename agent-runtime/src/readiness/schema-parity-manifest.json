@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "6874234072285fe3778ad2bb4fed80fc2ada81a8eeea941a157fbec16dada92a",
+  "migrationSourceDigest": "5464457def93c05e6bcf5f691fff2f92cc414da3bfeaddbaf14782453dea0fec",
   "generatedTypesSha256": "0af3d6cd830d104d730478c2558e8e70b26bd055601b05d05615884592e50a35",
   "generatedSchemaBodySha256": "988528babc43162c841d4b2e181825476a0b5caa42865e5249e41a8ccb5ab041",
   "localMigrations": [
@@ -4427,6 +4427,13 @@
       "filename": "20261124045000_615_acquisition_currency_comparability.sql",
       "sha256": "cfdd0b95fdf0ff4ea019fa6077c534bfab86051d7b01ac8ed67881d592f86030",
       "trimmedMd5": "de5e9346103c947173ea9933538280e6"
+    },
+    {
+      "version": "20261124045100",
+      "name": "616_economics_currency_comparability",
+      "filename": "20261124045100_616_economics_currency_comparability.sql",
+      "sha256": "aec079506755f701fac98bb7ee6b35a2fc1ae7fcfe69eb2ff7b431fa0162d41d",
+      "trimmedMd5": "e3e12c8a0a7e7a483b642efe7edac18e"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
