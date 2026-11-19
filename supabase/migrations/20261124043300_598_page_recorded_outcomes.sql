@@ -1,7 +1,8 @@
 -- First-party conversion evidence for landing and offer pages. The source
 -- page is the lead's recorded first source; it is not a page-view count or a
 -- claim that this page caused a later sale. Sale evidence is an explicit sale
--- stage, positive recorded sale value or positive collected cash. Retain
+-- stage, positive recorded sale value, positive collected cash or a recorded
+-- sale/cash stage transition. Retain
 -- archived page rows.
 create function public.page_recorded_outcomes_v8(
   p_client_id uuid,p_page_type text,p_days integer default 30)
@@ -26,7 +27,11 @@ begin
     count(l.id) filter(where l.consent_given_at is not null
       and nullif(btrim(l.consent_wording),'') is not null)::integer,
     count(l.id) filter(where l.stage in ('sale','cash')
-      or coalesce(l.sale_value,0)>0 or coalesce(l.cash_collected,0)>0)::integer,
+      or coalesce(l.sale_value,0)>0 or coalesce(l.cash_collected,0)>0
+      or exists (select 1 from public.lead_events sale_event
+        where sale_event.lead_id=l.id and sale_event.client_id=l.client_id
+          and sale_event.kind='stage_change'
+          and sale_event.to_stage in ('sale','cash')))::integer,
     coalesce(sum(l.cash_collected),0)::numeric,max(l.created_at)
   from public.client_pages p
   left join public.client_leads l on l.client_id=p.client_id
