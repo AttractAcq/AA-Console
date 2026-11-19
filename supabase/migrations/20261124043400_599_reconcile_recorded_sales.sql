@@ -83,9 +83,9 @@ left join lateral (
          count(*) filter (where lead_stage_rank(l.stage) >= 2)::int as followers,
          count(*) filter (where lead_stage_rank(l.stage) >= 3)::int as qualified
   from client_leads l
-  where l.source_asset_id = a.id
+  where not coalesce(l.is_probe,false) and (l.source_asset_id = a.id
      -- a lead may name the post rather than the asset; both mean this asset
-     or l.source_post_id in (select sp.id from scheduled_posts sp where sp.asset_id = a.id)
+     or l.source_post_id in (select sp.id from scheduled_posts sp where sp.asset_id = a.id))
 ) rev on true;
 
 create or replace function acquisition_funnel(p_client_id uuid, p_days integer default 30)
@@ -112,6 +112,7 @@ as $$
   with window_leads as (
     select * from client_leads l
     where l.client_id = p_client_id
+      and not coalesce(l.is_probe,false)
       and l.created_at >= now() - make_interval(days => greatest(1, least(coalesce(p_days, 30), 3650)))
   ),
   spend as (
@@ -221,6 +222,8 @@ begin
          coalesce(sum(p.cash_collected), 0)
     into v_leads, v_followers, v_qual, v_appts, v_custs, v_rev, v_cash
   from lead_progress p
+  join public.client_leads source_lead on source_lead.id=p.lead_id
+    and source_lead.client_id=p.client_id and not coalesce(source_lead.is_probe,false)
   where p.client_id = p_client_id
     and p.created_at >= p_since::timestamptz
     and p.created_at <  p_until::timestamptz;
@@ -297,6 +300,8 @@ begin
            sum(p.sale_value) as revenue,
            sum(p.cash_collected) as cash
     from lead_progress p
+    join public.client_leads source_lead on source_lead.id=p.lead_id
+      and source_lead.client_id=p.client_id and not coalesce(source_lead.is_probe,false)
     where p.client_id = p_client_id
       and p.created_at >= p_since::timestamptz and p.created_at < p_until::timestamptz
     group by 1
@@ -365,6 +370,8 @@ begin
            sum(p.sale_value) as revenue,
            sum(p.cash_collected) as cash
     from lead_progress p
+    join public.client_leads source_lead on source_lead.id=p.lead_id
+      and source_lead.client_id=p.client_id and not coalesce(source_lead.is_probe,false)
     where p.client_id = p_client_id
       and p.created_at >= p_since::timestamptz and p.created_at < p_until::timestamptz
     group by 1
@@ -434,6 +441,7 @@ begin
     into v_leads, v_conversations, v_appointments, v_sales, v_lost, v_pipeline, v_sale, v_cash
   from public.client_leads l
   where l.client_id = p_client_id
+    and not coalesce(l.is_probe,false)
     and l.created_at >= now() - make_interval(days => v_days);
 
   select coalesce(sum(s.amount), 0) into v_spend
@@ -502,6 +510,7 @@ begin
            ) as furthest_rank
     from public.client_leads l
     where l.client_id = p_client_id
+      and not coalesce(l.is_probe,false)
       and l.created_at >= p_start::timestamptz
       and l.created_at < p_end::timestamptz
   ) p;
@@ -575,6 +584,7 @@ begin
                ) as furthest_rank
         from public.client_leads l
         where l.client_id = p_client_id
+          and not coalesce(l.is_probe,false)
           and l.created_at >= p_start::timestamptz
           and l.created_at < p_end::timestamptz
           and (p_campaign_id is null or l.source_campaign_id is not distinct from p_campaign_id)

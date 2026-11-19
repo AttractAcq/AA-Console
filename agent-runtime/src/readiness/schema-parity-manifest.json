@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "1f445d2ac24fd7c8517dab1056a6866db49c93f2b8c80f59251f071ebff14dc8",
+  "migrationSourceDigest": "82d2136f71696232666077715b4bcd4662ec6c1eb53896be346f3cd11e96844f",
   "generatedTypesSha256": "3b3238259a29b4ed6a4799fc8b4c77d02d550ff5f315a79a6d60a3b83a7d7529",
   "generatedSchemaBodySha256": "dccf730eb844314c654af9dea5f1fd28630d7ed9125f9b81fb0024a20a9bc957",
   "localMigrations": [
@@ -4313,8 +4313,15 @@
       "version": "20261124043400",
       "name": "599_reconcile_recorded_sales",
       "filename": "20261124043400_599_reconcile_recorded_sales.sql",
-      "sha256": "01526cf87e4208934668443e38a17c210f1b0475a84ba2032301585799c9f13d",
-      "trimmedMd5": "26309cf614d7299c6d1b7c44ccf6daca"
+      "sha256": "6ffff4a66c4b657648f6538ddff2c90a30cea10b9187bcbd9b609d790eea631f",
+      "trimmedMd5": "197a0e5c89da14c076be6b51bf7b8e49"
+    },
+    {
+      "version": "20261124043500",
+      "name": "600_exclude_probe_coverage",
+      "filename": "20261124043500_600_exclude_probe_coverage.sql",
+      "sha256": "a3752165132cb67308a7fa88016be66762e3928875969041238b04601129c02a",
+      "trimmedMd5": "7ab7b1fb791120ebd4850f1fae85c420"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
