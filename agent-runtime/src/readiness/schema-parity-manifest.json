@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "180bcce9a33010b6f474944419297edfeedf73a014762499ce42b3a580b8cefc",
+  "migrationSourceDigest": "5e1a9a97bebda59b62f43de3c373f70de2c1988d78fea72ae854d5e246b259e7",
   "generatedTypesSha256": "b1de15348458382e6b1011b285a0e2a0c3839ee0e39b0ed8ab74b078628b3f43",
   "generatedSchemaBodySha256": "432d328b52c3febd32cb4b75027bf0ec3a47dbb9c8e58cc96d4e95525b88b62e",
   "localMigrations": [
@@ -4525,6 +4525,20 @@
       "filename": "20261124050400_629_historical_mcp_content_performance.sql",
       "sha256": "601961731dc2f5c2e823bbbc8a15926780f3e9063e385029656efebe730ea792",
       "trimmedMd5": "c8dd9059e7473edff977dc715315b2fb"
+    },
+    {
+      "version": "20261124050500",
+      "name": "630_historical_mcp_conversion_funnel",
+      "filename": "20261124050500_630_historical_mcp_conversion_funnel.sql",
+      "sha256": "c12161309966d104b8d9d41064c7c1a09d448ac4798a47ee5fc7d6e1a043dfde",
+      "trimmedMd5": "d5d69a599042f4010864c7e8732100af"
+    },
+    {
+      "version": "20261124050600",
+      "name": "631_historical_pipeline_cash_coverage",
+      "filename": "20261124050600_631_historical_pipeline_cash_coverage.sql",
+      "sha256": "581b5e09fa25185aa7d5d0b5511e819b27354794768ff85611f16b5fc02bae79",
+      "trimmedMd5": "1562cf958c11237ea220460e54987952"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
