@@ -33,7 +33,8 @@ function database(jobStatus = "completed", digest: string | null = null) {
     return query;
   });
   const rpc = vi.fn(async (name: string) => ({
-    data: name === "creative_storage_identity_v6" ? identity : ASSET,
+    data: name === "creative_storage_identity_v6" ? identity
+      : name === "creative_frame_storage_identities_v8" ? null : ASSET,
     error: null,
   }));
   const sb = { from, rpc, storage: { from: () => ({
