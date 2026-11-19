@@ -22,12 +22,17 @@ END = "20261124044600"
 EXPECTED = 60
 
 
-def docker(container: str, *args: str, input_bytes: bytes | None = None) -> bytes:
+def docker(container: str, *args: str, input_bytes: bytes | None = None,
+           log_path: Path | None = None) -> bytes:
     result = subprocess.run(["docker", *args], input=input_bytes,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             check=False)
+    if log_path is not None:
+        log_path.write_bytes(result.stdout + result.stderr)
+        log_path.chmod(0o600)
     if result.returncode:
-        # SQL errors may include restored customer data; do not print stderr.
+        # SQL errors may include restored customer data; only the protected
+        # local log gets the output, never the terminal or result JSON.
         raise RuntimeError(f"Local Docker command failed ({result.returncode}); stopped")
     return result.stdout
 
@@ -63,6 +68,7 @@ def local_identity(container: str) -> dict[str, str]:
         "cron": query(container, "select count(*)||'|'||count(*) filter(where active) from cron.job"),
         "cron_max_id": query(container, "select max(jobid)::text from cron.job"),
         "rls_trigger": query(container, "select count(*) from pg_event_trigger where evtname='ensure_rls' and evtenabled='O'"),
+        "postgres_superuser": query(container, "select rolsuper::text from pg_roles where rolname='postgres'"),
     }
 
 
@@ -98,9 +104,13 @@ def main() -> None:
     if history != f"569|{START}" or baseline["cron"] != "22|0" \
             or not baseline["storage_policies"].startswith("26|") \
             or baseline["storage_rls"] != "buckets:true,objects:true" \
-            or baseline["rls_trigger"] != "1":
-        raise RuntimeError("Restored staging baseline, paused cron, Storage policies or trigger differs; stopped")
+            or baseline["rls_trigger"] != "1" \
+            or baseline["postgres_superuser"] != "true":
+        raise RuntimeError("Restored staging baseline, paused cron, Storage, trigger or local replay role differs; stopped")
     old_cron = old_cron_digest(args.container, baseline["cron_max_id"])
+    log_dir = args.result.parent / "pr363-local-migration-logs"
+    log_dir.mkdir(mode=0o700, exist_ok=True)
+    log_dir.chmod(0o700)
     state: dict[str, object] = {"container": args.container, "start": START,
                                 "expected": EXPECTED, "before": baseline,
                                 "old_cron_digest": old_cron,
@@ -114,15 +124,18 @@ def main() -> None:
             raise RuntimeError("Unexpected migration filename; stopped")
         version, name = match.groups()
         sql = path.read_bytes()
+        log = log_dir / f"{version}.log"
         try:
             docker(args.container, "exec", "-i", args.container, "psql", "-U", "postgres",
-                   "-v", "ON_ERROR_STOP=1", "postgres", input_bytes=sql)
+                   "-v", "ON_ERROR_STOP=1", "postgres", input_bytes=sql,
+                   log_path=log)
             docker(args.container, "exec", "-i", args.container, "psql", "-U", "postgres",
                    "-v", "ON_ERROR_STOP=1", "postgres",
                    input_bytes=("insert into supabase_migrations.schema_migrations(version,name) "
-                                f"values('{version}','{name}');\n").encode())
+                                f"values('{version}','{name}');\n").encode(),
+                   log_path=log_dir / f"{version}-history.log")
         except RuntimeError:
-            state["failed"] = path.name
+            state["failed"] = {"file": path.name, "protected_log": str(log)}
             args.result.write_text(json.dumps(state, indent=2) + "\n")
             raise RuntimeError(f"Stopped at {path.name}; inspect isolated container and protected logs") from None
         state["applied"].append({"file": path.name, "sha256": digest})
@@ -141,6 +154,7 @@ def main() -> None:
                          and after["storage_policies"] == baseline["storage_policies"]
                          and after["storage_rls"] == baseline["storage_rls"]
                          and after["rls_trigger"] == baseline["rls_trigger"]
+                         and after["postgres_superuser"] == baseline["postgres_superuser"]
                          and after["cron"] == "23|0"
                          and state["old_cron_digest_after"] == old_cron)
     args.result.write_text(json.dumps(state, indent=2) + "\n")
