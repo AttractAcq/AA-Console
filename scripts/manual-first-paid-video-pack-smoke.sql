@@ -73,7 +73,7 @@ insert into public.client_campaigns(id,client_id,name,brief,acquisition_mode,run
   offer_version_id,audience,target_countries,daily_budget)
 values ('cccccccc-cccc-4ccc-8ccc-cccccccccccc',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Paid fixture campaign','Fixture',
-  'paid',false,true,'meta',2,0,2,now(),
+  'paid',false,true,'meta',4,0,4,now(),
   (select id from public.service_offer_versions where idempotency_key='paid-fixture'),
   'Local buyers',array['US'],25);
 insert into public.opportunity_links(opportunity_id,client_id,role,campaign_id)
@@ -81,7 +81,9 @@ select o.id,o.client_id,'campaign','cccccccc-cccc-4ccc-8ccc-cccccccccccc'
   from public.market_opportunities o where o.idempotency_key='paid-operator-opportunity';
 select public.set_campaign_content_spec_v7('cccccccc-cccc-4ccc-8ccc-cccccccccccc',
   '[{"route":"paid","platform":"facebook","media_type":"image","content_format":"single"},
-    {"route":"paid","platform":"instagram","media_type":"video","content_format":"reel"}]'::jsonb);
+    {"route":"paid","platform":"instagram","media_type":"video","content_format":"reel"},
+    {"route":"paid","platform":"instagram","media_type":"image","content_format":"carousel"},
+    {"route":"paid","platform":"instagram","media_type":"image","content_format":"story"}]'::jsonb);
 select public.approve_campaign_plan_v6('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
 select set_config('request.jwt.claim.role','service_role',true);
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
@@ -90,7 +92,10 @@ do $checks$
 declare cid uuid:='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
   client uuid:='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
   v_run_id uuid; route_id uuid; route_version integer; work_id uuid; video_work_id uuid;
-  asset_id uuid; video_asset_id uuid; asset_fingerprint text; plan_hash text; spec_hash text;
+  carousel_work_id uuid; story_work_id uuid;
+  asset_id uuid; video_asset_id uuid; carousel_asset_id uuid; story_asset_id uuid;
+  frame_one uuid; frame_two uuid; story_frame uuid;
+  asset_fingerprint text; plan_hash text; spec_hash text;
   frozen public.campaign_preparation_packages_v7%rowtype;
   bundle public.paid_operator_bundles_v7%rowtype;
   same_bundle public.paid_operator_bundles_v7%rowtype;
@@ -108,6 +113,10 @@ begin
     'creative_build','client_briefs','dddddddd-dddd-4ddd-8ddd-dddddddddddd');
   perform public.add_workflow_agent_step(v_run_id,'piece2_create','{}',
     'creative_build','client_briefs','eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
+  perform public.add_workflow_agent_step(v_run_id,'piece3_create','{}',
+    'creative_build','client_briefs','ffffffff-ffff-4fff-8fff-ffffffffffff');
+  perform public.add_workflow_agent_step(v_run_id,'piece4_create','{}',
+    'creative_build','client_briefs','11111111-1111-4111-8111-111111111111');
   select id,version into route_id,route_version
     from public.ensure_campaign_route_packages_v7(cid,v_run_id) where route='paid';
   select id into work_id from public.create_delivery_work_item_v6(cid,route_id,
@@ -120,6 +129,16 @@ begin
     jsonb_build_object('workflow_run_id',v_run_id),
     '{"artifact_kind":"asset","platform":"instagram","media_type":"video","content_format":"reel"}'::jsonb);
   perform public.bind_campaign_sweep_work_v7(video_work_id,v_run_id,'piece2','piece2_create');
+  select id into carousel_work_id from public.create_delivery_work_item_v6(cid,route_id,
+    null,null,'content_piece3',route_version,'content_production_factory',true,
+    jsonb_build_object('workflow_run_id',v_run_id),
+    '{"artifact_kind":"asset","platform":"instagram","media_type":"image","content_format":"carousel"}'::jsonb);
+  perform public.bind_campaign_sweep_work_v7(carousel_work_id,v_run_id,'piece3','piece3_create');
+  select id into story_work_id from public.create_delivery_work_item_v6(cid,route_id,
+    null,null,'content_piece4',route_version,'content_production_factory',true,
+    jsonb_build_object('workflow_run_id',v_run_id),
+    '{"artifact_kind":"asset","platform":"instagram","media_type":"image","content_format":"story"}'::jsonb);
+  perform public.bind_campaign_sweep_work_v7(story_work_id,v_run_id,'piece4','piece4_create');
   perform public.seal_workflow_run(v_run_id);
   perform public.sync_campaign_sweep_work_v7(10);
   insert into public.client_media_assets(client_id,media_type,content_format,title,
@@ -188,6 +207,72 @@ begin
     raise exception 'Paid short video lacks current exact human seats'; end if;
   perform set_config('request.jwt.claim.role','service_role',true);
   perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+  insert into public.client_media_assets(client_id,media_type,content_format,title,
+    storage_path,usage_rights,ad_primary_text,ad_headline,ad_cta)
+  values(client,'image','carousel','Paid carousel',
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/slide-one.png','agency_owned',
+    'Carousel copy','Carousel headline','Learn more') returning id into carousel_asset_id;
+  insert into public.client_media_frames(asset_id,position,storage_path,caption)
+  values(carousel_asset_id,1,
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/slide-one.png','Opening slide')
+    returning id into frame_one;
+  insert into public.client_media_frames(asset_id,position,storage_path,caption)
+  values(carousel_asset_id,2,
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/slide-two.png','Closing slide')
+    returning id into frame_two;
+  insert into public.client_media_assets(client_id,media_type,content_format,title,
+    storage_path,usage_rights,ad_primary_text,ad_headline,ad_cta)
+  values(client,'image','story','Paid story',
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/story.png','agency_owned',
+    'Story copy','Story headline','Learn more') returning id into story_asset_id;
+  insert into public.client_media_frames(asset_id,position,storage_path,caption)
+  values(story_asset_id,1,
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/story.png','Only story frame')
+    returning id into story_frame;
+  insert into storage.objects(id,bucket_id,name,version) values
+    ('ffffffff-ffff-4fff-8fff-ffffffffffff','client-media',
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/slide-one.png','v1'),
+    ('11111111-1111-4111-8111-111111111111','client-media',
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/slide-two.png','v1'),
+    ('22222222-2222-4222-8222-222222222222','client-media',
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/story.png','v1');
+  perform public.attest_creative_storage_bytes_v6(carousel_asset_id,
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/slide-one.png',repeat('d',64),14,
+    'ffffffff-ffff-4fff-8fff-ffffffffffff','v1',
+    (select updated_at from storage.objects where id='ffffffff-ffff-4fff-8fff-ffffffffffff'));
+  perform public.attest_creative_frame_bytes_v8(carousel_asset_id,frame_one,
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/slide-one.png',repeat('d',64),14,
+    'ffffffff-ffff-4fff-8fff-ffffffffffff','v1',
+    (select updated_at from storage.objects where id='ffffffff-ffff-4fff-8fff-ffffffffffff'));
+  perform public.attest_creative_frame_bytes_v8(carousel_asset_id,frame_two,
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/slide-two.png',repeat('e',64),16,
+    '11111111-1111-4111-8111-111111111111','v1',
+    (select updated_at from storage.objects where id='11111111-1111-4111-8111-111111111111'));
+  perform public.attest_creative_storage_bytes_v6(story_asset_id,
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/story.png',repeat('f',64),12,
+    '22222222-2222-4222-8222-222222222222','v1',
+    (select updated_at from storage.objects where id='22222222-2222-4222-8222-222222222222'));
+  perform public.attest_creative_frame_bytes_v8(story_asset_id,story_frame,
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/story.png',repeat('f',64),12,
+    '22222222-2222-4222-8222-222222222222','v1',
+    (select updated_at from storage.objects where id='22222222-2222-4222-8222-222222222222'));
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  perform set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  creative_request_id:=public.request_ordinary_media_review_v6(carousel_asset_id);
+  select id into creative_review_id from public.ordinary_media_review_requests_v6
+    where canonical_request_id=creative_request_id;
+  perform public.approve_ordinary_media_inbox_v6(creative_review_id,creative_request_id);
+  creative_request_id:=public.request_ordinary_media_review_v6(story_asset_id);
+  select id into creative_review_id from public.ordinary_media_review_requests_v6
+    where canonical_request_id=creative_request_id;
+  perform public.approve_ordinary_media_inbox_v6(creative_review_id,creative_request_id);
+  if not public.ordinary_media_signoff_current_v6(carousel_asset_id)
+    or not public.ordinary_media_signoff_current_v6(story_asset_id) then
+    raise exception 'Paid framed creative lacks exact review'; end if;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
   select fingerprint into asset_fingerprint from public.delivery_source_catalog_v6
     where entity_kind='content_asset' and source_key=asset_id::text;
   update public.workflow_steps set status='completed'
@@ -208,6 +293,26 @@ begin
     jsonb_build_object('result','pass','checks',jsonb_build_array('fixture_video'),
       'source_fingerprint',asset_fingerprint)
     from public.workflow_steps s where s.run_id=v_run_id and s.step_key='piece2_create';
+  select fingerprint into asset_fingerprint from public.delivery_source_catalog_v6
+    where entity_kind='content_asset' and source_key=carousel_asset_id::text;
+  update public.workflow_steps set status='completed'
+    where run_id=v_run_id and step_key='piece3_create';
+  insert into public.workflow_artifacts(run_id,step_id,artifact_kind,record_id,
+    version_key,qa_evidence)
+  select v_run_id,s.id,'asset',carousel_asset_id,'fixture-carousel-v1',
+    jsonb_build_object('result','pass','checks',jsonb_build_array('fixture_carousel'),
+      'source_fingerprint',asset_fingerprint)
+    from public.workflow_steps s where s.run_id=v_run_id and s.step_key='piece3_create';
+  select fingerprint into asset_fingerprint from public.delivery_source_catalog_v6
+    where entity_kind='content_asset' and source_key=story_asset_id::text;
+  update public.workflow_steps set status='completed'
+    where run_id=v_run_id and step_key='piece4_create';
+  insert into public.workflow_artifacts(run_id,step_id,artifact_kind,record_id,
+    version_key,qa_evidence)
+  select v_run_id,s.id,'asset',story_asset_id,'fixture-story-v1',
+    jsonb_build_object('result','pass','checks',jsonb_build_array('fixture_story'),
+      'source_fingerprint',asset_fingerprint)
+    from public.workflow_steps s where s.run_id=v_run_id and s.step_key='piece4_create';
   perform public.sync_campaign_sweep_work_v7(10);
   perform set_config('request.jwt.claim.role','authenticated',true);
   perform set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
@@ -222,14 +327,23 @@ begin
   select * into same_bundle from public.create_paid_operator_bundle_v7(frozen.id,
     'Paid manager','Cap at 25 per day','Use campaign and page source IDs');
   if bundle.id<>same_bundle.id or not public.paid_operator_bundle_current_v7(bundle.id)
-    or jsonb_array_length(bundle.snapshot->'source'->'creative')<>2
+    or jsonb_array_length(bundle.snapshot->'source'->'creative')<>4
     or not exists(select 1 from jsonb_array_elements(bundle.snapshot->'source'->'creative') item
       where item->>'asset_id'=video_asset_id::text
         and item->>'storage_path'='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/final.mp4'
         and item->>'file_sha256'=repeat('c',64))
     or not exists(select 1 from jsonb_array_elements(bundle.snapshot->'source'->'creative') item
       where item->>'asset_id'=asset_id::text
-        and item->>'ad_primary_text'='Fixture copy') then
+        and item->>'ad_primary_text'='Fixture copy')
+    or not exists(select 1 from jsonb_array_elements(bundle.snapshot->'source'->'creative') item
+      where item->>'asset_id'=carousel_asset_id::text
+        and jsonb_array_length(item->'files')=2
+        and item#>>'{files,0,file_sha256}'=repeat('d',64)
+        and item#>>'{files,1,file_sha256}'=repeat('e',64))
+    or not exists(select 1 from jsonb_array_elements(bundle.snapshot->'source'->'creative') item
+      where item->>'asset_id'=story_asset_id::text
+        and jsonb_array_length(item->'files')=1
+        and item#>>'{files,0,file_sha256}'=repeat('f',64)) then
     raise exception 'Exact paid bundle was not current, complete and idempotent'; end if;
   begin
     update public.client_media_assets set title='Changed paid cut'
@@ -244,6 +358,20 @@ begin
   end;
   if not public.paid_operator_bundle_current_v7(bundle.id) then
     raise exception 'Rollback-only video edit invalidated the original packet';
+  end if;
+  begin
+    update storage.objects set version='v2'
+      where id='11111111-1111-4111-8111-111111111111';
+    if public.ordinary_media_signoff_current_v6(carousel_asset_id)
+      or public.paid_operator_bundle_current_v7(bundle.id) then
+      raise exception 'Changed second frame retained a current paid packet';
+    end if;
+    raise exception 'rollback second frame probe';
+  exception when raise_exception then
+    if sqlerrm <> 'rollback second frame probe' then raise; end if;
+  end;
+  if not public.paid_operator_bundle_current_v7(bundle.id) then
+    raise exception 'Rollback-only frame edit invalidated the original packet';
   end if;
   select id into request_id from public.approval_requests_v6
     where source_kind='paid_operator_bundle' and source_id=bundle.id::text;

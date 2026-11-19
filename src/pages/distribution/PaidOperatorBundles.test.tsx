@@ -124,6 +124,31 @@ it("requires a reported verified download before the handoff button is usable", 
   expect(screen.getByRole("button", { name: "Download and verify all files" })).toBeEnabled();
 });
 
+it("shows every reviewed carousel frame and refuses an incomplete file list", async () => {
+  rows.paid_operator_bundles_v7 = [{ id: "bundle-framed", client_id: "client-1",
+    campaign_id: "campaign-1", package_id: "package-1", platform: "meta", version: 1,
+    snapshot_hash: "a".repeat(64), snapshot: { source: { campaign_name: "Local offer",
+      creative: [{ asset_id: "asset-1", content_format: "carousel", files: [
+        { asset_id: "asset-1", frame_id: "frame-1", position: 1,
+          storage_path: "client/one.png", file_sha256: "a".repeat(64), title: "Opening" },
+        { asset_id: "asset-1", frame_id: "frame-2", position: 2,
+          storage_path: "client/two.png", file_sha256: "b".repeat(64), title: "Closing" },
+      ] }] } }, created_at: "2026-11-16T00:00:00Z", created_by: "user-1" }];
+  const { unmount } = render(<PaidOperatorBundles clientId="client-1" platform="meta" />);
+  expect(await screen.findByRole("button", { name: "Download verified Opening · frame 1" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Download verified Closing · frame 2" })).toBeInTheDocument();
+  rows.paid_operator_bundles_v7 = [{ ...rows.paid_operator_bundles_v7[0] as object,
+    snapshot: { source: { campaign_name: "Local offer", creative: [{ asset_id: "asset-1",
+      files: [{ asset_id: "asset-1", frame_id: "frame-1", position: 1,
+        storage_path: "client/one.png", file_sha256: "a".repeat(64) },
+      { asset_id: "asset-1", frame_id: "frame-2", position: 2, storage_path: "client/two.png" }] }] } } }];
+  unmount();
+  render(<PaidOperatorBundles clientId="client-1" platform="meta" />);
+  await userEvent.click(await screen.findByRole("button", { name: "Download and verify all files" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("missing or incomplete creative files");
+  expect(rpc).not.toHaveBeenCalledWith("record_paid_operator_event_v7", expect.anything());
+});
+
 it("shows the reviewed Google copy packet without requiring a media file", async () => {
   rows.client_campaigns = [{ id: "campaign-1", name: "Local offer", paid_platform: "google" }];
   rows.paid_operator_bundles_v7 = [{ id: "bundle-google", client_id: "client-1",

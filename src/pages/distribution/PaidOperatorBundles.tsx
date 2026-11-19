@@ -25,14 +25,33 @@ function sourceOf(bundle: Bundle): Record<string, unknown> {
     ? snapshot.source as Record<string, unknown> : {};
 }
 
-type CreativeFile = { asset_id: string; storage_path: string; file_sha256: string; title?: string };
+type CreativeFile = { asset_id: string; storage_path: string; file_sha256: string;
+  frame_id?: string; position?: number; title?: string };
+
+function isCreativeFile(value: unknown): value is CreativeFile {
+  return !!value && typeof value === "object"
+    && typeof (value as CreativeFile).asset_id === "string"
+    && typeof (value as CreativeFile).storage_path === "string"
+    && typeof (value as CreativeFile).file_sha256 === "string";
+}
 
 function creativeFiles(bundle: Bundle): CreativeFile[] {
   const creative = sourceOf(bundle).creative;
   if (!Array.isArray(creative)) return [];
-  return creative.filter((item): item is CreativeFile => !!item && typeof item === "object"
-    && typeof item.asset_id === "string" && typeof item.storage_path === "string"
-    && typeof item.file_sha256 === "string");
+  return creative.flatMap((item) => item && typeof item === "object" && Array.isArray(item.files)
+    ? item.files.filter(isCreativeFile) : isCreativeFile(item) ? [item] : []);
+}
+
+function completeMetaCreative(creative: unknown, files: CreativeFile[]): boolean {
+  return Array.isArray(creative) && creative.length > 0
+    && creative.every((item) => item && typeof item === "object"
+      && typeof item.asset_id === "string"
+      && (Array.isArray(item.files)
+        ? item.files.length > 0 && item.files.every(isCreativeFile)
+          && item.files.every((file: CreativeFile) => file.asset_id === item.asset_id)
+        : isCreativeFile(item)))
+    && files.length === creative.reduce((count, item) => count
+      + (Array.isArray(item.files) ? item.files.length : 1), 0);
 }
 
 async function downloadCreative(file: CreativeFile): Promise<void> {
@@ -208,8 +227,8 @@ function PaidOperatorBundlesForClient({ clientId, platform, campaignId }: {
     try {
       const files = creativeFiles(bundle);
       const creative = sourceOf(bundle).creative;
-      if (platform === "meta" && files.length === 0)
-        throw new Error("The exact Meta bundle has no downloadable creative files.");
+      if (platform === "meta" && !completeMetaCreative(creative, files))
+        throw new Error("The exact Meta bundle has missing or incomplete creative files.");
       if (platform === "google" && (!Array.isArray(creative) || creative.length === 0
         || !creative.every((item) => item && typeof item === "object"
           && typeof item.copy_id === "string" && typeof item.copy_hash === "string"
@@ -293,10 +312,10 @@ function PaidOperatorBundlesForClient({ clientId, platform, campaignId }: {
           <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded bg-muted p-2">{JSON.stringify(bundle.snapshot, null, 2)}</pre>
         </details>
         <div className="mt-2 flex flex-wrap gap-3">{creativeFiles(bundle).map((file) =>
-          <button key={file.asset_id} type="button" className="underline" onClick={() => {
+          <button key={`${file.asset_id}:${file.frame_id ?? "single"}`} type="button" className="underline" onClick={() => {
             void downloadCreative(file).catch((cause: unknown) => setError(
               cause instanceof Error ? cause.message : "Could not verify creative bytes."));
-          }}>Download verified {file.title || file.asset_id.slice(0, 8)}</button>)}</div>
+          }}>Download verified {file.title || file.asset_id.slice(0, 8)}{file.position ? ` · frame ${file.position}` : ""}</button>)}</div>
         <div className="mt-2 flex flex-wrap gap-3">
           <button type="button" className="underline disabled:opacity-50" disabled={busy || !approved[bundle.id]}
             onClick={() => void verifyDownload(bundle)}>{platform === "google" ? "Download and verify Google packet" : "Download and verify all files"}</button>
