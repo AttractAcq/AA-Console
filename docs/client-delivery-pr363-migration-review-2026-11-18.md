@@ -104,4 +104,6 @@
 
 ## Acceptance remains open
 
+**Google Profile paid-account view checkpoint, 19 November 2026 (candidate):** The Metrics tab now displays the existing Google Ads account inventory separately from the unavailable Business Profile performance metrics. The embedded account view cannot queue a provider read; Google Ads Studio remains its owner. Current integration, customer and credential checks still gate displayed Ads data. Thirty-two focused Profile and Ads-read tests and the frontend build pass locally. A live Ads read, Business Profile metrics ingest and hosted role checks remain open.
+
 This manifest does not authorize deployment or outward effects. Phase 5 still needs real creative quality and human review. Phases 8 and 9 still need provider receipts, both organic and paid journeys, a consented route-to-cash trace, archive/retrieve, negative tests and exact post-release identities. The Console browser bridge is unavailable in this CLI session, so no new live UI evidence was gathered here.

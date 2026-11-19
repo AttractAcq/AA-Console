@@ -10,6 +10,7 @@ import { dayOrDash } from "../../lib/contentRecords";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
 import { PROFILE_FIELD_PATCH_HOLD } from "../../../agent-runtime/src/profiles/prewrite-gate.js";
+import { GoogleAdsReadPanel } from "../google-ads/GoogleAdsReadPanel";
 
 type Location = Database["public"]["Tables"]["client_google_locations"]["Row"];
 type ProfileDue = Database["public"]["Views"]["google_profile_due"]["Row"];
@@ -589,15 +590,25 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
       )}
 
       {tab === "metrics" && (
-        <div className="rounded-lg border border-border bg-card p-4">
-          <h3 className="font-semibold">Profile metrics</h3>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Views, searches and actions come from the Business Profile performance API, which
-            nothing in this runtime calls yet. Rather than show zeroes that look like data, this
-            says so: the ingest is the next slice, and it needs the same{" "}
-            <code className="text-xs">google_business</code> credential the rest of this page is
-            waiting on.
-          </p>
+        <div className="space-y-4">
+          <div className="rounded-lg border border-border bg-card p-4">
+            <h3 className="font-semibold">Business Profile metrics</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Views, searches and actions come from the Business Profile performance API, which
+              nothing in this runtime calls yet. Rather than show zeroes that look like data, this
+              says so: the ingest is the next slice, and it needs the same{" "}
+              <code className="text-xs">google_business</code> credential the rest of this page is
+              waiting on.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <h3 className="font-semibold">Paid Google activity</h3>
+            <p className="text-sm text-muted-foreground">
+              This is the separate Google Ads customer's latest account read. It does not measure
+              Business Profile views or actions. Request a new account read in Google Ads Studio.
+            </p>
+            <GoogleAdsReadPanel clientId={clientId} readOnly />
+          </div>
         </div>
       )}
 

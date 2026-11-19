@@ -24,6 +24,10 @@ vi.mock("react-router-dom", () => ({
 vi.mock("../../components/forms/FormModal", () => ({
   FormModal: (props: unknown) => { modalProps.push(props); return null; },
 }));
+vi.mock("../google-ads/GoogleAdsReadPanel", () => ({
+  GoogleAdsReadPanel: ({ clientId, readOnly }: { clientId: string; readOnly: boolean }) =>
+    <p>Paid account for {clientId}: {readOnly ? "view only" : "actions"}</p>,
+}));
 
 import { GoogleProfilePanel } from "./GoogleProfilePanel";
 
@@ -523,5 +527,7 @@ describe("posts and metrics", () => {
     render(<GoogleProfilePanel tab="metrics" />);
     expect(await screen.findByText(/nothing in this runtime calls yet/)).toBeInTheDocument();
     expect(screen.getByText(/Rather than show zeroes that look like data/)).toBeInTheDocument();
+    expect(screen.getByText("Paid account for client-1: view only")).toBeInTheDocument();
+    expect(screen.getByText(/does not measure Business Profile views or actions/)).toBeInTheDocument();
   });
 });

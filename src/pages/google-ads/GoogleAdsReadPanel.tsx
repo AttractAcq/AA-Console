@@ -8,11 +8,16 @@ type Campaign = Database["public"]["Tables"]["google_ads_campaign_reads_v7"]["Ro
 type Ad = Database["public"]["Tables"]["google_ads_ad_reads_v7"]["Row"];
 type Match = Database["public"]["Views"]["google_operator_google_match_v7"]["Row"];
 
-export function GoogleAdsReadPanel({ clientId }: { clientId: string | undefined }) {
-  return <GoogleAdsReadPanelForClient key={clientId ?? "no-client"} clientId={clientId} />;
+export function GoogleAdsReadPanel({ clientId, readOnly = false }: {
+  clientId: string | undefined; readOnly?: boolean;
+}) {
+  return <GoogleAdsReadPanelForClient key={clientId ?? "no-client"}
+    clientId={clientId} readOnly={readOnly} />;
 }
 
-function GoogleAdsReadPanelForClient({ clientId }: { clientId: string | undefined }) {
+function GoogleAdsReadPanelForClient({ clientId, readOnly }: {
+  clientId: string | undefined; readOnly: boolean;
+}) {
   const [run, setRun] = useState<Run | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [ads, setAds] = useState<Ad[]>([]);
@@ -80,7 +85,9 @@ function GoogleAdsReadPanelForClient({ clientId }: { clientId: string | undefine
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
     <div className="flex flex-wrap gap-2">
-      <Button disabled={busy || !clientId} onClick={() => void queue()}>Read Google Ads account</Button>
+      {!readOnly && <Button disabled={busy || !clientId} onClick={() => void queue()}>
+        Read Google Ads account
+      </Button>}
       <Button disabled={busy || !clientId} onClick={() => void refresh().catch((cause) => setError(String(cause)))}>Refresh view</Button>
     </div>
     {run ? <p className="text-xs text-muted-foreground">Customer {run.customer_id} · {run.currency} · {run.from_date} to {run.through_date} · fetched {new Date(run.fetched_at).toLocaleString()} · provider request {run.provider_request_id}</p>

@@ -31,6 +31,12 @@ beforeEach(() => {
 });
 
 describe("Google Ads read-only account view", () => {
+  it("shows the shared account snapshot without a queue action in profile mode", async () => {
+    render(<GoogleAdsReadPanel clientId="client-1" readOnly />);
+    expect(await screen.findByText(/Inventory and metrics are unknown/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Read Google Ads account" })).not.toBeInTheDocument();
+    expect(enqueueAgentJob).not.toHaveBeenCalled();
+  });
   it("keeps absent provider data unknown and only queues a read job", async () => {
     render(<GoogleAdsReadPanel clientId="client-1" />);
     expect(await screen.findByText(/Inventory and metrics are unknown/)).toBeInTheDocument();
