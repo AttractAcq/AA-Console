@@ -213,6 +213,17 @@ beforeEach(async () => {
   await db.exec(await sql("20261124041700_582_hold_paid_proof_placement_until_provider_live.sql"));
   await db.exec(await sql("20261124041800_583_proof_surface_event_contract.sql"));
   await db.exec(await sql("20261124041900_584_proof_retraction_keeps_surface_visible.sql"));
+  await db.exec(`
+    create type content_format as enum ('single','carousel','story','reel');
+    alter table client_media_assets add column content_format content_format default 'single';
+    create table client_media_frames(asset_id uuid,position integer,storage_path text);
+    create table post_frame_publications(
+      post_id uuid,client_id uuid,position integer,external_id text);
+    create table organic_provider_readback_latest_v8(
+      id uuid primary key default gen_random_uuid(),post_id uuid,client_id uuid,
+      frame_position integer,external_id text,state text);
+  `);
+  await db.exec(await sql("20261124042600_591_organic_proof_requires_provider_readback.sql"));
 });
 
 afterAll(async () => { await db?.close(); });
@@ -305,6 +316,9 @@ describe("G10 — recording where proof already went", () => {
     const { id: post } = await one<{ id: string }>(
       `insert into scheduled_posts (client_id, asset_id, publication_status, published_at, external_id, external_url)
        values ($1,$2,'published',now(),'provider-post-abc','https://instagram.com/p/abc') returning id`, [CLIENT, asset]);
+    await db.query(`insert into organic_provider_readback_latest_v8
+      (post_id,client_id,frame_position,external_id,state)
+      values ($1,$2,0,'provider-post-abc','verified')`, [post, CLIENT]);
     return post;
   }
 
@@ -338,6 +352,39 @@ describe("G10 — recording where proof already went", () => {
       `select record_proof_placement_for_post_v6($1) as id`, [post]);
     expect(id).toBeNull();
     expect(await rows(`select 1 from proof_placements`)).toHaveLength(0);
+  });
+
+  it("holds organic proof when the provider post has no verified account read-back", async () => {
+    await asService();
+    const post = await postWithProof();
+    await db.query(`update organic_provider_readback_latest_v8 set state='unavailable'
+      where post_id=$1`, [post]);
+    expect(await refusal(`select record_proof_placement_for_post_v6($1)`, [post]))
+      .toContain("Verified provider account read-back is required");
+    expect(await rows(`select 1 from proof_placements where destination_key='organic_social'`))
+      .toHaveLength(0);
+  });
+
+  it("holds story proof until every recorded frame has an exact read-back", async () => {
+    await asService();
+    const post = await postWithProof();
+    const { asset_id: asset } = await one<{ asset_id: string }>(
+      `select asset_id from scheduled_posts where id=$1`, [post]);
+    await db.query(`update client_media_assets set content_format='story' where id=$1`, [asset]);
+    await db.query(`insert into client_media_frames(asset_id,position,storage_path)
+      values ($1,1,'a'),($1,2,'b')`, [asset]);
+    await db.query(`insert into post_frame_publications(post_id,client_id,position,external_id)
+      values ($1,$2,1,'story-1'),($1,$2,2,'story-2')`, [post, CLIENT]);
+    await db.query(`insert into organic_provider_readback_latest_v8
+      (post_id,client_id,frame_position,external_id,state)
+      values ($1,$2,1,'story-1','verified')`, [post, CLIENT]);
+    expect(await refusal(`select record_proof_placement_for_post_v6($1)`, [post]))
+      .toContain("Every published story frame needs verified provider account read-back");
+    await db.query(`insert into organic_provider_readback_latest_v8
+      (post_id,client_id,frame_position,external_id,state)
+      values ($1,$2,2,'story-2','verified')`, [post, CLIENT]);
+    expect((await one<{ id: string }>(
+      `select record_proof_placement_for_post_v6($1) as id`, [post])).id).toBeTruthy();
   });
 
   it("refuses to claim distribution without a provider post ID", async () => {
@@ -430,6 +477,9 @@ describe("the question on the day rights lapse", () => {
     const { id: post } = await one<{ id: string }>(
       `insert into scheduled_posts (client_id, asset_id, publication_status, published_at, external_id, external_url)
        values ($1,$2,'published',now(),'provider-post-x','https://instagram.com/p/x') returning id`, [CLIENT, asset]);
+    await db.query(`insert into organic_provider_readback_latest_v8
+      (post_id,client_id,frame_position,external_id,state)
+      values ($1,$2,0,'provider-post-x','verified')`, [post, CLIENT]);
     const { id: placementId } = await one<{ id: string }>(
       `select record_proof_placement_for_post_v6($1) as id`, [post]);
 

@@ -68,10 +68,16 @@ const dueRow = (over: Record<string, unknown> = {}) => ({
  * tests pass by accident: the due view returned posts, which carry no state,
  * so the banner stayed silent whatever the data said.
  */
-function byTable(posts: unknown[], due: unknown[] = [], events: unknown[] = []) {
+function byTable(posts: unknown[], due: unknown[] = [], events: unknown[] = [],
+  readbacks: unknown[] = [], frames: unknown[] = []) {
   return (table: string) => table === "post_publication_events_v6"
     ? postsReturn(events, true)
-    : postsReturn(table === "distribution_due" ? due : posts);
+    : table === "organic_provider_readback_latest_v8" || table === "post_frame_publications"
+      ? { select: () => ({ eq: () => Promise.resolve({
+        data: table === "organic_provider_readback_latest_v8" ? readbacks : frames,
+        error: null,
+      }) }) }
+      : postsReturn(table === "distribution_due" ? due : posts);
 }
 
 beforeEach(() => {
@@ -122,6 +128,25 @@ describe("the board", () => {
     expect(screen.getByText("Rate limited")).toBeInTheDocument();
     expect(screen.getByText(/read-back before it is verified/)).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "ig-42" })).toHaveLength(2);
+    expect(screen.getByText("Provider acknowledged; read-back pending")).toBeInTheDocument();
+  });
+
+  it("shows provider verification separately from the publish acknowledgement", async () => {
+    from.mockImplementation(byTable([post({ publication_status: "published", external_id: "ig-42" })],
+      [], [], [{ post_id: "p1", frame_position: 0, state: "verified",
+        checked_at: "2026-11-19T01:00:00Z" }]));
+    render(<DistributionBoard channel="organic" />);
+    expect(await screen.findByText("Verified on provider account")).toBeInTheDocument();
+  });
+
+  it("keeps a story partial until every acknowledged frame is verified", async () => {
+    from.mockImplementation(byTable([post({ publication_status: "published", external_id: "ig-1" })],
+      [], [], [{ post_id: "p1", frame_position: 1, state: "verified",
+        checked_at: "2026-11-19T01:00:00Z" }],
+      [{ post_id: "p1", position: 1 }, { post_id: "p1", position: 2 }]));
+    render(<DistributionBoard channel="organic" />);
+    expect(await screen.findByText("Provider acknowledged; 1/2 recorded frames verified"))
+      .toBeInTheDocument();
   });
   it("shows which platform a scheduled post goes to", async () => {
     render(<DistributionBoard channel="organic" />);

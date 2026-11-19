@@ -22584,6 +22584,112 @@ export type Database = {
           },
         ]
       }
+      organic_provider_readback_events_v8: {
+        Row: {
+          checked_at: string
+          client_id: string
+          expected_account_ref: string
+          external_id: string
+          frame_position: number
+          id: string
+          observed_account_ref: string | null
+          platform: Database["public"]["Enums"]["post_platform"]
+          post_id: string
+          provider_url: string | null
+          state: string
+        }
+        Insert: {
+          checked_at?: string
+          client_id: string
+          expected_account_ref: string
+          external_id: string
+          frame_position?: number
+          id?: string
+          observed_account_ref?: string | null
+          platform: Database["public"]["Enums"]["post_platform"]
+          post_id: string
+          provider_url?: string | null
+          state: string
+        }
+        Update: {
+          checked_at?: string
+          client_id?: string
+          expected_account_ref?: string
+          external_id?: string
+          frame_position?: number
+          id?: string
+          observed_account_ref?: string | null
+          platform?: Database["public"]["Enums"]["post_platform"]
+          post_id?: string
+          provider_url?: string | null
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organic_provider_readback_events_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "organic_provider_readback_events_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "organic_provider_readback_events_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organic_provider_readback_events_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "organic_provider_readback_events_v8_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "distribution_due"
+            referencedColumns: ["schedule_id"]
+          },
+          {
+            foreignKeyName: "organic_provider_readback_events_v8_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_presence"
+            referencedColumns: ["post_id"]
+          },
+          {
+            foreignKeyName: "organic_provider_readback_events_v8_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "post_copy_effective"
+            referencedColumns: ["scheduled_post_id"]
+          },
+          {
+            foreignKeyName: "organic_provider_readback_events_v8_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["post_id"]
+          },
+          {
+            foreignKeyName: "organic_provider_readback_events_v8_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organic_publication_packages_v6: {
         Row: {
           artifact_hash: string
@@ -35100,6 +35206,86 @@ export type Database = {
           },
         ]
       }
+      organic_provider_readback_latest_v8: {
+        Row: {
+          checked_at: string | null
+          client_id: string | null
+          expected_account_ref: string | null
+          external_id: string | null
+          frame_position: number | null
+          id: string | null
+          observed_account_ref: string | null
+          platform: Database["public"]["Enums"]["post_platform"] | null
+          post_id: string | null
+          provider_url: string | null
+          state: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organic_provider_readback_events_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "organic_provider_readback_events_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "organic_provider_readback_events_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organic_provider_readback_events_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "organic_provider_readback_events_v8_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "distribution_due"
+            referencedColumns: ["schedule_id"]
+          },
+          {
+            foreignKeyName: "organic_provider_readback_events_v8_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_presence"
+            referencedColumns: ["post_id"]
+          },
+          {
+            foreignKeyName: "organic_provider_readback_events_v8_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "post_copy_effective"
+            referencedColumns: ["scheduled_post_id"]
+          },
+          {
+            foreignKeyName: "organic_provider_readback_events_v8_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["post_id"]
+          },
+          {
+            foreignKeyName: "organic_provider_readback_events_v8_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       outbound_message_due: {
         Row: {
           approval_status: string | null
@@ -43016,6 +43202,18 @@ export type Database = {
           p_client_id: string
           p_observed_value: string
           p_provider_ref: string
+        }
+        Returns: string
+      }
+      record_organic_provider_readback_v8: {
+        Args: {
+          p_expected_account_ref: string
+          p_external_id: string
+          p_frame_position: number
+          p_observed_account_ref: string
+          p_post_id: string
+          p_provider_url?: string
+          p_state: string
         }
         Returns: string
       }

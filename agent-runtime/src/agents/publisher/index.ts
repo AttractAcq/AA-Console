@@ -40,6 +40,7 @@ import { safeProviderErrorMessage } from "../../storage/signed-url-policy.js";
 import { verifyFrozenPublicationPackage } from "../../publishing/frozen-package.js";
 import { assertMetaPublishPrerequisites,
   type PublishPreflightRequest } from "../../publishing/preflight.js";
+import { readMetaPublication, type PublicationReadback } from "../../publishing/readback.js";
 import { requireOrganicRoute } from "./organic-route.js";
 import {
   PublishError,
@@ -51,6 +52,36 @@ import {
 
 const DEFAULT_BATCH = 5;
 type Preflight = (input: PublishPreflightRequest) => Promise<void>;
+type Readback = (request: PublishRequest, externalId: string) => Promise<PublicationReadback>;
+
+async function recordProviderReadback(
+  sb: SupabaseClient, jobId: string, request: PublishRequest,
+  externalId: string, framePosition: number, readback: Readback,
+): Promise<void> {
+  let result: PublicationReadback;
+  try { result = await readback(request, externalId); }
+  catch { result = { status: "unavailable", observedAccountRef: null, providerUrl: null }; }
+  try {
+    const { error } = await sb.rpc("record_organic_provider_readback_v8", {
+      p_post_id: request.postId, p_frame_position: framePosition,
+      p_external_id: externalId, p_expected_account_ref: request.accountId,
+      p_observed_account_ref: result.observedAccountRef,
+      p_state: result.status, p_provider_url: result.providerUrl,
+    } as never);
+    if (error) throw new Error(error.message);
+    await appendEvent(sb, jobId,
+      `${request.platform}: provider account read-back ${result.status}.`,
+      result.status === "verified" ? "info" : "warn",
+      { post_id: request.postId, frame_position: framePosition, external_id: externalId });
+  } catch (error) {
+    // The public effect is already acknowledged. Losing a read-back row must
+    // not put the post back in a publish retry queue.
+    logger.warn("provider_readback_not_recorded", {
+      jobId, postId: request.postId, framePosition,
+      message: safeProviderErrorMessage(error instanceof Error ? error.message : "unknown"),
+    });
+  }
+}
 
 type PrewritePackage = { artifact_hash: string; manifest: Record<string, unknown> };
 
@@ -213,6 +244,7 @@ async function publishStory(
   jobId: string,
   expectedAppId: string | null,
   preflight: Preflight,
+  readback: Readback,
 ): Promise<PublishSuccess> {
   if (!adapter.publishFrame) {
     throw new PublishError(`The ${adapter.provider} adapter cannot send a story.`, false);
@@ -256,10 +288,13 @@ async function publishStory(
     // than carrying on and widening the gap between the account and the
     // record.
     if (frameError) {
-      throw new Error(
-        `Story frame ${frame.position} went out, but could not be recorded: ${frameError.message}`,
+      throw new PublishError(
+        `Story frame ${frame.position} was acknowledged, but its database record is uncertain: ${frameError.message}`,
+        false, true,
       );
     }
+    await recordProviderReadback(sb, jobId, request, result.externalId,
+      frame.position, readback);
     sent += 1;
     first ??= { external_id: result.externalId, external_url: result.externalUrl ?? null };
     await appendEvent(
@@ -288,7 +323,7 @@ export async function runPublisherJob(
   agent: AgentRow,
   job: AgentJobRow,
   _deadlineAt?: number,
-  deps: { preflight?: Preflight } = {},
+  deps: { preflight?: Preflight; readback?: Readback } = {},
 ): Promise<JobResult> {
   if (!runtime.publishEnabled) {
     // Successfully nothing. See the header: a dry run that reports success
@@ -312,6 +347,7 @@ export async function runPublisherJob(
   let published = 0;
   let failed = 0;
   const preflight = deps.preflight ?? assertMetaPublishPrerequisites;
+  const readback = deps.readback ?? readMetaPublication;
 
   for (const post of claimed) {
     try {
@@ -320,7 +356,7 @@ export async function runPublisherJob(
       let result: PublishSuccess;
       if (request.contentFormat === "story") {
         result = await publishStory(sb, adapter, request, post, job.id,
-          runtime.metaAppId, preflight);
+          runtime.metaAppId, preflight, readback);
       } else {
         await requireProviderPreflight(request, runtime.metaAppId, preflight);
         await requireOutgoingPublicationPrewrite(sb, post.post_id, request.reviewedArtifactHash);
@@ -334,10 +370,16 @@ export async function runPublisherJob(
         p_external_url: result.externalUrl ?? null,
         p_bot: "publisher",
       } as never);
-      // The post is out. If this write fails the row stays claimed and the
-      // reaper will fail it, which is wrong but visible — and it says to go
-      // and look at the account, which is exactly the right instruction.
-      if (recordError) throw new Error(`Published, but could not record it: ${recordError.message}`);
+      // The provider has acknowledged a public effect. A failed or lost DB
+      // response is uncertain, never a reason to queue another public write.
+      if (recordError) throw new PublishError(
+        `Provider acknowledged the post, but its database record is uncertain: ${recordError.message}`,
+        false, true,
+      );
+
+      if (request.contentFormat !== "story") {
+        await recordProviderReadback(sb, job.id, request, result.externalId, 0, readback);
+      }
 
       published += 1;
 

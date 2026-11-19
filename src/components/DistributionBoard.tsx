@@ -47,6 +47,15 @@ type PublicationEvent = {
   occurred_at: string;
 };
 
+type ProviderReadback = {
+  post_id: string;
+  frame_position: number;
+  state: "verified" | "unavailable" | "mismatch";
+  checked_at: string;
+};
+
+type FrameAcknowledgement = { post_id: string; position: number };
+
 /**
  * Organic and Paid are the same board on a different channel. The current
  * schedule_asset RPC does not enforce route lineage, so this board checks it
@@ -57,6 +66,8 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
   const [posts, setPosts] = useState<Post[]>([]);
   const [events, setEvents] = useState<PublicationEvent[]>([]);
+  const [readbacks, setReadbacks] = useState<ProviderReadback[]>([]);
+  const [frameAcknowledgements, setFrameAcknowledgements] = useState<FrameAcknowledgement[]>([]);
   const [eventsMore, setEventsMore] = useState(false);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
@@ -86,6 +97,17 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
     // "Scheduled".
     setDue(await fetchDue(clientId, channel));
     if (channel === "organic") {
+      const { data: readbackRows, error: readbackError } = await supabase
+        .from("organic_provider_readback_latest_v8")
+        .select("post_id, frame_position, state, checked_at")
+        .eq("client_id", clientId);
+      if (readbackError) throw readbackError;
+      setReadbacks((readbackRows ?? []) as ProviderReadback[]);
+      const { data: frameRows, error: frameError } = await supabase
+        .from("post_frame_publications")
+        .select("post_id, position").eq("client_id", clientId);
+      if (frameError) throw frameError;
+      setFrameAcknowledgements((frameRows ?? []) as FrameAcknowledgement[]);
       const { data: eventRows, error: eventError } = await supabase
         .from("post_publication_events_v6")
         .select("id, post_id, ref_number, platform, event, publication_status, attempt_number, external_id, external_url, detail, occurred_at")
@@ -157,6 +179,27 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
     const row = due.find((d) => d.schedule_id === scheduleId);
     return row ? stateLabel(row) : null;
   };
+  const readbackFor = (post: Post): string => {
+    if (channel !== "organic") return "—";
+    const frames = frameAcknowledgements.filter((frame) => frame.post_id === post.id);
+    const reads = readbacks.filter((readback) => readback.post_id === post.id);
+    if (frames.length > 0) {
+      const frameReads = reads.filter((readback) => readback.frame_position > 0);
+      if (frameReads.some((readback) => readback.state === "mismatch"))
+        return "Account mismatch — inspect";
+      const verified = frames.filter((frame) => frameReads.some((readback) =>
+        readback.frame_position === frame.position && readback.state === "verified")).length;
+      return post.publication_status === "published" && verified === frames.length
+        ? `Verified ${verified}/${frames.length} published frames`
+        : `Provider acknowledged; ${verified}/${frames.length} recorded frames verified${post.publication_status === "published" ? "" : "; story incomplete"}`;
+    }
+    if (post.publication_status !== "published") return "—";
+    const read = reads.find((row) => row.frame_position === 0);
+    return read?.state === "verified" ? "Verified on provider account"
+      : read?.state === "mismatch" ? "Account mismatch — inspect"
+        : read?.state === "unavailable" ? "Provider read-back unavailable"
+          : "Provider acknowledged; read-back pending";
+  };
 
   const activeLabel = mediaFilters.find((f) => f.id === activeFilter)?.label ?? "";
 
@@ -220,7 +263,7 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
           <FilterPills options={mediaFilters} activeId={activeFilter} onChange={setActiveFilter} />
         </div>
         <DataTable
-          columns={["Date", "Ref Number", "Type", "Platform", "Status", "Attempts", "External record", "Copy"]}
+          columns={["Date", "Ref Number", "Type", "Platform", "Status", "Provider read-back", "Attempts", "External record", "Copy"]}
           emptyLabel={`No ${activeLabel.toLowerCase()} assets scheduled`}
           rows={shown.map((p) => [
             p.scheduled_for,
@@ -232,6 +275,7 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
               : p.publication_status === "failed" ? `Failed: ${p.failure_reason ?? "reason not recorded"}`
                 : p.publication_status === "publishing" ? "Publishing attempt in progress"
                   : (statusFor(p.id) ?? "Scheduled"),
+            readbackFor(p),
             p.publish_attempts ?? 0,
             p.external_url ? <a key={`external-${p.id}`} href={p.external_url} target="_blank" rel="noreferrer"
               className="text-brand-strong underline">{p.external_id ?? "Open post"}</a>

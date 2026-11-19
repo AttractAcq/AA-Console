@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "a18092a1408236a5b360c22ab494ccdba8f4837a80b9ab0045a2a768a2d1eafb",
-  "generatedTypesSha256": "93c8d4082d7f3cc769be5e649a85c5aec168196c8b74d7695dee5354b5dd1e60",
-  "generatedSchemaBodySha256": "5eb03cfd23d7705045fda2fac7a67161f9846263072c73ea4fc881648d1c1857",
+  "migrationSourceDigest": "0cfb8634bc51d0545200f7c5c799d8f68494f803811e0cd1389856a7e0e72d12",
+  "generatedTypesSha256": "0cfd0077ebb9d2c7316404be6448f1ab88308ab99c5e3cf3d5364003dc35cf2a",
+  "generatedSchemaBodySha256": "d725252ff722997af0283dc50c310c347d72fc5be6a40f07002fa880144ab54b",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4245,6 +4245,20 @@
       "filename": "20261124042400_589_organic_publication_approved_claim.sql",
       "sha256": "aadbb1461f93628628e3afeacf518430808db993864c5f2755ec625fce762193",
       "trimmedMd5": "cba033f6ab6c5b0edb3b23e58fb02968"
+    },
+    {
+      "version": "20261124042500",
+      "name": "590_organic_provider_readback",
+      "filename": "20261124042500_590_organic_provider_readback.sql",
+      "sha256": "633e2672e50c02d56ba3b2eea92f0ead6a845e57501ee5911c4a7815c29b3e3a",
+      "trimmedMd5": "882914895ada93df2c325b7924bb6bdd"
+    },
+    {
+      "version": "20261124042600",
+      "name": "591_organic_proof_requires_provider_readback",
+      "filename": "20261124042600_591_organic_proof_requires_provider_readback.sql",
+      "sha256": "896f797ca5e4f69858e82ed0bd58f0be0071690a5f7f06759b796f90f8f287f3",
+      "trimmedMd5": "be77313a9d0f21a5bccd69bb6326bcb9"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

@@ -460,4 +460,43 @@ describe("held exact organic publication package", () => {
       publish_claimed_at=null where id='${POST}'`);
     expect((await db.query("select * from claim_posts_for_publishing(5)")).rows).toHaveLength(0);
   });
+
+  it("records provider acknowledgement and account read-back separately", async () => {
+    await db.exec(`
+      alter table scheduled_posts add column external_id text;
+      create table post_frame_publications(
+        post_id uuid,client_id uuid,position integer,external_id text,
+        primary key(post_id,position));
+      update scheduled_posts set publication_status='published',external_id='123'
+        where id='${POST}';
+    `);
+    const migration = await readFile(new URL(
+      "../../supabase/migrations/20261124042500_590_organic_provider_readback.sql",
+      import.meta.url,
+    ), "utf8");
+    await db.exec(migration);
+    expect((await db.query("select * from organic_provider_readback_latest_v8")).rows)
+      .toHaveLength(0);
+    const args = [POST,0,"123","123456789","123456789","verified",
+      "https://www.instagram.com/p/ABC/"];
+    await db.query("select record_organic_provider_readback_v8($1,$2,$3,$4,$5,$6,$7)", args);
+    expect(await one<{ state: string; observed_account_ref: string }>(
+      "select state,observed_account_ref from organic_provider_readback_latest_v8"))
+      .toMatchObject({ state: "verified", observed_account_ref: "123456789" });
+    await expect(db.query(
+      "select record_organic_provider_readback_v8($1,$2,$3,$4,$5,$6,$7)",
+      [POST,0,"other","123456789","123456789","verified",null],
+    )).rejects.toThrow(/acknowledgement is missing/);
+    await expect(db.query(
+      "select record_organic_provider_readback_v8($1,$2,$3,$4,$5,$6,$7)",
+      [POST,0,"123","123456789","123456789","verified","https://example.com/"],
+    )).rejects.toThrow(/URL is inconsistent/);
+    await db.exec("select set_config('request.jwt.claim.role','authenticated',false)");
+    await expect(db.query(
+      "select record_organic_provider_readback_v8($1,$2,$3,$4,$5,$6,$7)", args,
+    )).rejects.toThrow(/Only the publisher/);
+    await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
+    await expect(db.exec("delete from organic_provider_readback_events_v8"))
+      .rejects.toThrow(/append-only/);
+  });
 });
