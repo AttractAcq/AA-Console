@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "8d2203cd62bd950e8f824f5034e7f493408bcd009b5d1ce59cee1504d80f1bef",
+  "migrationSourceDigest": "f89b8275cd1235b05c09c6c5e038d64fb31f8791ef01d252213a9908645c966f",
   "generatedTypesSha256": "74065bff8b1251f1d95d196869f804bdeb1d4eca808af9798ff8332205de67b9",
   "generatedSchemaBodySha256": "3c0ad2e89ac8dbfa4b1094ce701e00fcdbc749f9c62fc3daf7bcc97fde40264b",
   "localMigrations": [
@@ -4343,6 +4343,20 @@
       "filename": "20261124043800_603_framed_creative_exact_review.sql",
       "sha256": "1713f774108a75d802f754f9b6ce27ffc11234a6dfb550e9cef9dc9dcae96754",
       "trimmedMd5": "038afe0be1a7f165c7c90b797dba492b"
+    },
+    {
+      "version": "20261124043900",
+      "name": "604_single_frame_story_review",
+      "filename": "20261124043900_604_single_frame_story_review.sql",
+      "sha256": "10f2922fbe31639dcff9f182bec12ba349be492b063c351890dc52733ecd87a6",
+      "trimmedMd5": "6263e91d12384b8d32cd8227bc3d035a"
+    },
+    {
+      "version": "20261124044000",
+      "name": "605_organic_source_signoff_gate",
+      "filename": "20261124044000_605_organic_source_signoff_gate.sql",
+      "sha256": "3b826ccfdba66e93a55d3234450acbf89d8cc16450d127ae3ffa92d1ca88c8a4",
+      "trimmedMd5": "c935c59b8e74612e62d0bf3d2d348740"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

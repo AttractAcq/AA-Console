@@ -16,13 +16,18 @@ insert into public.client_media_assets
   (id,client_id,media_type,content_format,title,storage_path,usage_rights)
 values ('c1200000-0000-4000-8000-000000000001',
   'b1200000-0000-4000-8000-000000000001','image','carousel','Two-frame offer',
-  'framed-review/one.png','agency_owned');
+  'framed-review/one.png','agency_owned'),
+  ('c1200000-0000-4000-8000-000000000002',
+  'b1200000-0000-4000-8000-000000000001','image','story','One-frame story',
+  'framed-review/story.png','agency_owned');
 insert into public.client_media_frames(id,asset_id,position,storage_path,caption) values
   ('f1200000-0000-4000-8000-000000000001','c1200000-0000-4000-8000-000000000001',1,'framed-review/one.png','Open'),
-  ('f1200000-0000-4000-8000-000000000002','c1200000-0000-4000-8000-000000000001',2,'framed-review/two.png','Close');
+  ('f1200000-0000-4000-8000-000000000002','c1200000-0000-4000-8000-000000000001',2,'framed-review/two.png','Close'),
+  ('f1200000-0000-4000-8000-000000000003','c1200000-0000-4000-8000-000000000002',1,'framed-review/story.png','Only');
 insert into storage.objects(id,bucket_id,name,version) values
   ('d1200000-0000-4000-8000-000000000001','client-media','framed-review/one.png','v1'),
-  ('d1200000-0000-4000-8000-000000000002','client-media','framed-review/two.png','v1');
+  ('d1200000-0000-4000-8000-000000000002','client-media','framed-review/two.png','v1'),
+  ('d1200000-0000-4000-8000-000000000003','client-media','framed-review/story.png','v1');
 
 select set_config('request.jwt.claim.role','service_role',true);
 select public.attest_creative_storage_bytes_v6(
@@ -39,6 +44,15 @@ select public.attest_creative_frame_bytes_v8(
   'framed-review/two.png',repeat('b',64),15,
   'd1200000-0000-4000-8000-000000000002','v1',
   (select updated_at from storage.objects where name='framed-review/two.png'));
+select public.attest_creative_storage_bytes_v6(
+  'c1200000-0000-4000-8000-000000000002','framed-review/story.png',repeat('d',64),18,
+  'd1200000-0000-4000-8000-000000000003','v1',
+  (select updated_at from storage.objects where name='framed-review/story.png'));
+select public.attest_creative_frame_bytes_v8(
+  'c1200000-0000-4000-8000-000000000002','f1200000-0000-4000-8000-000000000003',
+  'framed-review/story.png',repeat('d',64),18,
+  'd1200000-0000-4000-8000-000000000003','v1',
+  (select updated_at from storage.objects where name='framed-review/story.png'));
 select set_config('request.jwt.claim.sub','a1200000-0000-4000-8000-000000000001',true);
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claims',
@@ -93,5 +107,14 @@ begin
   if not public.ordinary_media_signoff_current_v6(aid)
     or (select count(*) from public.ordinary_media_signoffs_v6 where asset_id=aid)<>2 then
     raise exception 'Second frame decision did not preserve first signoff'; end if;
+  aid:='c1200000-0000-4000-8000-000000000002';
+  if not public.framed_creative_evidence_current_v8(aid) then
+    raise exception 'A complete one-frame story was held'; end if;
+  request_id:=public.request_ordinary_media_review_v6(aid);
+  select id into review_id from public.ordinary_media_review_requests_v6
+    where canonical_request_id=request_id;
+  perform public.approve_ordinary_media_inbox_v6(review_id,request_id);
+  if not public.ordinary_media_signoff_current_v6(aid) then
+    raise exception 'One-frame story signoff did not become current'; end if;
 end $check$;
 rollback;

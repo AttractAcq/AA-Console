@@ -39,7 +39,8 @@ async function call(sb: SupabaseClient) {
 }
 
 function database(options: { identityClient?: string; secondVersion?: string; role?: string;
-  clientMember?: boolean; frames?: boolean; changedFrame?: boolean } = {}) {
+  clientMember?: boolean; frames?: boolean; changedFrame?: boolean;
+  singleStory?: boolean } = {}) {
   let identities = 0;
   let frameReads = 0;
   const rpc = vi.fn(async (name: string, _args?: Record<string, unknown>) => {
@@ -51,7 +52,8 @@ function database(options: { identityClient?: string; secondVersion?: string; ro
     if (name === "creative_frame_storage_identities_v8") {
       frameReads += 1;
       return { data: options.frames ? { client_id: CLIENT, asset_id: ASSET,
-        content_format: "carousel", frames: FRAMES.map((frame) => ({ ...frame,
+        content_format: options.singleStory ? "story" : "carousel",
+        frames: (options.singleStory ? FRAMES.slice(0, 1) : FRAMES).map((frame) => ({ ...frame,
           object_version: options.changedFrame && frameReads === 2 && frame.position === 2 ? "v2" : "v1" })) } : null,
       error: null };
     }
@@ -118,6 +120,13 @@ describe("trusted creative byte attestation", () => {
     expect(calls).toHaveLength(2);
     expect(calls[1]?.[1]).toMatchObject({ p_frame_id: FRAMES[1]!.frame_id,
       p_storage_path: FRAMES[1]!.storage_path, p_sha256: HASH, p_file_bytes: FILE.length });
+  });
+
+  it("attests the sole frame of a one-frame story", async () => {
+    const { sb, rpc } = database({ frames: true, singleStory: true });
+    expect((await call(sb)).code).toBe(200);
+    expect(rpc.mock.calls.filter(([name]) => name === "attest_creative_frame_bytes_v8"))
+      .toHaveLength(1);
   });
 
   it("refuses changed frame identity before saving any frame attestations", async () => {

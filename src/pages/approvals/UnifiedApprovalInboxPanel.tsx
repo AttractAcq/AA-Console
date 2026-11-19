@@ -600,7 +600,8 @@ function isOrdinaryMediaReady(request: UnifiedApprovalRequest, clientId: string)
   const hash = request.artifact_hash;
   const framed = asset.content_format === "carousel" || asset.content_format === "story";
   const frames = preview.frames;
-  const framesReady = !framed || (Array.isArray(frames) && frames.length >= 2
+  const framesReady = !framed || (Array.isArray(frames)
+    && frames.length >= (asset.content_format === "story" ? 1 : 2)
     && frames.every((entry, index) => {
       if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
       const frame = entry as Record<string, unknown>;

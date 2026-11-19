@@ -499,4 +499,37 @@ describe("held exact organic publication package", () => {
     await expect(db.exec("delete from organic_provider_readback_events_v8"))
       .rejects.toThrow(/append-only/);
   });
+
+  it("holds both publication snapshots when the creative source signoff is stale", async () => {
+    await db.exec(`
+      update scheduled_posts set publication_status='scheduled',published_at=null,
+        publish_claimed_at=null where id='${POST}';
+      create function public.ordinary_media_signoff_current_v6(uuid)
+      returns boolean language sql stable as
+        $$select current_setting('test.signoff_current',true)='on'$$;
+      select set_config('test.signoff_current','on',false);
+    `);
+    const migration = await readFile(new URL(
+      "../../supabase/migrations/20261124044000_605_organic_source_signoff_gate.sql",
+      import.meta.url,
+    ), "utf8");
+    await db.exec(migration);
+    expect((await one<{ packet: unknown }>(
+      `select organic_publication_source_snapshot_v6('${POST}') as packet`)).packet)
+      .not.toBeNull();
+    await db.exec("select set_config('test.signoff_current','off',false)");
+    expect((await one<{ packet: unknown }>(
+      `select organic_publication_source_snapshot_v6('${POST}') as packet`)).packet)
+      .toBeNull();
+    await db.exec(`update scheduled_posts set publication_status='publishing',
+      publish_claimed_at=now() where id='${POST}';
+      select set_config('test.signoff_current','on',false);`);
+    expect((await one<{ packet: unknown }>(
+      `select organic_publication_claim_snapshot_v7('${POST}') as packet`)).packet)
+      .not.toBeNull();
+    await db.exec("select set_config('test.signoff_current','off',false)");
+    expect((await one<{ packet: unknown }>(
+      `select organic_publication_claim_snapshot_v7('${POST}') as packet`)).packet)
+      .toBeNull();
+  });
 });

@@ -1629,6 +1629,24 @@ describe("unified approval inbox", () => {
     expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
   });
 
+  it("accepts a complete one-frame story packet", async () => {
+    requests = [{ ...readyOrdinaryMedia, preview: {
+      ...readyOrdinaryMedia.preview,
+      asset: { ...readyOrdinaryMedia.preview.asset, content_format: "story" },
+      frames: [{ frame_id: "frame-1", position: 1, caption: "Story",
+        storage_path: "client-1/image.png", file_sha256: mediaFileHash,
+        file_bytes: 12, object_id: "storage-object-1", object_version: "v1",
+        object_updated_at: "2026-11-19T00:00:00Z" }],
+    } }];
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    show();
+    const card = await screen.findByRole("article", { name: readyOrdinaryMedia.title });
+    const approve = within(card).getByRole("button", { name: "Approve exact version" });
+    expect(approve).toBeDisabled();
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify every frame" }));
+    await waitFor(() => expect(approve).toBeEnabled());
+  });
+
   it("schedules an exact Engine slot only after the reviewer verifies its file", async () => {
     requests = [readyEngineSlot];
     show();

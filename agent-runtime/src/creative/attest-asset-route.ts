@@ -37,7 +37,8 @@ function validFrameSnapshot(value: unknown, clientId: string, assetId: string): 
   const snapshot = value as Record<string, unknown>;
   if (snapshot.client_id !== clientId || snapshot.asset_id !== assetId
     || !["carousel", "story", "reel"].includes(String(snapshot.content_format))
-    || !Array.isArray(snapshot.frames) || snapshot.frames.length < 2) return false;
+    || !Array.isArray(snapshot.frames)
+    || snapshot.frames.length < (snapshot.content_format === "story" ? 1 : 2)) return false;
   return snapshot.frames.every((frame, index) => validIdentity({ ...frame,
     asset_id: assetId, client_id: clientId }, clientId, assetId)
     && typeof frame.frame_id === "string" && UUID.test(frame.frame_id)
