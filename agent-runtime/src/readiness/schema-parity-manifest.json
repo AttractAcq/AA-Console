@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "35daafc6537a886a018e4904456f6c9093805d773f6df10845af019c674ff8d8",
-  "generatedTypesSha256": "3a3c92d2b1fed22b00ebe5b1ee13974b4641d3cd50b9854e0a3882ff79243597",
-  "generatedSchemaBodySha256": "b26f0ba49f6de80ba070e72b25c346f6bc421dbb0346e30d21310aab4b72b515",
+  "migrationSourceDigest": "9e3d74b7f59d768b06664f4ea6fe0426d73052697adf1c14888eebc1a29bc3b0",
+  "generatedTypesSha256": "dad98f2582844bbc1ee84d9deb854e415ba4ffd635a232c3af279a08435d0bb0",
+  "generatedSchemaBodySha256": "585bf2af49aa005e3a228a9fcc686ad27e3ef76bf67befc98f312cb69f71763b",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4462,6 +4462,13 @@
       "filename": "20261124045500_620_require_explicit_spend_currency.sql",
       "sha256": "f7a3cc4a2ac80dd8bdce87f71355879bed67383098ab712b5bb81715ce986fa8",
       "trimmedMd5": "6f711ab373412b19f4cd6a8424db6efc"
+    },
+    {
+      "version": "20261124045600",
+      "name": "621_archived_lead_journey_trace",
+      "filename": "20261124045600_621_archived_lead_journey_trace.sql",
+      "sha256": "033e6f59a9516cd063e3fc53493fe73b515b2cd2bc862c2e19f4ac92a0c8cc38",
+      "trimmedMd5": "2afef70216ce79bea47840dddd82ba65"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

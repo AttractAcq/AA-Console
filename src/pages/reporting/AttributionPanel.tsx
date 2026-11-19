@@ -69,6 +69,7 @@ type Journey = {
   route_package_ids: string[];
   capture_submissions: number;
   unknown_route_submissions: number;
+  archived_at: string | null;
 };
 
 const WINDOWS = [
@@ -118,7 +119,7 @@ function ClientAttributionPanel({ clientId }: { clientId: string | undefined }) 
       supabase.rpc("acquisition_funnel", { p_client_id: clientId, p_days: days }),
       supabase.rpc("top_content_by_revenue", { p_client_id: clientId, p_limit: 10 }),
       supabase.rpc("acquisition_coverage_v8", { p_client_id: clientId, p_days: days }),
-      supabase.rpc("lead_journey_trace_v9", { p_client_id: clientId, p_days: days, p_limit: 50 }),
+      supabase.rpc("lead_journey_trace_v10", { p_client_id: clientId, p_days: days, p_limit: 50 }),
     ]);
     if (!isCurrent()) return;
     if (f.error || t.error || c.error || j.error || !f.data?.[0] || !c.data?.[0]) {
@@ -190,11 +191,11 @@ function ClientAttributionPanel({ clientId }: { clientId: string | undefined }) 
 
       <section>
         <h2 className="mb-2 text-sm font-semibold text-foreground">Recorded lead journeys</h2>
-        <p className="mb-3 text-xs text-muted-foreground">Latest 50 non-test leads in this window. Route IDs record capture doors, not which route caused a sale or whether a provider action ran. Unknown links remain unknown; archived source records remain traceable. Lead money currencies are stored separately but are not shown in this journey view.</p>
+        <p className="mb-3 text-xs text-muted-foreground">Latest 50 non-test leads in this window, including archived snapshots. Archived rows are historical and are excluded from the live funnel totals above. Route IDs record capture doors, not which route caused a sale or whether a provider action ran. Unknown links remain unknown. Lead money currencies are stored separately but are not shown in this journey view.</p>
         <DataTable columns={["Lead", "Source / route", "Campaign", "Opportunity / offer", "Asset / page / agent", "Outcome", "Recorded sale / cash"]}
           emptyLabel="No recorded lead journeys in this window."
           rows={journeys.map((j) => [
-            <span title={j.lead_id}>{j.lead_id.slice(0, 8)} · {new Date(j.lead_created_at).toLocaleDateString()}</span>,
+            <span title={j.lead_id}>{j.lead_id.slice(0, 8)} · {new Date(j.lead_created_at).toLocaleDateString()}{j.archived_at ? <><br />Archived {new Date(j.archived_at).toLocaleDateString()}</> : null}</span>,
             <span>{j.source_channel ?? "unknown"}<br />{j.route_package_ids.length
               ? j.route_package_ids.map((id) => <span key={id} title={id}>route {id.slice(0, 8)}<br /></span>)
               : "route unknown"}{j.unknown_route_submissions > 0 ? ` · ${j.unknown_route_submissions} unlinked capture${j.unknown_route_submissions === 1 ? "" : "s"}` : ""}</span>,
