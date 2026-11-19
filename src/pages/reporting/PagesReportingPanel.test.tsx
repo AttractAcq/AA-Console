@@ -19,14 +19,26 @@ describe("page outcomes", () => {
     rpc.mockResolvedValue({ data: [{ page_id: "page-1", page_title: "Winter offer",
       archived_at: "2026-11-01T00:00:00Z", recorded_leads: 3,
       consented_leads: 2, recorded_sales: 1, recorded_cash: 1200,
+      cash_currency: "USD", cash_currency_unverified_leads: 0, cash_currency_count: 1,
       latest_lead_at: "2026-11-18T10:00:00Z" }], error: null });
     render(<PagesReportingPanel pageType="offer" />);
     expect(await screen.findByText(/Winter offer · archived/)).toBeInTheDocument();
     expect(screen.getByText("2/3")).toBeInTheDocument();
+    expect(screen.getByText("USD 1,200")).toBeInTheDocument();
     expect(screen.getByText(/Page visits, conversion rate/)).toBeInTheDocument();
-    expect(rpc).toHaveBeenCalledWith("page_recorded_outcomes_v8", {
+    expect(rpc).toHaveBeenCalledWith("page_recorded_outcomes_v9", {
       p_client_id: "client-1", p_page_type: "offer", p_days: 30,
     });
+  });
+
+  it("does not turn an incomparable cash total into zero", async () => {
+    rpc.mockResolvedValue({ data: [{ page_id: "page-2", page_title: "Mixed cash",
+      archived_at: null, recorded_leads: 2, consented_leads: 2,
+      recorded_sales: 2, recorded_cash: null, cash_currency: null,
+      cash_currency_unverified_leads: 0, cash_currency_count: 2,
+      latest_lead_at: null }], error: null });
+    render(<PagesReportingPanel pageType="landing" />);
+    expect(await screen.findByText("Unknown · mixed currencies")).toBeInTheDocument();
   });
 
   it("changes the reporting window without retaining an earlier response", async () => {

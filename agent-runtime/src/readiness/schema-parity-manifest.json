@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "5e1a9a97bebda59b62f43de3c373f70de2c1988d78fea72ae854d5e246b259e7",
-  "generatedTypesSha256": "b1de15348458382e6b1011b285a0e2a0c3839ee0e39b0ed8ab74b078628b3f43",
-  "generatedSchemaBodySha256": "432d328b52c3febd32cb4b75027bf0ec3a47dbb9c8e58cc96d4e95525b88b62e",
+  "migrationSourceDigest": "66eed60dcbee3fcdf793982e6e07201442979769d939439588dae6a53f627535",
+  "generatedTypesSha256": "e001c5774578104239374f7468a20baa56d5d84f8509d29cb11d55bf0c87926d",
+  "generatedSchemaBodySha256": "e5ba27a052e1983dacc4dff038491d14b55f38f9f24b2020006f87900cbbb058",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4539,6 +4539,13 @@
       "filename": "20261124050600_631_historical_pipeline_cash_coverage.sql",
       "sha256": "581b5e09fa25185aa7d5d0b5511e819b27354794768ff85611f16b5fc02bae79",
       "trimmedMd5": "1562cf958c11237ea220460e54987952"
+    },
+    {
+      "version": "20261124050700",
+      "name": "632_historical_page_outcomes_currency",
+      "filename": "20261124050700_632_historical_page_outcomes_currency.sql",
+      "sha256": "816ae9e5c481f0fc6f15af6eac92075be29a214073066375a77b88ef4ea145eb",
+      "trimmedMd5": "8533c3e9e59f32f470b45667e702d875"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

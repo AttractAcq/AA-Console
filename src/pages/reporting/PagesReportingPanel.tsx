@@ -11,7 +11,10 @@ type Row = {
   recorded_leads: number;
   consented_leads: number;
   recorded_sales: number;
-  recorded_cash: number;
+  recorded_cash: number | null;
+  cash_currency: string | null;
+  cash_currency_unverified_leads: number;
+  cash_currency_count: number;
   latest_lead_at: string | null;
 };
 
@@ -35,7 +38,7 @@ function ClientPagesReporting({ clientId, pageType }: {
     if (!clientId) { setLoading(false); return; }
     setLoading(true);
     try {
-      const read = await supabase.rpc("page_recorded_outcomes_v8", {
+      const read = await supabase.rpc("page_recorded_outcomes_v9", {
         p_client_id: clientId, p_page_type: pageType, p_days: days,
       });
       if (current !== generation.current) return;
@@ -62,7 +65,8 @@ function ClientPagesReporting({ clientId, pageType }: {
       These are first-source lead and recorded outcome associations for this client. A returning lead
       can submit another page form without changing its first source. Page visits, conversion rate,
       traffic source completeness and site analytics remain unknown until a site connector is verified.
-      Sale and cash amounts do not have a recorded currency.
+      Cash is shown only when positive amounts share one recorded currency.
+      A mixed or missing currency leaves the total unknown.
     </p>
     <div className="my-4 flex gap-2" aria-label="Page outcome window">
       {[7, 30, 90].map((windowDays) => <button key={windowDays} type="button"
@@ -80,7 +84,13 @@ function ClientPagesReporting({ clientId, pageType }: {
             row.recorded_leads,
             `${row.consented_leads}/${row.recorded_leads}`,
             row.recorded_sales,
-            Number(row.recorded_cash).toLocaleString(),
+            row.recorded_cash === null
+              ? row.cash_currency_unverified_leads > 0
+                ? "Unknown · currency missing"
+                : "Unknown · mixed currencies"
+              : row.cash_currency
+                ? `${row.cash_currency} ${Number(row.recorded_cash).toLocaleString()}`
+                : Number(row.recorded_cash).toLocaleString(),
             row.latest_lead_at ? new Date(row.latest_lead_at).toLocaleDateString() : "none recorded",
           ])} />}
   </Panel>;

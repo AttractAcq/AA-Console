@@ -43385,6 +43385,22 @@ export type Database = {
           recorded_sales: number
         }[]
       }
+      page_recorded_outcomes_v9: {
+        Args: { p_client_id: string; p_days?: number; p_page_type: string }
+        Returns: {
+          archived_at: string
+          cash_currency: string
+          cash_currency_count: number
+          cash_currency_unverified_leads: number
+          consented_leads: number
+          latest_lead_at: string
+          page_id: string
+          page_title: string
+          recorded_cash: number
+          recorded_leads: number
+          recorded_sales: number
+        }[]
+      }
       paid_operator_bundle_approved_v7: {
         Args: { p_bundle_id: string }
         Returns: boolean
