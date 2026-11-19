@@ -46,7 +46,8 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
   const [assets, setAssets] = useState<CampaignAsset[]>([]);
   const [copying, setCopying] = useState<CampaignAsset | null>(null);
   const [landingUrl, setLandingUrl] = useState<string | null>(null);
-  const urls = useSignedPreviewPaths("client-media", assets.map((asset) => asset.storage_path));
+  const urls = useSignedPreviewPaths("client-media", assets.map((asset) =>
+    asset.render_path ?? asset.storage_path));
   const [artifactPackages, setArtifactPackages] = useState<{ briefs: Map<string, string>; assets: Map<string, string>; versions: Map<string, number> }>({ briefs: new Map(), assets: new Map(), versions: new Map() });
   const [building, setBuilding] = useState<Brief | null>(null);
   const [viewing, setViewing] = useState<Brief | null>(null);
@@ -138,7 +139,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
   const hasOrdinaryInboxRoute = (asset: CampaignAsset) =>
     (asset.media_type === "image" || asset.media_type === "text")
       && ["single", "carousel", "story"].includes(asset.content_format ?? "")
-      && !asset.render_path;
+      && ((asset.content_format ?? "single") === "single" || !asset.render_path);
   const requestCreativeReview = async (asset: CampaignAsset) => {
     if (!hasOrdinaryInboxRoute(asset)) {
       const result = await supabase.rpc("review_media_asset", {
@@ -241,7 +242,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
     <BriefDetailModal brief={viewing} open={viewing !== null} onClose={() => setViewing(null)} />
     <ApproveAndBuildModal brief={building} open={building !== null} onClose={() => setBuilding(null)} onDone={() => { void refresh(); onChanged(); setNotice("Production queued. Assets will appear here for approval."); }} />
     <AdCopyModal asset={copying} brief={copying?.brief_id ? briefById.get(copying.brief_id) ?? null : null} landingUrl={landingUrl} allowedCtas={allowedCtas(template, mirrorsTemplate)} open={copying !== null} onClose={() => setCopying(null)} onSaved={() => { setNotice("Ad copy saved. This asset is in the next Meta build."); void refresh(); }} />
-    <MediaDetailModal asset={preview} url={preview ? urls.get(preview.storage_path) : undefined} open={preview !== null} onClose={() => setPreview(null)} />
+    <MediaDetailModal asset={preview} url={preview ? urls.get(preview.render_path ?? preview.storage_path) : undefined} open={preview !== null} onClose={() => setPreview(null)} />
   </>;
 
   const v2AssetActions = (asset: CampaignAsset) => <div className="flex flex-wrap gap-2">
@@ -255,7 +256,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
 
   const v2Preview = (asset: CampaignAsset | undefined) => {
     if (!asset) return <span className="text-muted-foreground">Awaiting asset</span>;
-    const url = urls.get(asset.storage_path);
+    const url = urls.get(asset.render_path ?? asset.storage_path);
     return <button type="button" onClick={() => setPreview(asset)} aria-label={`Preview ${asset.title ?? "asset"}`}>
       {asset.media_type === "image" && url ? <img src={url} alt={asset.title ?? "Campaign asset"} className="h-16 w-24 rounded object-cover" />
         : asset.media_type === "video" && url ? <video src={url} className="h-16 w-24 rounded object-cover" muted preload="metadata" />

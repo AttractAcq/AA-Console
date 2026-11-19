@@ -19,15 +19,30 @@ insert into public.client_media_assets
 values ('cccccccc-cccc-4ccc-8ccc-cccccccccccc',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','image','single','Client image',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/creative.png','agency_owned');
+insert into public.client_media_assets
+  (id,client_id,media_type,content_format,title,storage_path,render_path,usage_rights)
+values ('cccccccc-cccc-4ccc-8ccc-cccccccccccd',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','image','single','Rendered image',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/source.png',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/render.png','agency_owned');
 insert into storage.objects(id,bucket_id,name,version) values
   ('dddddddd-dddd-4ddd-8ddd-dddddddddddd','client-media',
-   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/creative.png','v1');
+   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/creative.png','v1'),
+  ('dddddddd-dddd-4ddd-8ddd-ddddddddddde','client-media',
+   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/source.png','v1'),
+  ('dddddddd-dddd-4ddd-8ddd-dddddddddddf','client-media',
+   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/render.png','v1');
 select set_config('request.jwt.claim.role','service_role',true);
 select public.attest_creative_storage_bytes_v6(
   'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/creative.png',repeat('a',64),14,
   'dddddddd-dddd-4ddd-8ddd-dddddddddddd','v1',
   (select updated_at from storage.objects where id='dddddddd-dddd-4ddd-8ddd-dddddddddddd'));
+select public.attest_creative_storage_bytes_v6(
+  'cccccccc-cccc-4ccc-8ccc-cccccccccccd',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/render.png',repeat('c',64),17,
+  'dddddddd-dddd-4ddd-8ddd-dddddddddddf','v1',
+  (select updated_at from storage.objects where id='dddddddd-dddd-4ddd-8ddd-dddddddddddf'));
 select set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claims',
@@ -37,6 +52,10 @@ do $checks$
 declare request_id uuid;
   review_id uuid;
   v_asset_id uuid := 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  v_render_id uuid := 'cccccccc-cccc-4ccc-8ccc-cccccccccccd';
+  v_render_request uuid;
+  v_render_review uuid;
+  v_render_preview jsonb;
 begin
   begin
     perform public.review_media_asset(v_asset_id,'approved'::public.review_status);
@@ -120,5 +139,35 @@ begin
     or not public.ordinary_media_signoff_current_v6(v_asset_id)
     or (select status from public.approval_inbox_v6 where id=request_id)<>'approved' then
     raise exception 'New exact approval did not replace stale authority'; end if;
+  begin
+    perform public.review_media_asset(v_render_id,'approved'::public.review_status);
+    raise exception 'Rendered image bypassed exact review';
+  exception when insufficient_privilege then null; end;
+  v_render_request:=public.request_ordinary_media_review_v6(v_render_id);
+  select id into v_render_review from public.ordinary_media_review_requests_v6
+    where canonical_request_id=v_render_request;
+  select preview into v_render_preview from public.approval_requests_v6
+    where id=v_render_request;
+  if v_render_review is null
+    or v_render_preview#>>'{asset,render_path}'<>
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/render.png'
+    or v_render_preview#>>'{storage,object_id}'<>
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddf'
+    or v_render_preview#>>'{asset,file_sha256}'<>repeat('c',64)
+    or public.ordinary_media_review_source_state_v6(v_render_request)<>'pending' then
+    raise exception 'Rendered file was not bound to exact review'; end if;
+  perform public.approve_ordinary_media_inbox_v6(v_render_review,v_render_request);
+  if not public.ordinary_media_signoff_current_v6(v_render_id) then
+    raise exception 'Rendered file did not gain exact signoff'; end if;
+  update storage.objects set version='v2'
+    where id='dddddddd-dddd-4ddd-8ddd-dddddddddddf';
+  if public.ordinary_media_signoff_current_v6(v_render_id) then
+    raise exception 'Changed render bytes left exact signoff current'; end if;
+  begin
+    perform public.schedule_asset(v_render_id,current_date+1);
+    raise exception 'Stale rendered creative scheduled';
+  exception when SQLSTATE 'P0001' then
+    if SQLERRM not like '%exact creative signoff is missing or stale%' then raise; end if;
+  end;
 end $checks$;
 rollback;

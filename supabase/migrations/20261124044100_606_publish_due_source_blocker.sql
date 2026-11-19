@@ -36,7 +36,6 @@ select
     when a.human_approved_at is null then 'Nobody has approved the asset.'
     when a.media_type::text in ('image','text')
       and a.content_format in ('single','carousel','story')
-      and a.render_path is null
       and public.ordinary_media_signoff_current_v6(a.id) is not true
       then 'The exact creative source signoff is missing or stale. Request a new source review in Approval Inbox.'
     when sp.platform is null then 'The post has no platform.'

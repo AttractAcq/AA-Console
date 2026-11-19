@@ -28,7 +28,8 @@ begin
   end if;
   perform pg_advisory_xact_lock(hashtextextended('ordinary_media_review:'||a.id::text,0));
   if a.media_type not in ('image','text') or a.content_format not in ('single','carousel','story')
-    or a.render_path is not null or a.edit_stage<>'review_ready'
+    or (a.content_format<>'single' and a.render_path is not null)
+    or a.edit_stage<>'review_ready'
     or a.archived_at is not null or a.delivery_bytes_sha256 is null
     or a.usage_rights is null
     or (a.content_format<>'single' and not public.framed_creative_evidence_current_v8(a.id)) or a.review_status not in ('pending','approved')

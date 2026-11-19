@@ -72,9 +72,10 @@ set search_path=pg_catalog,public,storage as $$
         where f.asset_id=a.id))
       else '{}'::jsonb end
   from public.client_media_assets a
-  join storage.objects o on o.bucket_id='client-media' and o.name=a.storage_path
+  join storage.objects o on o.bucket_id='client-media'
+    and o.name=coalesce(nullif(btrim(a.render_path),''),a.storage_path)
   where a.id=p_review.asset_id and a.client_id=p_review.client_id
-    and a.render_path is null;
+    and (a.content_format='single' or a.render_path is null);
 $$;
 
 create or replace function public.ordinary_media_review_source_state_v6(p_request_id uuid)
@@ -108,7 +109,8 @@ begin
     or r.destination is distinct from 'creative_source:'||a.id::text
     then return 'superseded'; end if;
   if a.media_type not in ('image','text') or a.content_format not in ('single','carousel','story')
-    or a.render_path is not null or a.edit_stage<>'review_ready'
+    or (a.content_format<>'single' and a.render_path is not null)
+    or a.edit_stage<>'review_ready'
     or a.archived_at is not null or a.delivery_bytes_sha256 is null
     or a.usage_rights is null
     or (a.content_format<>'single' and not public.framed_creative_evidence_current_v8(a.id)) or exists(select 1 from public.content_slots cs
@@ -172,7 +174,8 @@ begin
   if a.id is null or (auth.role()='authenticated'
     and not public.can_access_client(a.client_id)) then return false; end if;
   if a.media_type not in ('image','text') or a.content_format not in ('single','carousel','story')
-    or a.render_path is not null or a.edit_stage<>'review_ready'
+    or (a.content_format<>'single' and a.render_path is not null)
+    or a.edit_stage<>'review_ready'
     or a.archived_at is not null or a.review_status<>'approved'
     or a.human_approved_at is null or a.delivery_bytes_sha256 is null
     or a.usage_rights is null
@@ -228,7 +231,8 @@ begin
   end if;
   perform pg_advisory_xact_lock(hashtextextended('ordinary_media_review:'||a.id::text,0));
   if a.media_type not in ('image','text') or a.content_format not in ('single','carousel','story')
-    or a.render_path is not null or a.edit_stage<>'review_ready'
+    or (a.content_format<>'single' and a.render_path is not null)
+    or a.edit_stage<>'review_ready'
     or a.archived_at is not null or a.delivery_bytes_sha256 is null
     or a.usage_rights is null
     or (a.content_format<>'single' and not public.framed_creative_evidence_current_v8(a.id)) or a.review_status not in ('pending','approved')
@@ -295,7 +299,8 @@ select a.client_id,a.id as asset_id,
   public.ordinary_media_signoff_current_v6(a.id) as current_signoff
 from public.client_media_assets a
 where a.media_type in ('image','text')
-  and a.content_format in ('single','carousel','story') and a.render_path is null
+  and a.content_format in ('single','carousel','story')
+  and (a.content_format='single' or a.render_path is null)
   and a.review_status='approved' and a.human_approved_at is not null;
 revoke all on public.ordinary_media_current_status_v6
   from public,anon,authenticated,service_role;
@@ -348,7 +353,7 @@ begin
     raise exception 'That asset has not been approved by a person yet. Approve it in Approvals before scheduling it.' using errcode = 'P0001';
   end if;
   if v_asset.media_type in ('image','text')
-    and v_asset.content_format in ('single','carousel','story') and v_asset.render_path is null
+    and v_asset.content_format in ('single','carousel','story')
     and not public.ordinary_media_signoff_current_v6(v_asset.id) then
     raise exception 'The exact creative signoff is missing or stale. Review a new version before scheduling.'
       using errcode='P0001';

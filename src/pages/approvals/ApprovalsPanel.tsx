@@ -25,7 +25,7 @@ export function ApprovalsPanel() {
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const urls = useSignedPreviewPaths("client-media", assets.map((asset) =>
-    asset.content_format === "reel" ? asset.render_path : asset.storage_path));
+    asset.render_path ?? asset.storage_path));
   const [sourcePaths, setSourcePaths] = useState<Map<string, string>>(new Map());
   const signedSourcePaths = useSignedPreviewPaths("client-media", [...sourcePaths.values()]);
   const sourceUrls = new Map([...sourcePaths].flatMap(([id, path]) => {
@@ -104,7 +104,8 @@ export function ApprovalsPanel() {
     // Same as Copy library: a text asset's file IS the content. Without this
     // the preview modal only has a signed URL and shows "could not be loaded".
     const textRows = rows.filter((row) => row.media_type === "text");
-    setBodies(await fetchTextBodies(textRows, await signPaths("client-media", textRows.map((row) => row.storage_path))));
+    setBodies(await fetchTextBodies(textRows, await signPaths("client-media", textRows.map((row) =>
+      row.render_path ?? row.storage_path))));
     setLoading(false);
     } catch (error) {
       setLoadError("Failed to load approvals: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
@@ -127,7 +128,8 @@ export function ApprovalsPanel() {
     setNotice(null);
     try {
       if (decision === "approved" && (asset.media_type === "image" || asset.media_type === "text")
-        && asset.content_format === "single" && !asset.render_path) {
+        && ["single", "carousel", "story"].includes(asset.content_format ?? "single")
+        && ((asset.content_format ?? "single") === "single" || !asset.render_path)) {
         if (!clientId) throw new Error("Client unavailable.");
         await requestOrdinaryMediaReview(clientId, asset.id);
         setNotice("Exact creative review requested. Decide it in Unified Approval Inbox.");
@@ -195,7 +197,7 @@ export function ApprovalsPanel() {
             <MediaCard
               key={asset.id}
               mediaType={asset.media_type}
-              url={urls.get(asset.content_format === "reel" ? asset.render_path ?? "" : asset.storage_path)}
+              url={urls.get(asset.render_path ?? asset.storage_path)}
               body={bodies.get(asset.id)}
               title={asset.title ?? "Untitled"}
               meta={`${asset.ref_number ?? "—"} · ${shortDate(asset.created_at)}`}
@@ -229,7 +231,8 @@ export function ApprovalsPanel() {
                     className="flex-1 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     {(asset.media_type === "image" || asset.media_type === "text")
-                      && asset.content_format === "single" && !asset.render_path
+                      && ["single", "carousel", "story"].includes(asset.content_format ?? "single")
+                      && ((asset.content_format ?? "single") === "single" || !asset.render_path)
                       ? "Request review" : "Approve"}
                   </button>}
                   <button
@@ -306,7 +309,7 @@ export function ApprovalsPanel() {
 
       <MediaDetailModal
         asset={preview}
-        url={preview ? urls.get(preview.content_format === "reel" ? preview.render_path ?? "" : preview.storage_path) : undefined}
+        url={preview ? urls.get(preview.render_path ?? preview.storage_path) : undefined}
         sourceUrl={preview?.source_asset_id ? sourceUrls.get(preview.source_asset_id) : undefined}
         body={preview ? bodies.get(preview.id) : undefined}
         open={preview !== null}

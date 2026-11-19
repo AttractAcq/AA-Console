@@ -539,5 +539,20 @@ describe("held exact organic publication package", () => {
     expect((await one<{ packet: unknown }>(
       `select organic_publication_claim_snapshot_v7('${POST}') as packet`)).packet)
       .toBeNull();
+    await db.exec(`update client_media_assets set render_path='${CLIENT}/render.png'
+      where id='${ASSET}';
+      update scheduled_posts set publication_status='scheduled',publish_claimed_at=null
+      where id='${POST}';
+      select set_config('test.signoff_current','on',false);`);
+    expect((await one<{ packet: { source_paths: string[] } }>(
+      `select organic_publication_source_snapshot_v6('${POST}') as packet`)).packet.source_paths)
+      .toEqual([`${CLIENT}/render.png`]);
+    await db.exec("select set_config('test.signoff_current','off',false)");
+    expect((await one<{ packet: unknown }>(
+      `select organic_publication_source_snapshot_v6('${POST}') as packet`)).packet)
+      .toBeNull();
+    expect((await one<{ blocker: string }>(
+      `select blocker from publish_due where post_id='${POST}'`)).blocker)
+      .toMatch(/exact creative source signoff is missing or stale/);
   });
 });

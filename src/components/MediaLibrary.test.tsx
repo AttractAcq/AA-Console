@@ -97,6 +97,15 @@ describe("approving from the library", () => {
     expect(rpc).not.toHaveBeenCalledWith("review_media_asset", expect.anything());
   });
 
+  it("requests exact review of a generated image's finished render", async () => {
+    fetchClientAssets.mockResolvedValue([asset({ render_path: "p/render.png" })]);
+    render(<MediaLibrary mediaType="image" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Submit for review" }));
+    await waitFor(() => expect(requestOrdinaryMediaReview)
+      .toHaveBeenCalledWith("client-1", "a1"));
+    expect(rpc).not.toHaveBeenCalledWith("review_media_asset", expect.anything());
+  });
+
   it("routes pending carousel creative through exact review", async () => {
     fetchClientAssets.mockResolvedValue([asset({ content_format: "carousel" })]);
     render(<MediaLibrary mediaType="image" contentFormat="carousel" />);

@@ -95,7 +95,7 @@ export function ClientConsolePage() {
     try {
       if (clientId && (asset.media_type === "image" || asset.media_type === "text")
         && ["single", "carousel", "story"].includes(asset.content_format ?? "")
-        && !asset.render_path) {
+        && ((asset.content_format ?? "single") === "single" || !asset.render_path)) {
         await requestOrdinaryMediaReview(clientId, asset.id);
         setNotice("Submitted for account-manager review of the exact creative.");
       } else {
@@ -166,7 +166,7 @@ export function ClientConsolePage() {
               >
                 {busyId === asset.id ? "Submitting…" : (asset.media_type === "image" || asset.media_type === "text")
                   && ["single", "carousel", "story"].includes(asset.content_format ?? "")
-                  && !asset.render_path
+                  && ((asset.content_format ?? "single") === "single" || !asset.render_path)
                   ? "Submit for review" : "Approve"}
               </button>,
             ])}

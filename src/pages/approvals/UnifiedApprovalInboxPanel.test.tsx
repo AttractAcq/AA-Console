@@ -1582,6 +1582,20 @@ describe("unified approval inbox", () => {
     }));
   });
 
+  it("downloads a generated single-file render rather than its source file", async () => {
+    requests = [{ ...readyOrdinaryMedia, preview: {
+      ...readyOrdinaryMedia.preview,
+      asset: { ...readyOrdinaryMedia.preview.asset, render_path: "client-1/render.png" },
+    } }];
+    show();
+    const card = await screen.findByRole("article", { name: readyOrdinaryMedia.title });
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify creative file" }));
+    await waitFor(() => expect(downloadVerifiedCreativeFile).toHaveBeenCalledWith(
+      "client-1/render.png", mediaFileHash,
+    ));
+  });
+
   it("requires every ordered carousel frame to match before source approval", async () => {
     const first = { frame_id: "frame-1", position: 1, caption: "Opening",
       storage_path: "client-1/image.png", file_sha256: mediaFileHash,

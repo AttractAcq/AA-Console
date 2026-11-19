@@ -37,7 +37,8 @@ export function AssetsPanel() {
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [currentSignoffs, setCurrentSignoffs] = useState<Map<string, boolean>>(new Map());
   const [bookings, setBookings] = useState<Map<string, Booking>>(new Map());
-  const urls = useSignedPreviewPaths("client-media", assets.map((asset) => asset.storage_path));
+  const urls = useSignedPreviewPaths("client-media", assets.map((asset) =>
+    asset.render_path ?? asset.storage_path));
   const [bodies, setBodies] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -91,7 +92,8 @@ export function AssetsPanel() {
       setBookings(booked);
 
       const textRows = rows.filter((row) => row.media_type === "text");
-      setBodies(await fetchTextBodies(textRows, await signPaths("client-media", textRows.map((row) => row.storage_path))));
+      setBodies(await fetchTextBodies(textRows, await signPaths("client-media", textRows.map((row) =>
+        row.render_path ?? row.storage_path))));
     } catch (err) {
       setLoadError(
         "Failed to load approved assets: " + (err instanceof Error ? err.message : "Unknown error"),
@@ -149,7 +151,7 @@ export function AssetsPanel() {
   function needsExactSignoff(asset: MediaAsset): boolean {
     return (asset.media_type === "image" || asset.media_type === "text")
       && ["single", "carousel", "story"].includes(asset.content_format ?? "")
-      && !asset.render_path;
+      && ((asset.content_format ?? "single") === "single" || !asset.render_path);
   }
 
   if (loadError) {
@@ -188,7 +190,7 @@ export function AssetsPanel() {
               <MediaCard
                 key={asset.id}
                 mediaType={asset.media_type}
-                url={urls.get(asset.storage_path)}
+                url={urls.get(asset.render_path ?? asset.storage_path)}
                 body={bodies.get(asset.id)}
                 title={asset.title ?? "Untitled"}
                 meta={`${asset.ref_number ?? "—"} · ${shortDate(asset.created_at)}`}
@@ -317,7 +319,7 @@ export function AssetsPanel() {
 
       <MediaDetailModal
         asset={preview}
-        url={preview ? urls.get(preview.storage_path) : undefined}
+        url={preview ? urls.get(preview.render_path ?? preview.storage_path) : undefined}
         body={preview ? bodies.get(preview.id) : undefined}
         open={preview !== null}
         onClose={() => setPreview(null)}

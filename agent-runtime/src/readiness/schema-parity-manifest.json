@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "ffc00d397dd7543d3185c7d368ff5531351e42d9d78f61baef223c4e63b240c9",
+  "migrationSourceDigest": "15f300941031732becb7de535674c665a969b7c522b7368839e326cc26fcc8a3",
   "generatedTypesSha256": "122cca31eac45a2fdac3b44a7dedb12c8aebedc1a51a19fa4d7a40bdcdc2687a",
   "generatedSchemaBodySha256": "749ca704c1323ef81b91016c957a7e899ddafd64d3bfb9da92dfee6b36ba3797",
   "localMigrations": [
@@ -4341,8 +4341,8 @@
       "version": "20261124043800",
       "name": "603_framed_creative_exact_review",
       "filename": "20261124043800_603_framed_creative_exact_review.sql",
-      "sha256": "1713f774108a75d802f754f9b6ce27ffc11234a6dfb550e9cef9dc9dcae96754",
-      "trimmedMd5": "038afe0be1a7f165c7c90b797dba492b"
+      "sha256": "0005255bdfdc6f9a18c06b390ca24912cad61d6ee643728bfe5f108a48e6694f",
+      "trimmedMd5": "234833503dcb4c6e9707b686d5cb64f1"
     },
     {
       "version": "20261124043900",
@@ -4355,22 +4355,22 @@
       "version": "20261124044000",
       "name": "605_organic_source_signoff_gate",
       "filename": "20261124044000_605_organic_source_signoff_gate.sql",
-      "sha256": "d2cb7153c6ffd641da422defe3ffff2f2f1250677f52ea2c97a2ed0f3b22596d",
-      "trimmedMd5": "bfb72aaa84a9542531a18e0ad6fbcfc6"
+      "sha256": "76c3ded9977d806fa8ecd0ca0b719747fce0e80b74887144cd1b166e6c5e1e26",
+      "trimmedMd5": "188f4bef883935fe976d32d836a9876c"
     },
     {
       "version": "20261124044100",
       "name": "606_publish_due_source_blocker",
       "filename": "20261124044100_606_publish_due_source_blocker.sql",
-      "sha256": "991b5ccd0627705f0cde1256e95dad55c30f848ae2455e0e4fa54e68bb7434bc",
-      "trimmedMd5": "0a743c4559e45d244e880b6acb815ef5"
+      "sha256": "9995aa7a831d92ab6c02aa0435aeaad1985579e185e75b2ede36474470f4b4fb",
+      "trimmedMd5": "8fc1b870c037d794ce717ac9cb0da946"
     },
     {
       "version": "20261124044200",
       "name": "607_legacy_creative_reconciliation",
       "filename": "20261124044200_607_legacy_creative_reconciliation.sql",
-      "sha256": "f3f513ca9a6afa2a84ced357118a098df2f2ed434d5255cddd4a3e506d67eb04",
-      "trimmedMd5": "10825a1d73da41b76deaa76617547659"
+      "sha256": "5f8155d20d9b49bdebfa7d39739d22d27ea44b53c7ead670fd523a366e67dfeb",
+      "trimmedMd5": "59ba47defefa83dc8ac97ef7c0b112f7"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
