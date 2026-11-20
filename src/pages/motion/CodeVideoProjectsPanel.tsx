@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { CodeVideoRenderCandidatesPanel } from "./CodeVideoRenderCandidatesPanel";
 import { CodeVideoAttachmentsPanel } from "./CodeVideoAttachmentsPanel";
+import { CodeVideoProjectReviewPanel } from "./CodeVideoProjectReviewPanel";
 
 type Project = { id: string; idea: string; audience: string | null;
   stage: string; stage_error: string | null; ir_version: number;
@@ -18,6 +19,7 @@ export function CodeVideoProjectsPanel() {
   const [audioAgentPaused, setAudioAgentPaused] = useState(true);
   const [selected, setSelected] = useState<string[]>([]);
   const [activeDraft, setActiveDraft] = useState<string | null>(null);
+  const [activeReview, setActiveReview] = useState<string | null>(null);
   const [idea, setIdea] = useState("");
   const [audience, setAudience] = useState("");
   const [note, setNote] = useState("");
@@ -150,9 +152,17 @@ export function CodeVideoProjectsPanel() {
         <div><p className="font-medium">{project.idea}</p>
           <p className="text-muted-foreground">{project.stage}{project.stage_error ? ` · ${project.stage_error}` : ""}
             {project.stage === "timing" && audioAgentPaused ? " · Audio worker paused" : ""}</p></div>
-        {project.stage === "draft" && <button type="button" onClick={() => { setActiveDraft(project.id); setSelected([]); setNote(""); }}
-          className="shrink-0 text-brand-strong hover:underline">Choose sources</button>}
+        <div className="flex shrink-0 gap-3">
+          {project.stage === "draft" && <button type="button" onClick={() => { setActiveDraft(project.id); setSelected([]); setNote(""); }}
+            className="text-brand-strong hover:underline">Choose sources</button>}
+          <button type="button" onClick={() => setActiveReview((current) => current === project.id ? null : project.id)}
+            aria-expanded={activeReview === project.id}
+            className="text-brand-strong hover:underline">{activeReview === project.id ? "Hide review" : "Inspect video"}</button>
+        </div>
       </div>)}
+      {clientId && activeReview && projects.some((project) => project.id === activeReview)
+        && <CodeVideoProjectReviewPanel clientId={clientId} projectId={activeReview}
+          stage={projects.find((project) => project.id === activeReview)!.stage} />}
     </div>
     <CodeVideoRenderCandidatesPanel clientId={clientId}
       titles={new Map(projects.map((project) => [project.id, project.idea]))} />

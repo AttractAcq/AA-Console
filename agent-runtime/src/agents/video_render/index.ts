@@ -111,7 +111,7 @@ export async function runVideoRenderJobWithPipeline(
       maxAlignmentLoss: alignmentLoss });
     if (review === "revised") {
       await appendEvent(sb, job.id,
-        "Pre-render critic committed a visual revision and queued its next exact-version review.",
+        "Pre-render critic committed a revision and queued its exact successor work.",
         "info", { project_id: project.id, from_ir_version: project.ir_version,
           to_ir_version: project.ir_version + 1 });
       return { ok: true, retryable: false };
