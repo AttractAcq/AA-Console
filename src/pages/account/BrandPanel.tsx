@@ -237,7 +237,7 @@ export function BrandPanel() {
         </p>
       </Panel>
 
-      {clientId && <VideoBrandPanel clientId={clientId} />}
+      {clientId && <VideoBrandPanel key={clientId} clientId={clientId} />}
 
       <FormModal
         open={open}
