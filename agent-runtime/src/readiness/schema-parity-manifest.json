@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "177e135dafc8014c16b2a30e3dd5d85072d0ad1ffd0124e5441db4bdb14e8184",
+  "migrationSourceDigest": "795ff2e53816ce3b2417bc1967bb04dda23393d3fb9fa3c41efeb265b46bb2a7",
   "generatedTypesSha256": "c33dfb1cf62a683c2712c09804617b53570722b2d41817260cf4c1c6f8461226",
   "generatedSchemaBodySha256": "71bde9f9383ba04b6dd315665a29aee7aecab3b306c5d29a670b6f4f24fea4f6",
   "localMigrations": [
@@ -4782,8 +4782,8 @@
       "version": "20261124054100",
       "name": "666_video_project_drafts",
       "filename": "20261124054100_666_video_project_drafts.sql",
-      "sha256": "d8c2bdbbd52c21725c15fdbb395dbc9e155c5f9a21f810468f6fef9b227fd764",
-      "trimmedMd5": "1a687175256f5bc4f07b8eb97f0b423b"
+      "sha256": "3390bf22a7c2f8857940f22650d0e4d381ee0c65ac9bb32353a2d7067135fa28",
+      "trimmedMd5": "c2bd5590445f70a03e6fbb5f7bc6fb0e"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

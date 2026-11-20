@@ -110,6 +110,12 @@ begin
     'organic',2,public.campaign_plan_fingerprint(c)
   from public.client_campaigns c
   where c.id=route_project.campaign_id;
+  replay := public.create_video_project_draft_v1(
+    first_project.client_id, first_project.idea,
+    null,'calm',120,array['1:1'],null,
+    route_project.campaign_id,route_project.route_package_id,'route-v1');
+  if replay.id <> route_project.id then
+    raise exception 'A superseded route broke an idempotent retry'; end if;
   begin
     perform public.create_video_project_draft_v1(
       first_project.client_id, first_project.idea,

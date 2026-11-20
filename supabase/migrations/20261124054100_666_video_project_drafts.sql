@@ -69,6 +69,24 @@ begin
     raise exception 'Campaign and route package must be supplied together.'
       using errcode = '22023';
   end if;
+  v_hash := encode(sha256(convert_to(jsonb_build_object(
+    'idea', v_idea, 'audience', v_audience, 'tone', p_tone,
+    'target_length_sec', p_target_length_sec, 'aspects', to_jsonb(p_aspects),
+    'brief_id', p_brief_id, 'campaign_id', p_campaign_id,
+    'route_package_id', p_route_package_id)::text, 'UTF8')), 'hex');
+  perform pg_advisory_xact_lock(hashtextextended(
+    p_client_id::text || ':video_project:' || p_request_key, 0));
+  select * into v from public.video_projects
+    where client_id = p_client_id and request_key = p_request_key;
+  if found then
+    if v.request_hash <> v_hash then
+      raise exception 'Video request key was reused for different inputs.'
+        using errcode = '23514';
+    end if;
+    return v;
+  end if;
+  -- A retry returns the historical draft even if its source was superseded.
+  -- Starting that draft must perform a fresh source and approval check.
   if p_brief_id is not null then
     select * into b from public.client_briefs
       where id = p_brief_id and client_id = p_client_id;
@@ -91,22 +109,6 @@ begin
       raise exception 'The current campaign route package is required.'
         using errcode = '23514';
     end if;
-  end if;
-  v_hash := encode(sha256(convert_to(jsonb_build_object(
-    'idea', v_idea, 'audience', v_audience, 'tone', p_tone,
-    'target_length_sec', p_target_length_sec, 'aspects', to_jsonb(p_aspects),
-    'brief_id', p_brief_id, 'campaign_id', p_campaign_id,
-    'route_package_id', p_route_package_id)::text, 'UTF8')), 'hex');
-  perform pg_advisory_xact_lock(hashtextextended(
-    p_client_id::text || ':video_project:' || p_request_key, 0));
-  select * into v from public.video_projects
-    where client_id = p_client_id and request_key = p_request_key;
-  if found then
-    if v.request_hash <> v_hash then
-      raise exception 'Video request key was reused for different inputs.'
-        using errcode = '23514';
-    end if;
-    return v;
   end if;
   insert into public.video_projects(client_id, idea, audience, tone,
     target_length_sec, aspects, stage, brief_id, campaign_id,
