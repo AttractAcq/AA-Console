@@ -29623,6 +29623,93 @@ export type Database = {
           },
         ]
       }
+      video_project_creative_attempts_v1: {
+        Row: {
+          candidate_id: string
+          claimed_at: string
+          client_id: string
+          decided_at: string | null
+          id: string
+          input_tokens: number | null
+          ir_version: number
+          job_id: string
+          model: string | null
+          output_tokens: number | null
+          project_id: string
+          report: Json | null
+          state: string
+          usd: number | null
+        }
+        Insert: {
+          candidate_id: string
+          claimed_at?: string
+          client_id: string
+          decided_at?: string | null
+          id?: string
+          input_tokens?: number | null
+          ir_version: number
+          job_id: string
+          model?: string | null
+          output_tokens?: number | null
+          project_id: string
+          report?: Json | null
+          state?: string
+          usd?: number | null
+        }
+        Update: {
+          candidate_id?: string
+          claimed_at?: string
+          client_id?: string
+          decided_at?: string | null
+          id?: string
+          input_tokens?: number | null
+          ir_version?: number
+          job_id?: string
+          model?: string | null
+          output_tokens?: number | null
+          project_id?: string
+          report?: Json | null
+          state?: string
+          usd?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_project_creative_attempts_v1_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: true
+            referencedRelation: "video_project_render_candidates_v1"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_creative_attempts_v1_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_creative_attempts_v1_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_project_creative_attempts_v1_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_project_creative_attempts_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
       video_project_music_attempts_v1: {
         Row: {
           client_id: string
@@ -41242,6 +41329,10 @@ export type Database = {
         Args: { p_issued_at: string; p_nonce_hash: string }
         Returns: boolean
       }
+      claim_video_project_creative_v1: {
+        Args: { p_candidate_id: string; p_job_id: string }
+        Returns: Json
+      }
       claim_video_project_render_v1: {
         Args: {
           p_aspect: string
@@ -44158,6 +44249,18 @@ export type Database = {
         }
         Returns: boolean
       }
+      finish_video_project_creative_v1: {
+        Args: {
+          p_attempt_id: string
+          p_input_tokens: number
+          p_job_id: string
+          p_model: string
+          p_output_tokens: number
+          p_report: Json
+          p_usd: number
+        }
+        Returns: string
+      }
       format_fits_media: {
         Args: {
           p_format: Database["public"]["Enums"]["content_format"]
@@ -44653,6 +44756,10 @@ export type Database = {
       }
       mark_sales_runtime_uncertain_v6: {
         Args: { p_reservation_id: string }
+        Returns: boolean
+      }
+      mark_video_project_creative_uncertain_v1: {
+        Args: { p_attempt_id: string; p_job_id: string }
         Returns: boolean
       }
       mark_video_project_render_uncertain_v1: {

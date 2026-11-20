@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "082067a7f60372b284a266f37300ceca9d6ba6020b68b8cd2a6c12b8a2827d98",
-  "generatedTypesSha256": "94dcb1083f223a43573f9428bedb665d878a54be38d77698b8d5972c40369f6b",
-  "generatedSchemaBodySha256": "b98f22c152ac80a5299125e816dbf1448de64d031bcf9ff10edaa184f36aa0db",
+  "migrationSourceDigest": "6e61df95e8b8a4fc9decdb07a11f4fcc7c3937784249b93416902673e2f10b04",
+  "generatedTypesSha256": "4b5ffdd1347f57c50b242170a6ba9cc11bf7939dfece5b8bd27de48dc2d8d542",
+  "generatedSchemaBodySha256": "cca9bc086872b5ccc39674b6631447bb7cce31463d6db3df31ad99ebc1d187d6",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4875,6 +4875,13 @@
       "filename": "20261124055400_679_video_project_candidate_attachment.sql",
       "sha256": "ee7a437e99974c52d8af019b8bbe15239bf9e56e9bc47250c4c40493cb581159",
       "trimmedMd5": "326bdba67ed9e0c2cf8f7dd774392b87"
+    },
+    {
+      "version": "20261124055500",
+      "name": "680_video_project_creative_attempt",
+      "filename": "20261124055500_680_video_project_creative_attempt.sql",
+      "sha256": "c3b4d6fc6533998915827a62af38ebc43d5acb5e2e819e597e3e6eec1f5bec8b",
+      "trimmedMd5": "d99cd541ea56f6d0ce13505c79485fc0"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

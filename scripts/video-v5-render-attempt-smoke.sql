@@ -29,6 +29,7 @@ declare p public.video_projects%rowtype;
   candidate_path text; candidate_id uuid; candidate_probe jsonb;
   creative_review jsonb;
   first_candidate_id uuid; attached_asset_id uuid;
+  creative_attempt uuid;
   render_cost uuid;
 begin
   p:=public.create_video_project_draft_v1(
@@ -205,26 +206,35 @@ begin
     {"area":"empty_frame","verdict":"pass","reason":"No empty frame."},
     {"area":"narration_visual_match","verdict":"pass","reason":"Narration matches."}
   ]}'::jsonb;
+  result:=public.claim_video_project_creative_v1(candidate_id,render_job);
+  creative_attempt:=(result->>'attempt_id')::uuid;
+  if result->>'state' is distinct from 'claimed'
+    or (public.claim_video_project_creative_v1(candidate_id,render_job)->>'state')
+      is distinct from 'already_claimed' then
+    raise exception 'Creative claim was not unique'; end if;
   begin
-    perform public.decide_video_project_render_candidate_v1(candidate_id,
-      'accepted',creative_review-'checks',null);
+    perform public.finish_video_project_creative_v1(creative_attempt,
+      render_job,creative_review-'checks','claude-test',100,20,0.012);
     raise exception 'Incomplete creative review was accepted';
-  exception when check_violation then null; end;
+  exception when check_violation or invalid_parameter_value then null; end;
   begin
-    perform public.decide_video_project_render_candidate_v1(candidate_id,
-      'rejected',creative_review,'Not good enough');
+    perform public.finish_video_project_creative_v1(creative_attempt,
+      render_job,creative_review||'{"result":"fail"}'::jsonb,
+      'claude-test',100,20,0.012);
     raise exception 'Passing review was rejected';
   exception when check_violation then null; end;
-  if candidate_id is distinct from public.decide_video_project_render_candidate_v1(
-    candidate_id,'accepted',creative_review,null) then
+  if candidate_id is distinct from public.finish_video_project_creative_v1(
+    creative_attempt,render_job,creative_review,'claude-test',100,20,0.012) then
     raise exception 'Creative decision did not bind candidate'; end if;
-  if candidate_id is distinct from public.decide_video_project_render_candidate_v1(
-    candidate_id,'accepted',creative_review,null) then
+  if candidate_id is distinct from public.finish_video_project_creative_v1(
+    creative_attempt,render_job,creative_review,'claude-test',100,20,0.012) then
     raise exception 'Creative decision replay changed receipt'; end if;
+  if (select count(*) from public.video_project_costs
+      where attempt_key='video-creative:'||creative_attempt::text)<>1 then
+    raise exception 'Creative cost receipt count changed'; end if;
   begin
-    perform public.decide_video_project_render_candidate_v1(candidate_id,
-      'rejected',creative_review||'{"result":"fail"}'::jsonb,
-      'Changed decision');
+    perform public.finish_video_project_creative_v1(creative_attempt,
+      render_job,creative_review,'claude-test',101,20,0.012);
     raise exception 'Creative decision was overwritten';
   exception when check_violation then null; end;
   first_candidate_id:=candidate_id;
@@ -299,6 +309,10 @@ begin
   begin
     perform public.attach_video_project_render_v1(p.id,first_candidate_id);
     raise exception 'Browser attached a render';
+  exception when insufficient_privilege then null; end;
+  begin
+    perform public.claim_video_project_creative_v1(first_candidate_id,render_job);
+    raise exception 'Browser claimed creative review';
   exception when insufficient_privilege then null; end;
   if (select count(*) from public.video_project_render_attempts_v1
       where project_id=p.id)<>2 then
