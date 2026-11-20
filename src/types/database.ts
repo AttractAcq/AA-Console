@@ -29423,6 +29423,172 @@ export type Database = {
           },
         ]
       }
+      video_project_costs: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          job_id: string | null
+          project_id: string
+          provider: string
+          stage: string
+          unit: string
+          units: number
+          usd: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          project_id: string
+          provider: string
+          stage: string
+          unit: string
+          units: number
+          usd: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          project_id?: string
+          provider?: string
+          stage?: string
+          unit?: string
+          units?: number
+          usd?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_project_costs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_costs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_project_costs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_project_costs_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
+      video_projects: {
+        Row: {
+          aspects: string[]
+          audience: string | null
+          client_id: string
+          cost_usd: number
+          created_at: string
+          created_by: string | null
+          critic_reports: Json
+          id: string
+          idea: string
+          ir: Json | null
+          ir_version: number
+          music_path: string | null
+          music_prompt: string | null
+          research: Json | null
+          script: Json | null
+          stage: string
+          stage_error: string | null
+          target_length_sec: number
+          tone: string
+          updated_at: string
+        }
+        Insert: {
+          aspects?: string[]
+          audience?: string | null
+          client_id: string
+          cost_usd?: number
+          created_at?: string
+          created_by?: string | null
+          critic_reports?: Json
+          id?: string
+          idea: string
+          ir?: Json | null
+          ir_version?: number
+          music_path?: string | null
+          music_prompt?: string | null
+          research?: Json | null
+          script?: Json | null
+          stage?: string
+          stage_error?: string | null
+          target_length_sec?: number
+          tone?: string
+          updated_at?: string
+        }
+        Update: {
+          aspects?: string[]
+          audience?: string | null
+          client_id?: string
+          cost_usd?: number
+          created_at?: string
+          created_by?: string | null
+          critic_reports?: Json
+          id?: string
+          idea?: string
+          ir?: Json | null
+          ir_version?: number
+          music_path?: string | null
+          music_prompt?: string | null
+          research?: Json | null
+          script?: Json | null
+          stage?: string
+          stage_error?: string | null
+          target_length_sec?: number
+          tone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       video_render_candidates: {
         Row: {
           asset_id: string
@@ -30226,6 +30392,74 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_scenes: {
+        Row: {
+          alignment: Json | null
+          audio_path: string | null
+          chapter: boolean
+          client_id: string
+          component: string
+          created_at: string
+          duration_sec: number | null
+          id: string
+          locked: boolean
+          min_duration_sec: number | null
+          narration: string
+          position: number
+          project_id: string
+          props: Json
+          scene_key: string
+          transition_in: string
+          updated_at: string
+        }
+        Insert: {
+          alignment?: Json | null
+          audio_path?: string | null
+          chapter?: boolean
+          client_id: string
+          component: string
+          created_at?: string
+          duration_sec?: number | null
+          id?: string
+          locked?: boolean
+          min_duration_sec?: number | null
+          narration: string
+          position: number
+          project_id: string
+          props: Json
+          scene_key: string
+          transition_in?: string
+          updated_at?: string
+        }
+        Update: {
+          alignment?: Json | null
+          audio_path?: string | null
+          chapter?: boolean
+          client_id?: string
+          component?: string
+          created_at?: string
+          duration_sec?: number | null
+          id?: string
+          locked?: boolean
+          min_duration_sec?: number | null
+          narration?: string
+          position?: number
+          project_id?: string
+          props?: Json
+          scene_key?: string
+          transition_in?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_scenes_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id", "client_id"]
           },
         ]
       }
@@ -48108,6 +48342,10 @@ export type Database = {
         Returns: boolean
       }
       video_approval_state: { Args: { p_asset_id: string }; Returns: Json }
+      video_aspects_valid_v1: {
+        Args: { p_aspects: string[] }
+        Returns: boolean
+      }
       video_client_approval_email_state: {
         Args: { p_asset_id: string }
         Returns: Json

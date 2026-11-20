@@ -210,6 +210,18 @@ diff -u src/types/database.ts "$evidence_dir/database.generated.ts" \
     exit 1
   }
 
+if [[ "${AA_SCHEMA_VIDEO_V2_SMOKE:-0}" == "1" ]]; then
+  if psql_local -qAt -f scripts/video-v2-project-schema-smoke.sql \
+    >"$run_dir/video-v2-project-schema-smoke.private.log" 2>&1; then
+    printf 'passed\n' >"$evidence_dir/video-v2-project-schema-smoke.status.txt"
+    echo 'Video V2 project schema rollback fixture passed.'
+  else
+    printf 'failed\n' >"$evidence_dir/video-v2-project-schema-smoke.status.txt"
+    grep -E 'ERROR:|psql:' "$run_dir/video-v2-project-schema-smoke.private.log" | tail -3 >&2 || true
+    exit 1
+  fi
+fi
+
 if [[ "${AA_SCHEMA_PHASE2_SMOKES:-0}" == "1" ]]; then
   smoke_count=0
   for smoke_file in scripts/phase2-*-smoke.sql; do
