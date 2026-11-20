@@ -162,13 +162,14 @@ export async function writeVideoStoryboard(request: VideoStoryboardRequest,
   throw new Error("Video storyboard attempts exhausted.");
 }
 
-export function anthropicVideoCompletion(config: RuntimeConfig): VideoCompletion {
+export function anthropicVideoCompletion(config: RuntimeConfig, system?: string): VideoCompletion {
   const model = process.env.VIDEO_SCRIPT_MODEL?.trim() || config.model;
   const client = new Anthropic({ apiKey: anthropicKeyForAgent(config, "video_script"),
     maxRetries: 2, timeout: 180_000 });
   return async (message) => {
     const response = await client.messages.stream({
       model, max_tokens: 8192,
+      ...(system ? { system } : {}),
       messages: [{ role: "user", content: message }],
     }).finalMessage();
     const text = response.content.filter((part): part is Anthropic.Messages.TextBlock =>

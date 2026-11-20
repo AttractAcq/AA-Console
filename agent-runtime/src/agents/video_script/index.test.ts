@@ -65,7 +65,7 @@ describe("video script job source and cost gates", () => {
   it("holds stale source before a model call", async () => {
     const { sb, project, costCalls } = store([false]);
     const complete = vi.fn();
-    const result = await runVideoScriptJobWithCompletion(sb, job, complete, "Catalogue");
+    const result = await runVideoScriptJobWithCompletion(sb, job, complete, complete, "Catalogue");
     expect(result).toMatchObject({ ok: false, retryable: false });
     expect(complete).not.toHaveBeenCalled();
     expect(project.stage).toBe("needs_human");
@@ -77,28 +77,47 @@ describe("video script job source and cost gates", () => {
       sceneSources: fixture.scenes.map((scene: { id: string }) => ({
         sceneId: scene.id, sourceIds: ["source-1"],
       })) }), usage });
-    const result = await runVideoScriptJobWithCompletion(sb, job, complete, "Catalogue");
+    const result = await runVideoScriptJobWithCompletion(sb, job, complete, complete, "Catalogue");
     expect(result).toMatchObject({ ok: false, retryable: false, usage });
     expect(project.stage).toBe("needs_human");
     expect(project.ir).toBeNull();
     expect(costCalls).toHaveLength(1);
   });
   it("stores a valid draft for review once and treats job replay as idempotent", async () => {
+    const { sb, project, costCalls } = store([true, true, true]);
+    const complete = vi.fn().mockResolvedValue({ text: JSON.stringify({ ir: fixture,
+      sceneSources: fixture.scenes.map((scene: { id: string }) => ({
+        sceneId: scene.id, sourceIds: ["source-1"],
+      })) }), usage });
+    const review = vi.fn().mockResolvedValue({
+      text: JSON.stringify({ verdict: "pass", reasons: [], edits: [] }), usage,
+    });
+    expect(await runVideoScriptJobWithCompletion(sb, job, complete, review, "Catalogue"))
+      .toMatchObject({ ok: true, usage: { inputTokens: 200, outputTokens: 400,
+        costUsd: 0.01 } });
+    expect(project.stage).toBe("needs_human");
+    expect(project.stage_error).toContain("human claim review pending");
+    expect(project.script).toMatchObject({ source_digest: "a".repeat(64) });
+    expect((project.script as { scene_sources: unknown[] }).scene_sources).toHaveLength(3);
+    expect(project.ir_version).toBe(1);
+    expect(await runVideoScriptJobWithCompletion(sb, job, complete, review, "Catalogue"))
+      .toMatchObject({ ok: true });
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(review).toHaveBeenCalledTimes(1);
+    expect(costCalls).toHaveLength(2);
+  });
+  it("records both model calls and holds an invalid independent review", async () => {
     const { sb, project, costCalls } = store([true, true]);
     const complete = vi.fn().mockResolvedValue({ text: JSON.stringify({ ir: fixture,
       sceneSources: fixture.scenes.map((scene: { id: string }) => ({
         sceneId: scene.id, sourceIds: ["source-1"],
       })) }), usage });
-    expect(await runVideoScriptJobWithCompletion(sb, job, complete, "Catalogue"))
-      .toMatchObject({ ok: true, usage });
+    const review = vi.fn().mockResolvedValue({ text: "not JSON", usage });
+    const result = await runVideoScriptJobWithCompletion(sb, job, complete, review, "Catalogue");
+    expect(result).toMatchObject({ ok: false, retryable: false,
+      usage: { inputTokens: 200, outputTokens: 400, costUsd: 0.01 } });
     expect(project.stage).toBe("needs_human");
-    expect(project.stage_error).toContain("independent claim review pending");
-    expect(project.script).toMatchObject({ source_digest: "a".repeat(64) });
-    expect((project.script as { scene_sources: unknown[] }).scene_sources).toHaveLength(3);
-    expect(project.ir_version).toBe(1);
-    expect(await runVideoScriptJobWithCompletion(sb, job, complete, "Catalogue"))
-      .toMatchObject({ ok: true });
-    expect(complete).toHaveBeenCalledTimes(1);
-    expect(costCalls).toHaveLength(1);
+    expect(project.ir).toBeNull();
+    expect(costCalls).toHaveLength(2);
   });
 });

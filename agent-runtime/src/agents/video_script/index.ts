@@ -8,6 +8,8 @@ import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { anthropicVideoCompletion, VideoStoryboardValidationError,
   writeVideoStoryboard, type VideoCompletion, type VideoSource } from "../../video/storyboard.js";
+import { reviewVideoStoryboard, VideoReviewValidationError,
+  VIDEO_REVIEW_SYSTEM } from "../../video/review.js";
 
 type Project = {
   id: string; client_id: string; stage: string; job_id: string | null;
@@ -41,11 +43,12 @@ async function sourceCurrent(sb: SupabaseClient, projectId: string): Promise<boo
 }
 
 async function accountAttempt(sb: SupabaseClient, projectId: string,
-  job: AgentJobRow, usage: { inputTokens: number; outputTokens: number; costUsd: number }): Promise<void> {
+  job: AgentJobRow, pass: "writer" | "reviewer",
+  usage: { inputTokens: number; outputTokens: number; costUsd: number }): Promise<void> {
   if (usage.inputTokens + usage.outputTokens === 0 && usage.costUsd === 0) return;
   const { error } = await sb.rpc("record_video_project_cost_v1", {
     p_project_id: projectId, p_job_id: job.id,
-    p_attempt_key: `${job.id}:script:${job.attempts}`,
+    p_attempt_key: `${job.id}:${pass}:${job.attempts}`,
     p_provider: "anthropic", p_units: usage.inputTokens + usage.outputTokens,
     p_usd: usage.costUsd,
   });
@@ -63,7 +66,7 @@ async function setNeedsHuman(sb: SupabaseClient, project: Project,
 
 export async function runVideoScriptJobWithCompletion(
   sb: SupabaseClient, job: AgentJobRow,
-  complete: VideoCompletion, catalogue: string,
+  complete: VideoCompletion, reviewComplete: VideoCompletion, catalogue: string,
 ): Promise<JobResult> {
   if (job.agent_key !== "video_script" || job.input_table !== "video_projects"
     || !job.input_id || !job.client_id) return { ok: false, retryable: false,
@@ -111,39 +114,66 @@ export async function runVideoScriptJobWithCompletion(
       sources, catalogue,
     }, complete);
     incurredUsage = storyboard.usage;
-    await accountAttempt(sb, project.id, job, storyboard.usage);
+    await accountAttempt(sb, project.id, job, "writer", storyboard.usage);
     if (!await sourceCurrent(sb, project.id)) {
-      await setNeedsHuman(sb, project, job, "Video source or campaign route changed during writing.");
+      await setNeedsHuman(sb, project, job, "Video source changed during writing.");
       return { ok: false, retryable: false,
         failureMessage: "Video source changed during writing; output was not stored.",
         usage: storyboard.usage };
     }
+    await appendEvent(sb, job.id, "Reviewing the storyboard independently.");
+    const review = await reviewVideoStoryboard(storyboard, sources, reviewComplete);
+    incurredUsage = { inputTokens: storyboard.usage.inputTokens + review.usage.inputTokens,
+      outputTokens: storyboard.usage.outputTokens + review.usage.outputTokens,
+      costUsd: storyboard.usage.costUsd + review.usage.costUsd };
+    await accountAttempt(sb, project.id, job, "reviewer", review.usage);
+    if (!await sourceCurrent(sb, project.id)) {
+      await setNeedsHuman(sb, project, job, "Video source or campaign route changed during writing.");
+      return { ok: false, retryable: false,
+        failureMessage: "Video source changed during writing; output was not stored.",
+        usage: incurredUsage };
+    }
     const saved = await sb.from("video_projects").update({
-      ir: storyboard.ir, ir_version: project.ir_version + 1,
-      script: { scene_sources: storyboard.sceneSources,
+      ir: review.ir, ir_version: project.ir_version + 1,
+      script: { scene_sources: review.sceneSources,
         source_digest: project.source_digest,
         writer_source_digest: storyboard.sourceDigest,
         unsourced: storyboard.unsourced,
-        writer_attempts: storyboard.attempts },
+        writer_attempts: storyboard.attempts,
+        independent_review: { accepted: review.accepted,
+          reasons: review.reasons, edits: review.edits } },
       stage: "needs_human",
-      stage_error: "Renderer compile and independent claim review pending.",
+      stage_error: review.accepted
+        ? "Independent review passed; renderer compile and human claim review pending."
+        : `Independent review held: ${review.reasons.join("; ").slice(0, 700)}`,
     }).eq("id", project.id).eq("client_id", project.client_id)
       .eq("job_id", job.id).eq("stage", "scripting")
       .eq("ir_version", project.ir_version).select("id").maybeSingle();
     if (saved.error || !saved.data) throw new Error("Video storyboard version changed before save.");
-    await appendEvent(sb, job.id,
-      `Storyboard draft stored for renderer and human review (${storyboard.ir.scenes.length} scenes).`);
-    return { ok: true, retryable: false, usage: storyboard.usage };
+    await appendEvent(sb, job.id, review.accepted
+      ? `Reviewed storyboard stored for renderer and human review (${review.ir.scenes.length} scenes).`
+      : "Storyboard held after independent review.");
+    return { ok: true, retryable: false, usage: incurredUsage };
   } catch (caught) {
     if (caught instanceof VideoStoryboardValidationError) {
       incurredUsage = caught.usage;
-      if (caught.usage) await accountAttempt(sb, project.id, job, caught.usage);
+      if (caught.usage) await accountAttempt(sb, project.id, job, "writer", caught.usage);
       await setNeedsHuman(sb, project, job, "Storyboard validation failed; revise the source or prompt.");
       return { ok: false, retryable: false,
         failureMessage: "Video storyboard did not pass validation.", usage: caught.usage };
     }
+    if (caught instanceof VideoReviewValidationError) {
+      incurredUsage = { inputTokens: (incurredUsage?.inputTokens ?? 0) + caught.usage.inputTokens,
+        outputTokens: (incurredUsage?.outputTokens ?? 0) + caught.usage.outputTokens,
+        costUsd: (incurredUsage?.costUsd ?? 0) + caught.usage.costUsd };
+      await accountAttempt(sb, project.id, job, "reviewer", caught.usage);
+      await setNeedsHuman(sb, project, job,
+        "Independent review was invalid; an operator must inspect the storyboard.");
+      return { ok: false, retryable: false,
+        failureMessage: "Independent video review did not pass validation.", usage: incurredUsage };
+    }
     const retryable = caught instanceof Anthropic.APIError
-      && (caught.status === 429 || caught.status >= 500);
+      && !incurredUsage && (caught.status === 429 || caught.status >= 500);
     if (!retryable) await setNeedsHuman(sb, project, job,
       "Video writing stopped; an operator must inspect the job.");
     return { ok: false, retryable,
@@ -157,5 +187,6 @@ export async function runVideoScriptJob(sb: SupabaseClient, config: RuntimeConfi
   _agent: AgentRow, job: AgentJobRow): Promise<JobResult> {
   const catalogue = await readFile(new URL("../../video/catalogue.md", import.meta.url), "utf8");
   return runVideoScriptJobWithCompletion(sb, job,
-    anthropicVideoCompletion(config), catalogue);
+    anthropicVideoCompletion(config),
+    anthropicVideoCompletion(config, VIDEO_REVIEW_SYSTEM), catalogue);
 }
