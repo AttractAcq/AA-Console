@@ -11,11 +11,14 @@ import { appendEvent } from "../../queue.js";
 import { VideoRenderUncertainError } from "../../video/render/handoff.js";
 import { LambdaRenderObservationError } from "../../video/render/lambda.js";
 import { renderAndFileProjectAspect } from "../../video/render/pipeline.js";
+import { finalizeVideoProjectRender, VideoCreativeReviewHeldError }
+  from "../../video/render/finalize.js";
 import type { VideoAspect } from "../../video/render/probe.js";
 
 type Project = { id: string; client_id: string; stage: string;
   ir_version: number; aspects: VideoAspect[] };
 type Pipeline = typeof renderAndFileProjectAspect;
+type Finalizer = typeof finalizeVideoProjectRender;
 const ASPECTS = new Set(["16:9", "9:16", "1:1"]);
 const REGION = /^[a-z]{2}(?:-[a-z]+)+-[1-9]$/;
 
@@ -49,6 +52,7 @@ export async function runVideoRenderJobWithPipeline(
   pipeline: Pipeline = renderAndFileProjectAspect,
   credentialsAvailable: () => boolean = () => Boolean(
     process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY),
+  finalizer: Finalizer = finalizeVideoProjectRender,
 ): Promise<JobResult> {
   const params = job.params ?? {};
   if (job.agent_key !== "video_render"
@@ -65,10 +69,23 @@ export async function runVideoRenderJobWithPipeline(
   const project = projectResult.data as Project | null;
   if (projectResult.error || !project
     || project.id !== job.input_id || project.client_id !== job.client_id
-    || project.stage !== "timed"
     || project.ir_version !== params.ir_version
     || !exactAspects(project.aspects)
     || JSON.stringify(project.aspects) !== JSON.stringify(params.aspects)) {
+    return { ok: false, retryable: false,
+      failureMessage: "Video render job differs from the current timed project." };
+  }
+  if (project.stage === "attached") {
+    const prior = await sb.from("video_project_attachments_v1")
+      .select("asset_id").eq("project_id", project.id)
+      .eq("client_id", project.client_id)
+      .eq("ir_version", project.ir_version).maybeSingle();
+    return prior.error || !prior.data?.asset_id
+      ? { ok: false, retryable: false,
+        failureMessage: "Attached video lacks its exact asset receipt." }
+      : { ok: true, retryable: false };
+  }
+  if (project.stage !== "timed") {
     return { ok: false, retryable: false,
       failureMessage: "Video render job differs from the current timed project." };
   }
@@ -82,6 +99,7 @@ export async function runVideoRenderJobWithPipeline(
   }
   const directory = await mkdtemp(join(tmpdir(), "aa-video-render-"));
   try {
+    const candidateIds = new Map<VideoAspect, string>();
     for (const aspect of project.aspects) {
       // Leave enough lease time to download, master, probe and file a large
       // video after Lambda observation. The next attempt resumes its handle.
@@ -103,13 +121,30 @@ export async function runVideoRenderJobWithPipeline(
         "info", { project_id: project.id, ir_version: project.ir_version,
           aspect, candidate_id: result.candidateId,
           probe_result: result.probeResult, resumed: result.resumed });
+      candidateIds.set(aspect, result.candidateId);
       if (result.probeResult !== "pass") {
         return { ok: false, retryable: false,
           failureMessage: `Video ${aspect} failed its physical media probe; inspect the candidate.` };
       }
     }
+    const finalized = await finalizer({ sb, config,
+      clientId: project.client_id, projectId: project.id,
+      jobId: job.id, irVersion: project.ir_version,
+      aspects: project.aspects, candidateIds, workDir: directory,
+      maxAlignmentLoss: alignmentLoss });
+    if (finalized.state === "rejected") {
+      return { ok: false, retryable: false,
+        failureMessage: "Video creative review rejected the exact first-aspect candidate." };
+    }
+    await appendEvent(sb, job.id, "Code-rendered video attached for human review.",
+      "info", { project_id: project.id, ir_version: project.ir_version,
+        asset_id: finalized.assetId });
     return { ok: true, retryable: false };
   } catch (error) {
+    if (error instanceof VideoCreativeReviewHeldError) {
+      return { ok: false, retryable: false, hold: true,
+        failureMessage: error.message };
+    }
     if (error instanceof VideoRenderUncertainError) {
       return { ok: false, retryable: false,
         failureMessage: "Video Lambda start is uncertain; reconcile the recorded attempt before any retry." };

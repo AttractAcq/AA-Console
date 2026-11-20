@@ -4,6 +4,7 @@ import type { RuntimeConfig } from "../../config.js";
 import type { AgentRow } from "../../orchestration/registry.js";
 import type { AgentJobRow } from "../../queue.js";
 import { VideoRenderUncertainError } from "../../video/render/handoff.js";
+import { VideoCreativeReviewHeldError } from "../../video/render/finalize.js";
 import { LambdaRenderObservationError } from "../../video/render/lambda.js";
 import { runVideoRenderJobWithPipeline } from "./index.js";
 
@@ -12,6 +13,7 @@ const projectId = "22222222-2222-4222-8222-222222222222";
 const jobId = "33333333-3333-4333-8333-333333333333";
 const aspects = ["16:9", "9:16", "1:1"];
 type Pipeline = NonNullable<Parameters<typeof runVideoRenderJobWithPipeline>[5]>;
+type Finalizer = NonNullable<Parameters<typeof runVideoRenderJobWithPipeline>[7]>;
 
 function fixture() {
   const project = { id: projectId, client_id: clientId,
@@ -19,10 +21,12 @@ function fixture() {
   const events: unknown[] = [];
   const from = vi.fn((table: string) => {
     const query = { select: () => query, eq: () => query,
-      maybeSingle: async () => ({ data: project, error: null }),
+      maybeSingle: async () => ({ data: table === "video_project_attachments_v1"
+        ? { asset_id: "asset-1" } : project, error: null }),
       insert: async (value: unknown) => { events.push(value);
         return { error: null }; } };
-    if (table !== "video_projects" && table !== "agent_job_events") {
+    if (table !== "video_projects" && table !== "agent_job_events"
+      && table !== "video_project_attachments_v1") {
       throw new Error(`Unexpected table ${table}`);
     }
     return query;
@@ -45,7 +49,9 @@ function fixture() {
   const pipeline = vi.fn(async (input: { aspect: string }) => ({
     candidateId: `candidate-${input.aspect}`, probeResult: "pass" as const,
     resumed: false })) as unknown as Pipeline;
-  return { sb, config, agent, job, project, pipeline, events };
+  const finalizer = vi.fn(async () => ({ state: "attached" as const,
+    assetId: "asset-1" })) as unknown as Finalizer;
+  return { sb, config, agent, job, project, pipeline, finalizer, events };
 }
 
 describe("video render worker", () => {
@@ -53,12 +59,15 @@ describe("video render worker", () => {
     const f = fixture();
     const result = await runVideoRenderJobWithPipeline(f.sb, f.config,
       f.agent, f.job, Date.now() + 4 * 60 * 60_000,
-      f.pipeline, () => true);
+      f.pipeline, () => true, f.finalizer);
     expect(result).toEqual({ ok: true, retryable: false });
     expect(f.pipeline).toHaveBeenCalledTimes(3);
     expect(vi.mocked(f.pipeline).mock.calls.map(([input]) => input.aspect))
       .toEqual(aspects);
-    expect(f.events).toHaveLength(3);
+    expect(f.events).toHaveLength(4);
+    expect(f.finalizer).toHaveBeenCalledWith(expect.objectContaining({
+      projectId, candidateIds: new Map(aspects.map((aspect) =>
+        [aspect, `candidate-${aspect}`])) }));
   });
 
   it("holds an unconfigured deployment or alignment policy", async () => {
@@ -66,7 +75,7 @@ describe("video render worker", () => {
     f.config.remotionServeUrl = null;
     const result = await runVideoRenderJobWithPipeline(f.sb, f.config,
       f.agent, f.job, Date.now() + 4 * 60 * 60_000,
-      f.pipeline, () => true);
+      f.pipeline, () => true, f.finalizer);
     expect(result.hold).toBe(true);
     expect(f.pipeline).not.toHaveBeenCalled();
   });
@@ -76,7 +85,7 @@ describe("video render worker", () => {
     f.job.params = { ir_version: 1, aspects: ["16:9"] };
     const result = await runVideoRenderJobWithPipeline(f.sb, f.config,
       f.agent, f.job, Date.now() + 4 * 60 * 60_000,
-      f.pipeline, () => true);
+      f.pipeline, () => true, f.finalizer);
     expect(result.ok).toBe(false);
     expect(result.retryable).toBe(false);
     expect(f.pipeline).not.toHaveBeenCalled();
@@ -88,7 +97,7 @@ describe("video render worker", () => {
       new VideoRenderUncertainError("attempt-1", "start unknown"));
     const result = await runVideoRenderJobWithPipeline(f.sb, f.config,
       f.agent, f.job, Date.now() + 4 * 60 * 60_000,
-      f.pipeline, () => true);
+      f.pipeline, () => true, f.finalizer);
     expect(result).toMatchObject({ ok: false, retryable: false });
     expect(f.events).toHaveLength(0);
   });
@@ -99,10 +108,32 @@ describe("video render worker", () => {
       probeResult: "fail", resumed: false });
     const result = await runVideoRenderJobWithPipeline(f.sb, f.config,
       f.agent, f.job, Date.now() + 4 * 60 * 60_000,
-      f.pipeline, () => true);
+      f.pipeline, () => true, f.finalizer);
     expect(result).toMatchObject({ ok: false, retryable: false });
     expect(f.events).toHaveLength(1);
     expect(f.pipeline).toHaveBeenCalledTimes(1);
+    expect(f.finalizer).not.toHaveBeenCalled();
+  });
+
+  it("holds a creative review with an unresolved paid attempt", async () => {
+    const f = fixture();
+    vi.mocked(f.finalizer).mockRejectedValueOnce(
+      new VideoCreativeReviewHeldError("Creative attempt is already claimed."));
+    const result = await runVideoRenderJobWithPipeline(f.sb, f.config,
+      f.agent, f.job, Date.now() + 4 * 60 * 60_000,
+      f.pipeline, () => true, f.finalizer);
+    expect(result).toMatchObject({ ok: false, retryable: false, hold: true });
+  });
+
+  it("reconciles an already attached asset without another render", async () => {
+    const f = fixture();
+    f.project.stage = "attached";
+    const result = await runVideoRenderJobWithPipeline(f.sb, f.config,
+      f.agent, f.job, Date.now() + 4 * 60 * 60_000,
+      f.pipeline, () => false, f.finalizer);
+    expect(result).toEqual({ ok: true, retryable: false });
+    expect(f.pipeline).not.toHaveBeenCalled();
+    expect(f.finalizer).not.toHaveBeenCalled();
   });
 
   it("retries only an observational Lambda failure, never a fatal render", async () => {
@@ -115,13 +146,13 @@ describe("video render worker", () => {
       new LambdaRenderObservationError("Lambda render observation timed out", handle));
     const retry = await runVideoRenderJobWithPipeline(f.sb, f.config,
       f.agent, f.job, Date.now() + 4 * 60 * 60_000,
-      f.pipeline, () => true);
+      f.pipeline, () => true, f.finalizer);
     expect(retry).toMatchObject({ ok: false, retryable: true });
     vi.mocked(f.pipeline).mockRejectedValueOnce(
       new LambdaRenderObservationError("Lambda render failed; provider fatal", handle));
     const fatal = await runVideoRenderJobWithPipeline(f.sb, f.config,
       f.agent, f.job, Date.now() + 4 * 60 * 60_000,
-      f.pipeline, () => true);
+      f.pipeline, () => true, f.finalizer);
     expect(fatal).toMatchObject({ ok: false, retryable: false });
   });
 });

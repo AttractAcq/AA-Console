@@ -200,14 +200,18 @@ export async function reviewCodeVideoCandidate(input: {
     }
     const response = await dependencies.complete(content);
     const parsed = parseSegmentReport(response.raw, batch);
+    if (responseModel && response.model !== responseModel) {
+      throw new CodeVideoCreativeReviewError(
+        "Creative review model changed between sampled segments.");
+    }
     segments.push(parsed);
     responseModel = response.model;
     usage.inputTokens += response.usage.inputTokens;
     usage.outputTokens += response.usage.outputTokens;
     usage.cacheReadTokens += response.usage.cacheReadTokens;
     usage.cacheWriteTokens += response.usage.cacheWriteTokens;
+    usage.costUsd += estimateCostUsd(response.model, response.usage);
   }
-  usage.costUsd = estimateCostUsd(input.model, usage);
   const checks: CreativeCheck[] = AREAS.map((area) => {
     const areaChecks = segments.flatMap((segment) => segment.checks)
       .filter((check) => check.area === area);
