@@ -48,8 +48,14 @@ function fixture(state: string) {
   });
   const resume = vi.fn(async () => ({ outputPath: input.localPath,
     sizeInBytes: 1000, progress: { done: true } }));
-  const deps = { prepare, start, resume } as unknown as Deps;
-  return { sb, calls, rpc, from, prepare, start, resume, deps };
+  const master = vi.fn(async () => ({ outputPath: "/tmp/video-master.mp4",
+    fileBytes: 900 }));
+  const probe = vi.fn(async () => ({ result: "pass", width: 1920,
+    height: 1080, duration_sec: 60, has_audio: true,
+    audio_integrated_lufs: -14, audio_true_peak_dbfs: -1.6,
+    black_intervals: [], freeze_intervals: [], checks: [] }));
+  const deps = { prepare, start, resume, master, probe } as unknown as Deps;
+  return { sb, calls, rpc, from, prepare, start, resume, master, probe, deps };
 }
 
 describe("exact render handoff", () => {
@@ -57,12 +63,17 @@ describe("exact render handoff", () => {
     const f = fixture("claimed");
     const result = await renderProjectAspect({ sb: f.sb, ...input }, f.deps);
     expect(result).toMatchObject({ attemptId, handle,
-      outputPath: input.localPath });
+      outputPath: "/tmp/video-master.mp4", sizeInBytes: 900,
+      probe: { result: "pass" } });
     expect(f.calls).toEqual(["claim_video_project_render_v1",
       "record_video_project_lambda_handle_v2"]);
     expect(f.start).toHaveBeenCalledTimes(1);
     expect(f.resume).toHaveBeenCalledWith({ handle,
       localPath: input.localPath });
+    expect(f.master).toHaveBeenCalledWith({ sourcePath: input.localPath,
+      outputPath: "/tmp/video-master.mp4" });
+    expect(f.probe).toHaveBeenCalledWith({ path: "/tmp/video-master.mp4",
+      aspect: "16:9" });
   });
 
   it("resumes an exact stored handle without another provider start", async () => {

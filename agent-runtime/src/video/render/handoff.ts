@@ -4,6 +4,8 @@ import { buildVideoRenderInputs } from "./inputs.js";
 import { LambdaRenderObservationError, LambdaRenderStartUnknownError,
   resumeLambdaRender, startLambdaRender,
   type LambdaRenderHandle } from "./lambda.js";
+import { masterProjectRender } from "./master.js";
+import { probeProjectRender, type ProjectRenderProbe } from "./probe.js";
 
 type Attempt = { id: string; project_id: string; client_id: string;
   ir_version: number; aspect: string; job_id: string; state: string;
@@ -11,9 +13,11 @@ type Attempt = { id: string; project_id: string; client_id: string;
   render_id: string | null; bucket_name: string | null;
   out_name: string | null; serve_url: string | null };
 type Dependencies = { prepare: typeof buildVideoRenderInputs;
-  start: typeof startLambdaRender; resume: typeof resumeLambdaRender };
+  start: typeof startLambdaRender; resume: typeof resumeLambdaRender;
+  master: typeof masterProjectRender; probe: typeof probeProjectRender };
 const dependencies: Dependencies = { prepare: buildVideoRenderInputs,
-  start: startLambdaRender, resume: resumeLambdaRender };
+  start: startLambdaRender, resume: resumeLambdaRender,
+  master: masterProjectRender, probe: probeProjectRender };
 
 export class VideoRenderUncertainError extends Error {
   constructor(readonly attemptId: string, reason: string) {
@@ -34,8 +38,8 @@ function attemptHandle(attempt: Attempt): LambdaRenderHandle {
 }
 
 /** Bind one aspect to a preflighted IR and one durable Lambda attempt.
- * A duplicate claim never calls Lambda again. The returned local MP4 still
- * needs probe, creative review and a candidate receipt before job completion.
+ * A duplicate claim never calls Lambda again. The mastered, probed local MP4
+ * still needs its exact Storage receipt and human review before attachment.
  */
 export async function renderProjectAspect(input: {
   sb: SupabaseClient; clientId: string; projectId: string;
@@ -45,8 +49,11 @@ export async function renderProjectAspect(input: {
   localPath: string; maxAlignmentLoss: number;
 }, deps: Dependencies = dependencies): Promise<{
   attemptId: string; handle: LambdaRenderHandle;
-  outputPath: string; sizeInBytes: number;
+  outputPath: string; sizeInBytes: number; probe: ProjectRenderProbe;
 }> {
+  if (!input.localPath.endsWith(".mp4")) {
+    throw new Error("Render download path must end in .mp4.");
+  }
   const prepared = await deps.prepare({ sb: input.sb,
     clientId: input.clientId, projectId: input.projectId,
     maxAlignmentLoss: input.maxAlignmentLoss });
@@ -127,6 +134,10 @@ export async function renderProjectAspect(input: {
       `existing attempt state ${state} cannot start again`);
   }
   const downloaded = await deps.resume({ handle, localPath: input.localPath });
-  return { attemptId, handle, outputPath: downloaded.outputPath,
-    sizeInBytes: downloaded.sizeInBytes };
+  const mastered = await deps.master({ sourcePath: downloaded.outputPath,
+    outputPath: downloaded.outputPath.replace(/\.mp4$/, "-master.mp4") });
+  const probe = await deps.probe({ path: mastered.outputPath,
+    aspect: input.aspect });
+  return { attemptId, handle, outputPath: mastered.outputPath,
+    sizeInBytes: mastered.fileBytes, probe };
 }
