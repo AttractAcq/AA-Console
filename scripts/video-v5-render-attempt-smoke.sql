@@ -27,6 +27,7 @@ declare p public.video_projects%rowtype;
   entry jsonb; result jsonb;
   out_name text;
   candidate_path text; candidate_id uuid; candidate_probe jsonb;
+  creative_review jsonb;
   render_cost uuid;
 begin
   p:=public.create_video_project_draft_v1(
@@ -193,6 +194,38 @@ begin
   if (select state from public.video_project_render_attempts_v1
       where id=render_attempt)<>'succeeded' then
     raise exception 'Passed candidate did not close render attempt'; end if;
+  creative_review:='{"result":"pass","summary":"All required checks passed.","checks":[
+    {"area":"text_overflow","verdict":"pass","reason":"Text fits."},
+    {"area":"caption_overlap","verdict":"pass","reason":"No overlap."},
+    {"area":"contrast","verdict":"pass","reason":"Contrast passes."},
+    {"area":"safe_area","verdict":"pass","reason":"In safe area."},
+    {"area":"reading_time","verdict":"pass","reason":"Time sufficient."},
+    {"area":"brand_token","verdict":"pass","reason":"Brand matches."},
+    {"area":"empty_frame","verdict":"pass","reason":"No empty frame."},
+    {"area":"narration_visual_match","verdict":"pass","reason":"Narration matches."}
+  ]}'::jsonb;
+  begin
+    perform public.decide_video_project_render_candidate_v1(candidate_id,
+      'accepted',creative_review-'checks',null);
+    raise exception 'Incomplete creative review was accepted';
+  exception when check_violation then null; end;
+  begin
+    perform public.decide_video_project_render_candidate_v1(candidate_id,
+      'rejected',creative_review,'Not good enough');
+    raise exception 'Passing review was rejected';
+  exception when check_violation then null; end;
+  if candidate_id is distinct from public.decide_video_project_render_candidate_v1(
+    candidate_id,'accepted',creative_review,null) then
+    raise exception 'Creative decision did not bind candidate'; end if;
+  if candidate_id is distinct from public.decide_video_project_render_candidate_v1(
+    candidate_id,'accepted',creative_review,null) then
+    raise exception 'Creative decision replay changed receipt'; end if;
+  begin
+    perform public.decide_video_project_render_candidate_v1(candidate_id,
+      'rejected',creative_review||'{"result":"fail"}'::jsonb,
+      'Changed decision');
+    raise exception 'Creative decision was overwritten';
+  exception when check_violation then null; end;
   result:=public.claim_video_project_render_v1(p.id,render_job,1,'9:16');
   second_attempt:=(result->>'attempt_id')::uuid;
   if not public.mark_video_project_render_uncertain_v1(

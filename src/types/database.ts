@@ -43523,6 +43523,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      decide_video_project_render_candidate_v1: {
+        Args: {
+          p_candidate_id: string
+          p_creative_review?: Json
+          p_rejection_reason?: string
+          p_verdict: string
+        }
+        Returns: string
+      }
       decide_video_render_candidate: {
         Args: {
           p_candidate_id: string
