@@ -15,19 +15,28 @@ type Dependencies = NonNullable<Parameters<typeof runPreRenderCritic>[1]>;
 
 function fixture(claimState = "claimed") {
   const calls: string[] = [];
+  let outcome = "pass";
+  let priorReport: unknown = null;
   const rpc = vi.fn(async (name: string) => {
     calls.push(name);
     if (name === "claim_video_project_prerender_v1") {
       return { data: { state: claimState, attempt_id: attemptId }, error: null };
     }
     if (name === "finish_video_project_prerender_v1") {
-      return { data: "pass", error: null };
+      return { data: outcome, error: null };
+    }
+    if (name === "resolve_video_project_critic_failure_v1") {
+      return { data: "visual_patch", error: null };
+    }
+    if (name === "apply_video_project_visual_patch_v1") {
+      return { data: { ir_version: 2, job_id: jobId }, error: null };
     }
     return { data: true, error: null };
   });
-  const from = vi.fn(() => {
+  const from = vi.fn((table: string) => {
     const query = { select: () => query, eq: () => query,
-      maybeSingle: async () => ({ data: { colour_primary: "navy" },
+      maybeSingle: async () => ({ data: table === "client_brand_profiles"
+        ? { colour_primary: "navy" } : priorReport,
         error: null }) };
     return query;
   });
@@ -54,7 +63,9 @@ function fixture(claimState = "claimed") {
     region: "eu-central-1" as const,
     functionName: "render-test", serveUrl: "https://site.example.test",
     maxAlignmentLoss: 0.25 };
-  return { input, deps, calls, rpc, prepare, stills, review };
+  return { input, deps, calls, rpc, prepare, stills, review,
+    setOutcome: (value: string) => { outcome = value; },
+    setPriorReport: (value: unknown) => { priorReport = value; } };
 }
 
 describe("exact pre-render paid critic handoff", () => {
@@ -90,5 +101,42 @@ describe("exact pre-render paid critic handoff", () => {
       .rejects.toBeInstanceOf(PreRenderReviewHeldError);
     expect(uncertain.calls).toEqual(["claim_video_project_prerender_v1",
       "mark_video_project_prerender_uncertain_v1"]);
+  });
+
+  it("commits a filed visual patch and queues the next IR version", async () => {
+    const f = fixture();
+    f.setOutcome("fail");
+    const failedReport = { result: "fail", checks: [],
+      patch: [{ op: "shorten_text", sceneId: "s01",
+        path: "props.subtitle", value: "One problem" }],
+      model: "claude-sonnet-4-5", sampled_frames: 9, batches: 1,
+      usage: { inputTokens: 100, outputTokens: 20,
+        cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: 0.012 } };
+    f.review.mockResolvedValueOnce(failedReport as never);
+    expect(await runPreRenderCritic(f.input, f.deps)).toBe("revised");
+    expect(f.calls).toEqual(["claim_video_project_prerender_v1",
+      "finish_video_project_prerender_v1",
+      "resolve_video_project_critic_failure_v1",
+      "apply_video_project_visual_patch_v1"]);
+    expect(f.rpc).toHaveBeenCalledWith("apply_video_project_visual_patch_v1",
+      expect.objectContaining({ p_expected_ir_version: 1,
+        p_new_ir: expect.objectContaining({ scenes: expect.arrayContaining([
+          expect.objectContaining({ props: expect.objectContaining({
+            subtitle: "One problem" }) })]) }) }));
+  });
+
+  it("resumes a decided failure from its stored report without another paid call", async () => {
+    const f = fixture("decided_fail");
+    f.setPriorReport({ id: attemptId, client_id: clientId,
+      project_id: projectId, ir_version: 1, job_id: jobId,
+      state: "decided", result: "fail",
+      report: { result: "fail", patch: [{ op: "shorten_text",
+        sceneId: "s01", path: "props.subtitle", value: "One problem" }] } });
+    expect(await runPreRenderCritic(f.input, f.deps)).toBe("revised");
+    expect(f.stills).not.toHaveBeenCalled();
+    expect(f.review).not.toHaveBeenCalled();
+    expect(f.calls).toEqual(["claim_video_project_prerender_v1",
+      "resolve_video_project_critic_failure_v1",
+      "apply_video_project_visual_patch_v1"]);
   });
 });

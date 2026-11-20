@@ -104,6 +104,17 @@ describe("video render worker", () => {
     expect(f.pipeline).not.toHaveBeenCalled();
   });
 
+  it("finishes the old job after a visual revision queues the new version", async () => {
+    const f = fixture();
+    vi.mocked(f.review).mockResolvedValueOnce("revised");
+    const result = await runVideoRenderJobWithPipeline(f.sb, f.config,
+      f.agent, f.job, Date.now() + 4 * 60 * 60_000,
+      f.pipeline, () => true, f.finalizer, f.review);
+    expect(result).toEqual({ ok: true, retryable: false });
+    expect(f.pipeline).not.toHaveBeenCalled();
+    expect(f.events).toHaveLength(1);
+  });
+
   it("rejects a job whose aspect list differs from the project", async () => {
     const f = fixture();
     f.job.params = { ir_version: 1, aspects: ["16:9"] };

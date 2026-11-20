@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "e1cbc412e9117d2aca47effc6e8081d5ecc77c2e82ce23d230bc926831a8c5e4",
-  "generatedTypesSha256": "a9cc92d1a94a42b366fdda5378cb7c824f3eac548185be7c3cd17449ed78dd44",
-  "generatedSchemaBodySha256": "1795dece44f1e4c21c8a60a2f266e92467b3ae42a7e753e766c874a91580bfe6",
+  "migrationSourceDigest": "8c59f57dd094d26c894d91e7013d5713fba355b6d53c8d91a89dc1ac4b219b95",
+  "generatedTypesSha256": "9efb91eea3dd6266162c9e8799333e4a6326ead5dc533b011ef264ce5e5725bb",
+  "generatedSchemaBodySha256": "b83462308a910cf7f7461347983ae6d7ceb334b7d7bce2fc91985fda4050554d",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4896,6 +4896,13 @@
       "filename": "20261124055700_682_video_audio_version_binding.sql",
       "sha256": "4ad517481bdda0a7607cad67197b7db9e455255d3f793f4e2409dc0cc1c4f98d",
       "trimmedMd5": "4a7acb57260fbea01d95d82f116c8b23"
+    },
+    {
+      "version": "20261124055800",
+      "name": "683_video_visual_critic_patch",
+      "filename": "20261124055800_683_video_visual_critic_patch.sql",
+      "sha256": "14082f2539d67baa73cebe9c7ef289101a5fff3fd4c7136be48ee6e8b221b182",
+      "trimmedMd5": "0cf2472f38efac95e47322f801cf917c"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

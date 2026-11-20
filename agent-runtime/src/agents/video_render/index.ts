@@ -109,6 +109,13 @@ export async function runVideoRenderJobWithPipeline(
       aspect: project.aspects[0]!, region: site.region,
       functionName: site.functionName, serveUrl: site.serveUrl,
       maxAlignmentLoss: alignmentLoss });
+    if (review === "revised") {
+      await appendEvent(sb, job.id,
+        "Pre-render critic committed a visual revision and queued its next exact-version review.",
+        "info", { project_id: project.id, from_ir_version: project.ir_version,
+          to_ir_version: project.ir_version + 1 });
+      return { ok: true, retryable: false };
+    }
     if (review !== "pass") {
       return { ok: false, retryable: false, hold: true,
         failureMessage: "Pre-render critic failed; review its exact report and patch before media rendering." };

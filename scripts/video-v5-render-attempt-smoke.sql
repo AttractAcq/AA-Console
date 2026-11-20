@@ -34,6 +34,8 @@ declare p public.video_projects%rowtype;
   prerender_attempt uuid;
   prerender_report jsonb;
   still_receipts jsonb;
+  patched_ir jsonb;
+  patched_result jsonb;
 begin
   p:=public.create_video_project_draft_v1(
     'f2222222-2222-4222-8222-222222222222',
@@ -44,16 +46,24 @@ begin
     'The exact operator prompt is the reviewed source.');
   perform set_config('request.jwt.claim.role','service_role',true);
   update public.video_projects set stage='timing',ir_version=1,
-    ir='{"music":{"enabled":false,"mood":""},"scenes":[{"id":"s01"},{"id":"s02"},{"id":"s03"}]}'::jsonb
+    ir='{"version":1,"title":"Fixture","audience":"Operators","tone":"calm",
+      "aspects":["16:9","9:16"],"music":{"enabled":false,"mood":""},
+      "scenes":[
+        {"id":"s01","component":"TitleCard","props":{"title":"Original title"},
+          "narration":"Hello one.","transitionIn":"cut","locked":false},
+        {"id":"s02","component":"BulletReveal","props":{"heading":"Evidence","items":["Demand"]},
+          "narration":"Hello two.","transitionIn":"fade","locked":false},
+        {"id":"s03","component":"Outro","props":{"headline":"Next step","cta":"Continue"},
+          "narration":"Hello three.","transitionIn":"fade","locked":false}
+      ]}'::jsonb
     where id=p.id;
   for entry in select value from jsonb_array_elements(
-    '[{"key":"s01","narration":"Hello one."},
-      {"key":"s02","narration":"Hello two."},
-      {"key":"s03","narration":"Hello three."}]'::jsonb) loop
+    (select ir->'scenes' from public.video_projects where id=p.id)) loop
     insert into public.video_scenes(project_id,client_id,position,scene_key,
-      component,props,narration)
-    values(p.id,p.client_id,substring(entry->>'key' from 2)::integer,
-      entry->>'key','TitleCard','{}'::jsonb,entry->>'narration')
+      component,props,narration,transition_in)
+    values(p.id,p.client_id,substring(entry->>'id' from 2)::integer,
+      entry->>'id',entry->>'component',entry->'props',entry->>'narration',
+      entry->>'transitionIn')
     returning * into s;
     narration_hash:=encode(sha256(convert_to(s.narration,'UTF8')),'hex');
     insert into public.agent_jobs(agent_key,client_id,input_table,input_id,
@@ -99,6 +109,58 @@ begin
   render_job:=public.queue_video_render_v1(p.id,1);
   if render_job is distinct from public.queue_video_render_v1(p.id,1) then
     raise exception 'Render queue replay created another job'; end if;
+  begin
+    result:=public.claim_video_project_prerender_v1(p.id,render_job,1);
+    prerender_attempt:=(result->>'attempt_id')::uuid;
+    select jsonb_agg(jsonb_build_object('sceneId',
+        's'||lpad(((n-1)/3+1)::text,2,'0'),
+        'frame',n*10,'renderId','patch-still-'||n::text,'costUsd',0.001)
+        order by n) into still_receipts
+      from generate_series(1,9) n;
+    prerender_report:='{"result":"fail","sampled_frames":9,"batches":1,
+      "model":"claude-test","patch":[{"op":"shorten_text","sceneId":"s01",
+        "path":"props.title","value":"Short"}],
+      "usage":{"inputTokens":100,"outputTokens":20,"costUsd":0.012},
+      "checks":[
+        {"area":"text_overflow","verdict":"fail","sceneId":"s01","reason":"Too long."},
+        {"area":"caption_overlap","verdict":"pass","sceneId":"s01","reason":"No overlap."},
+        {"area":"contrast","verdict":"pass","sceneId":"s02","reason":"Contrast passes."},
+        {"area":"safe_area","verdict":"pass","sceneId":"s02","reason":"In safe area."},
+        {"area":"reading_time","verdict":"pass","sceneId":"s02","reason":"Time sufficient."},
+        {"area":"brand_token","verdict":"pass","sceneId":"s03","reason":"Brand matches."},
+        {"area":"empty_frame","verdict":"pass","sceneId":"s03","reason":"No empty frame."},
+        {"area":"narration_visual_match","verdict":"pass","sceneId":"s03","reason":"Visual matches."}
+      ]}'::jsonb;
+    if public.finish_video_project_prerender_v1(prerender_attempt,
+      render_job,prerender_report,still_receipts,'claude-test',100,20,
+      0.012,0.009) is distinct from 'fail' then
+      raise exception 'Patch fixture critic did not fail'; end if;
+    if public.resolve_video_project_critic_failure_v1(prerender_attempt,
+      render_job) is distinct from 'visual_patch' then
+      raise exception 'First visual critic failure was not patchable'; end if;
+    patched_ir:=jsonb_set((select ir from public.video_projects where id=p.id),
+      '{scenes,0,props,title}','"Short"'::jsonb,false);
+    begin
+      perform public.apply_video_project_visual_patch_v1(prerender_attempt,
+        render_job,1,jsonb_set(patched_ir,'{scenes,0,props,title}',
+          '"Different"'::jsonb,false));
+      raise exception 'Unfiled visual patch was accepted';
+    exception when check_violation then null; end;
+    patched_result:=public.apply_video_project_visual_patch_v1(
+      prerender_attempt,render_job,1,patched_ir);
+    if (patched_result->>'ir_version')::integer<>2
+      or (select audio_ir_version from public.video_projects where id=p.id)<>1
+      or (select props->>'title' from public.video_scenes
+        where project_id=p.id and scene_key='s01') is distinct from 'Short'
+      or not public.complete_video_audio_project_v1(p.id,2) then
+      raise exception 'Visual patch lost audio or scene lineage'; end if;
+    if public.apply_video_project_visual_patch_v1(
+      prerender_attempt,render_job,1,patched_ir)->>'job_id'
+      is distinct from patched_result->>'job_id' then
+      raise exception 'Visual patch replay created another job'; end if;
+    raise exception 'Rollback isolated visual critic patch test'
+      using errcode='Z0001';
+  exception when sqlstate 'Z0001' then null; end;
   begin
     perform public.claim_video_project_render_v1(p.id,render_job,1,'16:9');
     raise exception 'Render started without a pre-render critic receipt';

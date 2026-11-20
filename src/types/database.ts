@@ -30116,6 +30116,105 @@ export type Database = {
           },
         ]
       }
+      video_project_visual_patches_v1: {
+        Row: {
+          applied_at: string
+          attempt_id: string
+          changed_scene_ids: string[]
+          client_id: string
+          from_ir_version: number
+          new_ir: Json
+          next_job_id: string
+          old_ir: Json
+          project_id: string
+          source_job_id: string
+          to_ir_version: number
+        }
+        Insert: {
+          applied_at?: string
+          attempt_id: string
+          changed_scene_ids: string[]
+          client_id: string
+          from_ir_version: number
+          new_ir: Json
+          next_job_id: string
+          old_ir: Json
+          project_id: string
+          source_job_id: string
+          to_ir_version: number
+        }
+        Update: {
+          applied_at?: string
+          attempt_id?: string
+          changed_scene_ids?: string[]
+          client_id?: string
+          from_ir_version?: number
+          new_ir?: Json
+          next_job_id?: string
+          old_ir?: Json
+          project_id?: string
+          source_job_id?: string
+          to_ir_version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_project_visual_patches_v1_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: true
+            referencedRelation: "video_project_prerender_attempts_v1"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_visual_patches_v1_next_job_id_fkey"
+            columns: ["next_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_visual_patches_v1_next_job_id_fkey"
+            columns: ["next_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_project_visual_patches_v1_next_job_id_fkey"
+            columns: ["next_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_project_visual_patches_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_project_visual_patches_v1_source_job_id_fkey"
+            columns: ["source_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_visual_patches_v1_source_job_id_fkey"
+            columns: ["source_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_project_visual_patches_v1_source_job_id_fkey"
+            columns: ["source_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+        ]
+      }
       video_projects: {
         Row: {
           aspects: string[]
@@ -40161,6 +40260,15 @@ export type Database = {
         Args: { p_max: number; p_values: string[] }
         Returns: boolean
       }
+      apply_video_project_visual_patch_v1: {
+        Args: {
+          p_attempt_id: string
+          p_expected_ir_version: number
+          p_job_id: string
+          p_new_ir: Json
+        }
+        Returns: Json
+      }
       approval_source_state_v6: {
         Args: { p_request_id: string }
         Returns: string
@@ -48046,6 +48154,10 @@ export type Database = {
           system_prompt: string
           widget_config: Json
         }[]
+      }
+      resolve_video_project_critic_failure_v1: {
+        Args: { p_attempt_id: string; p_job_id: string }
+        Returns: string
       }
       resume_completed_daily_motion_qa: {
         Args: { p_run_id: string }
