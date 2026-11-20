@@ -879,7 +879,7 @@ function CampaignExecutionPanelContent() {
               {packageState.manifest && <p className="mt-3 text-xs text-muted-foreground">New content links record the campaign package active when linked. Older links are marked as not version-bound; review the exact asset before requesting external approval.</p>}
               {packageState.approvals.length > 0 && <p className="mt-3 text-xs text-muted-foreground">Current-package approvals: {packageState.approvals.map((approval) => `${approval.action_key.replaceAll("_", " ")} · ${approval.status}`).join("; ")}</p>}
             </section>
-            {clientId && c.acquisition_mode !== "legacy" &&
+            {clientId && !c.campaign_kind && c.acquisition_mode !== "legacy" &&
               <CampaignPackageReadiness campaignId={c.id} clientId={clientId} />}
             {clientId && !c.campaign_kind && c.acquisition_mode !== "legacy" &&
               <CampaignSweepWork clientId={clientId} campaignId={c.id} />}
@@ -984,6 +984,8 @@ function CampaignExecutionPanelContent() {
               )}
             </section>}
             {v2Tab === "launch" && <>
+              {c.campaign_kind && clientId &&
+                <CampaignPackageReadiness campaignId={c.id} clientId={clientId} />}
               {launchDue.get(c.id)
                 ? <section className="py-4" aria-label="Launch"><CampaignLaunchGate due={launchDue.get(c.id)!} /></section>
                 : <section className="py-4"><p className="text-sm text-muted-foreground">No launch verdict yet. A campaign needs a package before there is anything to launch.</p></section>}

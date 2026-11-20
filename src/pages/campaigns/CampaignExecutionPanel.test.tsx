@@ -305,6 +305,7 @@ describe("campaign pages", () => {
     expect(screen.getByRole("region", { name: "Campaign production work" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Paid operator pack" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: "Launch" }));
+    expect(screen.getByRole("region", { name: "Campaign package readiness" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Launch paid operator pack" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Freeze operator bundle" })).toBeInTheDocument();
   });
