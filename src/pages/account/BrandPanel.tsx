@@ -8,6 +8,7 @@ import type { FieldDef, FormValues } from "../../components/forms/fields";
 import { supabase } from "../../lib/supabase";
 import { OnboardingSource } from "../../components/OnboardingSource";
 import { cn } from "../../lib/cn";
+import { VideoBrandPanel } from "./VideoBrandPanel";
 
 /**
  * What the brand looks like, so two assets for one client are recognisably
@@ -235,6 +236,8 @@ export function BrandPanel() {
           and treatment above are what reach the image models.
         </p>
       </Panel>
+
+      {clientId && <VideoBrandPanel key={clientId} clientId={clientId} />}
 
       <FormModal
         open={open}

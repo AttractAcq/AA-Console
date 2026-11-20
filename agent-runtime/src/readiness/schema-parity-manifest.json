@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "3ac4ee1f2913a263de871123c90550695ab6658fd3f80aa555245723d792e05b",
-  "generatedTypesSha256": "3874b931b266344478a6a26e5d0c9b82939f10a5f77d72039602413640c7c988",
-  "generatedSchemaBodySha256": "751ec8b66ce536c3fe06ea56196d9808ce11f68ae668556eee140b34a81ebb7b",
+  "migrationSourceDigest": "77a417c156569882b29e651b2703d79ac2d66089ece537886f95cb7082bbc5f9",
+  "generatedTypesSha256": "b49316bb5d8d8cc69a65dcdd8ee18ded7147ecd214bf5ce07811a8c9cba2a721",
+  "generatedSchemaBodySha256": "1e13f4802c82e9c4a1566ea95488fa483e53438f18d6efad4db56b12e43f546d",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4763,6 +4763,13 @@
       "filename": "20261124053800_663_generated_creative_rights_declaration.sql",
       "sha256": "37c76cd769040d1170e760baf690aaed850792a126e30eab546da952f206b719",
       "trimmedMd5": "46d8ee6a91362a9cbd1483a756dc1f72"
+    },
+    {
+      "version": "20261124053900",
+      "name": "664_client_video_brand",
+      "filename": "20261124053900_664_client_video_brand.sql",
+      "sha256": "2b309e903e2ef6e3bf9547240b8e86c566659812530c7dd918ea56354982a0c8",
+      "trimmedMd5": "f6b2ec8eed2ccd96fa095b96040106d3"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
