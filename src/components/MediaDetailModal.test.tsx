@@ -3,12 +3,16 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MediaAsset } from "../lib/media";
 
-const { tables } = vi.hoisted(() => ({ tables: new Map<string, unknown>() }));
+const { tables, rpc } = vi.hoisted(() => ({
+  tables: new Map<string, unknown>(),
+  rpc: vi.fn(),
+}));
 
 // The modal reads six tables in three different query shapes. Keying the
 // fake on the table name keeps each test's fixture readable.
 vi.mock("../lib/supabase", () => ({
   supabase: {
+    rpc,
     from: (table: string) => {
       const result = () => Promise.resolve(tables.get(table) ?? { data: null });
       return {
@@ -55,10 +59,33 @@ function show(props: Partial<Parameters<typeof MediaDetailModal>[0]> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  rpc.mockResolvedValue({ data: "declaration-1", error: null });
   tables.clear();
   tables.set("client_briefs", { data: { title: "Spring whitening", brief_ref: "BR-004" } });
   tables.set("creative_renders", { data: null });
   tables.set("client_asset_reviews", { data: [] });
+});
+
+it("records a human rights basis for the exact generated file before creative review", async () => {
+  const user = userEvent.setup();
+  const onChanged = vi.fn();
+  tables.set("creative_renders", { data: { quality: "medium", model: "gpt-image", generation_id: "gen-1" } });
+  tables.set("creative_generations", { data: { concept_model: "claude" } });
+  show({ onChanged, asset: asset({ review_status: "pending", content_format: "single",
+    usage_rights: null, delivery_bytes_sha256: "a".repeat(64) }) });
+  expect(await screen.findByRole("region", { name: "Generated creative usage rights" })).toBeInTheDocument();
+  const button = screen.getByRole("button", { name: "Record rights declaration" });
+  expect(button).toBeDisabled();
+  await user.selectOptions(screen.getByRole("combobox", { name: "Rights category" }), "agency_owned");
+  await user.type(screen.getByRole("textbox", { name: "Evidence and source of rights" }),
+    "Agency commissioned the render and cleared the supplied brand logo.");
+  await user.click(button);
+  await waitFor(() => expect(rpc).toHaveBeenCalledWith("declare_generated_creative_rights_v8", {
+    p_asset_id: "asset-1", p_rights: "agency_owned",
+    p_basis: "Agency commissioned the render and cleared the supplied brand logo.",
+  }));
+  expect(onChanged).toHaveBeenCalled();
+  expect(screen.getByRole("status")).toHaveTextContent("Rights declaration recorded");
 });
 
 describe("MediaDetailModal — visibility", () => {

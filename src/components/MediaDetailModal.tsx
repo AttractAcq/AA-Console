@@ -41,6 +41,7 @@ export function MediaDetailModal({
   body,
   open,
   onClose,
+  onChanged,
 }: {
   asset: MediaAsset | null;
   url?: string;
@@ -48,11 +49,44 @@ export function MediaDetailModal({
   body?: string | null;
   open: boolean;
   onClose: () => void;
+  onChanged?: () => void;
 }) {
   const [provenance, setProvenance] = useState<Provenance | null>(null);
   const [repurposeOpen, setRepurposeOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [rights, setRights] = useState("");
+  const [rightsBasis, setRightsBasis] = useState("");
+  const [recordedRights, setRecordedRights] = useState<string | null>(null);
+  const [rightsBusy, setRightsBusy] = useState(false);
+  const [rightsError, setRightsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setRights("");
+    setRightsBasis("");
+    setRecordedRights(asset?.usage_rights ?? null);
+    setRightsError(null);
+  }, [asset?.id, asset?.usage_rights]);
+
+  async function declareRights() {
+    if (!asset || rightsBusy) return;
+    setRightsBusy(true);
+    setRightsError(null);
+    try {
+      const { error } = await supabase.rpc("declare_generated_creative_rights_v8", {
+        p_asset_id: asset.id, p_rights: rights, p_basis: rightsBasis.trim(),
+      });
+      if (error) throw error;
+      setRecordedRights(rights);
+      setNotice("Rights declaration recorded for this exact file. Request its separate creative review next.");
+      onChanged?.();
+    } catch (cause) {
+      setRightsError(cause instanceof Error ? cause.message
+        : (cause as { message?: string }).message ?? "Could not record rights.");
+    } finally {
+      setRightsBusy(false);
+    }
+  }
 
   const load = useCallback(async () => {
     if (!asset) return;
@@ -223,6 +257,31 @@ export function MediaDetailModal({
               sight unseen. */}
           {asset.content_format && asset.content_format !== "single" && (
             <FrameStrip assetId={asset.id} onQueued={setNotice} onError={setNotice} />
+          )}
+
+          {provenance?.generated && asset.review_status === "pending"
+            && (asset.media_type === "image" || asset.media_type === "text")
+            && ["single", "carousel", "story"].includes(asset.content_format ?? "single") && (
+            <section className="space-y-3 border-t border-border px-5 py-4" aria-label="Generated creative usage rights">
+              <h3 className="text-sm font-semibold">Usage rights for this generated asset</h3>
+              <p className="text-xs text-muted-foreground">A person must confirm the rights to the generated file and any source materials before exact creative review. Publication needs another approval.</p>
+              {recordedRights && <p className="text-xs">Recorded category: {recordedRights.replaceAll("_", " ")}</p>}
+              {!asset.delivery_bytes_sha256 ? <p className="text-xs text-muted-foreground">Stored-file verification is pending. Rights cannot be declared until its bytes are attested.</p> : <>
+                <label className="block text-xs font-medium">Rights category
+                  <select className="mt-1 block w-full rounded-md border border-input bg-background p-2 text-sm" value={rights} onChange={(event) => setRights(event.target.value)}>
+                    <option value="">Choose the verified rights</option>
+                    <option value="client_owned">Client owned</option>
+                    <option value="licensed">Licensed for this use</option>
+                    <option value="agency_owned">Agency owned</option>
+                  </select>
+                </label>
+                <label className="block text-xs font-medium">Evidence and source of rights
+                  <textarea className="mt-1 block w-full rounded-md border border-input bg-background p-2 text-sm" value={rightsBasis} onChange={(event) => setRightsBasis(event.target.value)} maxLength={1000} rows={3} placeholder="Record who owns or licensed every supplied reference, logo and other source material." />
+                </label>
+                <button type="button" className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50" disabled={!rights || rightsBasis.trim().length < 20 || rightsBusy} onClick={() => void declareRights()}>{rightsBusy ? "Recording…" : "Record rights declaration"}</button>
+                {rightsError && <p role="alert" className="text-sm text-destructive">{rightsError}</p>}
+              </>}
+            </section>
           )}
 
           {reviews.length > 0 && (

@@ -252,7 +252,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
     <BriefDetailModal brief={viewing} open={viewing !== null} onClose={() => setViewing(null)} />
     <ApproveAndBuildModal brief={building} open={building !== null} onClose={() => setBuilding(null)} onDone={() => { void refresh(); onChanged(); setNotice("Production queued. Assets will appear here for approval."); }} />
     <AdCopyModal asset={copying} brief={copying?.brief_id ? briefById.get(copying.brief_id) ?? null : null} landingUrl={landingUrl} allowedCtas={allowedCtas(template, mirrorsTemplate)} open={copying !== null} onClose={() => setCopying(null)} onSaved={() => { setNotice("Ad copy saved. This asset is in the next Meta build."); void refresh(); }} />
-    <MediaDetailModal asset={preview} url={preview ? urls.get(preview.render_path ?? preview.storage_path) : undefined} open={preview !== null} onClose={() => setPreview(null)} />
+    <MediaDetailModal asset={preview} url={preview ? urls.get(preview.render_path ?? preview.storage_path) : undefined} open={preview !== null} onClose={() => setPreview(null)} onChanged={() => { void refresh(); onChanged(); }} />
   </>;
 
   const v2AssetActions = (asset: CampaignAsset) => <div className="flex flex-wrap gap-2">

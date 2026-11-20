@@ -14461,6 +14461,336 @@ export type Database = {
           },
         ]
       }
+      generated_creative_rights_declarations_v8: {
+        Row: {
+          asset_id: string
+          basis: string
+          client_id: string
+          declared_at: string
+          declared_by: string
+          file_sha256: string
+          id: string
+          source_hash: string
+          usage_rights: string
+        }
+        Insert: {
+          asset_id: string
+          basis: string
+          client_id: string
+          declared_at?: string
+          declared_by: string
+          file_sha256: string
+          id?: string
+          source_hash: string
+          usage_rights: string
+        }
+        Update: {
+          asset_id?: string
+          basis?: string
+          client_id?: string
+          declared_at?: string
+          declared_by?: string
+          file_sha256?: string
+          id?: string
+          source_hash?: string
+          usage_rights?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_creative_rights_declarations__asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations__asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations__asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id", "client_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations__asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id", "client_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations__asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id", "client_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations__asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations__asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations__asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_presence"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations_v8_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_rights_declarations_v8_declared_by_fkey"
+            columns: ["declared_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      generated_creative_storage_attestations_v8: {
+        Row: {
+          asset_id: string
+          attested_at: string
+          file_bytes: number
+          object_id: string
+          object_updated_at: string
+          object_version: string | null
+          sha256: string
+          storage_path: string
+        }
+        Insert: {
+          asset_id: string
+          attested_at?: string
+          file_bytes: number
+          object_id: string
+          object_updated_at: string
+          object_version?: string | null
+          sha256: string
+          storage_path: string
+        }
+        Update: {
+          asset_id?: string
+          attested_at?: string
+          file_bytes?: number
+          object_id?: string
+          object_updated_at?: string
+          object_version?: string | null
+          sha256?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_creative_storage_attestations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_storage_attestations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_storage_attestations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_creative_storage_attestations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_creative_storage_attestations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_storage_attestations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_storage_attestations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "meta_profile_presence"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_storage_attestations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_storage_attestations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "generated_creative_storage_attestations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_creative_storage_attestations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_creative_storage_attestations_v8_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       github_app_installations: {
         Row: {
           account_login: string
@@ -22887,6 +23217,7 @@ export type Database = {
           created_at: string
           id: string
           request_token: string
+          rights_declaration_id: string | null
           source_hash: string | null
         }
         Insert: {
@@ -22896,6 +23227,7 @@ export type Database = {
           created_at?: string
           id?: string
           request_token?: string
+          rights_declaration_id?: string | null
           source_hash?: string | null
         }
         Update: {
@@ -22905,6 +23237,7 @@ export type Database = {
           created_at?: string
           id?: string
           request_token?: string
+          rights_declaration_id?: string | null
           source_hash?: string | null
         }
         Relationships: [
@@ -23096,6 +23429,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_rights_declaration_id_fkey"
+            columns: ["rights_declaration_id"]
+            isOneToOne: false
+            referencedRelation: "generated_creative_rights_declarations_v8"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -42253,6 +42593,10 @@ export type Database = {
         }
         Returns: string
       }
+      declare_generated_creative_rights_v8: {
+        Args: { p_asset_id: string; p_basis: string; p_rights: string }
+        Returns: string
+      }
       decline_assignment: {
         Args: { p_assignment_id: string; p_reason: string }
         Returns: {
@@ -42735,6 +43079,10 @@ export type Database = {
       generate_recruitment_ad: {
         Args: { p_brief_id: string; p_quality?: string; p_size?: string }
         Returns: Json
+      }
+      generated_creative_rights_source_hash_v8: {
+        Args: { p_asset_id: string }
+        Returns: string
       }
       global_engine_activation_hash_v6: {
         Args: {

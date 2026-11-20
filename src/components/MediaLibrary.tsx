@@ -232,6 +232,7 @@ export function MediaLibrary({
         body={open ? bodies.get(open.id) : undefined}
         open={open !== null}
         onClose={() => setOpen(null)}
+        onChanged={() => void refresh()}
       />
     </div>
   );
