@@ -15,6 +15,38 @@ export const CaptionLayerSchema = z.strictObject({
 });
 export type CaptionLayerProps = { captions: Caption[]; style?: z.infer<typeof CaptionStyleSchema>; textRegion: TextRegion };
 
+type CaptionToken = { text: string; fromMs: number; toMs: number };
+export type CaptionPageLayout = { startMs: number; endMs: number; lines: CaptionToken[][] };
+
+export function layoutCaptionPages(captions: Caption[]): CaptionPageLayout[] {
+  const sourcePages = createTikTokStyleCaptions({ captions, combineTokensWithinMilliseconds: 900 }).pages;
+  const layouts: CaptionPageLayout[] = [];
+  for (const source of sourcePages) {
+    let lines: CaptionToken[][] = [[]];
+    let lineLength = 0;
+    const flush = () => {
+      const tokens = lines.flat();
+      if (tokens.length) layouts.push({ startMs: tokens[0]!.fromMs, endMs: tokens.at(-1)!.toMs, lines });
+      lines = [[]];
+      lineLength = 0;
+    };
+    for (const token of source.tokens) {
+      const text = token.text.trim();
+      const length = Array.from(text).length;
+      if (length > 32) throw new Error("Caption word exceeds 32 characters");
+      if (!length) continue;
+      if (lineLength > 0 && lineLength + 1 + length > 32) {
+        if (lines.length === 2) flush();
+        else { lines.push([]); lineLength = 0; }
+      }
+      lines.at(-1)!.push({ text, fromMs: token.fromMs, toMs: token.toMs });
+      lineLength += (lineLength ? 1 : 0) + length;
+    }
+    flush();
+  }
+  return layouts.map((page, index) => ({ ...page, endMs: Math.min(layouts[index + 1]?.startMs ?? Infinity, page.endMs + 300) }));
+}
+
 function overlaps(a: TextRegion, b: TextRegion) {
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
@@ -32,9 +64,9 @@ export function CaptionLayer({ captions, style = "pill", textRegion }: CaptionLa
   const { theme, aspect } = useStage();
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const pages = useMemo(() => createTikTokStyleCaptions({ captions, combineTokensWithinMilliseconds: 900 }).pages, [captions]);
+  const pages = useMemo(() => layoutCaptionPages(captions), [captions]);
   const currentMs = frame * 1000 / fps;
-  const page = pages.find((candidate, index) => currentMs >= candidate.startMs && currentMs < (pages[index + 1]?.startMs ?? candidate.startMs + candidate.durationMs));
+  const page = pages.find((candidate) => currentMs >= candidate.startMs && currentMs < candidate.endMs);
   const placement = captionPlacement(textRegion);
   if (!page || placement === "hidden") return null;
   return <div style={{
@@ -44,7 +76,9 @@ export function CaptionLayer({ captions, style = "pill", textRegion }: CaptionLa
     background: style === "pill" ? theme.captionBackground : "transparent", color: theme.captionText,
     fontSize: aspect === "9:16" ? 40 : 38, fontWeight: 750, lineHeight: 1.18,
     overflow: "hidden", whiteSpace: "pre-wrap", overflowWrap: "anywhere",
-  }}><span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-    {page.tokens.map((token, index) => <span key={`${index}-${token.fromMs}`} style={{ color: currentMs >= token.fromMs && currentMs < token.toMs ? theme.tokens.colours.secondary : theme.captionText }}>{token.text}</span>)}
+  }}><span style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    {page.lines.map((line, lineIndex) => <span key={lineIndex}>
+      {line.map((token, index) => <span key={`${index}-${token.fromMs}`} style={{ color: currentMs >= token.fromMs && currentMs < token.toMs ? theme.tokens.colours.secondary : theme.captionText }}>{token.text}{index < line.length - 1 ? " " : ""}</span>)}
+    </span>)}
   </span></div>;
 }

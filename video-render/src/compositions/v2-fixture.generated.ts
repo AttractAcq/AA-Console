@@ -20,7 +20,7 @@ export const V2_FIXTURE = {
         "component": "TitleCard",
         "props": {
           "title": "A clearer route to growth",
-          "subtitle": "From a buying moment to a reviewed campaign",
+          "subtitle": "From buying moment to a reviewed campaign",
           "kicker": "ATTRACT ACQUISITION"
         },
         "narration": "Growth becomes easier to understand when every campaign starts with a real buying moment, a relevant offer, and a clear path from first contact to outcome.",
@@ -179,7 +179,7 @@ export const V2_FIXTURE = {
         "id": "s08",
         "component": "Quote",
         "props": {
-          "text": "An approval is a decision on a version, not proof that an external action ran.",
+          "text": "Approval records decisions, not external execution.",
           "attribution": "AA operating principle"
         },
         "narration": "The central control is simple: approval belongs to a particular version and action. A scheduled item, an exported bundle, and a provider receipt are different pieces of evidence.",

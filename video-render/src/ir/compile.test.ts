@@ -46,6 +46,11 @@ describe("video IR", () => {
     const wipeResult = validateIR(unrelatedWipe);
     expect(wipeResult.ok).toBe(false);
     if (!wipeResult.ok) expect(wipeResult.problems).toContain("scenes.4.transitionIn: brand wipe requires a TitleCard boundary");
+    const longText = structuredClone(fixture);
+    longText.scenes[0].props.subtitle = "Eight words should not fit inside a title block";
+    const textResult = validateIR(longText);
+    expect(textResult.ok).toBe(false);
+    if (!textResult.ok) expect(textResult.problems).toContain("scenes.0.props.subtitle: on-screen text block exceeds seven words");
   });
 
   it("binds timings by scene ID and refuses out-of-range audio or words", () => {
@@ -58,6 +63,9 @@ describe("video IR", () => {
     const lateWord = structuredClone(timings);
     lateWord.scenes[0].words = [{ text: "Late", startSec: 13.4, endSec: 14 }];
     expect(() => compile(fixture, lateWord)).toThrow("word timing exceeds audio duration");
+    const lateReveal = structuredClone(fixture);
+    lateReveal.scenes[2].props.revealAt = [0, 2, 13.1];
+    expect(() => compile(lateReveal, timings)).toThrow("reading time");
     const music = structuredClone(fixture);
     music.music.enabled = true;
     expect(() => compile(music, timings)).toThrow("Enabled music requires a source");

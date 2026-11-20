@@ -36,6 +36,18 @@ function jsonPath(path: PropertyKey[]): string {
   return path.length ? path.map(String).join(".") : "root";
 }
 
+function visibleTextProblems(value: unknown, path: string): string[] {
+  if (typeof value === "string") {
+    // Code and formula syntax is reviewed as a separate visual element.
+    if (/\.(code|latex|url)$/.test(path)) return [];
+    const words = value.match(/[\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*/gu) ?? [];
+    return words.length > 7 ? [`${path}: on-screen text block exceeds seven words`] : [];
+  }
+  if (Array.isArray(value)) return value.flatMap((entry, index) => visibleTextProblems(entry, `${path}.${index}`));
+  if (value && typeof value === "object") return Object.entries(value).flatMap(([key, entry]) => visibleTextProblems(entry, `${path}.${key}`));
+  return [];
+}
+
 export function validateIR(raw: unknown): IRValidation {
   const envelope = VideoIRSchema.safeParse(raw);
   if (!envelope.success) return {
@@ -52,6 +64,13 @@ export function validateIR(raw: unknown): IRValidation {
     if (scene.id !== expectedId) problems.push(`${path}.id: expected ${expectedId}`);
     const parsedProps = registry[scene.component].schema.safeParse(scene.props);
     if (!parsedProps.success) problems.push(...parsedProps.error.issues.map((issue) => `${path}.props.${jsonPath(issue.path)}: ${issue.message}`));
+    else {
+      problems.push(...visibleTextProblems(parsedProps.data, `${path}.props`));
+      if (scene.component === "KineticHeadline" && "words" in parsedProps.data
+          && Array.isArray(parsedProps.data.words) && parsedProps.data.words.length > 7) {
+        problems.push(`${path}.props.words: headline exceeds seven words`);
+      }
+    }
     if (scene.component === "ThumbnailCard") problems.push(`${path}.component: ThumbnailCard is a still, not a video scene`);
     if (index === 0 && scene.component !== "TitleCard" && scene.component !== "SectionCard") problems.push(`${path}.component: video must open with TitleCard or SectionCard`);
     if (index === 0 && scene.transitionIn !== "cut") problems.push(`${path}.transitionIn: opening scene must use cut`);

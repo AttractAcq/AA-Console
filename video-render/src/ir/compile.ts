@@ -118,5 +118,18 @@ export function compile(rawIR: unknown, rawTimings: unknown): Timeline {
     if (scene.chapter) chapters.push({ title: chapterTitle(scene.component, props), startSec: from / FPS });
     from += durationInFrames;
   });
+  scenes.forEach((scene, index) => {
+    const nextTransition = scenes[index + 1]?.transitionIn;
+    const visibleUntilSec = (scene.durationInFrames - (nextTransition && nextTransition !== "cut" ? TRANSITION_FRAMES : 0)) / FPS;
+    if (scene.component === "BulletReveal" || scene.component === "KineticHeadline") {
+      const revealAt = scene.props.revealAt as number[] | undefined;
+      const blocks = scene.component === "BulletReveal" ? scene.props.items as string[] : scene.props.words as string[];
+      revealAt?.forEach((at, blockIndex) => {
+        const wordCount = normalizeWords(blocks[blockIndex] ?? "").length;
+        const requiredSec = Math.max(1.2, wordCount * 0.18);
+        if (visibleUntilSec - at < requiredSec) throw new Error(`${scene.id}: reveal ${blockIndex + 1} has less than ${requiredSec.toFixed(2)} seconds of reading time`);
+      });
+    }
+  });
   return { version: 1, fps: FPS, title: ir.title, aspects: ir.aspects, totalFrames: from, music: ir.music, musicSrc: timings.musicSrc, scenes, chapters };
 }
