@@ -229,7 +229,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
         Preview {asset.title ?? "asset"}
       </button>
       <span className="text-xs text-muted-foreground">
-        {asset.review_status === "approved" ? "Ready to distribute" : asset.review_status === "pending" ? "Awaiting approval" : "Rejected"}
+        {asset.review_status === "approved" ? "Creative approved" : asset.review_status === "pending" ? "Awaiting approval" : "Rejected"}
       </span>
       {/* Only an approved single image can be built as a Meta ad. Copy on
           it is what puts it into the campaign's next build. */}
@@ -281,7 +281,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
   };
 
   if (layout === "v2") return <section className="mt-4 space-y-3" aria-label="Campaign content production">
-    <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-semibold">Content production</h3><p className="text-xs text-muted-foreground">{visibleReady} ready to distribute · {contentCount} planned · {visibleIdeas.length} ideas</p></div><button type="button" className={buttonClass} onClick={() => void refresh()}>Refresh content</button></div>
+    <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-semibold">Content production</h3><p className="text-xs text-muted-foreground">{visibleReady} creative approved · {contentCount} planned · {visibleIdeas.length} ideas</p></div><button type="button" className={buttonClass} onClick={() => void refresh()}>Refresh content</button></div>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
     {contentCount > 0 && builtAt && !contentIdeasGeneratedAt && <button type="button" className={buttonClass} disabled={busy !== null || loading} onClick={() => void act(() => supabase.rpc("enqueue_agent_job", { p_agent_key: "campaign_plan", p_client_id: clientId, p_input_table: "client_campaigns", p_input_id: campaignId }), "Queued campaign ideas.", { id: campaignId, action: "plan" })}>Generate campaign ideas</button>}
@@ -307,7 +307,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
 
   return <section className="mt-4 space-y-3 border-t border-border pt-4" aria-label="Campaign content production">
     <h4 className="text-sm font-semibold">Content production</h4>
-    <p className="text-xs text-muted-foreground">{ready} ready to distribute · {contentCount} pieces planned · {ideas.length} campaign ideas</p>
+    <p className="text-xs text-muted-foreground">{ready} creative approved · {contentCount} pieces planned · {ideas.length} campaign ideas</p>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
     {contentCount > 0 && builtAt && !contentIdeasGeneratedAt && <div className="rounded-md border border-border p-3">
