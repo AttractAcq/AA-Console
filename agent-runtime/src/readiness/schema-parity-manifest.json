@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "b9367cd37093cd7995d5ed542579e6db43b9bb2edb143304283d5927fdbf6cfc",
-  "generatedTypesSha256": "e5b39c4a925d3681af12b29ff328c1d27d0e96b240fb48232f461be06750b41c",
-  "generatedSchemaBodySha256": "1fe5438989ef941f89e6a010e3501f35bc1890c8055939902e633487cdcc7aec",
+  "migrationSourceDigest": "d730d4b9bf50c880b6945f046957933b86e6fe097a3f2a104eb72920f0b795df",
+  "generatedTypesSha256": "ada3127285721cabb0eb37424bf2461b35d4add3c4a017c1f2efd513cef5e113",
+  "generatedSchemaBodySha256": "bd9f37d62707e8d1d9ddc2a25e6e3dc6eba16dfd8b260cb3df4507beb8111e8e",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4812,6 +4812,13 @@
       "filename": "20261124054500_670_video_audio_queue.sql",
       "sha256": "b1b2dd9440ab3462863f1d822e7fa027ed6853324b9aa4ae8e0fcc9c34f772df",
       "trimmedMd5": "a7ed84d0d57a0883aa84c146c1096c4a"
+    },
+    {
+      "version": "20261124054600",
+      "name": "671_video_scene_speech_cost",
+      "filename": "20261124054600_671_video_scene_speech_cost.sql",
+      "sha256": "a692939f3d561837816e42abed2beb3605c898fa0b7f8e07ad72b246fe8ed172",
+      "trimmedMd5": "e428eb6fc52f14acd36a13a65f88ca42"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

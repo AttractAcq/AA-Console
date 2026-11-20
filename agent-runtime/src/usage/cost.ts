@@ -59,3 +59,20 @@ export function estimateCostUsd(model: string, usage: TokenUsage): number {
   // cost_usd is numeric(12,6) — round to match so the DB never truncates.
   return Math.round(total * 1_000_000) / 1_000_000;
 }
+
+// Public ElevenAPI list prices checked 2026-11-20. These are estimates;
+// reconcile against the provider's account ledger before reporting actual spend.
+// https://elevenlabs.io/pricing/api
+export function elevenLabsUsd(characters: number): number {
+  if (!Number.isInteger(characters) || characters < 1 || characters > 5000) {
+    throw new Error("Eleven v3 character count is invalid.");
+  }
+  return Math.round(characters * 0.10 / 1000 * 1_000_000) / 1_000_000;
+}
+
+export function elevenMusicUsd(seconds: number): number {
+  if (!Number.isFinite(seconds) || seconds < 3 || seconds > 900) {
+    throw new Error("Eleven Music duration is invalid.");
+  }
+  return Math.round(seconds * 0.15 / 60 * 1_000_000) / 1_000_000;
+}

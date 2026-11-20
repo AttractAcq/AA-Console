@@ -60,6 +60,9 @@ function fixture(options: { scene?: Record<string, unknown>;
       if (name === "begin_video_scene_audio_attempt_v1") {
         return { data: true, error: null };
       }
+      if (name === "record_video_scene_speech_cost_v1") {
+        return { data: "f6666666-6666-4666-8666-666666666666", error: null };
+      }
       if (name === "complete_video_audio_project_v1") {
         return { data: false, error: null };
       }
@@ -78,7 +81,8 @@ describe("paused-by-default scene audio worker contract", () => {
       job, produce, file);
     expect(result).toMatchObject({ ok: true, retryable: false });
     expect(produce).toHaveBeenCalledWith({ sceneId: "s01", narration,
-      maxAlignmentLoss: 0.25, apiKey: "managed-test-key", voiceId: "fixed-voice" });
+      maxAlignmentLoss: 0.25, apiKey: "managed-test-key", voiceId: "fixed-voice",
+      onSynthesis: expect.any(Function) });
     expect(file).toHaveBeenCalledWith(expect.objectContaining({
       sceneId, projectId, irVersion: 1, voiceId: "fixed-voice", audio }));
     expect(calls).toEqual(["video_scene_audio_upload_target_v1",
@@ -127,5 +131,40 @@ describe("paused-by-default scene audio worker contract", () => {
         failureMessage: expect.stringContaining("reconcile before retry") });
     expect(produce).not.toHaveBeenCalled();
     expect(calls).toContain("begin_video_scene_audio_attempt_v1");
+  });
+  it("records each successful speech response against the exact scene", async () => {
+    const { sb, calls } = fixture();
+    const produce = vi.fn(async (input: {
+      onSynthesis: (attempt: number) => Promise<void> }) => {
+      await input.onSynthesis(1);
+      await input.onSynthesis(2);
+      return audio;
+    });
+    expect(await runVideoAudioJobWithProducer(sb, config, agent,
+      job, produce, vi.fn())).toMatchObject({ ok: true });
+    const costCalls = vi.mocked(sb.rpc).mock.calls.filter(([name]) =>
+      name === "record_video_scene_speech_cost_v1");
+    expect(costCalls).toHaveLength(2);
+    expect(costCalls.map(([, args]) => args)).toEqual([
+      expect.objectContaining({ p_scene_id: sceneId, p_job_id: job.id,
+        p_attempt: 1, p_units: narration.length, p_usd: 0.002 }),
+      expect.objectContaining({ p_scene_id: sceneId, p_job_id: job.id,
+        p_attempt: 2, p_units: narration.length, p_usd: 0.002 }),
+    ]);
+    expect(calls).toContain("complete_video_audio_project_v1");
+  });
+  it("holds a scene after provider success if its cost receipt cannot be written", async () => {
+    const { sb } = fixture({ rpcError: "record_video_scene_speech_cost_v1" });
+    const produce = vi.fn(async (input: {
+      onSynthesis: (attempt: number) => Promise<void> }) => {
+      await input.onSynthesis(1);
+      return audio;
+    });
+    const file = vi.fn();
+    const result = await runVideoAudioJobWithProducer(sb, config, agent,
+      job, produce, file);
+    expect(result).toMatchObject({ ok: false, retryable: false });
+    expect(produce).toHaveBeenCalledTimes(1);
+    expect(file).not.toHaveBeenCalled();
   });
 });

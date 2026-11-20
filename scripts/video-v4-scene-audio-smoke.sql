@@ -19,7 +19,8 @@ update public.agents set paused=false where agent_key='video_script';
 
 do $checks$
 declare p public.video_projects%rowtype; s public.video_scenes%rowtype;
-  o storage.objects%rowtype; path text; job uuid;
+  o storage.objects%rowtype; path text; job uuid; audio_job uuid;
+  first_cost uuid;
   narration_hash text; audio_hash text:=repeat('a',64);
   words jsonb:='[{"text":"Hello.","startSec":0.1,"endSec":2.1,"loss":0.05}]'::jsonb;
 begin
@@ -37,10 +38,35 @@ begin
   returning * into s;
   path:=p.client_id::text||'/video/projects/'||p.id::text||
     '/ir-v1/scenes/s01/audio.mp3';
+  narration_hash:=encode(sha256(convert_to(s.narration,'UTF8')),'hex');
+  insert into public.agent_jobs(agent_key,client_id,input_table,input_id,
+    created_by,params)
+  values('video_audio',p.client_id,'video_scenes',s.id,p.started_by,
+    jsonb_build_object('project_id',p.id,'ir_version',1,
+      'scene_key','s01','narration_sha256',narration_hash))
+  returning id into audio_job;
+  if not public.begin_video_scene_audio_attempt_v1(p.id,s.id,audio_job,1) then
+    raise exception 'Exact speech attempt did not begin'; end if;
+  first_cost:=public.record_video_scene_speech_cost_v1(
+    p.id,s.id,audio_job,1,1,6,0.000600);
+  if public.record_video_scene_speech_cost_v1(
+    p.id,s.id,audio_job,1,1,6,0.000600) is distinct from first_cost then
+    raise exception 'Speech cost replay was not idempotent'; end if;
+  begin
+    perform public.record_video_scene_speech_cost_v1(
+      p.id,s.id,audio_job,1,2,7,0.000700);
+    raise exception 'Wrong narration units were accepted';
+  exception when check_violation then null; end;
+  perform public.record_video_scene_speech_cost_v1(
+    p.id,s.id,audio_job,1,2,6,0.000600);
+  if (select count(*) from public.video_project_costs
+      where project_id=p.id and stage='audio')<>2
+    or (select cost_usd from public.video_projects where id=p.id)
+      is distinct from 0.0012 then
+    raise exception 'Per-attempt speech cost was duplicated or lost'; end if;
   insert into storage.objects(id,bucket_id,name,version)
   values ('f5555555-5555-4555-8555-555555555555',
     'client-media',path,'v1') returning * into o;
-  narration_hash:=encode(sha256(convert_to(s.narration,'UTF8')),'hex');
   if not public.video_project_source_current_v1(p.id) then
     raise exception 'Reviewed source did not remain current in timing'; end if;
   if public.video_scene_audio_upload_target_v1(p.id,s.id)->>'storage_path'

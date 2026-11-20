@@ -44,9 +44,12 @@ describe("per-scene narration pipeline", () => {
       .mockResolvedValueOnce({ loss: 0.5, words })
       .mockResolvedValueOnce({ loss: 0.1, words });
     const synthesize = vi.fn().mockResolvedValue(mp3);
-    const result = await produceSceneAudio(input, { synthesize, align, normalise });
+    const onSynthesis = vi.fn().mockResolvedValue(undefined);
+    const result = await produceSceneAudio(input, { synthesize, align,
+      normalise, onSynthesis });
     expect(result.attempts).toBe(2);
     expect(synthesize).toHaveBeenCalledTimes(2);
+    expect(onSynthesis.mock.calls).toEqual([[1], [2]]);
     const bad = vi.fn().mockResolvedValue({ loss: 0.5, words });
     await expect(produceSceneAudio(input, { synthesize, align: bad, normalise }))
       .rejects.toBeInstanceOf(SceneAudioQualityError);
@@ -57,5 +60,14 @@ describe("per-scene narration pipeline", () => {
     await expect(produceSceneAudio({ ...input, maxAlignmentLoss: Number.NaN },
       { synthesize, align: vi.fn() })).rejects.toThrow(/alignment policy/);
     expect(synthesize).not.toHaveBeenCalled();
+  });
+  it("stops before alignment if a paid speech response cannot be receipted", async () => {
+    const synthesize = vi.fn().mockResolvedValue(mp3);
+    const align = vi.fn();
+    const onSynthesis = vi.fn().mockRejectedValue(new Error("Cost ledger unavailable"));
+    await expect(produceSceneAudio(input, { synthesize, align, onSynthesis }))
+      .rejects.toThrow(/Cost ledger unavailable/);
+    expect(synthesize).toHaveBeenCalledTimes(1);
+    expect(align).not.toHaveBeenCalled();
   });
 });

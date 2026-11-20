@@ -4,6 +4,7 @@ import type { RuntimeConfig } from "../../config.js";
 import type { AgentRow } from "../../orchestration/registry.js";
 import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
+import { elevenLabsUsd } from "../../usage/cost.js";
 import { ElevenLabsHttpError } from "../../video/audio/elevenlabs.js";
 import { fileSceneAudio } from "../../video/audio/file-scene.js";
 import { elevenLabsSceneDependencies, produceSceneAudio,
@@ -14,7 +15,8 @@ type Scene = { id: string; project_id: string; client_id: string;
 type Receipt = { scene_id: string; project_id: string; client_id: string;
   ir_version: number; narration_sha256: string; storage_path: string };
 type Produce = (input: { sceneId: string; narration: string;
-  maxAlignmentLoss: number; apiKey: string; voiceId: string }) => Promise<SceneAudio>;
+  maxAlignmentLoss: number; apiKey: string; voiceId: string;
+  onSynthesis: (attempt: number) => Promise<void> }) => Promise<SceneAudio>;
 
 function validLoss(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value)
@@ -112,9 +114,20 @@ export async function runVideoAudioJobWithProducer(
       failureMessage: "Video audio attempt may already have run; reconcile before retry." };
   }
   try {
+    const onSynthesis = async (attempt: number): Promise<void> => {
+      const units = [...scene.narration].length;
+      const cost = await sb.rpc("record_video_scene_speech_cost_v1", {
+        p_project_id: projectId, p_scene_id: scene.id, p_job_id: job.id,
+        p_ir_version: irVersion, p_attempt: attempt,
+        p_units: units, p_usd: elevenLabsUsd(units),
+      });
+      if (cost.error || typeof cost.data !== "string") {
+        throw new Error("Video speech cost could not be recorded after provider success.");
+      }
+    };
     const audio = await produce({ sceneId: scene.scene_key,
       narration: scene.narration, maxAlignmentLoss: maxLoss,
-      apiKey, voiceId });
+      apiKey, voiceId, onSynthesis });
     await file({ sb, clientId: job.client_id, projectId,
       sceneId: scene.id, sceneKey: scene.scene_key,
       irVersion, voiceId, audio });
@@ -142,7 +155,7 @@ export async function runVideoAudioJobWithProducer(
 export async function runVideoAudioJob(sb: SupabaseClient, config: RuntimeConfig,
   agent: AgentRow, job: AgentJobRow): Promise<JobResult> {
   return runVideoAudioJobWithProducer(sb, config, agent, job,
-    ({ sceneId, narration, maxAlignmentLoss, apiKey, voiceId }) =>
+    ({ sceneId, narration, maxAlignmentLoss, apiKey, voiceId, onSynthesis }) =>
       produceSceneAudio({ sceneId, narration, maxAlignmentLoss },
-        elevenLabsSceneDependencies(apiKey, voiceId)));
+        { ...elevenLabsSceneDependencies(apiKey, voiceId), onSynthesis }));
 }

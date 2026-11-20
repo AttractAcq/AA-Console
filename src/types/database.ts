@@ -46322,6 +46322,18 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      record_video_scene_speech_cost_v1: {
+        Args: {
+          p_attempt: number
+          p_ir_version: number
+          p_job_id: string
+          p_project_id: string
+          p_scene_id: string
+          p_units: number
+          p_usd: number
+        }
+        Returns: string
+      }
       record_workflow_lead_attribution: {
         Args: {
           p_evidence: Json

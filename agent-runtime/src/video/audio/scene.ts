@@ -20,6 +20,7 @@ type Dependencies = {
   synthesize: (narration: string) => Promise<Buffer>;
   align: (mp3: Buffer, narration: string) => Promise<Alignment>;
   normalise?: typeof normaliseTo;
+  onSynthesis?: (attempt: number) => Promise<void>;
 };
 
 /** The result is not filed in Storage; the caller must bind it to an exact project scene. */
@@ -36,6 +37,7 @@ export async function produceSceneAudio(input: {
       const inputPath = join(work, `speech-${attempt}.mp3`);
       const outputPath = join(work, `levelled-${attempt}.mp3`);
       const raw = await dependencies.synthesize(input.narration);
+      await dependencies.onSynthesis?.(attempt);
       await writeFile(inputPath, raw, { flag: "wx" });
       const normalized = await (dependencies.normalise ?? normaliseTo)(inputPath,
         outputPath, -16, { trimLeadingSilenceOverSec: 0.15, padTailSec: 0.4 });
