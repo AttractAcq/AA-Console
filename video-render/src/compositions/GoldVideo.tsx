@@ -1,4 +1,5 @@
 import { TransitionSeries, type TransitionPresentation } from "@remotion/transitions";
+import { AbsoluteFill } from "remotion";
 import { z } from "zod";
 import { AA_THEME, AspectSchema, Stage } from "../components/primitives/Stage.js";
 import { transitionPreset, TransitionNameSchema } from "../components/primitives/TransitionPresets.js";
@@ -44,7 +45,7 @@ export function GoldVideo(input: { aspect: z.infer<typeof AspectSchema>; scenes:
     const entry = registry[scene.component];
     const Component = entry.Component as React.ComponentType<any>;
     elements.push(<TransitionSeries.Sequence key={scene.id} durationInFrames={scene.durationInFrames}>
-      <Component {...entry.schema.parse(scene.props)} />
+      <AbsoluteFill style={{ background: AA_THEME.tokens.colours.background }}><Component {...entry.schema.parse(scene.props)} /></AbsoluteFill>
     </TransitionSeries.Sequence>);
   });
   return <Stage aspect={aspect} theme={AA_THEME}><TransitionSeries>{elements}</TransitionSeries></Stage>;

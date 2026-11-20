@@ -1,6 +1,5 @@
 import type { TransitionPresentation, TransitionPresentationComponentProps } from "@remotion/transitions";
 import { linearTiming } from "@remotion/transitions";
-import { fade } from "@remotion/transitions/fade";
 import { slide } from "@remotion/transitions/slide";
 import { wipe } from "@remotion/transitions/wipe";
 import { AbsoluteFill } from "remotion";
@@ -9,6 +8,20 @@ import { z } from "zod";
 export const TransitionNameSchema = z.enum(["cut", "fade", "slideLeft", "slideUp", "wipeBrand"]);
 export type TransitionName = z.infer<typeof TransitionNameSchema>;
 type WipeBrandProps = { color: string };
+type FadeProps = Record<string, never>;
+
+function FadeThroughBackground({ children, presentationDirection, presentationProgress }: TransitionPresentationComponentProps<FadeProps>) {
+  // A two-stage dip keeps text from different scenes from sitting on top of
+  // each other. The Stage background remains visible between the two halves.
+  const opacity = presentationDirection === "exiting"
+    ? 1 - Math.min(1, presentationProgress * 2)
+    : Math.max(0, (presentationProgress - 0.5) * 2);
+  return <AbsoluteFill style={{ opacity }}>{children}</AbsoluteFill>;
+}
+
+export function fadeThroughBackground(): TransitionPresentation<FadeProps> {
+  return { component: FadeThroughBackground, props: {} };
+}
 
 function BrandWipe({ children, passedProps, presentationDirection, presentationProgress }: TransitionPresentationComponentProps<WipeBrandProps>) {
   if (presentationDirection === "exiting") return <AbsoluteFill>{children}</AbsoluteFill>;
@@ -28,7 +41,7 @@ export function transitionPreset(name: TransitionName, primaryColor: string, dur
   TransitionNameSchema.parse(name);
   if (name === "cut") return null;
   if (!Number.isInteger(durationInFrames) || durationInFrames < 1) throw new Error("Transition duration must be a positive frame count");
-  const presentation = name === "fade" ? fade()
+  const presentation = name === "fade" ? fadeThroughBackground()
     : name === "slideLeft" ? slide({ direction: "from-right" })
       : name === "slideUp" ? slide({ direction: "from-bottom" })
         : name === "wipeBrand" ? wipeBrand(primaryColor)
