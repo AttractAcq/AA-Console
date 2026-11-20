@@ -26,6 +26,7 @@ declare p public.video_projects%rowtype;
   scene_path text; narration_hash text;
   entry jsonb; result jsonb;
   out_name text;
+  candidate_path text; candidate_id uuid; candidate_probe jsonb;
 begin
   p:=public.create_video_project_draft_v1(
     'f2222222-2222-4222-8222-222222222222',
@@ -125,6 +126,44 @@ begin
       'https://site.example.invalid/another-release');
     raise exception 'Changed renderer site was accepted';
   exception when check_violation then null; end;
+  candidate_path:=p.client_id::text||'/video/projects/'||p.id::text||
+    '/ir-v1/candidates/'||render_attempt::text||'-16x9-'||repeat('c',64)||'.mp4';
+  insert into storage.objects(bucket_id,name,version)
+    values('client-media',candidate_path,'v1') returning * into o;
+  result:=public.video_project_render_candidate_identity_v1(render_attempt,repeat('c',64));
+  if result->>'storage_path' is distinct from candidate_path
+    or (result->>'object_id')::uuid is distinct from o.id then
+    raise exception 'Candidate Storage identity mismatch'; end if;
+  candidate_probe:='{"result":"pass","width":1920,"height":1080,
+    "duration_sec":60,"has_audio":true,"checks":[]}'::jsonb;
+  begin
+    perform public.record_video_project_render_candidate_v1(render_attempt,
+      render_job,candidate_path,repeat('c',64),1024,o.id,'wrong',o.updated_at,
+      candidate_probe);
+    raise exception 'Changed Storage object was accepted';
+  exception when check_violation then null; end;
+  begin
+    perform public.record_video_project_render_candidate_v1(render_attempt,
+      render_job,candidate_path,repeat('c',64),1024,o.id,o.version,o.updated_at,
+      candidate_probe||'{"duration_sec":"bad"}'::jsonb);
+    raise exception 'Invalid media probe was accepted';
+  exception when check_violation then null; end;
+  candidate_id:=public.record_video_project_render_candidate_v1(render_attempt,
+    render_job,candidate_path,repeat('c',64),1024,o.id,o.version,o.updated_at,
+    candidate_probe);
+  if candidate_id is distinct from public.record_video_project_render_candidate_v1(
+    render_attempt,render_job,candidate_path,repeat('c',64),1024,o.id,o.version,
+    o.updated_at,candidate_probe) then
+    raise exception 'Candidate exact replay changed receipt'; end if;
+  begin
+    perform public.record_video_project_render_candidate_v1(render_attempt,
+      render_job,candidate_path,repeat('d',64),1024,o.id,o.version,o.updated_at,
+      candidate_probe);
+    raise exception 'Changed candidate bytes were accepted';
+  exception when check_violation then null; end;
+  if (select state from public.video_project_render_attempts_v1
+      where id=render_attempt)<>'succeeded' then
+    raise exception 'Passed candidate did not close render attempt'; end if;
   result:=public.claim_video_project_render_v1(p.id,render_job,1,'9:16');
   second_attempt:=(result->>'attempt_id')::uuid;
   if not public.mark_video_project_render_uncertain_v1(

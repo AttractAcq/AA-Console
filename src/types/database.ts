@@ -29733,6 +29733,87 @@ export type Database = {
           },
         ]
       }
+      video_project_render_candidates_v1: {
+        Row: {
+          aspect: string
+          attempt_id: string
+          client_id: string
+          created_at: string
+          creative_review: Json | null
+          file_bytes: number
+          file_sha256: string
+          id: string
+          ir_version: number
+          media_probe: Json
+          object_id: string
+          object_updated_at: string
+          object_version: string | null
+          probe_result: string
+          project_id: string
+          rejection_reason: string | null
+          reviewed_at: string | null
+          storage_path: string
+          verdict: string
+        }
+        Insert: {
+          aspect: string
+          attempt_id: string
+          client_id: string
+          created_at?: string
+          creative_review?: Json | null
+          file_bytes: number
+          file_sha256: string
+          id?: string
+          ir_version: number
+          media_probe: Json
+          object_id: string
+          object_updated_at: string
+          object_version?: string | null
+          probe_result: string
+          project_id: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          storage_path: string
+          verdict?: string
+        }
+        Update: {
+          aspect?: string
+          attempt_id?: string
+          client_id?: string
+          created_at?: string
+          creative_review?: Json | null
+          file_bytes?: number
+          file_sha256?: string
+          id?: string
+          ir_version?: number
+          media_probe?: Json
+          object_id?: string
+          object_updated_at?: string
+          object_version?: string | null
+          probe_result?: string
+          project_id?: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          storage_path?: string
+          verdict?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_project_render_candidates_v1_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: true
+            referencedRelation: "video_project_render_attempts_v1"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_render_candidates_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
       video_projects: {
         Row: {
           aspects: string[]
@@ -46610,6 +46691,20 @@ export type Database = {
         }
         Returns: string
       }
+      record_video_project_render_candidate_v1: {
+        Args: {
+          p_attempt_id: string
+          p_file_bytes: number
+          p_file_sha256: string
+          p_job_id: string
+          p_media_probe: Json
+          p_object_id: string
+          p_object_updated_at: string
+          p_object_version: string
+          p_storage_path: string
+        }
+        Returns: string
+      }
       record_video_render_candidate: {
         Args: {
           p_asset_id: string
@@ -49081,6 +49176,10 @@ export type Database = {
       }
       video_project_music_storage_identity_v1: {
         Args: { p_ir_version: number; p_project_id: string }
+        Returns: Json
+      }
+      video_project_render_candidate_identity_v1: {
+        Args: { p_attempt_id: string; p_file_sha256: string }
         Returns: Json
       }
       video_project_source_current_v1: {
