@@ -30194,6 +30194,108 @@ export type Database = {
           },
         ]
       }
+      video_project_thumbnail_attempts_v1: {
+        Row: {
+          claimed_at: string
+          client_id: string
+          error_code: string | null
+          file_bytes: number | null
+          file_sha256: string | null
+          filed_at: string | null
+          first_candidate_id: string
+          id: string
+          ir_version: number
+          job_id: string
+          object_id: string | null
+          object_updated_at: string | null
+          object_version: string | null
+          project_id: string
+          provider_render_id: string | null
+          provider_usd: number | null
+          rendered_at: string | null
+          state: string
+          storage_path: string | null
+        }
+        Insert: {
+          claimed_at?: string
+          client_id: string
+          error_code?: string | null
+          file_bytes?: number | null
+          file_sha256?: string | null
+          filed_at?: string | null
+          first_candidate_id: string
+          id?: string
+          ir_version: number
+          job_id: string
+          object_id?: string | null
+          object_updated_at?: string | null
+          object_version?: string | null
+          project_id: string
+          provider_render_id?: string | null
+          provider_usd?: number | null
+          rendered_at?: string | null
+          state?: string
+          storage_path?: string | null
+        }
+        Update: {
+          claimed_at?: string
+          client_id?: string
+          error_code?: string | null
+          file_bytes?: number | null
+          file_sha256?: string | null
+          filed_at?: string | null
+          first_candidate_id?: string
+          id?: string
+          ir_version?: number
+          job_id?: string
+          object_id?: string | null
+          object_updated_at?: string | null
+          object_version?: string | null
+          project_id?: string
+          provider_render_id?: string | null
+          provider_usd?: number | null
+          rendered_at?: string | null
+          state?: string
+          storage_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_project_thumbnail_attempts_v1_first_candidate_id_fkey"
+            columns: ["first_candidate_id"]
+            isOneToOne: false
+            referencedRelation: "video_project_render_candidates_v1"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_thumbnail_attempts_v1_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_thumbnail_attempts_v1_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_project_thumbnail_attempts_v1_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_project_thumbnail_attempts_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
       video_project_visual_patches_v1: {
         Row: {
           applied_at: string
@@ -41698,6 +41800,15 @@ export type Database = {
         }
         Returns: Json
       }
+      claim_video_project_thumbnail_v1: {
+        Args: {
+          p_first_candidate_id: string
+          p_ir_version: number
+          p_job_id: string
+          p_project_id: string
+        }
+        Returns: Json
+      }
       client_authority_assignment_hash_v6: {
         Args: {
           q: Database["public"]["Tables"]["client_authority_assignment_reviews_v6"]["Row"]
@@ -44531,6 +44642,21 @@ export type Database = {
         }
         Returns: boolean
       }
+      file_video_project_thumbnail_v1: {
+        Args: {
+          p_attempt_id: string
+          p_file_bytes: number
+          p_file_sha256: string
+          p_height: number
+          p_job_id: string
+          p_object_id: string
+          p_object_updated_at: string
+          p_object_version: string
+          p_storage_path: string
+          p_width: number
+        }
+        Returns: string
+      }
       finish_console_invitation_send_v6: {
         Args: {
           p_outcome: string
@@ -45141,6 +45267,10 @@ export type Database = {
         Returns: boolean
       }
       mark_video_project_render_uncertain_v1: {
+        Args: { p_attempt_id: string; p_code: string; p_job_id: string }
+        Returns: boolean
+      }
+      mark_video_project_thumbnail_uncertain_v1: {
         Args: { p_attempt_id: string; p_code: string; p_job_id: string }
         Returns: boolean
       }
@@ -47339,6 +47469,15 @@ export type Database = {
           p_currency: string
           p_estimated_usd: number
           p_job_id: string
+        }
+        Returns: string
+      }
+      record_video_project_thumbnail_provider_v1: {
+        Args: {
+          p_attempt_id: string
+          p_job_id: string
+          p_render_id: string
+          p_usd: number
         }
         Returns: string
       }
@@ -49826,6 +49965,10 @@ export type Database = {
       video_project_source_current_v1: {
         Args: { p_project_id: string }
         Returns: boolean
+      }
+      video_project_thumbnail_storage_identity_v1: {
+        Args: { p_attempt_id: string; p_file_sha256: string }
+        Returns: Json
       }
       video_scene_audio_storage_exists_v1: {
         Args: { p_project_id: string; p_scene_id: string }

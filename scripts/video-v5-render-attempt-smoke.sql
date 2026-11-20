@@ -29,6 +29,9 @@ declare p public.video_projects%rowtype;
   candidate_path text; candidate_id uuid; candidate_probe jsonb;
   creative_review jsonb;
   first_candidate_id uuid; attached_asset_id uuid;
+  thumbnail_attempt uuid; thumbnail_path text;
+  thumbnail_hash text:=repeat('e',64);
+  thumbnail_cost uuid;
   creative_attempt uuid;
   render_cost uuid;
   prerender_attempt uuid;
@@ -482,6 +485,56 @@ begin
     perform public.attach_video_project_render_v1(p.id,candidate_id);
     raise exception 'Derivative was used as the primary attachment';
   exception when check_violation then null; end;
+  begin
+    perform public.claim_video_project_thumbnail_v1(
+      p.id,render_job,1,candidate_id);
+    raise exception 'Derivative claimed the thumbnail';
+  exception when check_violation then null; end;
+  result:=public.claim_video_project_thumbnail_v1(
+    p.id,render_job,1,first_candidate_id);
+  thumbnail_attempt:=(result->>'attempt_id')::uuid;
+  if result->>'state' is distinct from 'claimed'
+    or (public.claim_video_project_thumbnail_v1(
+      p.id,render_job,1,first_candidate_id)->>'state')
+      is distinct from 'already_claimed' then
+    raise exception 'Thumbnail billable attempt was not unique'; end if;
+  thumbnail_cost:=public.record_video_project_thumbnail_provider_v1(
+    thumbnail_attempt,render_job,'thumbnail-render-fixture',0.001234);
+  if thumbnail_cost is distinct from
+      public.record_video_project_thumbnail_provider_v1(
+        thumbnail_attempt,render_job,'thumbnail-render-fixture',0.001234)
+    or (select count(*) from public.video_project_costs
+      where attempt_key='video-thumbnail:'||thumbnail_attempt::text)<>1 then
+    raise exception 'Thumbnail provider cost was not idempotent'; end if;
+  thumbnail_path:=p.client_id::text||'/video/projects/'||p.id::text||
+    '/ir-v1/thumbnail-'||thumbnail_attempt::text||'-'||thumbnail_hash||'.jpg';
+  insert into storage.objects(bucket_id,name,version)
+  values('client-media',thumbnail_path,'v1') returning * into o;
+  if public.video_project_thumbnail_storage_identity_v1(
+      thumbnail_attempt,thumbnail_hash)->>'object_id'
+      is distinct from o.id::text then
+    raise exception 'Thumbnail Storage identity was not exact'; end if;
+  begin
+    perform public.file_video_project_thumbnail_v1(thumbnail_attempt,
+      render_job,thumbnail_path,thumbnail_hash,2048,o.id,o.version,
+      o.updated_at,1280,721);
+    raise exception 'Wrong thumbnail dimensions were accepted';
+  exception when check_violation then null; end;
+  -- Keep mutation checks in separate statements; SQL does not promise
+  -- left-to-right evaluation of volatile calls inside one boolean expression.
+  if public.file_video_project_thumbnail_v1(thumbnail_attempt,
+      render_job,thumbnail_path,thumbnail_hash,2048,o.id,o.version,
+      o.updated_at,1280,720) is distinct from thumbnail_attempt then
+    raise exception 'Thumbnail first filing returned another attempt'; end if;
+  if public.file_video_project_thumbnail_v1(thumbnail_attempt,
+      render_job,thumbnail_path,thumbnail_hash,2048,o.id,o.version,
+      o.updated_at,1280,720) is distinct from thumbnail_attempt then
+    raise exception 'Thumbnail filing replay returned another attempt'; end if;
+  if (select state from public.video_project_thumbnail_attempts_v1
+      where id=thumbnail_attempt) is distinct from 'filed' then
+    raise exception 'Thumbnail state was not filed: %',
+      (select state from public.video_project_thumbnail_attempts_v1
+        where id=thumbnail_attempt); end if;
   attached_asset_id:=public.attach_video_project_render_v1(p.id,first_candidate_id);
   if attached_asset_id is distinct from public.attach_video_project_render_v1(
     p.id,first_candidate_id)
@@ -512,6 +565,11 @@ begin
   begin
     perform public.claim_video_project_creative_v1(first_candidate_id,render_job);
     raise exception 'Browser claimed creative review';
+  exception when insufficient_privilege then null; end;
+  begin
+    perform public.claim_video_project_thumbnail_v1(
+      p.id,render_job,1,first_candidate_id);
+    raise exception 'Browser claimed billable thumbnail work';
   exception when insufficient_privilege then null; end;
   if (select count(*) from public.video_project_render_attempts_v1
       where project_id=p.id)<>2 then
