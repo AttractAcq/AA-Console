@@ -25,6 +25,24 @@ export class VideoRenderUncertainError extends Error {
   }
 }
 
+export type LambdaCostEstimate = { billingMs: number;
+  estimatedUsd: number; currency: "USD" };
+
+function finalEstimate(progress: Awaited<ReturnType<typeof resumeLambdaRender>>["progress"]): LambdaCostEstimate {
+  const billingMs = progress.estimatedBillingDurationInMilliseconds;
+  const usd = progress.costs?.accruedSoFar;
+  if (progress.done !== true || typeof billingMs !== "number"
+    || !Number.isSafeInteger(billingMs)
+    || billingMs <= 0 || billingMs > 9_999_999_999
+    || typeof usd !== "number" || !Number.isFinite(usd)
+    || usd < 0 || usd > 10_000
+    || progress.costs.currency !== "USD") {
+    throw new Error("Lambda final USD billing estimate is unavailable; reconcile before candidate filing.");
+  }
+  return { billingMs, estimatedUsd: Math.round(usd * 1_000_000) / 1_000_000,
+    currency: "USD" };
+}
+
 function attemptHandle(attempt: Attempt): LambdaRenderHandle {
   if (!attempt.region || !attempt.function_name || !attempt.render_id
     || !attempt.bucket_name || !attempt.out_name || !attempt.serve_url) {
@@ -51,6 +69,7 @@ export async function renderProjectAspect(input: {
 }, deps: Dependencies = dependencies): Promise<{
   attemptId: string; handle: LambdaRenderHandle;
   outputPath: string; sizeInBytes: number; probe: ProjectRenderProbe;
+  providerEstimate: LambdaCostEstimate;
 }> {
   if (!input.localPath.endsWith(".mp4")) {
     throw new Error("Render download path must end in .mp4.");
@@ -142,5 +161,6 @@ export async function renderProjectAspect(input: {
   const probe = await deps.probe({ path: mastered.outputPath,
     aspect: input.aspect });
   return { attemptId, handle, outputPath: mastered.outputPath,
-    sizeInBytes: mastered.fileBytes, probe };
+    sizeInBytes: mastered.fileBytes, probe,
+    providerEstimate: finalEstimate(downloaded.progress) };
 }

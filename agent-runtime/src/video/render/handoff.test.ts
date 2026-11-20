@@ -47,7 +47,9 @@ function fixture(state: string) {
     return handle;
   });
   const resume = vi.fn(async () => ({ outputPath: input.localPath,
-    sizeInBytes: 1000, progress: { done: true } }));
+    sizeInBytes: 1000, progress: { done: true,
+      estimatedBillingDurationInMilliseconds: 42000,
+      costs: { accruedSoFar: 0.036, currency: "USD" } } }));
   const master = vi.fn(async () => ({ outputPath: "/tmp/video-master.mp4",
     fileBytes: 900 }));
   const probe = vi.fn(async () => ({ result: "pass", width: 1920,
@@ -64,7 +66,9 @@ describe("exact render handoff", () => {
     const result = await renderProjectAspect({ sb: f.sb, ...input }, f.deps);
     expect(result).toMatchObject({ attemptId, handle,
       outputPath: "/tmp/video-master.mp4", sizeInBytes: 900,
-      probe: { result: "pass" } });
+      probe: { result: "pass" },
+      providerEstimate: { billingMs: 42000, estimatedUsd: 0.036,
+        currency: "USD" } });
     expect(f.calls).toEqual(["claim_video_project_render_v1",
       "record_video_project_lambda_handle_v2"]);
     expect(f.start).toHaveBeenCalledTimes(1);

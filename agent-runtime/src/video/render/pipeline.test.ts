@@ -20,14 +20,22 @@ function fixture(priorCandidate = false) {
     file_sha256: "a".repeat(64), file_bytes: 1024,
     probe_result: "pass" };
   const attempt = { id: attemptId, job_id: jobId, state: "succeeded" };
+  const cost = { id: "77777777-7777-4777-8777-777777777777",
+    project_id: projectId, client_id: clientId, job_id: jobId,
+    stage: "render", provider: "remotion_lambda_estimate" };
   const from = vi.fn((table: string) => {
     const query = { select: () => query, eq: () => query,
       maybeSingle: async () => ({ data: table === "video_project_render_candidates_v1"
-        ? (priorCandidate ? receipt : null) : attempt, error: null }) };
+        ? (priorCandidate ? receipt : null)
+        : table === "video_project_costs" ? cost : attempt,
+        error: null }) };
     return query;
   });
   const render = vi.fn(async () => ({ attemptId, handle: {},
-    outputPath: "/tmp/master.mp4", sizeInBytes: 1024, probe }));
+    outputPath: "/tmp/master.mp4", sizeInBytes: 1024, probe,
+    providerEstimate: { billingMs: 42000, estimatedUsd: 0.036,
+      currency: "USD" as const } }));
+  const recordCost = vi.fn(async () => cost.id);
   const file = vi.fn(async () => candidateId);
   const verifyRemote = vi.fn(async () => {});
   const rpc = vi.fn(async () => ({ data: true, error: null }));
@@ -38,8 +46,9 @@ function fixture(priorCandidate = false) {
     region: "eu-central-1" as const,
     functionName: "remotion", serveUrl: "https://site.example.test",
     localPath: "/tmp/raw.mp4", maxAlignmentLoss: 0.25 };
-  const deps = { render, file, verifyRemote } as unknown as Deps;
-  return { input, deps, from, rpc, render, file, verifyRemote, receipt, attempt };
+  const deps = { render, recordCost, file, verifyRemote } as unknown as Deps;
+  return { input, deps, from, rpc, render, recordCost, file,
+    verifyRemote, receipt, attempt, cost };
 }
 
 describe("render candidate pipeline", () => {
@@ -48,6 +57,9 @@ describe("render candidate pipeline", () => {
     expect(await renderAndFileProjectAspect(f.input, f.deps)).toEqual({
       candidateId, probeResult: "pass", resumed: false });
     expect(f.render).toHaveBeenCalledOnce();
+    expect(f.recordCost).toHaveBeenCalledWith(expect.objectContaining({
+      attemptId, jobId, estimate: { billingMs: 42000,
+        estimatedUsd: 0.036, currency: "USD" } }));
     expect(f.file).toHaveBeenCalledWith(expect.objectContaining({
       attemptId, outputPath: "/tmp/master.mp4", probe }));
   });
@@ -57,6 +69,7 @@ describe("render candidate pipeline", () => {
     expect(await renderAndFileProjectAspect(f.input, f.deps)).toEqual({
       candidateId, probeResult: "pass", resumed: true });
     expect(f.render).not.toHaveBeenCalled();
+    expect(f.recordCost).not.toHaveBeenCalled();
     expect(f.file).not.toHaveBeenCalled();
     expect(f.rpc).toHaveBeenCalledWith("complete_video_audio_project_v1",
       { p_project_id: projectId, p_ir_version: 1 });
@@ -79,5 +92,13 @@ describe("render candidate pipeline", () => {
       .rejects.toThrow("source is no longer current");
     expect(f.render).not.toHaveBeenCalled();
     expect(f.verifyRemote).not.toHaveBeenCalled();
+  });
+
+  it("never files a candidate when Lambda cost cannot be recorded", async () => {
+    const f = fixture();
+    f.recordCost.mockRejectedValueOnce(new Error("cost receipt unavailable"));
+    await expect(renderAndFileProjectAspect(f.input, f.deps))
+      .rejects.toThrow("cost receipt unavailable");
+    expect(f.file).not.toHaveBeenCalled();
   });
 });

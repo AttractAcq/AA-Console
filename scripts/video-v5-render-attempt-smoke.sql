@@ -27,6 +27,7 @@ declare p public.video_projects%rowtype;
   entry jsonb; result jsonb;
   out_name text;
   candidate_path text; candidate_id uuid; candidate_probe jsonb;
+  render_cost uuid;
 begin
   p:=public.create_video_project_draft_v1(
     'f2222222-2222-4222-8222-222222222222',
@@ -113,6 +114,34 @@ begin
     'https://site.example.invalid/ir-v1') then
     raise exception 'Exact Lambda handle replay failed'; end if;
   begin
+    insert into public.video_project_render_candidates_v1
+      (attempt_id,project_id,client_id,ir_version,aspect,storage_path,
+        file_sha256,file_bytes,object_id,object_updated_at,
+        media_probe,probe_result)
+    values(render_attempt,p.id,p.client_id,1,'16:9','pre-cost.mp4',
+      repeat('e',64),1024,gen_random_uuid(),clock_timestamp(),
+      '{"result":"pass"}'::jsonb,'pass');
+    raise exception 'Candidate without Lambda cost was accepted';
+  exception when check_violation then null; end;
+  begin
+    perform public.record_video_project_render_cost_v1(render_attempt,
+      render_job,42000,0.036,'EUR');
+    raise exception 'Non-USD Lambda estimate was accepted';
+  exception when invalid_parameter_value then null; end;
+  render_cost:=public.record_video_project_render_cost_v1(render_attempt,
+    render_job,42000,0.036,'USD');
+  if render_cost is distinct from public.record_video_project_render_cost_v1(
+    render_attempt,render_job,42000,0.036,'USD') then
+    raise exception 'Exact Lambda cost replay duplicated the receipt'; end if;
+  begin
+    perform public.record_video_project_render_cost_v1(render_attempt,
+      render_job,43000,0.036,'USD');
+    raise exception 'Changed Lambda billing duration was accepted';
+  exception when check_violation then null; end;
+  if (select count(*) from public.video_project_costs
+      where attempt_key='video-render:'||render_attempt::text)<>1 then
+    raise exception 'Lambda render cost count changed'; end if;
+  begin
     perform public.record_video_project_lambda_handle_v2(render_attempt,
       render_job,'eu-central-1','remotion-render-test','render2',
       'remotion-fixture-bucket',out_name,
@@ -180,6 +209,11 @@ begin
   begin
     perform public.claim_video_project_render_v1(p.id,render_job,1,'16:9');
     raise exception 'Browser claimed an external render';
+  exception when insufficient_privilege then null; end;
+  begin
+    perform public.record_video_project_render_cost_v1(render_attempt,
+      render_job,42000,0.036,'USD');
+    raise exception 'Browser filed Lambda render cost';
   exception when insufficient_privilege then null; end;
   if (select count(*) from public.video_project_render_attempts_v1
       where project_id=p.id)<>2 then

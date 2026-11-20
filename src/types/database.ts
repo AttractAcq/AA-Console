@@ -46705,6 +46705,16 @@ export type Database = {
         }
         Returns: string
       }
+      record_video_project_render_cost_v1: {
+        Args: {
+          p_attempt_id: string
+          p_billing_ms: number
+          p_currency: string
+          p_estimated_usd: number
+          p_job_id: string
+        }
+        Returns: string
+      }
       record_video_render_candidate: {
         Args: {
           p_asset_id: string

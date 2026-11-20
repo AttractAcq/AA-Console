@@ -2,14 +2,17 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AwsRegion } from "@remotion/lambda";
 import type { RuntimeConfig } from "../../config.js";
 import { fileProjectRenderCandidate, verifyRemoteBytes } from "./candidate.js";
+import { fileLambdaRenderCost } from "./cost.js";
 import { renderProjectAspect } from "./handoff.js";
 import type { VideoAspect } from "./probe.js";
 
 type Dependencies = { render: typeof renderProjectAspect;
+  recordCost: typeof fileLambdaRenderCost;
   file: typeof fileProjectRenderCandidate;
   verifyRemote: typeof verifyRemoteBytes };
 const defaults: Dependencies = { render: renderProjectAspect,
-  file: fileProjectRenderCandidate, verifyRemote: verifyRemoteBytes };
+  recordCost: fileLambdaRenderCost, file: fileProjectRenderCandidate,
+  verifyRemote: verifyRemoteBytes };
 
 /** One aspect ends at a durable candidate receipt, never public attachment.
  * A worker retry after the receipt transaction verifies the remote bytes and
@@ -47,6 +50,18 @@ export async function renderAndFileProjectAspect(input: {
         ? "succeeded" : "failed")) {
       throw new Error("Prior candidate is not bound to this render job.");
     }
+    const costResult = await input.sb.from("video_project_costs")
+      .select("id,project_id,client_id,job_id,stage,provider")
+      .eq("attempt_key", `video-render:${receipt.attempt_id}`)
+      .maybeSingle();
+    if (costResult.error || !costResult.data
+      || costResult.data.project_id !== input.projectId
+      || costResult.data.client_id !== input.clientId
+      || costResult.data.job_id !== input.jobId
+      || costResult.data.stage !== "render"
+      || costResult.data.provider !== "remotion_lambda_estimate") {
+      throw new Error("Prior candidate has no exact Lambda cost receipt.");
+    }
     await deps.verifyRemote({ sb: input.sb,
       storagePath: receipt.storage_path,
       sha256: receipt.file_sha256,
@@ -55,6 +70,8 @@ export async function renderAndFileProjectAspect(input: {
       probeResult: receipt.probe_result as "pass" | "fail", resumed: true };
   }
   const rendered = await deps.render(input);
+  await deps.recordCost({ sb: input.sb, attemptId: rendered.attemptId,
+    jobId: input.jobId, estimate: rendered.providerEstimate });
   const candidateId = await deps.file({ sb: input.sb, config: input.config,
     clientId: input.clientId, projectId: input.projectId,
     jobId: input.jobId, attemptId: rendered.attemptId,
