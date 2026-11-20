@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
+import { CodeVideoRenderCandidatesPanel } from "./CodeVideoRenderCandidatesPanel";
 
 type Project = { id: string; idea: string; audience: string | null;
   stage: string; stage_error: string | null; ir_version: number;
@@ -146,5 +147,7 @@ export function CodeVideoProjectsPanel() {
           className="shrink-0 text-brand-strong hover:underline">Choose sources</button>}
       </div>)}
     </div>
+    <CodeVideoRenderCandidatesPanel clientId={clientId}
+      titles={new Map(projects.map((project) => [project.id, project.idea]))} />
   </section>;
 }
