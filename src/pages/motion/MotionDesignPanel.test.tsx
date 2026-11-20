@@ -13,6 +13,7 @@ vi.mock("../../lib/supabase", () => ({ supabase: {
   rpc,
   from: (table: string) => { const chain = { select: () => chain, eq: () => chain,
     order: () => chain, limit: () => chain, in: () => chain, not: () => chain,
+    maybeSingle: async () => ({ data: table === "agents" ? { paused: true } : null, error: null }),
     then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data:
       table === "motion_design_projects" ? scenario.projects
         : table === "client_briefs" ? scenario.briefs

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { supabase } from "../../lib/supabase";
+import { CodeVideoProjectsPanel } from "./CodeVideoProjectsPanel";
 
 type Preset = "explainer" | "tutorial" | "hero";
 type Aspect = "vertical" | "square" | "horizontal";
@@ -131,6 +132,7 @@ export function MotionDesignPanel() {
   }
 
   return <div className="space-y-6">
+    <CodeVideoProjectsPanel />
     <section className="space-y-3 rounded-lg border border-border p-4" aria-label="Create motion design">
       <h2 className="text-sm font-semibold">Create motion design</h2>
       <p className="text-xs text-muted-foreground">Describe the motion graphic as you would to a designer. Claude Opus 5 lays out the visuals and timing, then the Console renders a muted MP4. Include the story, visual metaphor, on-screen words, and desired feel.</p>
