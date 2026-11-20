@@ -28,6 +28,7 @@ declare p public.video_projects%rowtype;
   out_name text;
   candidate_path text; candidate_id uuid; candidate_probe jsonb;
   creative_review jsonb;
+  first_candidate_id uuid; attached_asset_id uuid;
   render_cost uuid;
 begin
   p:=public.create_video_project_draft_v1(
@@ -226,14 +227,61 @@ begin
       'Changed decision');
     raise exception 'Creative decision was overwritten';
   exception when check_violation then null; end;
+  first_candidate_id:=candidate_id;
+  begin
+    perform public.attach_video_project_render_v1(p.id,first_candidate_id);
+    raise exception 'Missing derivative was attached';
+  exception when check_violation then null; end;
+  begin
+    result:=public.claim_video_project_render_v1(p.id,render_job,1,'9:16');
+    second_attempt:=(result->>'attempt_id')::uuid;
+    if not public.mark_video_project_render_uncertain_v1(
+      second_attempt,render_job,'start_unknown') then
+      raise exception 'Uncertain render was not recorded'; end if;
+    result:=public.claim_video_project_render_v1(p.id,render_job,1,'9:16');
+    if result->>'state' is distinct from 'already_uncertain' then
+      raise exception 'Uncertain render could be restarted'; end if;
+    raise exception 'Rollback isolated uncertainty test' using errcode='Z0001';
+  exception when sqlstate 'Z0001' then null; end;
   result:=public.claim_video_project_render_v1(p.id,render_job,1,'9:16');
   second_attempt:=(result->>'attempt_id')::uuid;
-  if not public.mark_video_project_render_uncertain_v1(
-    second_attempt,render_job,'start_unknown') then
-    raise exception 'Uncertain render was not recorded'; end if;
-  result:=public.claim_video_project_render_v1(p.id,render_job,1,'9:16');
-  if result->>'state' is distinct from 'already_uncertain' then
-    raise exception 'Uncertain render could be restarted'; end if;
+  out_name:=p.id::text||'-9x16.mp4';
+  perform public.record_video_project_lambda_handle_v2(second_attempt,
+    render_job,'eu-central-1','remotion-render-test','render-vertical',
+    'remotion-fixture-bucket',out_name,
+    'https://site.example.invalid/ir-v1');
+  perform public.record_video_project_render_cost_v1(second_attempt,
+    render_job,42000,0.036,'USD');
+  candidate_path:=p.client_id::text||'/video/projects/'||p.id::text||
+    '/ir-v1/candidates/'||second_attempt::text||'-9x16-'||repeat('d',64)||'.mp4';
+  insert into storage.objects(bucket_id,name,version)
+    values('client-media',candidate_path,'v1') returning * into o;
+  candidate_probe:='{"result":"pass","width":1080,"height":1920,
+    "duration_sec":60,"has_audio":true,"checks":[]}'::jsonb;
+  candidate_id:=public.record_video_project_render_candidate_v1(second_attempt,
+    render_job,candidate_path,repeat('d',64),1024,o.id,o.version,o.updated_at,
+    candidate_probe);
+  if candidate_id is distinct from public.decide_video_project_render_candidate_v1(
+    candidate_id,'accepted',null,null) then
+    raise exception 'Derivative creative inheritance failed'; end if;
+  if (select candidate_row.creative_review->>'inherited_from'
+      from public.video_project_render_candidates_v1 candidate_row
+      where candidate_row.id=candidate_id)
+      is distinct from first_candidate_id::text then
+    raise exception 'Derivative did not name first review'; end if;
+  begin
+    perform public.attach_video_project_render_v1(p.id,candidate_id);
+    raise exception 'Derivative was used as the primary attachment';
+  exception when check_violation then null; end;
+  attached_asset_id:=public.attach_video_project_render_v1(p.id,first_candidate_id);
+  if attached_asset_id is distinct from public.attach_video_project_render_v1(
+    p.id,first_candidate_id)
+    or (select stage from public.video_projects where id=p.id)<>'attached'
+    or (select delivery_bytes_sha256 from public.client_media_assets
+      where id=attached_asset_id) is distinct from repeat('c',64)
+    or (select human_approved_at from public.client_media_assets
+      where id=attached_asset_id) is not null then
+    raise exception 'Exact review-ready attachment was not stable'; end if;
   perform set_config('request.jwt.claim.role','authenticated',true);
   begin
     perform public.queue_video_render_v1(p.id,1);
@@ -247,6 +295,10 @@ begin
     perform public.record_video_project_render_cost_v1(render_attempt,
       render_job,42000,0.036,'USD');
     raise exception 'Browser filed Lambda render cost';
+  exception when insufficient_privilege then null; end;
+  begin
+    perform public.attach_video_project_render_v1(p.id,first_candidate_id);
+    raise exception 'Browser attached a render';
   exception when insufficient_privilege then null; end;
   if (select count(*) from public.video_project_render_attempts_v1
       where project_id=p.id)<>2 then

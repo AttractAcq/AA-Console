@@ -29423,6 +29423,135 @@ export type Database = {
           },
         ]
       }
+      video_project_attachments_v1: {
+        Row: {
+          asset_id: string
+          attached_at: string
+          client_id: string
+          first_candidate_id: string
+          id: string
+          ir_version: number
+          project_id: string
+        }
+        Insert: {
+          asset_id: string
+          attached_at?: string
+          client_id: string
+          first_candidate_id: string
+          id?: string
+          ir_version: number
+          project_id: string
+        }
+        Update: {
+          asset_id?: string
+          attached_at?: string
+          client_id?: string
+          first_candidate_id?: string
+          id?: string
+          ir_version?: number
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "meta_profile_presence"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_first_candidate_id_fkey"
+            columns: ["first_candidate_id"]
+            isOneToOne: true
+            referencedRelation: "video_project_render_candidates_v1"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
       video_project_costs: {
         Row: {
           attempt_key: string | null
@@ -40305,6 +40434,10 @@ export type Database = {
       }
       attach_motion_design: {
         Args: { p_brief_id?: string; p_project_id: string }
+        Returns: string
+      }
+      attach_video_project_render_v1: {
+        Args: { p_first_candidate_id: string; p_project_id: string }
         Returns: string
       }
       attest_creative_frame_bytes_v8: {
