@@ -31,6 +31,9 @@ declare p public.video_projects%rowtype;
   first_candidate_id uuid; attached_asset_id uuid;
   creative_attempt uuid;
   render_cost uuid;
+  prerender_attempt uuid;
+  prerender_report jsonb;
+  still_receipts jsonb;
 begin
   p:=public.create_video_project_draft_v1(
     'f2222222-2222-4222-8222-222222222222',
@@ -82,6 +85,51 @@ begin
   render_job:=public.queue_video_render_v1(p.id,1);
   if render_job is distinct from public.queue_video_render_v1(p.id,1) then
     raise exception 'Render queue replay created another job'; end if;
+  begin
+    perform public.claim_video_project_render_v1(p.id,render_job,1,'16:9');
+    raise exception 'Render started without a pre-render critic receipt';
+  exception when check_violation then null; end;
+  result:=public.claim_video_project_prerender_v1(p.id,render_job,1);
+  prerender_attempt:=(result->>'attempt_id')::uuid;
+  if result->>'state' is distinct from 'claimed'
+    or (public.claim_video_project_prerender_v1(p.id,render_job,1)->>'state')
+      is distinct from 'already_claimed' then
+    raise exception 'Pre-render paid review claim was not unique'; end if;
+  select jsonb_agg(jsonb_build_object('sceneId',
+      's'||lpad(((n-1)/3+1)::text,2,'0'),
+      'frame',n*10,'renderId','still-'||n::text,'costUsd',0.001)
+      order by n) into still_receipts
+    from generate_series(1,9) n;
+  prerender_report:='{"result":"pass","sampled_frames":9,"batches":1,
+    "model":"claude-test","patch":[],"usage":{"inputTokens":100,
+      "outputTokens":20,"costUsd":0.012},"checks":[
+    {"area":"text_overflow","verdict":"pass","sceneId":"s01","reason":"Text fits."},
+    {"area":"caption_overlap","verdict":"pass","sceneId":"s01","reason":"No overlap."},
+    {"area":"contrast","verdict":"pass","sceneId":"s02","reason":"Contrast passes."},
+    {"area":"safe_area","verdict":"pass","sceneId":"s02","reason":"In safe area."},
+    {"area":"reading_time","verdict":"pass","sceneId":"s02","reason":"Time sufficient."},
+    {"area":"brand_token","verdict":"pass","sceneId":"s03","reason":"Brand matches."},
+    {"area":"empty_frame","verdict":"pass","sceneId":"s03","reason":"No empty frame."},
+    {"area":"narration_visual_match","verdict":"pass","sceneId":"s03","reason":"Visual matches."}
+  ]}'::jsonb;
+  begin
+    perform public.finish_video_project_prerender_v1(prerender_attempt,
+      render_job,prerender_report,still_receipts,'claude-test',100,20,
+      0.012,0.008);
+    raise exception 'Changed still cost was accepted';
+  exception when check_violation then null; end;
+  if public.finish_video_project_prerender_v1(prerender_attempt,
+      render_job,prerender_report,still_receipts,'claude-test',100,20,
+      0.012,0.009) is distinct from 'pass' then
+    raise exception 'Pre-render critic did not pass'; end if;
+  if public.finish_video_project_prerender_v1(prerender_attempt,
+      render_job,prerender_report,still_receipts,'claude-test',100,20,
+      0.012,0.009) is distinct from 'pass' then
+    raise exception 'Exact pre-render replay did not pass'; end if;
+  if (select count(*) from public.video_project_costs
+      where attempt_key in ('video-prerender-stills:'||prerender_attempt::text,
+        'video-prerender-model:'||prerender_attempt::text))<>2 then
+    raise exception 'Pre-render cost receipts were not filed exactly once'; end if;
   begin
     perform public.queue_video_render_v1(p.id,2);
     raise exception 'Stale render IR was queued';

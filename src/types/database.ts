@@ -29860,6 +29860,92 @@ export type Database = {
           },
         ]
       }
+      video_project_prerender_attempts_v1: {
+        Row: {
+          claimed_at: string
+          client_id: string
+          decided_at: string | null
+          id: string
+          input_tokens: number | null
+          ir_version: number
+          job_id: string
+          model: string | null
+          model_usd: number | null
+          output_tokens: number | null
+          project_id: string
+          report: Json | null
+          result: string | null
+          state: string
+          still_receipts: Json | null
+          still_usd: number | null
+        }
+        Insert: {
+          claimed_at?: string
+          client_id: string
+          decided_at?: string | null
+          id?: string
+          input_tokens?: number | null
+          ir_version: number
+          job_id: string
+          model?: string | null
+          model_usd?: number | null
+          output_tokens?: number | null
+          project_id: string
+          report?: Json | null
+          result?: string | null
+          state?: string
+          still_receipts?: Json | null
+          still_usd?: number | null
+        }
+        Update: {
+          claimed_at?: string
+          client_id?: string
+          decided_at?: string | null
+          id?: string
+          input_tokens?: number | null
+          ir_version?: number
+          job_id?: string
+          model?: string | null
+          model_usd?: number | null
+          output_tokens?: number | null
+          project_id?: string
+          report?: Json | null
+          result?: string | null
+          state?: string
+          still_receipts?: Json | null
+          still_usd?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_project_prerender_attempts_v1_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_prerender_attempts_v1_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_project_prerender_attempts_v1_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_project_prerender_attempts_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
       video_project_render_attempts_v1: {
         Row: {
           aspect: string
@@ -41333,6 +41419,10 @@ export type Database = {
         Args: { p_candidate_id: string; p_job_id: string }
         Returns: Json
       }
+      claim_video_project_prerender_v1: {
+        Args: { p_ir_version: number; p_job_id: string; p_project_id: string }
+        Returns: Json
+      }
       claim_video_project_render_v1: {
         Args: {
           p_aspect: string
@@ -44261,6 +44351,20 @@ export type Database = {
         }
         Returns: string
       }
+      finish_video_project_prerender_v1: {
+        Args: {
+          p_attempt_id: string
+          p_input_tokens: number
+          p_job_id: string
+          p_model: string
+          p_model_usd: number
+          p_output_tokens: number
+          p_report: Json
+          p_still_receipts: Json
+          p_still_usd: number
+        }
+        Returns: string
+      }
       format_fits_media: {
         Args: {
           p_format: Database["public"]["Enums"]["content_format"]
@@ -44759,6 +44863,10 @@ export type Database = {
         Returns: boolean
       }
       mark_video_project_creative_uncertain_v1: {
+        Args: { p_attempt_id: string; p_job_id: string }
+        Returns: boolean
+      }
+      mark_video_project_prerender_uncertain_v1: {
         Args: { p_attempt_id: string; p_job_id: string }
         Returns: boolean
       }
