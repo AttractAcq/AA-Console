@@ -113,7 +113,7 @@ export async function renderPreRenderStills(input: {
         inputProps: { ir: input.ir, timings: input.timings,
           aspect: input.aspect },
         frame: point.frame, imageFormat: "jpeg", privacy: "private",
-        forceWidth: 640, maxRetries: 1,
+        forceWidth: 640, maxRetries: 0,
         outName: `${input.projectId}-v${input.irVersion}-${input.attemptId}`
           + `-${String(index).padStart(3, "0")}.jpg`,
       });
