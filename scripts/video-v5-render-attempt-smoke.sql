@@ -486,6 +486,10 @@ begin
     raise exception 'Derivative was used as the primary attachment';
   exception when check_violation then null; end;
   begin
+    perform public.attach_video_project_render_v1(p.id,first_candidate_id);
+    raise exception 'Attachment succeeded without a filed thumbnail';
+  exception when check_violation then null; end;
+  begin
     perform public.claim_video_project_thumbnail_v1(
       p.id,render_job,1,candidate_id);
     raise exception 'Derivative claimed the thumbnail';
@@ -539,6 +543,8 @@ begin
   if attached_asset_id is distinct from public.attach_video_project_render_v1(
     p.id,first_candidate_id)
     or (select stage from public.video_projects where id=p.id)<>'attached'
+    or (select thumbnail_attempt_id from public.video_project_attachments_v1
+      where project_id=p.id) is distinct from thumbnail_attempt
     or (select delivery_bytes_sha256 from public.client_media_assets
       where id=attached_asset_id) is distinct from repeat('c',64)
     or (select human_approved_at from public.client_media_assets

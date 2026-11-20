@@ -2,11 +2,13 @@ import { createHash } from "node:crypto";
 import { open, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AwsRegion } from "@remotion/lambda";
 import type { RuntimeConfig } from "../../config.js";
 import { anthropicKeyForAgent } from "../../config.js";
 import { buildVideoRenderInputs } from "./inputs.js";
 import { reviewCodeVideoCandidate } from "./creative.js";
 import type { VideoAspect } from "./probe.js";
+import { renderAndFileProjectThumbnail } from "./thumbnail.js";
 
 type Candidate = { id: string; client_id: string; project_id: string;
   ir_version: number; aspect: VideoAspect; storage_path: string;
@@ -14,9 +16,11 @@ type Candidate = { id: string; client_id: string; project_id: string;
   verdict: string; media_probe: { duration_sec?: number } };
 type Dependencies = { prepare: typeof buildVideoRenderInputs;
   review: typeof reviewCodeVideoCandidate;
-  download: typeof downloadCandidateExact };
+  download: typeof downloadCandidateExact;
+  thumbnail: typeof renderAndFileProjectThumbnail };
 const defaults: Dependencies = { prepare: buildVideoRenderInputs,
-  review: reviewCodeVideoCandidate, download: downloadCandidateExact };
+  review: reviewCodeVideoCandidate, download: downloadCandidateExact,
+  thumbnail: renderAndFileProjectThumbnail };
 const HASH = /^[0-9a-f]{64}$/;
 
 export class VideoCreativeReviewHeldError extends Error {}
@@ -89,8 +93,9 @@ export async function finalizeVideoProjectRender(input: {
   projectId: string; jobId: string; irVersion: number;
   aspects: VideoAspect[]; candidateIds: ReadonlyMap<VideoAspect, string>;
   workDir: string; maxAlignmentLoss: number;
+  region: AwsRegion; functionName: string; serveUrl: string;
 }, deps: Dependencies = defaults): Promise<{ state: "attached" | "rejected";
-  assetId?: string }> {
+  assetId?: string; thumbnailAttemptId?: string }> {
   const firstAspect = input.aspects[0];
   const firstId = firstAspect && input.candidateIds.get(firstAspect);
   if (!firstAspect || !firstId || input.candidateIds.size !== input.aspects.length) {
@@ -176,10 +181,18 @@ export async function finalizeVideoProjectRender(input: {
       throw new Error(`Derivative ${aspect} cannot inherit the first review.`);
     }
   }
+  const thumbnailAttemptId = await deps.thumbnail({
+    sb: input.sb,config: input.config,clientId: input.clientId,
+    projectId: input.projectId,jobId: input.jobId,
+    irVersion: input.irVersion,firstCandidateId: candidate.id,
+    region: input.region,functionName: input.functionName,
+    serveUrl: input.serveUrl,maxAlignmentLoss: input.maxAlignmentLoss,
+  });
   const attached = await input.sb.rpc("attach_video_project_render_v1", {
     p_project_id: input.projectId, p_first_candidate_id: candidate.id });
   if (attached.error || typeof attached.data !== "string") {
     throw new Error("Accepted video candidates could not enter human asset review.");
   }
-  return { state: "attached", assetId: attached.data };
+  return { state: "attached", assetId: attached.data,
+    thumbnailAttemptId };
 }

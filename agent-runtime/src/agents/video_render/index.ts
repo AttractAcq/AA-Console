@@ -16,6 +16,7 @@ import { runPreRenderCritic, PreRenderReviewHeldError }
 import { finalizeVideoProjectRender, VideoCreativeReviewHeldError }
   from "../../video/render/finalize.js";
 import type { VideoAspect } from "../../video/render/probe.js";
+import { ThumbnailOutcomeHeldError } from "../../video/render/thumbnail.js";
 
 type Project = { id: string; client_id: string; stage: string;
   ir_version: number; aspects: VideoAspect[] };
@@ -152,14 +153,17 @@ export async function runVideoRenderJobWithPipeline(
       clientId: project.client_id, projectId: project.id,
       jobId: job.id, irVersion: project.ir_version,
       aspects: project.aspects, candidateIds, workDir: directory,
-      maxAlignmentLoss: alignmentLoss });
+      maxAlignmentLoss: alignmentLoss,
+      region: site.region,functionName: site.functionName,
+      serveUrl: site.serveUrl });
     if (finalized.state === "rejected") {
       return { ok: false, retryable: false,
         failureMessage: "Video creative review rejected the exact first-aspect candidate." };
     }
     await appendEvent(sb, job.id, "Code-rendered video attached for human review.",
       "info", { project_id: project.id, ir_version: project.ir_version,
-        asset_id: finalized.assetId });
+        asset_id: finalized.assetId,
+        thumbnail_attempt_id: finalized.thumbnailAttemptId });
     return { ok: true, retryable: false };
   } catch (error) {
     if (error instanceof PreRenderReviewHeldError) {
@@ -167,6 +171,10 @@ export async function runVideoRenderJobWithPipeline(
         failureMessage: error.message };
     }
     if (error instanceof VideoCreativeReviewHeldError) {
+      return { ok: false, retryable: false, hold: true,
+        failureMessage: error.message };
+    }
+    if (error instanceof ThumbnailOutcomeHeldError) {
       return { ok: false, retryable: false, hold: true,
         failureMessage: error.message };
     }

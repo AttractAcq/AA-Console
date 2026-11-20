@@ -64,15 +64,19 @@ function fixture() {
     usage: { inputTokens: 100, outputTokens: 20,
       cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: 0.02 } }));
   const download = vi.fn(async () => {});
-  const deps = { prepare, review, download } as unknown as Deps;
+  const thumbnail = vi.fn(async () => "thumbnail-attempt-1");
+  const deps = { prepare, review, download, thumbnail } as unknown as Deps;
   const config = { model: "model-test", anthropicApiKey: "test",
     anthropicApiKeyByAgent: {} } as RuntimeConfig;
   const input = { sb, config, clientId, projectId, jobId,
     irVersion: 1, aspects: ["16:9", "9:16"] as Array<"16:9" | "9:16">,
     candidateIds: new Map([["16:9", firstId], ["9:16", secondId]]) as
       ReadonlyMap<"16:9" | "9:16", string>,
-    workDir: "/tmp/aa-video-finalize-test", maxAlignmentLoss: 0.25 };
-  return { input, deps, rpc, candidate, prepare, review, download,
+    workDir: "/tmp/aa-video-finalize-test", maxAlignmentLoss: 0.25,
+    region: "eu-central-1" as const,
+    functionName: "remotion-render-test",
+    serveUrl: "https://site.example.test" };
+  return { input, deps, rpc, candidate, prepare, review, download, thumbnail,
     setClaim: (state: string) => { claimState = state; } };
 }
 
@@ -80,7 +84,8 @@ describe("code-video finalization", () => {
   it("files the paid first review before accepting derivatives and attaching", async () => {
     const f = fixture();
     expect(await finalizeVideoProjectRender(f.input, f.deps))
-      .toEqual({ state: "attached", assetId: "asset-1" });
+      .toEqual({ state: "attached", assetId: "asset-1",
+        thumbnailAttemptId: "thumbnail-attempt-1" });
     expect(f.download).toHaveBeenCalledOnce();
     expect(f.review).toHaveBeenCalledWith(expect.objectContaining({
       narration: "First.\nSecond.", brandRules: expect.stringContaining("#AABBCC") }));
@@ -88,6 +93,9 @@ describe("code-video finalization", () => {
       "claim_video_project_creative_v1", "finish_video_project_creative_v1",
       "decide_video_project_render_candidate_v1",
       "attach_video_project_render_v1" ]);
+    expect(f.thumbnail).toHaveBeenCalledWith(expect.objectContaining({
+      projectId, firstCandidateId: firstId,
+      region: "eu-central-1",functionName: "remotion-render-test" }));
   });
 
   it("does not spend again when a creative claim is already held", async () => {
@@ -111,6 +119,15 @@ describe("code-video finalization", () => {
       .toEqual({ state: "rejected" });
     expect(f.rpc.mock.calls.map(([name]) => name)).toEqual([
       "claim_video_project_creative_v1", "finish_video_project_creative_v1" ]);
+  });
+
+  it("holds attachment when the thumbnail receipt cannot be filed", async () => {
+    const f = fixture();
+    f.thumbnail.mockRejectedValueOnce(new Error("thumbnail uncertain"));
+    await expect(finalizeVideoProjectRender(f.input, f.deps))
+      .rejects.toThrow(/thumbnail uncertain/);
+    expect(f.rpc).not.toHaveBeenCalledWith(
+      "attach_video_project_render_v1",expect.anything());
   });
 
   it("holds after an uncertain model result instead of repeating it", async () => {

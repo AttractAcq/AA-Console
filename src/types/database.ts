@@ -29432,6 +29432,7 @@ export type Database = {
           id: string
           ir_version: number
           project_id: string
+          thumbnail_attempt_id: string | null
         }
         Insert: {
           asset_id: string
@@ -29441,6 +29442,7 @@ export type Database = {
           id?: string
           ir_version: number
           project_id: string
+          thumbnail_attempt_id?: string | null
         }
         Update: {
           asset_id?: string
@@ -29450,6 +29452,7 @@ export type Database = {
           id?: string
           ir_version?: number
           project_id?: string
+          thumbnail_attempt_id?: string | null
         }
         Relationships: [
           {
@@ -29549,6 +29552,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "video_projects"
             referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_thumbnail_attempt_id_fkey"
+            columns: ["thumbnail_attempt_id"]
+            isOneToOne: false
+            referencedRelation: "video_project_thumbnail_attempts_v1"
+            referencedColumns: ["id"]
           },
         ]
       }
