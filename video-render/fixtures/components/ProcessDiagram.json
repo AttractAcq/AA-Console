@@ -1,0 +1,34 @@
+{
+  "nodes": [
+    {
+      "id": "signal",
+      "label": "Buying signal"
+    },
+    {
+      "id": "offer",
+      "label": "Relevant offer"
+    },
+    {
+      "id": "review",
+      "label": "Human review"
+    },
+    {
+      "id": "release",
+      "label": "Release"
+    }
+  ],
+  "edges": [
+    {
+      "from": "signal",
+      "to": "offer"
+    },
+    {
+      "from": "offer",
+      "to": "review"
+    },
+    {
+      "from": "review",
+      "to": "release"
+    }
+  ]
+}

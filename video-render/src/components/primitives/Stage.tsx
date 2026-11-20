@@ -2,6 +2,7 @@ import { createContext, useContext, type CSSProperties, type PropsWithChildren }
 import { AbsoluteFill } from "remotion";
 import { z } from "zod";
 import { buildTheme, type Theme } from "../../brand/theme.js";
+import { SAFE_AREAS as SAFE_PIXELS } from "../../brand/motion.js";
 
 export const AspectSchema = z.enum(["16:9", "9:16", "1:1"]);
 export type Aspect = z.infer<typeof AspectSchema>;
@@ -10,11 +11,7 @@ export const DIMENSIONS: Record<Aspect, { width: number; height: number }> = {
   "9:16": { width: 1080, height: 1920 },
   "1:1": { width: 1080, height: 1080 },
 };
-export const SAFE_AREAS: Record<Aspect, { x: number; y: number }> = {
-  "16:9": { x: 0.08, y: 0.1 },
-  "9:16": { x: 0.09, y: 0.13 },
-  "1:1": { x: 0.09, y: 0.11 },
-};
+export const SAFE_AREAS: Record<Aspect, { x: number; y: number }> = SAFE_PIXELS;
 
 export interface StageContextValue { aspect: Aspect; theme: Theme }
 const Context = createContext<StageContextValue | null>(null);
@@ -32,8 +29,8 @@ export function Stage({ aspect, theme, children }: PropsWithChildren<StageContex
     backgroundColor: theme.tokens.colours.background,
     color: theme.tokens.colours.text,
     fontFamily: theme.tokens.type.body,
-    "--safe-x": `${safe.x * 100}%`,
-    "--safe-y": `${safe.y * 100}%`,
+    "--safe-x": `${safe.x}px`,
+    "--safe-y": `${safe.y}px`,
   } as CSSProperties;
   return <Context.Provider value={{ aspect, theme }}><AbsoluteFill style={style}>{children}</AbsoluteFill></Context.Provider>;
 }
@@ -41,13 +38,16 @@ export function Stage({ aspect, theme, children }: PropsWithChildren<StageContex
 export function SafeArea({ children, style }: PropsWithChildren<{ style?: CSSProperties }>) {
   const { aspect } = useStage();
   const safe = SAFE_AREAS[aspect];
-  return <AbsoluteFill style={{ padding: `${safe.y * 100}% ${safe.x * 100}%`, boxSizing: "border-box", ...style }}>{children}</AbsoluteFill>;
+  return <AbsoluteFill style={{ padding: `${safe.y}px ${safe.x}px`, boxSizing: "border-box", ...style }}>{children}</AbsoluteFill>;
 }
 
 export type TextRegion = { x: number; y: number; width: number; height: number };
 export function centeredTextRegion(aspect: Aspect): TextRegion {
   const safe = SAFE_AREAS[aspect];
-  return { x: safe.x, y: safe.y, width: 1 - safe.x * 2, height: 1 - safe.y * 2 };
+  const size = DIMENSIONS[aspect];
+  const x = safe.x / size.width;
+  const y = safe.y / size.height;
+  return { x, y, width: 1 - x * 2, height: 1 - y * 2 };
 }
 
 export const AA_THEME = buildTheme(null);

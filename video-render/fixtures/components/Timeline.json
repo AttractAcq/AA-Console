@@ -1,0 +1,20 @@
+{
+  "events": [
+    {
+      "at": "Week 1",
+      "label": "Research"
+    },
+    {
+      "at": "Week 2",
+      "label": "Build"
+    },
+    {
+      "at": "Week 3",
+      "label": "Review"
+    },
+    {
+      "at": "Week 4",
+      "label": "Launch"
+    }
+  ]
+}

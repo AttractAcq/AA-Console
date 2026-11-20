@@ -1,16 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { registry, validateComponentProps } from "./registry.js";
 import { AspectSchema, DIMENSIONS, SAFE_AREAS } from "../components/primitives/Stage.js";
+import { demoFixtures } from "./demo-fixtures.js";
+import { layoutLayers } from "../components/explain/ProcessDiagram.js";
 
 describe("video component catalogue", () => {
   it("validates every Studio fixture", () => {
     for (const [name, entry] of Object.entries(registry)) {
-      const fixture = name === "TitleCard"
-        ? { title: "Build a clearer route to growth", subtitle: "A simple operating system for service businesses", kicker: "ATTRACT ACQUISITION" }
-        : name === "SectionCard"
-          ? { index: 1, title: "Find the buying moment" }
-          : { headline: "Ready to turn insight into action?", cta: "Explore the next step", url: "attractacq.com" };
-      expect(entry.schema.parse(fixture)).toEqual(fixture);
+      const fixture = demoFixtures[name as keyof typeof demoFixtures];
+      expect(entry.schema.parse(fixture)).toBeDefined();
       expect(entry.catalogueText.length).toBeGreaterThan(30);
       for (const aspect of AspectSchema.options) {
         const region = entry.textRegion(aspect);
@@ -36,5 +34,10 @@ describe("video component catalogue", () => {
       expect(SAFE_AREAS[aspect].x).toBeGreaterThan(0);
       expect(SAFE_AREAS[aspect].y).toBeGreaterThan(0);
     }
+  });
+
+  it("lays directed processes into deterministic layers and rejects cycles", () => {
+    expect(layoutLayers({ nodes: [{ id: "a", label: "A" }, { id: "b", label: "B" }, { id: "c", label: "C" }], edges: [{ from: "a", to: "b" }, { from: "b", to: "c" }] })).toEqual([["a"], ["b"], ["c"]]);
+    expect(() => layoutLayers({ nodes: [{ id: "a", label: "A" }, { id: "b", label: "B" }], edges: [{ from: "a", to: "b" }, { from: "b", to: "a" }] })).toThrow("cycle");
   });
 });

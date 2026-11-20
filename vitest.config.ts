@@ -1,12 +1,12 @@
 import { defineConfig } from "vitest/config";
 
-// agent-runtime is a separate deployable with its own package.json,
-// dependency tree and NodeNext module setup — it owns and runs its own
+// agent-runtime and video-render are separate packages with their own
+// dependency trees and NodeNext module setup — they own and run their own
 // tests via its own `npm test`, not this one.
 export default defineConfig({
   test: {
     // Node's built-in test runner owns these standalone replay tests.
-    exclude: ["**/node_modules/**", "agent-runtime/**", "aa-mcp-gateway/**",
+    exclude: ["**/node_modules/**", "agent-runtime/**", "aa-mcp-gateway/**", "video-render/**",
       "scripts/prepare-schema-replay.test.mjs", "scripts/schema-migration-order.test.mjs",
       "scripts/schema-replay-fingerprint.test.mjs", "scripts/staging-reconciliation-workspace.test.mjs",
       "scripts/assert-current-deploy-sha.test.mjs"],

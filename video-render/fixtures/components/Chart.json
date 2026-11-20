@@ -1,0 +1,21 @@
+{
+  "kind": "bar",
+  "series": [
+    {
+      "name": "Leads",
+      "values": [
+        6,
+        11,
+        15,
+        23
+      ]
+    }
+  ],
+  "categories": [
+    "Research",
+    "Offer",
+    "Content",
+    "Launch"
+  ],
+  "highlight": "Launch"
+}

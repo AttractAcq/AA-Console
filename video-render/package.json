@@ -9,6 +9,8 @@
     "build": "tsc -p tsconfig.json && node scripts/export-brand-schema.mjs && node scripts/export-brand-fixture.mjs",
     "studio": "remotion studio src/index.ts",
     "compositions": "remotion compositions src/index.ts",
+    "test:visual": "node scripts/visual-snapshots.mjs",
+    "snapshots:update": "node scripts/visual-snapshots.mjs --update",
     "test": "vitest run"
   },
   "dependencies": {
@@ -17,15 +19,24 @@
     "@remotion/media": "4.0.545",
     "@remotion/renderer": "4.0.545",
     "@remotion/transitions": "4.0.545",
+    "d3-scale": "4.0.3",
+    "d3-shape": "3.2.1",
+    "katex": "0.19.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "remotion": "4.0.545",
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@remotion/bundler": "4.0.545",
+    "@types/d3-scale": "4.0.9",
+    "@types/d3-shape": "3.2.0",
     "@types/node": "^24.13.3",
+    "@types/pngjs": "6.0.5",
     "@types/react": "18.3.31",
     "@types/react-dom": "18.3.7",
+    "pixelmatch": "8.0.0",
+    "pngjs": "7.0.0",
     "typescript": "~6.0.2",
     "vitest": "^4.1.11"
   }
