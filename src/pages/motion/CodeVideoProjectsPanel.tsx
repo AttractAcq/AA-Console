@@ -13,6 +13,7 @@ export function CodeVideoProjectsPanel() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
   const [agentPaused, setAgentPaused] = useState(true);
+  const [audioAgentPaused, setAudioAgentPaused] = useState(true);
   const [selected, setSelected] = useState<string[]>([]);
   const [activeDraft, setActiveDraft] = useState<string | null>(null);
   const [idea, setIdea] = useState("");
@@ -28,7 +29,7 @@ export function CodeVideoProjectsPanel() {
 
   const refresh = useCallback(async () => {
     if (!clientId) return;
-    const [projectResult, sourceResult, agentResult] = await Promise.all([
+    const [projectResult, sourceResult, agentResult, audioAgentResult] = await Promise.all([
       supabase.from("video_projects")
         .select("id,idea,audience,stage,stage_error,ir_version,source_snapshot,created_at")
         .eq("client_id", clientId).order("created_at", { ascending: false }).limit(30),
@@ -37,15 +38,19 @@ export function CodeVideoProjectsPanel() {
         .eq("client_id", clientId).eq("review_state", "supported")
         .order("title").limit(100),
       supabase.from("agents").select("paused").eq("agent_key", "video_script").maybeSingle(),
+      supabase.from("agents").select("paused").eq("agent_key", "video_audio").maybeSingle(),
     ]);
-    if (projectResult.error || sourceResult.error || agentResult.error) {
+    if (projectResult.error || sourceResult.error || agentResult.error
+      || audioAgentResult.error) {
       setError(projectResult.error?.message ?? sourceResult.error?.message
-        ?? agentResult.error?.message ?? "Could not load code-rendered video projects.");
+        ?? agentResult.error?.message ?? audioAgentResult.error?.message
+        ?? "Could not load code-rendered video projects.");
       return;
     }
     setProjects((projectResult.data ?? []) as Project[]);
     setSources((sourceResult.data ?? []) as Source[]);
     setAgentPaused(agentResult.data?.paused !== false);
+    setAudioAgentPaused(audioAgentResult.data?.paused !== false);
   }, [clientId]);
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -135,7 +140,8 @@ export function CodeVideoProjectsPanel() {
       {projects.length === 0 && <p className="text-xs text-muted-foreground">No code-rendered projects yet.</p>}
       {projects.map((project) => <div key={project.id} className="flex items-start justify-between gap-3 border-t border-border pt-2 text-xs">
         <div><p className="font-medium">{project.idea}</p>
-          <p className="text-muted-foreground">{project.stage}{project.stage_error ? ` · ${project.stage_error}` : ""}</p></div>
+          <p className="text-muted-foreground">{project.stage}{project.stage_error ? ` · ${project.stage_error}` : ""}
+            {project.stage === "timing" && audioAgentPaused ? " · Audio worker paused" : ""}</p></div>
         {project.stage === "draft" && <button type="button" onClick={() => { setActiveDraft(project.id); setSelected([]); setNote(""); }}
           className="shrink-0 text-brand-strong hover:underline">Choose sources</button>}
       </div>)}

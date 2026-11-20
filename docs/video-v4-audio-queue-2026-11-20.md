@@ -24,6 +24,10 @@ start and before receipt requires reconciliation; automated retry and cost
 accounting are V7 work. No real ElevenLabs request, hosted Storage write,
 migration or outward switch change was made in this source slice.
 
+The code-video project list shows “Audio worker paused” on timing projects
+while the registry agent remains held, so the operator can see that queued
+narration is waiting rather than completed.
+
 Local evidence: the disposable schema replay at
 `/private/tmp/aa-video-v4-670-audio-queue-evidence-final/` passed clean and
 released-to-current migration replay, catalog, generated types, lock-order and

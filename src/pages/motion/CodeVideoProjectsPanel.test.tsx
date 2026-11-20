@@ -8,14 +8,21 @@ const { rpc, records } = vi.hoisted(() => ({
   records: { projects: [] as Record<string, unknown>[],
     sources: [{ record_id: "source-1", title: "Reviewed offer", domain: "offer_strategy",
       observed_on: "2026-11-20", review_state: "supported" }],
-    paused: true },
+    paused: true, audioPaused: true },
 }));
 vi.mock("../../lib/supabase", () => ({ supabase: {
   rpc,
   from: (table: string) => {
-    const query = { select: () => query, eq: () => query, order: () => query,
+    let agentKey = "video_script";
+    const query = { select: () => query,
+      eq: (column: string, value: string) => {
+        if (column === "agent_key") agentKey = value;
+        return query;
+      }, order: () => query,
       limit: () => query,
-      maybeSingle: async () => ({ data: table === "agents" ? { paused: records.paused } : null,
+      maybeSingle: async () => ({ data: table === "agents"
+        ? { paused: agentKey === "video_audio" ? records.audioPaused : records.paused }
+        : null,
         error: null }),
       then: (resolve: (value: unknown) => unknown) => Promise.resolve({
         data: table === "video_projects" ? records.projects : records.sources,
@@ -32,7 +39,8 @@ vi.mock("react-router-dom", async (original) => ({
 
 import { CodeVideoProjectsPanel } from "./CodeVideoProjectsPanel";
 
-beforeEach(() => { rpc.mockReset(); records.projects = []; records.paused = true; });
+beforeEach(() => { rpc.mockReset(); records.projects = [];
+  records.paused = true; records.audioPaused = true; });
 
 it("saves a manual draft and keeps storyboard start held while the agent is paused", async () => {
   rpc.mockResolvedValue({ data: { id: "project-1", stage: "draft", ir_version: 0 }, error: null });
@@ -59,4 +67,12 @@ it("shows supported sources but cannot start a draft with a paused worker", asyn
   expect(screen.getByText(/Reviewed offer/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Start storyboard" })).toBeDisabled();
   expect(rpc).not.toHaveBeenCalled();
+});
+
+it("shows the paused audio worker on a queued narration project", async () => {
+  records.projects = [{ id: "project-2", idea: "Explain reviewed evidence to buyers.",
+    audience: "Local buyers", stage: "timing", stage_error: null, ir_version: 1,
+    source_snapshot: [], created_at: "2026-11-20" }];
+  render(<MemoryRouter><CodeVideoProjectsPanel /></MemoryRouter>);
+  expect(await screen.findByText(/timing · Audio worker paused/)).toBeInTheDocument();
 });
