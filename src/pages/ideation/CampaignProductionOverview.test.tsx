@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { expect, it, vi } from "vitest";
 
@@ -44,4 +44,7 @@ it("shows campaign requests and blockers from the shared production records", as
   expect(screen.getByText(/piece1 · paid v2/)).toBeInTheDocument();
   expect(inFilter).toHaveBeenCalledWith("route_package_id", ["route-new"]);
   expect(screen.getByText(/Request ID:/)).toHaveTextContent("work-1");
+  const readsBeforeRefresh = from.mock.calls.length;
+  fireEvent.click(screen.getByRole("button", { name: "Refresh campaign work" }));
+  await waitFor(() => expect(from.mock.calls.length).toBeGreaterThan(readsBeforeRefresh));
 });

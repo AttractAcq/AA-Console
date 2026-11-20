@@ -22,6 +22,7 @@ export function CampaignProductionOverview() {
   const [packages, setPackages] = useState<Map<string, RoutePackage>>(new Map());
   const [work, setWork] = useState<Map<string, Work>>(new Map());
   const [error, setError] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState(0);
 
   useEffect(() => {
     if (!clientId) return;
@@ -74,11 +75,15 @@ export function CampaignProductionOverview() {
     };
     void load();
     return () => { active = false; };
-  }, [clientId]);
+  }, [clientId, refreshToken]);
 
   if (!clientId) return null;
   return <section className="mb-5 rounded-lg border border-border bg-card p-4" aria-label="Campaign production requests">
-    <h2 className="font-semibold">Campaign production requests</h2>
+    <div className="flex items-center justify-between gap-2">
+      <h2 className="font-semibold">Campaign production requests</h2>
+      <button type="button" className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent"
+        onClick={() => setRefreshToken((value) => value + 1)}>Refresh campaign work</button>
+    </div>
     {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
     {!error && !demand.length && <p className="mt-2 text-xs text-muted-foreground">
       {campaigns.length ? "No campaign assets have been requested yet. Generate Assets from an approved campaign plan." : "No planned campaigns for this client."}
