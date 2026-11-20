@@ -60,8 +60,19 @@ async function setNeedsHuman(sb: SupabaseClient, project: Project,
   const { error } = await sb.from("video_projects").update({ stage: "needs_human",
     stage_error: reason.slice(0, 1000) })
     .eq("id", project.id).eq("client_id", project.client_id)
-    .eq("job_id", job.id).in("stage", ["queued", "scripting"]);
+    .eq("job_id", job.id).in("stage", ["queued", "scripting", "needs_human"]);
   if (error) throw new Error("Video project could not enter human review.");
+}
+
+async function queueAudio(sb: SupabaseClient, project: Project,
+  job: AgentJobRow, irVersion: number, sceneCount: number): Promise<void> {
+  const result = await sb.rpc("queue_video_audio_v1", {
+    p_project_id: project.id, p_script_job_id: job.id,
+    p_ir_version: irVersion,
+  });
+  if (result.error || result.data !== sceneCount) {
+    throw new Error("Accepted storyboard could not queue its exact audio scenes.");
+  }
 }
 
 export async function runVideoScriptJobWithCompletion(
@@ -76,8 +87,16 @@ export async function runVideoScriptJobWithCompletion(
   if (error || !data) return { ok: false, retryable: false,
     failureMessage: "Video project is unavailable to the job." };
   const project = data as Project;
-  if (project.job_id === job.id && project.stage === "needs_human"
-    && project.ir !== null && project.script !== null) {
+  if (project.job_id === job.id && project.ir !== null && project.script !== null
+    && ["needs_human", "timing", "timed"].includes(project.stage)) {
+    const packet = project.script as { independent_review?: { accepted?: boolean } };
+    if (packet.independent_review?.accepted === true
+      && project.stage === "needs_human") {
+      const scenes = (project.ir as { scenes?: unknown[] }).scenes;
+      if (!Array.isArray(scenes)) return { ok: false, retryable: false,
+        failureMessage: "Stored video scenes are invalid." };
+      await queueAudio(sb, project, job, project.ir_version, scenes.length);
+    }
     return { ok: true, retryable: false };
   }
   if (project.job_id !== job.id
@@ -151,8 +170,12 @@ export async function runVideoScriptJobWithCompletion(
     if (saved.error || saved.data !== project.ir_version + 1) {
       throw new Error("Video storyboard or sources changed before scene commit.");
     }
+    if (review.accepted) {
+      await queueAudio(sb, project, job,
+        project.ir_version + 1, review.ir.scenes.length);
+    }
     await appendEvent(sb, job.id, review.accepted
-      ? `Reviewed storyboard stored for renderer and human review (${review.ir.scenes.length} scenes).`
+      ? `Reviewed storyboard queued for audio (${review.ir.scenes.length} scenes).`
       : "Storyboard held after independent review.");
     return { ok: true, retryable: false, usage: incurredUsage };
   } catch (caught) {

@@ -25,7 +25,8 @@ update public.agents set paused=false where agent_key='video_script';
 
 do $checks$
 declare p public.video_projects%rowtype; q public.video_projects%rowtype;
-  job_id uuid; q_job uuid; ir jsonb; script jsonb; bad jsonb;
+  s public.video_scenes%rowtype;
+  job_id uuid; q_job uuid; audio_job uuid; ir jsonb; script jsonb; bad jsonb;
 begin
   p:=public.create_video_project_draft_v1(
     'f2222222-2222-4222-8222-222222222222',
@@ -69,6 +70,43 @@ begin
     or (select stage from public.video_projects where id=p.id)<>'needs_human'
     or (select ir_version from public.video_projects where id=p.id)<>1 then
     raise exception 'Scenes and project were not committed atomically'; end if;
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  begin
+    perform public.queue_video_audio_v1(p.id,job_id,1);
+    raise exception 'Browser queued video audio';
+  exception when insufficient_privilege then null; end;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  if public.queue_video_audio_v1(p.id,job_id,1)<>3 then
+    raise exception 'Accepted storyboard returned the wrong audio scene count'; end if;
+  if (select stage from public.video_projects where id=p.id)<>'timing' then
+    raise exception 'Accepted storyboard did not enter timing'; end if;
+  if (select count(*) from public.agent_jobs j
+      join public.video_scenes scene_join on scene_join.id=j.input_id
+      where scene_join.project_id=p.id and j.agent_key='video_audio')<>3 then
+    raise exception 'Accepted storyboard did not queue three audio jobs'; end if;
+  if (select paused from public.agents where agent_key='video_audio')
+      is distinct from true then
+    raise exception 'Video audio agent was released before review'; end if;
+  if public.queue_video_audio_v1(p.id,job_id,1)<>3 then
+    raise exception 'Exact audio queue replay was not idempotent'; end if;
+  select * into s from public.video_scenes where project_id=p.id
+    and scene_key='s01';
+  select id into audio_job from public.agent_jobs
+    where agent_key='video_audio' and input_id=s.id;
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  begin
+    perform public.begin_video_scene_audio_attempt_v1(p.id,s.id,audio_job,1);
+    raise exception 'Browser began a video audio attempt';
+  exception when insufficient_privilege then null; end;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  if not public.begin_video_scene_audio_attempt_v1(p.id,s.id,audio_job,1) then
+    raise exception 'Exact scene attempt did not begin'; end if;
+  begin
+    perform public.begin_video_scene_audio_attempt_v1(p.id,s.id,audio_job,1);
+    raise exception 'Duplicate provider attempt was accepted';
+  exception when check_violation then null; end;
+  if public.complete_video_audio_project_v1(p.id,1) then
+    raise exception 'Incomplete audio project marked timed'; end if;
   begin
     perform public.commit_video_storyboard_v1(p.id,job_id,0,ir,script,'Replay');
     raise exception 'Second commit accepted';

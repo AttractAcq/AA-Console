@@ -30516,6 +30516,75 @@ export type Database = {
           },
         ]
       }
+      video_scene_audio_attempts_v1: {
+        Row: {
+          client_id: string
+          filed_at: string | null
+          ir_version: number
+          job_id: string
+          project_id: string
+          scene_id: string
+          started_at: string
+          state: string
+        }
+        Insert: {
+          client_id: string
+          filed_at?: string | null
+          ir_version: number
+          job_id: string
+          project_id: string
+          scene_id: string
+          started_at?: string
+          state?: string
+        }
+        Update: {
+          client_id?: string
+          filed_at?: string | null
+          ir_version?: number
+          job_id?: string
+          project_id?: string
+          scene_id?: string
+          started_at?: string
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_scene_audio_attempts_v1_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_scene_audio_attempts_v1_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_scene_audio_attempts_v1_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_scene_audio_attempts_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_scene_audio_attempts_v1_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: true
+            referencedRelation: "video_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       video_scene_audio_receipts_v1: {
         Row: {
           alignment: Json
@@ -40035,6 +40104,15 @@ export type Database = {
         Args: { p_attempt_id: string; p_claim_key: string }
         Returns: boolean
       }
+      begin_video_scene_audio_attempt_v1: {
+        Args: {
+          p_ir_version: number
+          p_job_id: string
+          p_project_id: string
+          p_scene_id: string
+        }
+        Returns: boolean
+      }
       bind_campaign_action_sources_v6: {
         Args: { p_request_id: string }
         Returns: undefined
@@ -40956,6 +41034,10 @@ export type Database = {
           p_width: number
         }
         Returns: string
+      }
+      complete_video_audio_project_v1: {
+        Args: { p_ir_version: number; p_project_id: string }
+        Returns: boolean
       }
       compose_recruitment_body: {
         Args: {
@@ -45454,6 +45536,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      queue_video_audio_v1: {
+        Args: {
+          p_ir_version: number
+          p_project_id: string
+          p_script_job_id: string
+        }
+        Returns: number
+      }
       reap_stale_campaign_action_claims: { Args: never; Returns: number }
       reap_stale_lead_magnet_deliveries: { Args: never; Returns: number }
       reap_stale_outbound_claims: { Args: never; Returns: number }
@@ -48657,6 +48747,10 @@ export type Database = {
       }
       video_project_source_current_v1: {
         Args: { p_project_id: string }
+        Returns: boolean
+      }
+      video_scene_audio_storage_exists_v1: {
+        Args: { p_project_id: string; p_scene_id: string }
         Returns: boolean
       }
       video_scene_audio_storage_identity_v1: {

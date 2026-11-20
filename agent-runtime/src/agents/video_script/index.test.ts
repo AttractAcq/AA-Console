@@ -27,6 +27,7 @@ function store(current: boolean[]) {
   };
   const costCalls: unknown[] = [];
   const commitCalls: unknown[] = [];
+  const queueCalls: unknown[] = [];
   const sb = {
     rpc: vi.fn(async (name: string, args: unknown) => {
       if (name === "video_project_source_current_v1") {
@@ -41,6 +42,11 @@ function store(current: boolean[]) {
         Object.assign(project, { ir: packet.p_ir, script: packet.p_script,
           ir_version: 1, stage: "needs_human", stage_error: packet.p_stage_error });
         return { data: 1, error: null };
+      }
+      if (name === "queue_video_audio_v1") {
+        queueCalls.push(args);
+        Object.assign(project, { stage: "timing", stage_error: null });
+        return { data: 3, error: null };
       }
       throw new Error(`Unexpected RPC ${name}`);
     }),
@@ -66,7 +72,8 @@ function store(current: boolean[]) {
       return query;
     },
   };
-  return { sb: sb as unknown as SupabaseClient, project, costCalls, commitCalls };
+  return { sb: sb as unknown as SupabaseClient, project, costCalls,
+    commitCalls, queueCalls };
 }
 
 describe("video script job source and cost gates", () => {
@@ -92,7 +99,7 @@ describe("video script job source and cost gates", () => {
     expect(costCalls).toHaveLength(1);
   });
   it("stores a valid draft for review once and treats job replay as idempotent", async () => {
-    const { sb, project, costCalls, commitCalls } = store([true, true, true]);
+    const { sb, project, costCalls, commitCalls, queueCalls } = store([true, true, true]);
     const complete = vi.fn().mockResolvedValue({ text: JSON.stringify({ ir: fixture,
       sceneSources: fixture.scenes.map((scene: { id: string }) => ({
         sceneId: scene.id, sourceIds: ["source-1"],
@@ -103,8 +110,8 @@ describe("video script job source and cost gates", () => {
     expect(await runVideoScriptJobWithCompletion(sb, job, complete, review, "Catalogue"))
       .toMatchObject({ ok: true, usage: { inputTokens: 200, outputTokens: 400,
         costUsd: 0.01 } });
-    expect(project.stage).toBe("needs_human");
-    expect(project.stage_error).toContain("human claim review pending");
+    expect(project.stage).toBe("timing");
+    expect(project.stage_error).toBeNull();
     expect(project.script).toMatchObject({ source_digest: "a".repeat(64) });
     expect((project.script as { scene_sources: unknown[] }).scene_sources).toHaveLength(3);
     expect(project.ir_version).toBe(1);
@@ -114,6 +121,7 @@ describe("video script job source and cost gates", () => {
     expect(review).toHaveBeenCalledTimes(1);
     expect(costCalls).toHaveLength(2);
     expect(commitCalls).toHaveLength(1);
+    expect(queueCalls).toHaveLength(1);
   });
   it("records both model calls and holds an invalid independent review", async () => {
     const { sb, project, costCalls } = store([true, true]);
@@ -128,5 +136,32 @@ describe("video script job source and cost gates", () => {
     expect(project.stage).toBe("needs_human");
     expect(project.ir).toBeNull();
     expect(costCalls).toHaveLength(2);
+  });
+  it("recovers an accepted storyboard after a crash before audio enqueue", async () => {
+    const { sb, project, queueCalls, costCalls } = store([]);
+    Object.assign(project, { stage: "needs_human", ir_version: 1,
+      ir: fixture, script: { independent_review: { accepted: true } } });
+    const complete = vi.fn();
+    const result = await runVideoScriptJobWithCompletion(sb, job,
+      complete, complete, "Catalogue");
+    expect(result).toMatchObject({ ok: true, retryable: false });
+    expect(project.stage).toBe("timing");
+    expect(queueCalls).toHaveLength(1);
+    expect(costCalls).toHaveLength(0);
+    expect(complete).not.toHaveBeenCalled();
+  });
+  it("keeps an explicit independent-review failure out of audio", async () => {
+    const { sb, project, queueCalls } = store([true, true, true]);
+    const complete = vi.fn().mockResolvedValue({ text: JSON.stringify({ ir: fixture,
+      sceneSources: fixture.scenes.map((scene: { id: string }) => ({
+        sceneId: scene.id, sourceIds: ["source-1"],
+      })) }), usage });
+    const review = vi.fn().mockResolvedValue({ text: JSON.stringify({
+      verdict: "fail", reasons: ["Unsupported claim"], edits: [],
+    }), usage });
+    expect(await runVideoScriptJobWithCompletion(sb, job,
+      complete, review, "Catalogue")).toMatchObject({ ok: true });
+    expect(project.stage).toBe("needs_human");
+    expect(queueCalls).toHaveLength(0);
   });
 });

@@ -97,6 +97,9 @@ export interface RuntimeConfig {
    */
   leadMagnetDeliveryEnabled: boolean;
   openaiApiKey: string | null;
+  /** Fixed narrator for the code-rendered video route; both are optional until release. */
+  elevenLabsApiKey?: string | null;
+  elevenLabsVoiceId?: string | null;
   imageModel: string;
   /** Reel keyframes can use a precision-first model without changing static creative. */
   reelImageModel: string;
@@ -347,6 +350,8 @@ export function loadConfig(): RuntimeConfig {
     leadMagnetDeliveryEnabled:
       (optionalEnv("LEAD_MAGNET_DELIVERY_ENABLED") ?? "false").toLowerCase() === "true",
     openaiApiKey: optionalEnv("OPENAI_API_KEY") ?? null,
+    elevenLabsApiKey: optionalEnv("ELEVENLABS_API_KEY") ?? null,
+    elevenLabsVoiceId: optionalEnv("ELEVENLABS_VOICE_ID") ?? null,
     // Not pinned in code: the correct id is a provider fact that changes
     // faster than this repo does, so a wrong one is a config edit.
     imageModel: optionalEnv("OPENAI_IMAGE_MODEL") ?? "gpt-image-2",
