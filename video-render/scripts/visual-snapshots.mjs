@@ -20,7 +20,7 @@ const failures = [];
 try {
   const compositions = await getCompositions({ serveUrl, puppeteerInstance: browser });
   for (const composition of compositions) {
-    if (composition.id.startsWith("Gold-")) continue;
+    if (composition.id.startsWith("Gold-") || composition.id.startsWith("VideoIR-")) continue;
     const [component, aspect] = composition.id.match(/^(.*)-(16x9|9x16|1x1)$/)?.slice(1) ?? [];
     if (!component || !aspect) throw new Error(`Unexpected composition ID: ${composition.id}`);
     const frames = composition.durationInFrames === 1 ? [["10", 0], ["50", 0], ["90", 0]] : [["10", 15], ["50", 75], ["90", 135]];

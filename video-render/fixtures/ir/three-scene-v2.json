@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "title": "Three-scene compiler check",
+  "audience": "AA operators",
+  "tone": "calm",
+  "aspects": ["16:9", "9:16", "1:1"],
+  "music": { "enabled": false, "mood": "" },
+  "scenes": [
+    {
+      "id": "s01", "component": "TitleCard",
+      "props": { "title": "A useful starting point", "subtitle": "One clear problem", "kicker": "AA EXPLAINER" },
+      "narration": "Start with a clear problem.", "transitionIn": "cut", "chapter": false, "locked": false
+    },
+    {
+      "id": "s02", "component": "BulletReveal",
+      "props": { "heading": "Then check", "items": ["Evidence of demand", "A relevant offer"] },
+      "narration": "Check evidence of demand and a relevant offer.", "transitionIn": "fade", "chapter": true, "locked": false
+    },
+    {
+      "id": "s03", "component": "Outro",
+      "props": { "headline": "Review the exact version", "cta": "Continue the plan" },
+      "narration": "Review the exact version before release.", "transitionIn": "wipeBrand", "chapter": false, "locked": false
+    }
+  ]
+}

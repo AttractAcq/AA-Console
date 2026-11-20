@@ -6,13 +6,14 @@
     "node": "22.x"
   },
   "scripts": {
-    "prebuild": "node scripts/export-gold-fixture.mjs",
-    "build": "tsc -p tsconfig.json && node scripts/export-brand-schema.mjs && node scripts/export-brand-fixture.mjs",
+    "prebuild": "node scripts/export-gold-fixture.mjs && node scripts/export-v2-fixture.mjs",
+    "build": "tsc -p tsconfig.json && node scripts/export-brand-schema.mjs && node scripts/export-brand-fixture.mjs && node scripts/export-ir-schema.mjs --check",
     "studio": "remotion studio src/index.ts",
     "compositions": "remotion compositions src/index.ts",
     "test:visual": "node scripts/visual-snapshots.mjs",
     "snapshots:update": "node scripts/visual-snapshots.mjs --update",
     "render:gold": "node scripts/render-gold.mjs",
+    "render:ir": "node scripts/render-ir.mjs",
     "test": "vitest run"
   },
   "dependencies": {

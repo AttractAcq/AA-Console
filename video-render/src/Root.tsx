@@ -6,6 +6,9 @@ import { registry, type ComponentName } from "./ir/registry.js";
 import { demoFixtures } from "./ir/demo-fixtures.js";
 import { GoldVideo, goldDuration, validateGoldFixture } from "./compositions/GoldVideo.js";
 import { GOLD_FIXTURE } from "./compositions/gold-fixture.generated.js";
+import { V2_FIXTURE } from "./compositions/v2-fixture.generated.js";
+import { VideoFromIR } from "./compositions/VideoFromIR.js";
+import { compile } from "./ir/compile.js";
 
 const ComponentNameSchema = z.enum(Object.keys(registry) as [ComponentName, ...ComponentName[]]);
 const DemoSchema = z.strictObject({ aspect: AspectSchema, kind: ComponentNameSchema, props: z.unknown() });
@@ -35,6 +38,25 @@ export function RemotionRoot() {
         calculateMetadata={({ props: supplied }) => {
           const parsed = validateGoldFixture({ scenes: supplied.scenes });
           return { durationInFrames: goldDuration(parsed) };
+        }}
+      />;
+    })}
+    {AspectSchema.options.map((aspect) => {
+      const { width, height } = DIMENSIONS[aspect];
+      const defaultTimeline = compile(V2_FIXTURE.ir, V2_FIXTURE.timings);
+      return <Composition
+        key={`VideoIR-${aspect}`}
+        id={`VideoIR-${aspect.replace(":", "x")}`}
+        component={VideoFromIR}
+        durationInFrames={defaultTimeline.totalFrames}
+        fps={30}
+        width={width}
+        height={height}
+        defaultProps={{ aspect, ir: V2_FIXTURE.ir, timings: V2_FIXTURE.timings }}
+        calculateMetadata={({ props: supplied }) => {
+          const timeline = compile(supplied.ir, supplied.timings);
+          if (!timeline.aspects.includes(aspect)) throw new Error(`IR does not request ${aspect}`);
+          return { durationInFrames: timeline.totalFrames };
         }}
       />;
     })}
