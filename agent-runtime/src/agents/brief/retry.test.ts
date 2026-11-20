@@ -16,7 +16,9 @@ const job = { id: 'job', client_id: 'client', input_table: 'client_ideas', input
 const config = { anthropicApiKeyByAgent: {}, anthropicApiKey: 'test' } as RuntimeConfig;
 const agent = { agent_key: 'brief' } as AgentRow;
 const existing = { id: 'brief', client_id: 'client', source_idea_id: 'idea', title: 'Human edited' };
-function database(options: { existing?: typeof existing; conflict?: boolean; error?: string; wrongOwner?: boolean; proof?: Record<string, unknown>; selectionCurrent?: boolean } = {}) {
+function database(options: { existing?: typeof existing; conflict?: boolean; error?: string; wrongOwner?: boolean;
+  proof?: Record<string, unknown>; idea?: Record<string, unknown>; pillar?: Record<string, unknown>;
+  selectionCurrent?: boolean } = {}) {
   let saved: Record<string, unknown> | undefined = options.existing;
   const insert = vi.fn(async (row: Record<string, unknown>) => {
     if (options.error) return { error: { code: options.error, message: 'write failed' } };
@@ -34,7 +36,8 @@ function database(options: { existing?: typeof existing; conflict?: boolean; err
       neq: async () => ({ count: 0 }),
       maybeSingle: async () => ({ error: null, data: table === 'client_briefs' ? saved ?? null
         : table === 'client_proof_assets' ? options.proof ?? null
-        : table === 'client_ideas' ? { id: 'idea', title: 'Idea', media_type: 'image' } : { name: 'Client' } }),
+        : table === 'client_content_pillars' ? options.pillar ?? null
+        : table === 'client_ideas' ? { id: 'idea', title: 'Idea', media_type: 'image', ...options.idea } : { name: 'Client' } }),
       insert,
     };
     return query;
@@ -112,5 +115,30 @@ describe('proof factory selected source', () => {
     const db=database({proof});
     expect((await runBriefJob(db.sb,config,agent,pinnedJob,Date.now()+60_000)).ok).toBe(true);
     expect(db.saved()?.proof_asset_id).toBe('proof-1');
+  });
+});
+
+describe('exact idea sources in a production brief', () => {
+  const proof = {id:'proof-1',ref_number:'PRF-1',usage_rights:'approved',permission_basis:'Customer consent',expires_on:null};
+  const pillar = {id:'pillar-1',client_id:'client',active:true,name:'Care decisions',
+    premise:'Explain when to seek help',belongs:'Buyer questions',does_not_belong:'Unproven claims'};
+
+  it('carries the active selected pillar and cleared idea proof into the brief', async () => {
+    const response = await model();
+    model.mockClear();
+    model.mockResolvedValue({...response, submitted:{...response.submitted,proof_ref:'PRF-1'}});
+    const db = database({idea:{pillar_id:'pillar-1',proof_id:'proof-1'},pillar,proof});
+    expect((await run(db.sb)).ok).toBe(true);
+    expect(model.mock.calls[0]?.[0]?.prompt).toContain('Care decisions: Explain when to seek help');
+    expect(db.saved()?.proof_asset_id).toBe('proof-1');
+  });
+
+  it('holds a retired selected pillar and a revoked idea proof before calling the model', async () => {
+    const retired = database({idea:{pillar_id:'pillar-1'},pillar:{...pillar,active:false}});
+    expect((await run(retired.sb)).ok).toBe(false);
+    expect(model).not.toHaveBeenCalled();
+    const revoked = database({idea:{proof_id:'proof-1'},proof:{...proof,usage_rights:'restricted'}});
+    expect((await run(revoked.sb)).ok).toBe(false);
+    expect(model).not.toHaveBeenCalled();
   });
 });

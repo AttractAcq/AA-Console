@@ -112,7 +112,7 @@ export async function runBriefJob(
 
   const { data: idea, error: ideaError } = await sb
     .from("client_ideas")
-    .select("id, title, body, media_type, content_territory, source_question, strategic_reason, content_format, target_platform, campaign_id")
+    .select("id, title, body, media_type, content_territory, source_question, strategic_reason, content_format, target_platform, campaign_id, pillar_id, proof_id")
     .eq("id", ideaId)
     .maybeSingle();
   if (ideaError) throw new Error(`Failed to load idea: ${ideaError.message}`);
@@ -121,6 +121,17 @@ export async function runBriefJob(
   }
   const campaignContext = await loadCampaignBriefContext(sb, job.client_id, idea.campaign_id);
   if (campaignContext.blocker) return { ok: false, retryable: false, failureMessage: campaignContext.blocker };
+  let pillarContext = "";
+  if (idea.pillar_id) {
+    const { data: pillar, error } = await sb.from("client_content_pillars")
+      .select("id, client_id, name, premise, belongs, does_not_belong, active")
+      .eq("id", idea.pillar_id).maybeSingle();
+    if (error) throw new Error(`Could not load the idea's content pillar: ${error.message}`);
+    if (!pillar || pillar.client_id !== job.client_id || !pillar.active)
+      return { ok: false, retryable: false,
+        failureMessage: "The idea's selected content pillar is missing, retired or belongs to another client." };
+    pillarContext = `SELECTED CONTENT PILLAR — keep the brief inside this scope\n${pillar.name}: ${pillar.premise}\nBelongs: ${pillar.belongs}\nDoes not belong: ${pillar.does_not_belong}`;
+  }
 
   // Per-idea retrieval, not the whole corpus — same discipline as
   // ideation, and the reason the architecture calls this "progressive
@@ -147,7 +158,10 @@ export async function runBriefJob(
       .neq("usage_rights", "approved"),
   ]);
   let usable = availableProof;
-  const pinnedProofId = typeof job.params?.proof_factory_source_id === "string" ? job.params.proof_factory_source_id : null;
+  const jobProofId = typeof job.params?.proof_factory_source_id === "string" ? job.params.proof_factory_source_id : null;
+  if (jobProofId && idea.proof_id && jobProofId !== idea.proof_id)
+    return { ok: false, retryable: false, failureMessage: "The idea and job select different proof sources." };
+  const pinnedProofId = jobProofId ?? idea.proof_id;
   if (pinnedProofId) {
     const { data: selected, error: selectedError } = await sb.from("client_proof_assets")
       .select("*").eq("id", pinnedProofId).eq("client_id", job.client_id).maybeSingle();
@@ -214,6 +228,7 @@ ${idea.source_question ? `Answers this buyer question: ${idea.source_question}` 
 ${idea.strategic_reason ? `Why it matters: ${idea.strategic_reason}` : ""}
 ${idea.content_territory ? `Content territory: ${idea.content_territory}` : ""}
 ${campaignContext.text ? `\n${campaignContext.text}\n` : ""}
+${pillarContext ? `\n${pillarContext}\n` : ""}
 ${contentFormat === "reel"
     ? reelPlannerNote()
     : `Format: ${idea.media_type}${idea.content_format && idea.content_format !== "single" ? ` — produced as a ${idea.content_format}, which is an ordered set of frames rather than one picture` : ""}`}
