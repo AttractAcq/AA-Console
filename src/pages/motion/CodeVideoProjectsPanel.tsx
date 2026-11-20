@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { CodeVideoRenderCandidatesPanel } from "./CodeVideoRenderCandidatesPanel";
+import { CodeVideoAttachmentsPanel } from "./CodeVideoAttachmentsPanel";
 
 type Project = { id: string; idea: string; audience: string | null;
   stage: string; stage_error: string | null; ir_version: number;
@@ -22,7 +23,7 @@ export function CodeVideoProjectsPanel() {
   const [note, setNote] = useState("");
   const [tone, setTone] = useState<"calm" | "confident" | "energetic">("confident");
   const [seconds, setSeconds] = useState(120);
-  const [aspect, setAspect] = useState<"16:9" | "9:16" | "1:1">("16:9");
+  const [aspects, setAspects] = useState<Array<"16:9" | "9:16" | "1:1">>(["16:9"]);
   const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +61,7 @@ export function CodeVideoProjectsPanel() {
     setBusy(true); setError(null); setNotice(null);
     const result = await supabase.rpc("create_video_project_draft_v1", {
       p_client_id: clientId, p_idea: idea.trim(), p_audience: audience.trim(),
-      p_tone: tone, p_target_length_sec: seconds, p_aspects: [aspect],
+      p_tone: tone, p_target_length_sec: seconds, p_aspects: aspects,
       p_request_key: requestKey,
     });
     setBusy(false);
@@ -105,13 +106,19 @@ export function CodeVideoProjectsPanel() {
         <input aria-label="Video length" type="number" min={30} max={900} value={seconds}
           onChange={(event) => setSeconds(Number(event.target.value))}
           className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></label>
-      <label className="text-xs">Aspect
-        <select aria-label="Video aspect" value={aspect} onChange={(event) => setAspect(event.target.value as typeof aspect)}
-          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-          <option value="16:9">16:9</option><option value="9:16">9:16</option><option value="1:1">1:1</option>
-        </select></label>
+      <fieldset className="space-y-1 text-xs"><legend>Video aspects</legend>
+        {(["16:9", "9:16", "1:1"] as const).map((item) =>
+          <label key={item} className="flex items-center gap-2">
+            <input type="checkbox" aria-label={`Video aspect ${item}`}
+              checked={aspects.includes(item)}
+              onChange={() => setAspects((current) => current.includes(item)
+                ? current.filter((value) => value !== item) : [...current, item])} />
+            {item}</label>)}
+        <p className="text-muted-foreground">Choose at least one. The first aspect supplies the human-review asset.</p>
+      </fieldset>
     </div>
-    <button type="button" disabled={busy || idea.trim().length < 15 || !audience.trim()
+    <button type="button" disabled={busy || aspects.length === 0
+      || idea.trim().length < 15 || !audience.trim()
       || seconds < 30 || seconds > 900 || !Number.isInteger(seconds)}
       onClick={() => void createDraft()}
       className="rounded-md border border-border px-3 py-2 text-xs font-medium disabled:opacity-50">Save code-video draft</button>
@@ -148,6 +155,8 @@ export function CodeVideoProjectsPanel() {
       </div>)}
     </div>
     <CodeVideoRenderCandidatesPanel clientId={clientId}
+      titles={new Map(projects.map((project) => [project.id, project.idea]))} />
+    <CodeVideoAttachmentsPanel clientId={clientId}
       titles={new Map(projects.map((project) => [project.id, project.idea]))} />
   </section>;
 }

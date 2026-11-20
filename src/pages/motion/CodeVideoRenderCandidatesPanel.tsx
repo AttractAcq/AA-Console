@@ -9,6 +9,17 @@ function object(value: Json | null): Record<string, Json | undefined> {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
+type Check = { area: string; verdict: string; reason: string;
+  at_sec: number | null };
+function checks(value: Json | undefined): Check[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is Check => item !== null
+    && typeof item === "object" && !Array.isArray(item)
+    && typeof item.area === "string"
+    && typeof item.verdict === "string"
+    && typeof item.reason === "string");
+}
+
 export function CodeVideoRenderCandidatesPanel({ clientId, titles }: {
   clientId: string | undefined;
   titles: ReadonlyMap<string, string>;
@@ -44,6 +55,10 @@ export function CodeVideoRenderCandidatesPanel({ clientId, titles }: {
     {candidates.map((row) => {
       const probe = object(row.media_probe);
       const review = object(row.creative_review);
+      const creativeChecks = checks(review.checks);
+      const probeChecks = Array.isArray(probe.checks)
+        ? probe.checks.filter((issue): issue is string => typeof issue === "string") : [];
+      const segments = Array.isArray(review.segments) ? review.segments : [];
       const url = urls.get(row.storage_path);
       return <article key={row.id} className="rounded-md border border-border p-3 text-xs">
         <h4 className="font-medium">{titles.get(row.project_id) ?? "Video project"} · {row.aspect} · IR v{row.ir_version}</h4>
@@ -53,6 +68,32 @@ export function CodeVideoRenderCandidatesPanel({ clientId, titles }: {
           : <p className="text-muted-foreground">Private preview unavailable.</p>}
         {row.rejection_reason && <p className="mt-2 text-destructive">{row.rejection_reason}</p>}
         {typeof review.summary === "string" && <p className="mt-2">{review.summary}</p>}
+        <details className="mt-2"><summary className="cursor-pointer">Inspect media and creative checks</summary>
+          <div className="mt-2 space-y-1">
+            <p>Audio: {probe.has_audio === true ? "present" : "unknown or absent"}
+              {typeof probe.audio_integrated_lufs === "number"
+                ? ` · ${probe.audio_integrated_lufs} LUFS` : ""}
+              {typeof probe.audio_true_peak_dbfs === "number"
+                ? ` · true peak ${probe.audio_true_peak_dbfs} dBFS` : ""}</p>
+            {probeChecks.map((issue, index) => <p key={`${row.id}-probe-${index}`}
+              className="text-destructive">Media: {issue}</p>)}
+            {creativeChecks.map((check) => <p key={`${row.id}-${check.area}`}
+              className={check.verdict === "fail" ? "text-destructive" : undefined}>
+              {check.area.replace(/_/g, " ")} · {check.verdict}
+              {typeof check.at_sec === "number" ? ` at ${check.at_sec}s` : ""}: {check.reason}</p>)}
+            {segments.length > 0 && <p>{segments.length} sampled review segments
+              {typeof review.sampled_frames === "number"
+                ? ` · ${review.sampled_frames} frames` : ""}</p>}
+            {segments.map((segment, index) => {
+              const item = object(segment as Json);
+              return <p key={`${row.id}-segment-${index}`}>Segment {index + 1}:
+                {typeof item.first_sec === "number" ? ` ${item.first_sec}s` : ""}
+                {typeof item.last_sec === "number" ? `–${item.last_sec}s` : ""}
+                {typeof item.summary === "string" ? ` · ${item.summary}` : ""}</p>;
+            })}
+            {row.verdict === "pending" && <p>Creative review has not been filed.</p>}
+          </div>
+        </details>
         <details className="mt-2"><summary className="cursor-pointer">Exact candidate receipt</summary>
           <p className="break-all">SHA-256: {row.file_sha256}</p>
           <p className="break-all">Attempt: {row.attempt_id}</p>

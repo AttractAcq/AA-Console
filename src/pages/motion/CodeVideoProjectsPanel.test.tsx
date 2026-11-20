@@ -36,6 +36,9 @@ vi.mock("react-router-dom", async (original) => ({
   ...(await original<typeof import("react-router-dom")>()),
   useParams: () => ({ clientId: "client-1" }),
 }));
+vi.mock("./CodeVideoAttachmentsPanel", () => ({
+  CodeVideoAttachmentsPanel: () => null,
+}));
 
 import { CodeVideoProjectsPanel } from "./CodeVideoProjectsPanel";
 
@@ -75,4 +78,17 @@ it("shows the paused audio worker on a queued narration project", async () => {
     source_snapshot: [], created_at: "2026-11-20" }];
   render(<MemoryRouter><CodeVideoProjectsPanel /></MemoryRouter>);
   expect(await screen.findByText(/timing · Audio worker paused/)).toBeInTheDocument();
+});
+
+it("saves the operator's exact ordered set of requested aspects", async () => {
+  rpc.mockResolvedValue({ data: { id: "project-3", stage: "draft", ir_version: 0 }, error: null });
+  const user = userEvent.setup();
+  render(<MemoryRouter><CodeVideoProjectsPanel /></MemoryRouter>);
+  await user.type(screen.getByRole("textbox", { name: "Video idea" }),
+    "Explain reviewed services in several useful formats.");
+  await user.type(screen.getByRole("textbox", { name: "Video audience" }), "Local buyers");
+  await user.click(screen.getByRole("checkbox", { name: "Video aspect 9:16" }));
+  await user.click(screen.getByRole("button", { name: "Save code-video draft" }));
+  expect(rpc).toHaveBeenCalledWith("create_video_project_draft_v1",
+    expect.objectContaining({ p_aspects: ["16:9", "9:16"] }));
 });

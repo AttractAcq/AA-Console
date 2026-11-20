@@ -35,3 +35,26 @@ it("distinguishes a passed media probe from creative and human approval", async 
   expect(container.querySelector("video")).toHaveAttribute("src", "https://example.test/signed");
   expect(screen.queryByRole("button", { name: /approve/i })).not.toBeInTheDocument();
 });
+
+it("shows a failed critic area and the sampled segment evidence", async () => {
+  rows.value = [{ id: "candidate-2", project_id: "project-1", aspect: "9:16",
+    ir_version: 4, probe_result: "pass", verdict: "rejected", file_bytes: 2000000,
+    storage_path: "client/video/rejected.mp4", file_sha256: "b".repeat(64),
+    attempt_id: "attempt-2", created_at: "2026-11-20",
+    rejection_reason: "Contrast failed.",
+    media_probe: { width: 1080, height: 1920, duration_sec: 60,
+      has_audio: true, audio_integrated_lufs: -14.1,
+      audio_true_peak_dbfs: -1.7, checks: [] },
+    creative_review: { result: "fail", summary: "Contrast failed.",
+      sampled_frames: 6,
+      checks: [{ area: "contrast", verdict: "fail",
+        reason: "Text is unreadable.", at_sec: 12 }],
+      segments: [{ first_sec: 0.2, last_sec: 15.8,
+        summary: "Contrast failed in opening scene." }] } }];
+  render(<CodeVideoRenderCandidatesPanel clientId="client-1"
+    titles={new Map([["project-1", "An explainer"]])} />);
+  expect(await screen.findByText(/An explainer · 9:16 · IR v4/)).toBeInTheDocument();
+  expect(screen.getByText(/contrast · fail at 12s: Text is unreadable/))
+    .toBeInTheDocument();
+  expect(screen.getByText(/Segment 1: 0.2s–15.8s/)).toBeInTheDocument();
+});
