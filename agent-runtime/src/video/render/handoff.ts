@@ -9,7 +9,7 @@ type Attempt = { id: string; project_id: string; client_id: string;
   ir_version: number; aspect: string; job_id: string; state: string;
   region: string | null; function_name: string | null;
   render_id: string | null; bucket_name: string | null;
-  out_name: string | null };
+  out_name: string | null; serve_url: string | null };
 type Dependencies = { prepare: typeof buildVideoRenderInputs;
   start: typeof startLambdaRender; resume: typeof resumeLambdaRender };
 const dependencies: Dependencies = { prepare: buildVideoRenderInputs,
@@ -23,13 +23,14 @@ export class VideoRenderUncertainError extends Error {
 
 function attemptHandle(attempt: Attempt): LambdaRenderHandle {
   if (!attempt.region || !attempt.function_name || !attempt.render_id
-    || !attempt.bucket_name || !attempt.out_name) {
+    || !attempt.bucket_name || !attempt.out_name || !attempt.serve_url) {
     throw new VideoRenderUncertainError(attempt.id,
       "a started attempt has no complete provider handle");
   }
   return { region: attempt.region as AwsRegion,
     functionName: attempt.function_name, renderId: attempt.render_id,
-    bucketName: attempt.bucket_name, outName: attempt.out_name };
+    bucketName: attempt.bucket_name, outName: attempt.out_name,
+    serveUrl: attempt.serve_url };
 }
 
 /** Bind one aspect to a preflighted IR and one durable Lambda attempt.
@@ -72,11 +73,11 @@ export async function renderProjectAspect(input: {
         projectId: input.projectId, aspect: input.aspect,
         ir: prepared.ir, timings: prepared.timings,
         onStarted: async (started) => {
-          const filed = await input.sb.rpc("record_video_project_lambda_handle_v1", {
+          const filed = await input.sb.rpc("record_video_project_lambda_handle_v2", {
             p_attempt_id: attemptId, p_job_id: input.jobId,
             p_region: started.region, p_function_name: started.functionName,
             p_render_id: started.renderId, p_bucket_name: started.bucketName,
-            p_out_name: started.outName,
+            p_out_name: started.outName, p_serve_url: started.serveUrl,
           });
           if (filed.error || filed.data !== true) {
             throw new Error("Lambda handle was not durably recorded.");
@@ -96,7 +97,7 @@ export async function renderProjectAspect(input: {
     }
   } else if (state === "already_started") {
     const loaded = await input.sb.from("video_project_render_attempts_v1")
-      .select("id,project_id,client_id,ir_version,aspect,job_id,state,region,function_name,render_id,bucket_name,out_name")
+      .select("id,project_id,client_id,ir_version,aspect,job_id,state,region,function_name,render_id,bucket_name,out_name,serve_url")
       .eq("id", attemptId).eq("client_id", input.clientId).maybeSingle();
     const attempt = loaded.data as Attempt | null;
     if (loaded.error || !attempt || attempt.id !== attemptId
@@ -110,6 +111,7 @@ export async function renderProjectAspect(input: {
     handle = attemptHandle(attempt);
     if (handle.region !== input.region
       || handle.functionName !== input.functionName
+      || handle.serveUrl !== input.serveUrl
       || handle.outName !== `${input.projectId}-${input.aspect.replace(":", "x")}.mp4`) {
       throw new VideoRenderUncertainError(attemptId,
         "the deployment identity changed since the provider start");

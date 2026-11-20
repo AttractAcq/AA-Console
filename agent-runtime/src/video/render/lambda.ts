@@ -3,7 +3,8 @@ import { getRenderProgress, renderMediaOnLambda } from "@remotion/lambda/client"
 import type { AwsRegion } from "@remotion/lambda";
 
 export type LambdaRenderHandle = { region: AwsRegion; functionName: string;
-  renderId: string; bucketName: string; outName: string };
+  renderId: string; bucketName: string; outName: string;
+  serveUrl: string };
 type Progress = Awaited<ReturnType<typeof getRenderProgress>>;
 type Transport = { start: typeof renderMediaOnLambda;
   progress: typeof getRenderProgress; download: typeof downloadMedia;
@@ -29,7 +30,9 @@ function validateHandle(handle: LambdaRenderHandle): void {
   if (!handle.region || !handle.functionName
     || !/^[a-zA-Z0-9-]+$/.test(handle.renderId)
     || !/^[a-z0-9.-]+$/.test(handle.bucketName)
-    || !/^[a-zA-Z0-9_.-]+\.mp4$/.test(handle.outName)) {
+    || !/^[a-zA-Z0-9_.-]+\.mp4$/.test(handle.outName)
+    || !handle.serveUrl.startsWith("https://")
+    || handle.serveUrl.length > 2048) {
     throw new Error("Lambda render handle is invalid.");
   }
 }
@@ -126,7 +129,8 @@ export async function startLambdaRender(input: {
     throw new LambdaRenderStartUnknownError();
   }
   const handle = { region: input.region, functionName: input.functionName,
-    renderId: started.renderId, bucketName: started.bucketName, outName };
+    renderId: started.renderId, bucketName: started.bucketName,
+    outName, serveUrl: input.serveUrl };
   validateHandle(handle);
   try { await input.onStarted(handle); }
   catch {

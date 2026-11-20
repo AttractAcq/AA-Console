@@ -29660,6 +29660,7 @@ export type Database = {
           project_id: string
           region: string | null
           render_id: string | null
+          serve_url: string | null
           started_at: string | null
           state: string
         }
@@ -29678,6 +29679,7 @@ export type Database = {
           project_id: string
           region?: string | null
           render_id?: string | null
+          serve_url?: string | null
           started_at?: string | null
           state?: string
         }
@@ -29696,6 +29698,7 @@ export type Database = {
           project_id?: string
           region?: string | null
           render_id?: string | null
+          serve_url?: string | null
           started_at?: string | null
           state?: string
         }
@@ -46584,7 +46587,7 @@ export type Database = {
         }
         Returns: string
       }
-      record_video_project_lambda_handle_v1: {
+      record_video_project_lambda_handle_v2: {
         Args: {
           p_attempt_id: string
           p_bucket_name: string
@@ -46593,6 +46596,7 @@ export type Database = {
           p_out_name: string
           p_region: string
           p_render_id: string
+          p_serve_url: string
         }
         Returns: boolean
       }

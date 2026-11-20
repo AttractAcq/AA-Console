@@ -5,7 +5,8 @@ import { LambdaRenderObservationError, LambdaRenderStartUnknownError,
 const projectId = "11111111-1111-4111-8111-111111111111";
 const handle = { region: "eu-central-1" as const,
   functionName: "remotion-render-test", renderId: "render123",
-  bucketName: "remotion-test-bucket", outName: `${projectId}-16x9.mp4` };
+  bucketName: "remotion-test-bucket", outName: `${projectId}-16x9.mp4`,
+  serveUrl: "https://site.example.test" };
 type Transport = NonNullable<Parameters<typeof startLambdaRender>[1]>;
 
 function mockTransport(progressValues: Array<unknown> = []) {

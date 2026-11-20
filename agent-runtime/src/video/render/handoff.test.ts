@@ -10,7 +10,8 @@ const attemptId = "44444444-4444-4444-8444-444444444444";
 const handle = { region: "eu-central-1" as const,
   functionName: "remotion-render-test", renderId: "render123",
   bucketName: "remotion-bucket",
-  outName: `${projectId}-16x9.mp4` };
+  outName: `${projectId}-16x9.mp4`,
+  serveUrl: "https://site.example.test" };
 const input = { clientId, projectId, jobId, irVersion: 1,
   aspect: "16:9" as const, region: handle.region,
   functionName: handle.functionName,
@@ -24,7 +25,8 @@ function fixture(state: string) {
     client_id: clientId, ir_version: 1, aspect: "16:9",
     job_id: jobId, state: "started", region: handle.region,
     function_name: handle.functionName, render_id: handle.renderId,
-    bucket_name: handle.bucketName, out_name: handle.outName };
+    bucket_name: handle.bucketName, out_name: handle.outName,
+    serve_url: handle.serveUrl };
   const rpc = vi.fn(async (name: string) => {
     calls.push(name);
     if (name === "claim_video_project_render_v1") {
@@ -57,7 +59,7 @@ describe("exact render handoff", () => {
     expect(result).toMatchObject({ attemptId, handle,
       outputPath: input.localPath });
     expect(f.calls).toEqual(["claim_video_project_render_v1",
-      "record_video_project_lambda_handle_v1"]);
+      "record_video_project_lambda_handle_v2"]);
     expect(f.start).toHaveBeenCalledTimes(1);
     expect(f.resume).toHaveBeenCalledWith({ handle,
       localPath: input.localPath });
@@ -69,6 +71,10 @@ describe("exact render handoff", () => {
     expect(f.start).not.toHaveBeenCalled();
     expect(f.from).toHaveBeenCalledWith("video_project_render_attempts_v1");
     expect(f.resume).toHaveBeenCalledTimes(1);
+    await expect(renderProjectAspect({ sb: f.sb, ...input,
+      serveUrl: "https://site.example.test/changed" }, f.deps))
+      .rejects.toBeInstanceOf(VideoRenderUncertainError);
+    expect(f.start).not.toHaveBeenCalled();
   });
 
   it("holds a claimed-without-handle or uncertain provider start", async () => {

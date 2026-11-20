@@ -95,24 +95,35 @@ begin
     raise exception 'Render claim replay could start another Lambda'; end if;
   out_name:=p.id::text||'-16x9.mp4';
   begin
-    perform public.record_video_project_lambda_handle_v1(render_attempt,
+    perform public.record_video_project_lambda_handle_v2(render_attempt,
       render_job,'eu-central-1','remotion-render-test','render1',
-      'remotion-fixture-bucket','wrong.mp4');
+      'remotion-fixture-bucket','wrong.mp4',
+      'https://site.example.invalid/ir-v1');
     raise exception 'Wrong Lambda output was accepted';
   exception when check_violation then null; end;
-  if not public.record_video_project_lambda_handle_v1(render_attempt,
+  if not public.record_video_project_lambda_handle_v2(render_attempt,
     render_job,'eu-central-1','remotion-render-test','render1',
-    'remotion-fixture-bucket',out_name) then
+    'remotion-fixture-bucket',out_name,
+    'https://site.example.invalid/ir-v1') then
     raise exception 'Lambda handle was not persisted'; end if;
-  if not public.record_video_project_lambda_handle_v1(render_attempt,
+  if not public.record_video_project_lambda_handle_v2(render_attempt,
     render_job,'eu-central-1','remotion-render-test','render1',
-    'remotion-fixture-bucket',out_name) then
+    'remotion-fixture-bucket',out_name,
+    'https://site.example.invalid/ir-v1') then
     raise exception 'Exact Lambda handle replay failed'; end if;
   begin
-    perform public.record_video_project_lambda_handle_v1(render_attempt,
+    perform public.record_video_project_lambda_handle_v2(render_attempt,
       render_job,'eu-central-1','remotion-render-test','render2',
-      'remotion-fixture-bucket',out_name);
+      'remotion-fixture-bucket',out_name,
+      'https://site.example.invalid/ir-v1');
     raise exception 'Changed Lambda handle was accepted';
+  exception when check_violation then null; end;
+  begin
+    perform public.record_video_project_lambda_handle_v2(render_attempt,
+      render_job,'eu-central-1','remotion-render-test','render1',
+      'remotion-fixture-bucket',out_name,
+      'https://site.example.invalid/another-release');
+    raise exception 'Changed renderer site was accepted';
   exception when check_violation then null; end;
   result:=public.claim_video_project_render_v1(p.id,render_job,1,'9:16');
   second_attempt:=(result->>'attempt_id')::uuid;
