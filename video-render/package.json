@@ -1,0 +1,18 @@
+{
+  "name": "@aa/video-render",
+  "private": true,
+  "type": "module",
+  "engines": { "node": "22.x" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/export-brand-schema.mjs && node scripts/export-brand-fixture.mjs",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.11"
+  }
+}

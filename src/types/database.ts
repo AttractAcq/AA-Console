@@ -6358,8 +6358,11 @@ export type Database = {
           imagery_style: string | null
           lighting: string | null
           mood: string | null
+          narrator_voice_id: string | null
           never_do: string | null
           updated_at: string
+          video_rulebook_notes: string | null
+          video_tokens: Json | null
         }
         Insert: {
           client_id: string
@@ -6375,8 +6378,11 @@ export type Database = {
           imagery_style?: string | null
           lighting?: string | null
           mood?: string | null
+          narrator_voice_id?: string | null
           never_do?: string | null
           updated_at?: string
+          video_rulebook_notes?: string | null
+          video_tokens?: Json | null
         }
         Update: {
           client_id?: string
@@ -6392,8 +6398,11 @@ export type Database = {
           imagery_style?: string | null
           lighting?: string | null
           mood?: string | null
+          narrator_voice_id?: string | null
           never_do?: string | null
           updated_at?: string
+          video_rulebook_notes?: string | null
+          video_tokens?: Json | null
         }
         Relationships: [
           {

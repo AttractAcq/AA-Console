@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="Attract Acquisition motion brand title-card fixture">
+  <rect width="1280" height="720" fill="#F5F7F3"/>
+  <rect x="96" y="54" width="1088" height="612" rx="24" fill="#FFFFFF" stroke="#254D38" stroke-width="4"/>
+  <rect x="144" y="108" width="304" height="56" rx="28" fill="#D8EDB4"/>
+  <text x="172" y="144" fill="#142B23" font-family="system-ui,sans-serif" font-size="25" font-weight="700">ATTRACT ACQUISITION</text>
+  <text x="144" y="290" fill="#142B23" font-family="system-ui,sans-serif" font-size="72" font-weight="700">One idea per scene.</text>
+  <text x="148" y="355" fill="#192925" font-family="system-ui,sans-serif" font-size="40">A calm, legible explanation system.</text>
+  <circle cx="1010" cy="316" r="112" fill="#D8EDB4"/>
+  <path d="M947 318 L990 361 L1074 271" fill="none" stroke="#142B23" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  <rect x="144" y="550" width="992" height="80" rx="24" fill="#F5F7F3"/>
+  <text x="180" y="600" fill="#192925" font-family="system-ui,sans-serif" font-size="34">Captions own the lower safe area.</text>
+</svg>

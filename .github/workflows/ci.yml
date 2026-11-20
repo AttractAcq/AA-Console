@@ -127,3 +127,22 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
+
+  video-render:
+    name: Video renderer (brand build and test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: video-render
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: video-render/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npx tsc -p tsconfig.json
+      - run: node scripts/export-brand-schema.mjs --check
+      - run: node scripts/export-brand-fixture.mjs --check
