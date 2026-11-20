@@ -142,7 +142,7 @@ export const V2_FIXTURE = {
           ]
         },
         "narration": "A campaign plan names the assets it needs. Content and conversion pages are produced to a review gate. Only the approved versions can proceed to an operator handoff or distribution.",
-        "transitionIn": "wipeBrand",
+        "transitionIn": "fade",
         "chapter": true,
         "locked": false
       },
@@ -196,7 +196,7 @@ export const V2_FIXTURE = {
           "url": "attractacq.com"
         },
         "narration": "When the record is connected, the team can see what was planned, what was approved, what was released, and what outcome followed. Choose the next opportunity with that context.",
-        "transitionIn": "wipeBrand",
+        "transitionIn": "fade",
         "chapter": false,
         "locked": false
       }

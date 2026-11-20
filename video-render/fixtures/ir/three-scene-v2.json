@@ -19,7 +19,7 @@
     {
       "id": "s03", "component": "Outro",
       "props": { "headline": "Review the exact version", "cta": "Continue the plan" },
-      "narration": "Review the exact version before release.", "transitionIn": "wipeBrand", "chapter": false, "locked": false
+      "narration": "Review the exact version before release.", "transitionIn": "fade", "chapter": false, "locked": false
     }
   ]
 }

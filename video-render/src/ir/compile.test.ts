@@ -41,6 +41,11 @@ describe("video IR", () => {
     still.scenes[3].component = "ThumbnailCard";
     still.scenes[3].props = { hook: "Still" };
     expect(validateIR(still).ok).toBe(false);
+    const unrelatedWipe = structuredClone(fixture);
+    unrelatedWipe.scenes[4].transitionIn = "wipeBrand";
+    const wipeResult = validateIR(unrelatedWipe);
+    expect(wipeResult.ok).toBe(false);
+    if (!wipeResult.ok) expect(wipeResult.problems).toContain("scenes.4.transitionIn: brand wipe requires a TitleCard boundary");
   });
 
   it("binds timings by scene ID and refuses out-of-range audio or words", () => {

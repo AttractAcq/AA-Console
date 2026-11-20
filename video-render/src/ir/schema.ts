@@ -56,6 +56,10 @@ export function validateIR(raw: unknown): IRValidation {
     if (index === 0 && scene.component !== "TitleCard" && scene.component !== "SectionCard") problems.push(`${path}.component: video must open with TitleCard or SectionCard`);
     if (index === 0 && scene.transitionIn !== "cut") problems.push(`${path}.transitionIn: opening scene must use cut`);
     if (index > 0 && scene.component === ir.scenes[index - 1]?.component) problems.push(`${path}.component: consecutive scenes must use different components`);
+    if (index > 0 && scene.transitionIn === "wipeBrand"
+        && scene.component !== "TitleCard" && ir.scenes[index - 1]?.component !== "TitleCard") {
+      problems.push(`${path}.transitionIn: brand wipe requires a TitleCard boundary`);
+    }
     // Colour is a theme role, never a model-supplied literal in the IR.
     if (/#[0-9a-f]{3,8}\b/i.test(JSON.stringify(scene.props))) problems.push(`${path}.props: literal hex colours are not permitted`);
   });
