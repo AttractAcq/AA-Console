@@ -30516,6 +30516,87 @@ export type Database = {
           },
         ]
       }
+      video_scene_audio_receipts_v1: {
+        Row: {
+          alignment: Json
+          alignment_loss: number
+          attempts: number
+          audio_sha256: string
+          client_id: string
+          created_at: string
+          duration_sec: number
+          file_bytes: number
+          ir_version: number
+          measured_lufs: number
+          model_id: string
+          narration_sha256: string
+          object_id: string
+          object_updated_at: string
+          object_version: string | null
+          project_id: string
+          scene_id: string
+          storage_path: string
+          voice_id: string
+        }
+        Insert: {
+          alignment: Json
+          alignment_loss: number
+          attempts: number
+          audio_sha256: string
+          client_id: string
+          created_at?: string
+          duration_sec: number
+          file_bytes: number
+          ir_version: number
+          measured_lufs: number
+          model_id: string
+          narration_sha256: string
+          object_id: string
+          object_updated_at: string
+          object_version?: string | null
+          project_id: string
+          scene_id: string
+          storage_path: string
+          voice_id: string
+        }
+        Update: {
+          alignment?: Json
+          alignment_loss?: number
+          attempts?: number
+          audio_sha256?: string
+          client_id?: string
+          created_at?: string
+          duration_sec?: number
+          file_bytes?: number
+          ir_version?: number
+          measured_lufs?: number
+          model_id?: string
+          narration_sha256?: string
+          object_id?: string
+          object_updated_at?: string
+          object_version?: string | null
+          project_id?: string
+          scene_id?: string
+          storage_path?: string
+          voice_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_scene_audio_receipts_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_scene_audio_receipts_v1_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: true
+            referencedRelation: "video_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       video_scenes: {
         Row: {
           alignment: Json | null
@@ -40792,6 +40873,27 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      commit_video_scene_audio_v1: {
+        Args: {
+          p_alignment: Json
+          p_alignment_loss: number
+          p_attempts: number
+          p_audio_sha256: string
+          p_duration_sec: number
+          p_file_bytes: number
+          p_ir_version: number
+          p_measured_lufs: number
+          p_narration_sha256: string
+          p_object_id: string
+          p_object_updated_at: string
+          p_object_version: string
+          p_project_id: string
+          p_scene_id: string
+          p_storage_path: string
+          p_voice_id: string
+        }
+        Returns: string
+      }
       commit_video_storyboard_v1: {
         Args: {
           p_expected_ir_version: number
@@ -48556,6 +48658,14 @@ export type Database = {
       video_project_source_current_v1: {
         Args: { p_project_id: string }
         Returns: boolean
+      }
+      video_scene_audio_storage_identity_v1: {
+        Args: { p_project_id: string; p_scene_id: string }
+        Returns: Json
+      }
+      video_scene_audio_upload_target_v1: {
+        Args: { p_project_id: string; p_scene_id: string }
+        Returns: Json
       }
       video_seat_review_hash_v6: {
         Args: {

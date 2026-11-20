@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "5d80d7c073abee39cf82a356a3cc9a832c6fc77b57e124a041c6c3187d9d4b88",
-  "generatedTypesSha256": "f6491ff705cd4a004bb2310d79edd5166044ac47de8ad8ffef985b86c8a8b438",
-  "generatedSchemaBodySha256": "96cc22d8750d376d1aebff134d9ac21a0e06c1199f0a9d77d484108ff94ee229",
+  "migrationSourceDigest": "d85951e752bae60d7d5c04468b8abf26e5dd51987eeda35df595548dedf7311c",
+  "generatedTypesSha256": "f176cecd749b72517cecf2a76ed8746c05a8ad4a3b30668f2c27010075bb7994",
+  "generatedSchemaBodySha256": "9734c3b64b7e05bd7bd9b384a9730dabdf639f846d6a34068b09cce802563593",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4798,6 +4798,13 @@
       "filename": "20261124054300_668_video_storyboard_scene_commit.sql",
       "sha256": "d2c900bb3d9051e32890b1f992095cb74199a0637891191ce7f8e0736e25d508",
       "trimmedMd5": "c776094b5b63e1a040acef2f86cd351e"
+    },
+    {
+      "version": "20261124054400",
+      "name": "669_video_scene_audio_receipts",
+      "filename": "20261124054400_669_video_scene_audio_receipts.sql",
+      "sha256": "5100ba7122534057b02e539bfac9b4e68bc1ae25ec90c72639b174e9f121602b",
+      "trimmedMd5": "4fc3a3a4c2ceb37c4559bed1ffafd280"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
