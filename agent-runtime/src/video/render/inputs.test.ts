@@ -14,9 +14,10 @@ const hash = createHash("sha256").update(bytes).digest("hex");
 const digest = (text: string) => createHash("sha256").update(text).digest("hex");
 
 function fixture(options: { tamper?: boolean; secondCheckFails?: boolean;
-  musicState?: string } = {}) {
+  musicState?: string; visualVersion?: number } = {}) {
   const project = { id: projectId, client_id: clientId,
-    stage: "timed", ir_version: 2, ir, music_path: null };
+    stage: "timed", ir_version: options.visualVersion ?? 2,
+    audio_ir_version: 2, ir, music_path: null };
   const scenes = ir.scenes.map((source: { id: string; narration: string },
     index: number) => {
     const path = `${clientId}/video/projects/${projectId}`
@@ -93,5 +94,17 @@ describe("render input preflight", () => {
     await expect(buildVideoRenderInputs({ sb: unfinished.sb, clientId,
       projectId, maxAlignmentLoss: 0.25 })).rejects.toThrow(/not terminal/);
     expect(unfinished.download).not.toHaveBeenCalled();
+  });
+
+  it("binds a visual IR revision to unchanged verified audio bytes", async () => {
+    const db = fixture({ visualVersion: 3 });
+    const result = await buildVideoRenderInputs({ sb: db.sb,
+      clientId, projectId, maxAlignmentLoss: 0.25 });
+    expect(result.irVersion).toBe(3);
+    expect(db.createSignedUrl).toHaveBeenCalledWith(
+      `${clientId}/video/projects/${projectId}/ir-v2/scenes/s01/audio.mp3`,
+      7200);
+    expect(db.rpc).toHaveBeenCalledWith("complete_video_audio_project_v1",
+      { p_project_id: projectId, p_ir_version: 3 });
   });
 });

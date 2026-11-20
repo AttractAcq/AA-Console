@@ -82,6 +82,20 @@ begin
     raise exception 'Video audio completion failed'; end if;
   if (select stage from public.video_projects where id=p.id)<>'timed' then
     raise exception 'Video did not reach timed stage'; end if;
+  if (select audio_ir_version from public.video_projects where id=p.id)<>1 then
+    raise exception 'Exact audio version was not bound at timing completion'; end if;
+  begin
+    update public.video_projects set ir_version=2 where id=p.id;
+    if not public.complete_video_audio_project_v1(p.id,2) then
+      raise exception 'Unchanged audio was not valid for a visual IR revision'; end if;
+    update public.video_scenes set narration='Changed narration.'
+      where project_id=p.id and scene_key='s01';
+    begin
+      perform public.complete_video_audio_project_v1(p.id,2);
+      raise exception 'Changed narration reused old audio';
+    exception when check_violation then null; end;
+    raise exception 'Rollback isolated visual-version test' using errcode='Z0001';
+  exception when sqlstate 'Z0001' then null; end;
   render_job:=public.queue_video_render_v1(p.id,1);
   if render_job is distinct from public.queue_video_render_v1(p.id,1) then
     raise exception 'Render queue replay created another job'; end if;

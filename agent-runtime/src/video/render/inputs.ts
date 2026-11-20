@@ -4,7 +4,8 @@ import { renderTimingsFromReceipts } from "../audio/render-timings.js";
 import { parseRuntimeIR } from "../validate.js";
 
 type Project = { id: string; client_id: string; stage: string;
-  ir_version: number; ir: unknown; music_path: string | null };
+  ir_version: number; audio_ir_version: number | null;
+  ir: unknown; music_path: string | null };
 type Scene = { id: string; client_id: string; project_id: string;
   position: number; scene_key: string; narration: string;
   audio_path: string | null; duration_sec: number | null;
@@ -42,7 +43,7 @@ export async function buildVideoRenderInputs(input: {
 }) {
   const { sb, clientId, projectId } = input;
   const projectResult = await sb.from("video_projects")
-    .select("id,client_id,stage,ir_version,ir,music_path")
+    .select("id,client_id,stage,ir_version,audio_ir_version,ir,music_path")
     .eq("id", projectId).eq("client_id", clientId).maybeSingle();
   const project = projectResult.data as Project | null;
   if (projectResult.error || !project || project.id !== projectId
@@ -51,6 +52,11 @@ export async function buildVideoRenderInputs(input: {
     throw new Error("Video project is not in the exact timed state.");
   }
   const ir = parseRuntimeIR(project.ir);
+  const audioVersion = project.audio_ir_version ?? project.ir_version;
+  if (!Number.isInteger(audioVersion) || audioVersion < 1
+    || audioVersion > project.ir_version) {
+    throw new Error("Video audio version binding is invalid.");
+  }
   await verifyCompletedAudio(sb, projectId, project.ir_version);
   const [scenesResult, receiptsResult, musicResult, musicAttemptResult] = await Promise.all([
     sb.from("video_scenes")
@@ -59,13 +65,15 @@ export async function buildVideoRenderInputs(input: {
     sb.from("video_scene_audio_receipts_v1")
       .select("scene_id,client_id,project_id,ir_version,narration_sha256,audio_sha256,storage_path,file_bytes,duration_sec,alignment,alignment_loss")
       .eq("project_id", projectId).eq("client_id", clientId)
-      .eq("ir_version", project.ir_version),
+      .eq("ir_version", audioVersion),
     sb.from("video_project_music_receipts_v1")
       .select("client_id,project_id,ir_version,storage_path,audio_sha256,file_bytes")
-      .eq("project_id", projectId).eq("client_id", clientId).maybeSingle(),
+      .eq("project_id", projectId).eq("client_id", clientId)
+      .eq("ir_version", audioVersion).maybeSingle(),
     sb.from("video_project_music_attempts_v1")
       .select("client_id,project_id,ir_version,state,requested")
-      .eq("project_id", projectId).eq("client_id", clientId).maybeSingle(),
+      .eq("project_id", projectId).eq("client_id", clientId)
+      .eq("ir_version", audioVersion).maybeSingle(),
   ]);
   if (scenesResult.error || receiptsResult.error || musicResult.error
     || musicAttemptResult.error) {
@@ -77,7 +85,7 @@ export async function buildVideoRenderInputs(input: {
   const musicAttempt = musicAttemptResult.data as MusicAttempt | null;
   if (!musicAttempt || musicAttempt.client_id !== clientId
     || musicAttempt.project_id !== projectId
-    || musicAttempt.ir_version !== project.ir_version
+    || musicAttempt.ir_version !== audioVersion
     || musicAttempt.requested !== ir.music.enabled
     || !["filed", "failed", "skipped"].includes(musicAttempt.state)
     || (musicAttempt.state === "filed") !== (musicReceipt !== null)
@@ -118,15 +126,16 @@ export async function buildVideoRenderInputs(input: {
     signedMedia.push({ path: file.path, url: signed.data.signedUrl });
   }
   const timings = renderTimingsFromReceipts({ clientId, projectId,
-    irVersion: project.ir_version, scenes, receipts,
+    irVersion: audioVersion, scenes, receipts,
     musicPath: project.music_path, musicReceipt, signedMedia,
     maxAlignmentLoss: input.maxAlignmentLoss });
   await verifyCompletedAudio(sb, projectId, project.ir_version);
   const final = await sb.from("video_projects")
-    .select("stage,ir_version,ir,music_path")
+    .select("stage,ir_version,audio_ir_version,ir,music_path")
     .eq("id", projectId).eq("client_id", clientId).maybeSingle();
   if (final.error || final.data?.stage !== "timed"
     || final.data.ir_version !== project.ir_version
+    || final.data.audio_ir_version !== project.audio_ir_version
     || final.data.music_path !== project.music_path
     || JSON.stringify(final.data.ir) !== JSON.stringify(project.ir)) {
     throw new Error("Video IR changed while render inputs were prepared.");

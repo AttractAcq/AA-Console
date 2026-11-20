@@ -30120,6 +30120,7 @@ export type Database = {
         Row: {
           aspects: string[]
           audience: string | null
+          audio_ir_version: number | null
           brief_id: string | null
           campaign_id: string | null
           client_id: string
@@ -30151,6 +30152,7 @@ export type Database = {
         Insert: {
           aspects?: string[]
           audience?: string | null
+          audio_ir_version?: number | null
           brief_id?: string | null
           campaign_id?: string | null
           client_id: string
@@ -30182,6 +30184,7 @@ export type Database = {
         Update: {
           aspects?: string[]
           audience?: string | null
+          audio_ir_version?: number | null
           brief_id?: string | null
           campaign_id?: string | null
           client_id?: string
@@ -43215,6 +43218,7 @@ export type Database = {
         Returns: {
           aspects: string[]
           audience: string | null
+          audio_ir_version: number | null
           brief_id: string | null
           campaign_id: string | null
           client_id: string

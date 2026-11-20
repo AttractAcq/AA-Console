@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "d6dc305954fa149300294bdf6f6556f39541fbef24671b5d1f7ec11deb272b3b",
-  "generatedTypesSha256": "9d895df45b545c379acc08f2c16718e7da358708f53e455ae22ee0bd7f076b12",
-  "generatedSchemaBodySha256": "edaa6c6a87b536d2a4be3784cc481537b2236bc25fa0d33b99c7bc011edcc4c0",
+  "migrationSourceDigest": "e1cbc412e9117d2aca47effc6e8081d5ecc77c2e82ce23d230bc926831a8c5e4",
+  "generatedTypesSha256": "a9cc92d1a94a42b366fdda5378cb7c824f3eac548185be7c3cd17449ed78dd44",
+  "generatedSchemaBodySha256": "1795dece44f1e4c21c8a60a2f266e92467b3ae42a7e753e766c874a91580bfe6",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4889,6 +4889,13 @@
       "filename": "20261124055600_681_video_prerender_critic_receipt.sql",
       "sha256": "d733b744bb03e1d31ef50ba53aebde939b942c55337b51f627b4d8efab275a75",
       "trimmedMd5": "5feeb01fa516b48327d132bda2c4bdf5"
+    },
+    {
+      "version": "20261124055700",
+      "name": "682_video_audio_version_binding",
+      "filename": "20261124055700_682_video_audio_version_binding.sql",
+      "sha256": "4ad517481bdda0a7607cad67197b7db9e455255d3f793f4e2409dc0cc1c4f98d",
+      "trimmedMd5": "4a7acb57260fbea01d95d82f116c8b23"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
