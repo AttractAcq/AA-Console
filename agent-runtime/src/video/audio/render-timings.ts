@@ -21,12 +21,16 @@ const SHA = /^[0-9a-f]{64}$/;
  */
 export function renderTimingsFromReceipts(input: {
   clientId: string; projectId: string; irVersion: number;
+  audioVersion?: number;
   scenes: Scene[]; receipts: Receipt[];
   musicPath: string | null; musicReceipt: MusicReceipt | null;
   signedMedia: Media[]; maxAlignmentLoss: number;
 }): { musicSrc: string | null; scenes: SceneTiming[] } {
   const { clientId, projectId, irVersion } = input;
+  const audioVersion = input.audioVersion ?? irVersion;
   if (!clientId || !projectId || !Number.isInteger(irVersion) || irVersion < 1
+    || !Number.isInteger(audioVersion) || audioVersion < 1
+    || audioVersion > irVersion
     || !Number.isFinite(input.maxAlignmentLoss) || input.maxAlignmentLoss < 0
     || input.receipts.length !== input.scenes.length
     || input.scenes.length < 3 || input.scenes.length > 40) {
@@ -48,13 +52,14 @@ export function renderTimingsFromReceipts(input: {
   const timings = input.scenes.map((scene, index) => {
     const receipt = receipts.get(scene.id);
     const expectedPath = `${clientId}/video/projects/${projectId}`
-      + `/ir-v${irVersion}/scenes/${scene.scene_key}/audio.mp3`;
+      + `/ir-v${receipt?.ir_version}/scenes/${scene.scene_key}/audio.mp3`;
     if (scene.position !== index + 1
       || scene.scene_key !== `s${String(index + 1).padStart(2, "0")}`
       || scene.client_id !== clientId || scene.project_id !== projectId
       || !receipt || receipt.scene_id !== scene.id
       || receipt.client_id !== clientId || receipt.project_id !== projectId
-      || receipt.ir_version !== irVersion
+      || !Number.isInteger(receipt.ir_version)
+      || receipt.ir_version < audioVersion || receipt.ir_version > irVersion
       || receipt.storage_path !== expectedPath || scene.audio_path !== expectedPath
       || !SHA.test(receipt.audio_sha256)
       || receipt.narration_sha256 !== createHash("sha256")
@@ -75,11 +80,11 @@ export function renderTimingsFromReceipts(input: {
   let musicSrc: string | null = null;
   if (input.musicPath !== null) {
     const expectedPath = `${clientId}/video/projects/${projectId}`
-      + `/ir-v${irVersion}/music.mp3`;
+      + `/ir-v${audioVersion}/music.mp3`;
     const receipt = input.musicReceipt;
     if (input.musicPath !== expectedPath || !receipt
       || receipt.client_id !== clientId || receipt.project_id !== projectId
-      || receipt.ir_version !== irVersion || receipt.storage_path !== expectedPath
+      || receipt.ir_version !== audioVersion || receipt.storage_path !== expectedPath
       || !SHA.test(receipt.audio_sha256) || !urls.has(expectedPath)) {
       throw new Error("Renderer music receipt is unavailable.");
     }

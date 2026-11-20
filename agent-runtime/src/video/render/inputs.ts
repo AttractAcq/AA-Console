@@ -64,8 +64,7 @@ export async function buildVideoRenderInputs(input: {
       .eq("project_id", projectId).eq("client_id", clientId).order("position"),
     sb.from("video_scene_audio_receipts_v1")
       .select("scene_id,client_id,project_id,ir_version,narration_sha256,audio_sha256,storage_path,file_bytes,duration_sec,alignment,alignment_loss")
-      .eq("project_id", projectId).eq("client_id", clientId)
-      .eq("ir_version", audioVersion),
+      .eq("project_id", projectId).eq("client_id", clientId),
     sb.from("video_project_music_receipts_v1")
       .select("client_id,project_id,ir_version,storage_path,audio_sha256,file_bytes")
       .eq("project_id", projectId).eq("client_id", clientId)
@@ -126,7 +125,7 @@ export async function buildVideoRenderInputs(input: {
     signedMedia.push({ path: file.path, url: signed.data.signedUrl });
   }
   const timings = renderTimingsFromReceipts({ clientId, projectId,
-    irVersion: audioVersion, scenes, receipts,
+    irVersion: project.ir_version, audioVersion, scenes, receipts,
     musicPath: project.music_path, musicReceipt, signedMedia,
     maxAlignmentLoss: input.maxAlignmentLoss });
   await verifyCompletedAudio(sb, projectId, project.ir_version);

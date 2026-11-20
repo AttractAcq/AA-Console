@@ -14,14 +14,19 @@ const hash = createHash("sha256").update(bytes).digest("hex");
 const digest = (text: string) => createHash("sha256").update(text).digest("hex");
 
 function fixture(options: { tamper?: boolean; secondCheckFails?: boolean;
-  musicState?: string; visualVersion?: number } = {}) {
+  musicState?: string; visualVersion?: number; revisedScene?: boolean } = {}) {
+  const currentIr = structuredClone(ir);
+  if (options.revisedScene) {
+    currentIr.scenes[1].narration = "A revised scene with fresh audio.";
+  }
   const project = { id: projectId, client_id: clientId,
     stage: "timed", ir_version: options.visualVersion ?? 2,
-    audio_ir_version: 2, ir, music_path: null };
-  const scenes = ir.scenes.map((source: { id: string; narration: string },
+    audio_ir_version: 2, ir: currentIr, music_path: null };
+  const scenes = currentIr.scenes.map((source: { id: string; narration: string },
     index: number) => {
+    const version = options.revisedScene && index === 1 ? 3 : 2;
     const path = `${clientId}/video/projects/${projectId}`
-      + `/ir-v2/scenes/${source.id}/audio.mp3`;
+      + `/ir-v${version}/scenes/${source.id}/audio.mp3`;
     const alignment = source.narration.split(" ").map((text: string,
       word: number) => ({ text, startSec: word * 0.3,
       endSec: word * 0.3 + 0.2, loss: 0.01 }));
@@ -32,7 +37,8 @@ function fixture(options: { tamper?: boolean; secondCheckFails?: boolean;
   });
   const receipts = scenes.map((scene: typeof scenes[number]) => ({
     scene_id: scene.id, client_id: clientId, project_id: projectId,
-    ir_version: 2, narration_sha256: digest(scene.narration),
+    ir_version: options.revisedScene && scene.position === 2 ? 3 : 2,
+    narration_sha256: digest(scene.narration),
     audio_sha256: hash, storage_path: scene.audio_path,
     file_bytes: bytes.length, duration_sec: 4,
     alignment: scene.alignment, alignment_loss: 0.01,
@@ -106,5 +112,18 @@ describe("render input preflight", () => {
       7200);
     expect(db.rpc).toHaveBeenCalledWith("complete_video_audio_project_v1",
       { p_project_id: projectId, p_ir_version: 3 });
+  });
+
+  it("checks mixed scene receipts after a narration revision", async () => {
+    const db = fixture({ visualVersion: 3, revisedScene: true });
+    const result = await buildVideoRenderInputs({ sb: db.sb,
+      clientId, projectId, maxAlignmentLoss: 0.25 });
+    expect(result.irVersion).toBe(3);
+    expect(db.createSignedUrl).toHaveBeenCalledWith(
+      `${clientId}/video/projects/${projectId}/ir-v3/scenes/s02/audio.mp3`,
+      7200);
+    expect(db.createSignedUrl).toHaveBeenCalledWith(
+      `${clientId}/video/projects/${projectId}/ir-v2/scenes/s01/audio.mp3`,
+      7200);
   });
 });

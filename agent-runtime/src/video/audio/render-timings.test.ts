@@ -30,7 +30,7 @@ function fixture() {
     alignment, alignment_loss: 0.01 }));
   const signedMedia = scenes.map((scene) => ({ path: scene.audio_path,
     url: `https://media.example.test/${scene.scene_key}.mp3?signature=ok` }));
-  return { clientId, projectId, irVersion, scenes, receipts,
+  return { clientId, projectId, irVersion, audioVersion: irVersion, scenes, receipts,
     musicPath: null, musicReceipt: null, signedMedia,
     maxAlignmentLoss: 0.25 };
 }
@@ -67,5 +67,32 @@ describe("exact render timings", () => {
       musicReceipt: { client_id: clientId, project_id: projectId,
         ir_version: 2, storage_path: "unbound", audio_sha256: audioSha } }))
       .toThrow(/music path and receipt disagree/);
+  });
+
+  it("uses only the changed scene's newer audio and keeps music on the baseline", () => {
+    const input = fixture();
+    input.irVersion = 3;
+    input.audioVersion = 2;
+    input.scenes[1]!.narration = "A revised service explanation.";
+    const revisedAlignment = [
+      { text: "A", startSec: 0.1, endSec: 0.2, loss: 0.01 },
+      { text: "revised", startSec: 0.3, endSec: 0.6, loss: 0.01 },
+      { text: "service", startSec: 0.7, endSec: 1.0, loss: 0.01 },
+      { text: "explanation.", startSec: 1.1, endSec: 1.5, loss: 0.01 },
+    ];
+    input.scenes[1]!.alignment = revisedAlignment;
+    input.receipts[1]!.alignment = revisedAlignment;
+    input.receipts[1]!.narration_sha256 = createHash("sha256")
+      .update(input.scenes[1]!.narration).digest("hex");
+    input.receipts[1]!.ir_version = 3;
+    const revisedPath = `${clientId}/video/projects/${projectId}`
+      + "/ir-v3/scenes/s02/audio.mp3";
+    input.scenes[1]!.audio_path = revisedPath;
+    input.receipts[1]!.storage_path = revisedPath;
+    input.signedMedia[1]!.path = revisedPath;
+    expect(renderTimingsFromReceipts(input).scenes).toHaveLength(3);
+    input.receipts[1]!.ir_version = 4;
+    expect(() => renderTimingsFromReceipts(input))
+      .toThrow(/exact scene audio receipt/);
   });
 });
