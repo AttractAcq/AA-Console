@@ -11,6 +11,8 @@ import { appendEvent } from "../../queue.js";
 import { VideoRenderUncertainError } from "../../video/render/handoff.js";
 import { LambdaRenderObservationError } from "../../video/render/lambda.js";
 import { renderAndFileProjectAspect } from "../../video/render/pipeline.js";
+import { runPreRenderCritic, PreRenderReviewHeldError }
+  from "../../video/render/prerender.js";
 import { finalizeVideoProjectRender, VideoCreativeReviewHeldError }
   from "../../video/render/finalize.js";
 import type { VideoAspect } from "../../video/render/probe.js";
@@ -19,6 +21,7 @@ type Project = { id: string; client_id: string; stage: string;
   ir_version: number; aspects: VideoAspect[] };
 type Pipeline = typeof renderAndFileProjectAspect;
 type Finalizer = typeof finalizeVideoProjectRender;
+type PreReview = typeof runPreRenderCritic;
 const ASPECTS = new Set(["16:9", "9:16", "1:1"]);
 const REGION = /^[a-z]{2}(?:-[a-z]+)+-[1-9]$/;
 
@@ -53,6 +56,7 @@ export async function runVideoRenderJobWithPipeline(
   credentialsAvailable: () => boolean = () => Boolean(
     process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY),
   finalizer: Finalizer = finalizeVideoProjectRender,
+  preReview: PreReview = runPreRenderCritic,
 ): Promise<JobResult> {
   const params = job.params ?? {};
   if (job.agent_key !== "video_render"
@@ -99,6 +103,16 @@ export async function runVideoRenderJobWithPipeline(
   }
   const directory = await mkdtemp(join(tmpdir(), "aa-video-render-"));
   try {
+    const review = await preReview({ sb, config,
+      clientId: project.client_id, projectId: project.id,
+      jobId: job.id, irVersion: project.ir_version,
+      aspect: project.aspects[0]!, region: site.region,
+      functionName: site.functionName, serveUrl: site.serveUrl,
+      maxAlignmentLoss: alignmentLoss });
+    if (review !== "pass") {
+      return { ok: false, retryable: false, hold: true,
+        failureMessage: "Pre-render critic failed; review its exact report and patch before media rendering." };
+    }
     const candidateIds = new Map<VideoAspect, string>();
     for (const aspect of project.aspects) {
       // Leave enough lease time to download, master, probe and file a large
@@ -141,6 +155,10 @@ export async function runVideoRenderJobWithPipeline(
         asset_id: finalized.assetId });
     return { ok: true, retryable: false };
   } catch (error) {
+    if (error instanceof PreRenderReviewHeldError) {
+      return { ok: false, retryable: false, hold: true,
+        failureMessage: error.message };
+    }
     if (error instanceof VideoCreativeReviewHeldError) {
       return { ok: false, retryable: false, hold: true,
         failureMessage: error.message };

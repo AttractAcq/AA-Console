@@ -71,7 +71,7 @@ export async function downloadCandidateExact(input: { sb: SupabaseClient;
   await handle.close();
 }
 
-function brandRules(value: Record<string, unknown> | null): string {
+export function brandRules(value: Record<string, unknown> | null): string {
   if (!value) return "No reviewed brand profile is available.";
   return ["colour_primary", "colour_secondary", "colour_accent",
     "colour_background", "colour_text", "font_heading", "font_body",
