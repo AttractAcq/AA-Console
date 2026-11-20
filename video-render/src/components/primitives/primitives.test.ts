@@ -13,6 +13,16 @@ describe("audio mixing", () => {
     expect(musicGainAtFrame(110, 30, intervals, -24, -14)).toBeCloseTo(bed);
   });
 
+  it("keeps a prepared -24 LUFS bed at unity outside speech and ducks 14 dB inside", () => {
+    const defaults = AudioBedSchema.parse({ musicSrc: "music.mp3",
+      speechIntervals: [[1, 3]] });
+    expect(defaults.bedDb).toBe(0);
+    expect(musicGainAtFrame(0, 30, defaults.speechIntervals,
+      defaults.bedDb, defaults.duckDb)).toBeCloseTo(1);
+    expect(musicGainAtFrame(60, 30, defaults.speechIntervals,
+      defaults.bedDb, defaults.duckDb)).toBeCloseTo(10 ** (-14 / 20));
+  });
+
   it("rejects reversed speech intervals", () => {
     expect(() => AudioBedSchema.parse({ musicSrc: "music.mp3", speechIntervals: [[3, 1]] })).toThrow();
   });

@@ -6,7 +6,9 @@ export const SpeechIntervalSchema = z.tuple([z.number().finite().nonnegative(), 
 export const AudioBedSchema = z.strictObject({
   musicSrc: z.string().min(1),
   speechIntervals: z.array(SpeechIntervalSchema),
-  bedDb: z.number().min(-60).max(0).default(-24),
+  // The prepared file is already -24 LUFS. Unity gain keeps that level;
+  // duckDb is an additional attenuation while narration is speaking.
+  bedDb: z.number().min(-60).max(0).default(0),
   duckDb: z.number().min(-60).max(0).default(-14),
 });
 export type AudioBedProps = z.input<typeof AudioBedSchema>;

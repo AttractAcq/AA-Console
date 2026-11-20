@@ -19,6 +19,12 @@ stage must still record a failed/disabled music attempt and file a successful
 bed in client Storage with versioned provenance. This code has no Storage
 write, hosted migration, provider cost, finished render or outward action.
 
+The prepared bed is already normalized to -24 LUFS. The renderer now uses
+unity gain outside narration and applies a further 14 dB attenuation during
+speech, with a twelve-frame ramp. Its previous default applied another 24 dB
+cut to the prepared file. A focused gain test and renderer build passed; final
+mix quality still requires a rendered audio review.
+
 Mocked transport tests cover request shape, instrumental enforcement, error
 classification and response validation. A local four-second sine fixture
 tests real -24 LUFS normalization, hashing and duration. Renderer compiler
