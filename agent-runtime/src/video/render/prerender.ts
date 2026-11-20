@@ -28,12 +28,12 @@ async function continueFailedReview(input: {
     throw new PreRenderReviewHeldError(
       "Failed pre-render review could not be resolved from its exact receipt.");
   }
-  if (resolution.data === "needs_human"
-    || resolution.data === "timing_required") return "fail";
-  if (resolution.data !== "visual_patch" || !Array.isArray(input.report.patch)
+  if (resolution.data === "needs_human") return "fail";
+  if (!["visual_patch", "timing_required"].includes(resolution.data)
+    || !Array.isArray(input.report.patch)
     || input.report.patch.length === 0) {
     throw new PreRenderReviewHeldError(
-      "Failed pre-render review has no supported visual patch.");
+      "Failed pre-render review has no supported critic patch.");
   }
   let revised: ReturnType<typeof applyCriticPatch>;
   try { revised = applyCriticPatch(input.ir, input.report.patch); }
@@ -41,18 +41,25 @@ async function continueFailedReview(input: {
     throw new PreRenderReviewHeldError(
       "Filed visual patch no longer validates against the exact IR.");
   }
-  if (revised.narrationChanged) {
+  if (revised.narrationChanged !== (resolution.data === "timing_required")) {
     throw new PreRenderReviewHeldError(
-      "Narration patch requires regenerated timing before another render.");
+      "Filed critic resolution disagrees with the proposed narration change.");
   }
-  const committed = await input.sb.rpc("apply_video_project_visual_patch_v1", {
+  const rpc = revised.narrationChanged
+    ? "apply_video_project_narration_patch_v1"
+    : "apply_video_project_visual_patch_v1";
+  const committed = await input.sb.rpc(rpc, {
     p_attempt_id: input.attemptId, p_job_id: input.jobId,
     p_expected_ir_version: input.irVersion, p_new_ir: revised.ir });
   if (committed.error
     || committed.data?.ir_version !== input.irVersion + 1
-    || typeof committed.data?.job_id !== "string") {
+    || (revised.narrationChanged
+      ? !Array.isArray(committed.data?.job_ids)
+        || committed.data.job_ids.length === 0
+        || committed.data.job_ids.some((id: unknown) => typeof id !== "string")
+      : typeof committed.data?.job_id !== "string")) {
     throw new PreRenderReviewHeldError(
-      "Visual patch and successor job were not committed together.");
+      "Critic patch and successor jobs were not committed together.");
   }
   return "revised";
 }

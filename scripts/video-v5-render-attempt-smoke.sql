@@ -162,6 +162,68 @@ begin
       using errcode='Z0001';
   exception when sqlstate 'Z0001' then null; end;
   begin
+    result:=public.claim_video_project_prerender_v1(p.id,render_job,1);
+    prerender_attempt:=(result->>'attempt_id')::uuid;
+    prerender_report:=jsonb_set(prerender_report,'{patch}',
+      '[{"op":"shorten_text","sceneId":"s01","path":"narration",
+        "value":"Hi."}]'::jsonb,false);
+    if public.finish_video_project_prerender_v1(prerender_attempt,
+      render_job,prerender_report,still_receipts,'claude-test',100,20,
+      0.012,0.009) is distinct from 'fail' then
+      raise exception 'Narration fixture critic did not fail'; end if;
+    if public.resolve_video_project_critic_failure_v1(prerender_attempt,
+      render_job) is distinct from 'timing_required' then
+      raise exception 'Narration critic did not require new timing'; end if;
+    patched_ir:=jsonb_set((select ir from public.video_projects where id=p.id),
+      '{scenes,0,narration}','"Hi."'::jsonb,false);
+    patched_result:=public.apply_video_project_narration_patch_v1(
+      prerender_attempt,render_job,1,patched_ir);
+    if (patched_result->>'ir_version')::integer<>2
+      or jsonb_array_length(patched_result->'job_ids')<>1
+      or (select stage from public.video_projects where id=p.id)<>'timing'
+      or (select audio_ir_version from public.video_projects where id=p.id)<>1
+      or (select count(*) from public.video_scene_audio_revisions_v1
+        where project_id=p.id and ir_version=1)<>1
+      or (select count(*) from public.video_scene_audio_receipts_v1
+        where project_id=p.id and ir_version=1)<>2
+      or (select count(*) from public.agent_jobs j
+        join public.video_scenes scene_join on scene_join.id=j.input_id
+        where scene_join.project_id=p.id and j.agent_key='video_audio'
+          and j.params->>'ir_version'='2')<>1 then
+      raise exception 'Narration patch did not preserve unchanged audio'; end if;
+    select * into s from public.video_scenes
+      where project_id=p.id and scene_key='s01';
+    audio_job:=(patched_result->'job_ids'->>0)::uuid;
+    if not public.begin_video_scene_audio_attempt_v1(p.id,s.id,audio_job,2) then
+      raise exception 'Revised audio attempt was not bound'; end if;
+    scene_path:=p.client_id::text||'/video/projects/'||p.id::text||
+      '/ir-v2/scenes/s01/audio.mp3';
+    insert into storage.objects(bucket_id,name,version)
+    values('client-media',scene_path,'v2') returning * into o;
+    narration_hash:=encode(sha256(convert_to(s.narration,'UTF8')),'hex');
+    perform public.commit_video_scene_audio_v1(p.id,s.id,2,narration_hash,
+      repeat('b',64),scene_path,1024,o.id,o.version,o.updated_at,
+      '[{"text":"Hi","startSec":0.1,"endSec":1.5,"loss":0.05}]'::jsonb,
+      0.05,4,-16,'narrator-1',1);
+    if not public.complete_video_audio_project_v1(p.id,2) then
+      raise exception 'Revised audio receipts were incomplete'; end if;
+    if (select stage from public.video_projects where id=p.id)<>'timed'
+      or (select audio_ir_version from public.video_projects where id=p.id)<>1
+      or (select count(*) from public.video_scene_audio_receipts_v1
+        where project_id=p.id and ir_version=2)<>1 then
+      raise exception 'Mixed revised audio did not complete: stage %, baseline %, revised receipts %',
+        (select stage from public.video_projects where id=p.id),
+        (select audio_ir_version from public.video_projects where id=p.id),
+        (select count(*) from public.video_scene_audio_receipts_v1
+          where project_id=p.id and ir_version=2); end if;
+    if public.apply_video_project_narration_patch_v1(
+      prerender_attempt,render_job,1,patched_ir)->'job_ids'
+      is distinct from patched_result->'job_ids' then
+      raise exception 'Narration replay queued another audio job'; end if;
+    raise exception 'Rollback isolated narration critic patch test'
+      using errcode='Z0001';
+  exception when sqlstate 'Z0001' then null; end;
+  begin
     perform public.claim_video_project_render_v1(p.id,render_job,1,'16:9');
     raise exception 'Render started without a pre-render critic receipt';
   exception when check_violation then null; end;

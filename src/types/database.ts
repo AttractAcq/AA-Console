@@ -29860,6 +29860,84 @@ export type Database = {
           },
         ]
       }
+      video_project_narration_patches_v1: {
+        Row: {
+          applied_at: string
+          attempt_id: string
+          changed_scene_ids: string[]
+          client_id: string
+          from_ir_version: number
+          new_ir: Json
+          next_job_ids: string[]
+          old_ir: Json
+          project_id: string
+          source_job_id: string
+          to_ir_version: number
+        }
+        Insert: {
+          applied_at?: string
+          attempt_id: string
+          changed_scene_ids: string[]
+          client_id: string
+          from_ir_version: number
+          new_ir: Json
+          next_job_ids: string[]
+          old_ir: Json
+          project_id: string
+          source_job_id: string
+          to_ir_version: number
+        }
+        Update: {
+          applied_at?: string
+          attempt_id?: string
+          changed_scene_ids?: string[]
+          client_id?: string
+          from_ir_version?: number
+          new_ir?: Json
+          next_job_ids?: string[]
+          old_ir?: Json
+          project_id?: string
+          source_job_id?: string
+          to_ir_version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_project_narration_patches_v1_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: true
+            referencedRelation: "video_project_prerender_attempts_v1"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_narration_patches_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_project_narration_patches_v1_source_job_id_fkey"
+            columns: ["source_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_narration_patches_v1_source_job_id_fkey"
+            columns: ["source_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_project_narration_patches_v1_source_job_id_fkey"
+            columns: ["source_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+        ]
+      }
       video_project_prerender_attempts_v1: {
         Row: {
           claimed_at: string
@@ -31386,6 +31464,57 @@ export type Database = {
             columns: ["scene_id"]
             isOneToOne: true
             referencedRelation: "video_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_scene_audio_revisions_v1: {
+        Row: {
+          archived_at: string
+          attempt: Json
+          client_id: string
+          ir_version: number
+          narration: string
+          project_id: string
+          receipt: Json
+          scene_id: string
+          source_attempt_id: string
+        }
+        Insert: {
+          archived_at?: string
+          attempt: Json
+          client_id: string
+          ir_version: number
+          narration: string
+          project_id: string
+          receipt: Json
+          scene_id: string
+          source_attempt_id: string
+        }
+        Update: {
+          archived_at?: string
+          attempt?: Json
+          client_id?: string
+          ir_version?: number
+          narration?: string
+          project_id?: string
+          receipt?: Json
+          scene_id?: string
+          source_attempt_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_scene_audio_revisions_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_scene_audio_revisions_v1_source_attempt_id_fkey"
+            columns: ["source_attempt_id"]
+            isOneToOne: false
+            referencedRelation: "video_project_prerender_attempts_v1"
             referencedColumns: ["id"]
           },
         ]
@@ -40259,6 +40388,15 @@ export type Database = {
       all_within_length: {
         Args: { p_max: number; p_values: string[] }
         Returns: boolean
+      }
+      apply_video_project_narration_patch_v1: {
+        Args: {
+          p_attempt_id: string
+          p_expected_ir_version: number
+          p_job_id: string
+          p_new_ir: Json
+        }
+        Returns: Json
       }
       apply_video_project_visual_patch_v1: {
         Args: {

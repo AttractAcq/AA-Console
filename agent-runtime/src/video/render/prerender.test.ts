@@ -16,6 +16,7 @@ type Dependencies = NonNullable<Parameters<typeof runPreRenderCritic>[1]>;
 function fixture(claimState = "claimed") {
   const calls: string[] = [];
   let outcome = "pass";
+  let resolution = "visual_patch";
   let priorReport: unknown = null;
   const rpc = vi.fn(async (name: string) => {
     calls.push(name);
@@ -26,10 +27,13 @@ function fixture(claimState = "claimed") {
       return { data: outcome, error: null };
     }
     if (name === "resolve_video_project_critic_failure_v1") {
-      return { data: "visual_patch", error: null };
+      return { data: resolution, error: null };
     }
     if (name === "apply_video_project_visual_patch_v1") {
       return { data: { ir_version: 2, job_id: jobId }, error: null };
+    }
+    if (name === "apply_video_project_narration_patch_v1") {
+      return { data: { ir_version: 2, job_ids: [jobId] }, error: null };
     }
     return { data: true, error: null };
   });
@@ -65,6 +69,7 @@ function fixture(claimState = "claimed") {
     maxAlignmentLoss: 0.25 };
   return { input, deps, calls, rpc, prepare, stills, review,
     setOutcome: (value: string) => { outcome = value; },
+    setResolution: (value: string) => { resolution = value; },
     setPriorReport: (value: unknown) => { priorReport = value; } };
 }
 
@@ -138,5 +143,23 @@ describe("exact pre-render paid critic handoff", () => {
     expect(f.calls).toEqual(["claim_video_project_prerender_v1",
       "resolve_video_project_critic_failure_v1",
       "apply_video_project_visual_patch_v1"]);
+  });
+
+  it("queues changed narration for new audio without repeating paid review", async () => {
+    const f = fixture("decided_fail");
+    f.setResolution("timing_required");
+    f.setPriorReport({ id: attemptId, client_id: clientId,
+      project_id: projectId, ir_version: 1, job_id: jobId,
+      state: "decided", result: "fail",
+      report: { result: "fail", patch: [{ op: "shorten_text",
+        sceneId: "s01", path: "narration", value: "A shorter voiceover." }] } });
+    expect(await runPreRenderCritic(f.input, f.deps)).toBe("revised");
+    expect(f.stills).not.toHaveBeenCalled();
+    expect(f.review).not.toHaveBeenCalled();
+    expect(f.rpc).toHaveBeenCalledWith("apply_video_project_narration_patch_v1",
+      expect.objectContaining({ p_expected_ir_version: 1,
+        p_new_ir: expect.objectContaining({ scenes: expect.arrayContaining([
+          expect.objectContaining({ id: "s01",
+            narration: "A shorter voiceover." })]) }) }));
   });
 });
