@@ -8,6 +8,9 @@ import { GoldVideo, goldDuration, validateGoldFixture } from "./compositions/Gol
 import { GOLD_FIXTURE } from "./compositions/gold-fixture.generated.js";
 import { V2_FIXTURE } from "./compositions/v2-fixture.generated.js";
 import { VideoFromIR } from "./compositions/VideoFromIR.js";
+import { ThumbnailFromIR } from "./compositions/ThumbnailFromIR.js";
+import { parseIR } from "./ir/schema.js";
+import { buildThemeFromSnapshot } from "./brand/theme.js";
 import { compile } from "./ir/compile.js";
 
 const ComponentNameSchema = z.enum(Object.keys(registry) as [ComponentName, ...ComponentName[]]);
@@ -23,6 +26,21 @@ function Demo(input: z.infer<typeof DemoSchema>) {
 
 export function RemotionRoot() {
   return <>
+    <Composition
+      id="VideoThumbnail"
+      component={ThumbnailFromIR}
+      durationInFrames={1}
+      fps={30}
+      width={1280}
+      height={720}
+      defaultProps={{ ir: V2_FIXTURE.ir, brandSnapshot: {} }}
+      calculateMetadata={({ props }) => {
+        // Validate the exact review version before any still render.
+        parseIR(props.ir);
+        buildThemeFromSnapshot(props.brandSnapshot);
+        return {};
+      }}
+    />
     {AspectSchema.options.map((aspect) => {
       const { width, height } = DIMENSIONS[aspect];
       const fixture = validateGoldFixture(GOLD_FIXTURE);

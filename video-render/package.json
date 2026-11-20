@@ -14,6 +14,7 @@
     "snapshots:update": "node scripts/visual-snapshots.mjs --update",
     "render:gold": "node scripts/render-gold.mjs",
     "render:ir": "node scripts/render-ir.mjs",
+    "render:thumbnail": "node scripts/render-thumbnail.mjs",
     "test": "vitest run"
   },
   "dependencies": {
