@@ -19,10 +19,10 @@ Disposable local verification at migration head 666 passed clean and upgrade
 replay, generated types, parity manifest, catalog contract, frontend build,
 the existing Video V2 schema fixture, Phase 9 scoped-read fixture, and a new
 rollback fixture for draft creation, replay, changed-key rejection, invalid
-aspects, cross-client brief rejection, client-role denial, and no queued job.
-Evidence: `/private/tmp/aa-video-v2-666-draft-evidence-final/`.
+aspects, cross-client brief rejection, assigned and unassigned manager access,
+client-role denial, current and stale route versions, and no queued job.
+Final local evidence: `/private/tmp/aa-video-v2-666-manager-evidence/`.
 
-Remaining: manager-assignment and current-route fixture coverage, exact
-start/stage operations, runtime workers, audio/render/critic, reviewed asset
+Remaining: exact start/stage operations, runtime workers, audio/render/critic, reviewed asset
 attachment, Console entry points, hosted provider validation and acceptance.
 No hosted migration or switch changed.
