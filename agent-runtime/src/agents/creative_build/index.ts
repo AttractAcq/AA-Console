@@ -59,6 +59,7 @@ import {
 import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
 import { attestCreativeAssetBytes } from "../../creative/attest-asset-route.js";
+import { reusableGeneratedAsset } from "./generatedAsset.js";
 import { compositionNote, frameVerdict, isNearlyBlank, measureComposition } from "./screen.js";
 
 class RecruitmentApprovalHold extends Error {}
@@ -883,6 +884,7 @@ Call ${submitTool.name} once when you are done.`;
 
     const path = `${job.client_id}/generated/${renderId}.md`;
     const document = [`# ${String(concept.headline ?? typed.title)}`, "", body, "", `**Call to action:** ${String(concept.call_to_action ?? "")}`].join("\n");
+    const existingAssetId = await reusableGeneratedAsset(sb, String(job.client_id), typed.id, path, "text");
     const documentBytes = Buffer.from(document, "utf8");
     const { error: uploadError } = await sb.storage
       .from(BUCKET)
@@ -891,7 +893,7 @@ Call ${submitTool.name} once when you are done.`;
       });
     if (uploadError) throw new Error(`Could not store the copy: ${uploadError.message}`);
 
-    const assetId = await insertAsset(sb, job, typed, path, "text");
+    const assetId = existingAssetId ?? await insertAsset(sb, job, typed, path, "text");
     await attestCreativeAssetBytes(sb, String(job.client_id), assetId, documentBytes);
     await sb
       .from("creative_renders")
@@ -1278,6 +1280,7 @@ Call ${submitTool.name} once when you are done.`;
   }
 
   const path = `${job.client_id}/generated/${renderId}.${final.extension}`;
+  const existingAssetId = await reusableGeneratedAsset(sb, String(job.client_id), typed.id, path, "image");
   const { error: uploadError } = await sb.storage
     .from(BUCKET)
     .upload(path, final.bytes, {
@@ -1285,7 +1288,7 @@ Call ${submitTool.name} once when you are done.`;
     });
   if (uploadError) throw new Error(`Could not store the image: ${uploadError.message}`);
 
-  const assetId = await insertAsset(sb, job, typed, path, "image");
+  const assetId = existingAssetId ?? await insertAsset(sb, job, typed, path, "image");
   await attestCreativeAssetBytes(sb, String(job.client_id), assetId, final.bytes);
   await sb
     .from("creative_renders")
