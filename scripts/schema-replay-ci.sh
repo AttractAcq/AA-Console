@@ -231,6 +231,17 @@ if [[ "${AA_SCHEMA_VIDEO_V2_SMOKE:-0}" == "1" ]]; then
       exit 1
     fi
   fi
+  if [[ -f scripts/video-v3-project-start-smoke.sql ]]; then
+    if psql_local -qAt -f scripts/video-v3-project-start-smoke.sql \
+      >"$run_dir/video-v3-project-start-smoke.private.log" 2>&1; then
+      printf 'passed\n' >"$evidence_dir/video-v3-project-start-smoke.status.txt"
+      echo 'Video V3 project start rollback fixture passed.'
+    else
+      printf 'failed\n' >"$evidence_dir/video-v3-project-start-smoke.status.txt"
+      grep -E 'ERROR:|psql:' "$run_dir/video-v3-project-start-smoke.private.log" | tail -3 >&2 || true
+      exit 1
+    fi
+  fi
 fi
 
 if [[ "${AA_SCHEMA_PHASE2_SMOKES:-0}" == "1" ]]; then

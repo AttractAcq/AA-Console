@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "795ff2e53816ce3b2417bc1967bb04dda23393d3fb9fa3c41efeb265b46bb2a7",
-  "generatedTypesSha256": "c33dfb1cf62a683c2712c09804617b53570722b2d41817260cf4c1c6f8461226",
-  "generatedSchemaBodySha256": "71bde9f9383ba04b6dd315665a29aee7aecab3b306c5d29a670b6f4f24fea4f6",
+  "migrationSourceDigest": "ba384ff1d6b19d45468170438910a7513f4d7db438dcea031964413cdf340b4f",
+  "generatedTypesSha256": "7c0e7f28d2b8d9f794718ddbb87761fdfc999384ba937ee9e3f3b89a5bd84508",
+  "generatedSchemaBodySha256": "93aa77cd28da20dccd41d67b001fe44d58e3c3012668070a2cc8bdc5aa2597e0",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4784,6 +4784,13 @@
       "filename": "20261124054100_666_video_project_drafts.sql",
       "sha256": "3390bf22a7c2f8857940f22650d0e4d381ee0c65ac9bb32353a2d7067135fa28",
       "trimmedMd5": "c2bd5590445f70a03e6fbb5f7bc6fb0e"
+    },
+    {
+      "version": "20261124054200",
+      "name": "667_video_script_start",
+      "filename": "20261124054200_667_video_script_start.sql",
+      "sha256": "8957b89387846599d20c7c7d82b1a0a8b9a670faaf5003ae530654ec8a777643",
+      "trimmedMd5": "0a8afac559cd5140fa7aa8c4cb85ca42"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

@@ -29425,6 +29425,7 @@ export type Database = {
       }
       video_project_costs: {
         Row: {
+          attempt_key: string | null
           client_id: string
           created_at: string
           id: string
@@ -29437,6 +29438,7 @@ export type Database = {
           usd: number
         }
         Insert: {
+          attempt_key?: string | null
           client_id: string
           created_at?: string
           id?: string
@@ -29449,6 +29451,7 @@ export type Database = {
           usd: number
         }
         Update: {
+          attempt_key?: string | null
           client_id?: string
           created_at?: string
           id?: string
@@ -29506,6 +29509,7 @@ export type Database = {
           idea: string
           ir: Json | null
           ir_version: number
+          job_id: string | null
           music_path: string | null
           music_prompt: string | null
           request_hash: string | null
@@ -29513,8 +29517,11 @@ export type Database = {
           research: Json | null
           route_package_id: string | null
           script: Json | null
+          source_digest: string | null
+          source_snapshot: Json
           stage: string
           stage_error: string | null
+          started_by: string | null
           target_length_sec: number
           tone: string
           updated_at: string
@@ -29533,6 +29540,7 @@ export type Database = {
           idea: string
           ir?: Json | null
           ir_version?: number
+          job_id?: string | null
           music_path?: string | null
           music_prompt?: string | null
           request_hash?: string | null
@@ -29540,8 +29548,11 @@ export type Database = {
           research?: Json | null
           route_package_id?: string | null
           script?: Json | null
+          source_digest?: string | null
+          source_snapshot?: Json
           stage?: string
           stage_error?: string | null
+          started_by?: string | null
           target_length_sec?: number
           tone?: string
           updated_at?: string
@@ -29560,6 +29571,7 @@ export type Database = {
           idea?: string
           ir?: Json | null
           ir_version?: number
+          job_id?: string | null
           music_path?: string | null
           music_prompt?: string | null
           request_hash?: string | null
@@ -29567,8 +29579,11 @@ export type Database = {
           research?: Json | null
           route_package_id?: string | null
           script?: Json | null
+          source_digest?: string | null
+          source_snapshot?: Json
           stage?: string
           stage_error?: string | null
+          started_by?: string | null
           target_length_sec?: number
           tone?: string
           updated_at?: string
@@ -29664,6 +29679,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_projects_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_projects_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_projects_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
           },
           {
             foreignKeyName: "video_projects_route_client_fk"
@@ -42322,6 +42358,7 @@ export type Database = {
           idea: string
           ir: Json | null
           ir_version: number
+          job_id: string | null
           music_path: string | null
           music_prompt: string | null
           request_hash: string | null
@@ -42329,8 +42366,11 @@ export type Database = {
           research: Json | null
           route_package_id: string | null
           script: Json | null
+          source_digest: string | null
+          source_snapshot: Json
           stage: string
           stage_error: string | null
+          started_by: string | null
           target_length_sec: number
           tone: string
           updated_at: string
@@ -46038,6 +46078,17 @@ export type Database = {
         Args: { p_packet: Json; p_request_id: string }
         Returns: string
       }
+      record_video_project_cost_v1: {
+        Args: {
+          p_attempt_key: string
+          p_job_id: string
+          p_project_id: string
+          p_provider: string
+          p_units: number
+          p_usd: number
+        }
+        Returns: string
+      }
       record_video_render_candidate: {
         Args: {
           p_asset_id: string
@@ -48369,6 +48420,15 @@ export type Database = {
         Returns: string
       }
       start_onboarding: { Args: { p_client_id: string }; Returns: undefined }
+      start_video_project_v1: {
+        Args: {
+          p_expected_ir_version: number
+          p_operator_note?: string
+          p_project_id: string
+          p_record_ids?: string[]
+        }
+        Returns: string
+      }
       submit_production_release_candidate_v6: {
         Args: { p_candidate: Json; p_expires_at: string }
         Returns: string
@@ -48481,6 +48541,10 @@ export type Database = {
       video_client_approval_email_state: {
         Args: { p_asset_id: string }
         Returns: Json
+      }
+      video_project_source_current_v1: {
+        Args: { p_project_id: string }
+        Returns: boolean
       }
       video_seat_review_hash_v6: {
         Args: {
