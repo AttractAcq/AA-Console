@@ -41,7 +41,8 @@ function fixture(state: string) {
   });
   const sb = { rpc, from } as unknown as SupabaseClient;
   const prepare = vi.fn(async () => ({ irVersion: 1,
-    ir: { aspects: ["16:9"] }, timings: { scenes: [] } }));
+    ir: { aspects: ["16:9"] }, timings: { scenes: [] },
+    brandSnapshot: { colour_primary: "#123456" } }));
   const start = vi.fn(async (request: { onStarted: (value: typeof handle) => Promise<void> }) => {
     await request.onStarted(handle);
     return handle;

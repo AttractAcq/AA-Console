@@ -45,6 +45,16 @@ begin
   script_job:=public.start_video_project_v1(p.id,0,array[]::uuid[],
     'The exact operator prompt is the reviewed source.');
   perform set_config('request.jwt.claim.role','service_role',true);
+  if (select brand_snapshot from public.video_projects where id=p.id)
+      is distinct from '{}'::jsonb
+    or (select brand_snapshot_sha256 from public.video_projects where id=p.id)
+      is distinct from encode(sha256(convert_to('{}','UTF8')),'hex') then
+    raise exception 'Started project did not freeze its exact brand fallback'; end if;
+  begin
+    update public.video_projects set brand_snapshot='{"colour_primary":"#123456"}'::jsonb
+      where id=p.id;
+    raise exception 'Started brand snapshot was editable';
+  exception when check_violation then null; end;
   update public.video_projects set stage='timing',ir_version=1,
     ir='{"version":1,"title":"Fixture","audience":"Operators","tone":"calm",
       "aspects":["16:9","9:16"],"music":{"enabled":false,"mood":""},

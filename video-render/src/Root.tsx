@@ -52,7 +52,8 @@ export function RemotionRoot() {
         fps={30}
         width={width}
         height={height}
-        defaultProps={{ aspect, ir: V2_FIXTURE.ir, timings: V2_FIXTURE.timings }}
+        defaultProps={{ aspect, ir: V2_FIXTURE.ir, timings: V2_FIXTURE.timings,
+          brandSnapshot: {} }}
         calculateMetadata={({ props: supplied }) => {
           const timeline = compile(supplied.ir, supplied.timings);
           if (!timeline.aspects.includes(aspect)) throw new Error(`IR does not request ${aspect}`);

@@ -73,11 +73,12 @@ export async function downloadCandidateExact(input: { sb: SupabaseClient;
 
 export function brandRules(value: Record<string, unknown> | null): string {
   if (!value) return "No reviewed brand profile is available.";
-  return ["colour_primary", "colour_secondary", "colour_accent",
+  const fields = ["colour_primary", "colour_secondary", "colour_accent",
     "colour_background", "colour_text", "font_heading", "font_body",
-    "imagery_style", "never_do"].map((key) =>
+    "imagery_style", "never_do", "video_rulebook_notes"].map((key) =>
     `${key}: ${typeof value[key] === "string" && value[key] ? value[key] : "not recorded"}`)
     .join("; ");
+  return `${fields}; video_tokens: ${JSON.stringify(value.video_tokens ?? {})}`;
 }
 
 /** Finish one exact IR version; no derivative or asset attachment occurs
@@ -126,12 +127,6 @@ export async function finalizeVideoProjectRender(input: {
       || Math.abs(startSec - Number(candidate.media_probe.duration_sec)) > 0.5) {
       throw new Error("Creative review timing differs from the physical MP4.");
     }
-    const brand = await input.sb.from("client_brand_profiles")
-      .select("colour_primary,colour_secondary,colour_accent,colour_background,colour_text,font_heading,font_body,imagery_style,never_do")
-      .eq("client_id", input.clientId).maybeSingle();
-    if (brand.error || !brand.data) {
-      throw new Error("Client brand rules are required before paid video review.");
-    }
     const localPath = join(input.workDir, "creative-first.mp4");
     await deps.download({ sb: input.sb, candidate, localPath });
     const claim = await input.sb.rpc("claim_video_project_creative_v1", {
@@ -149,7 +144,7 @@ export async function finalizeVideoProjectRender(input: {
         workDir: join(input.workDir, "creative-frames"), scenes: timings,
         narration: (prepared.ir.scenes as Array<typeof prepared.ir.scenes[number]
           & { narration: string }>).map((scene) => scene.narration).join("\n"),
-        brandRules: brandRules(brand.data as Record<string, unknown> | null),
+        brandRules: brandRules(prepared.brandSnapshot),
         model: process.env.VIDEO_RENDER_REVIEW_MODEL?.trim() || input.config.model,
         apiKey: anthropicKeyForAgent(input.config, "video_render") });
       const finished = await input.sb.rpc("finish_video_project_creative_v1", {

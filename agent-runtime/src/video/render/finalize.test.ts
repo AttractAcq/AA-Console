@@ -24,7 +24,8 @@ function fixture() {
     file_sha256: "a".repeat(64), file_bytes: 1024,
     probe_result: "pass", verdict: "pending",
     media_probe: { duration_sec: 6 } };
-  const brand = { colour_primary: "#111111", never_do: "No stock imagery" };
+  const brand = { colour_primary: "#111111", never_do: "No stock imagery",
+    video_tokens: { colours: { accent: "#AABBCC" } } };
   const from = vi.fn((table: string) => {
     const query = { select: () => query, eq: () => query,
       maybeSingle: async () => ({ data: table === "client_brand_profiles"
@@ -52,6 +53,7 @@ function fixture() {
   });
   const sb = { from, rpc } as unknown as SupabaseClient;
   const prepare = vi.fn(async () => ({ irVersion: 1,
+    brandSnapshot: brand,
     ir: { aspects: ["16:9", "9:16"],
       scenes: [{ narration: "First." }, { narration: "Second." }] },
     timings: { scenes: [{ id: "s01", durationSec: 3 },
@@ -81,7 +83,7 @@ describe("code-video finalization", () => {
       .toEqual({ state: "attached", assetId: "asset-1" });
     expect(f.download).toHaveBeenCalledOnce();
     expect(f.review).toHaveBeenCalledWith(expect.objectContaining({
-      narration: "First.\nSecond.", brandRules: expect.stringContaining("No stock imagery") }));
+      narration: "First.\nSecond.", brandRules: expect.stringContaining("#AABBCC") }));
     expect(f.rpc.mock.calls.map(([name]) => name)).toEqual([
       "claim_video_project_creative_v1", "finish_video_project_creative_v1",
       "decide_video_project_render_candidate_v1",

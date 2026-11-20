@@ -82,13 +82,6 @@ export async function runPreRenderCritic(input: {
     throw new PreRenderReviewHeldError(
       "Pre-render critic source differs from the exact first aspect.");
   }
-  const brand = await input.sb.from("client_brand_profiles")
-    .select("colour_primary,colour_secondary,colour_accent,colour_background,colour_text,font_heading,font_body,imagery_style,never_do")
-    .eq("client_id", input.clientId).maybeSingle();
-  if (brand.error || !brand.data) {
-    throw new PreRenderReviewHeldError(
-      "Client brand rules are required before pre-render review.");
-  }
   const model = process.env.VIDEO_RENDER_REVIEW_MODEL?.trim()
     || input.config.model;
   const apiKey = anthropicKeyForAgent(input.config, "video_render");
@@ -135,10 +128,11 @@ export async function runPreRenderCritic(input: {
     const frames = await deps.stills({ region: input.region,
       functionName: input.functionName, serveUrl: input.serveUrl,
       aspect: input.aspect, ir: prepared.ir, timings: prepared.timings,
+      brandSnapshot: prepared.brandSnapshot,
       projectId: input.projectId, irVersion: input.irVersion,
       attemptId: claimed.attempt_id });
     report = await deps.review({ frames, ir: prepared.ir,
-      brandRules: brandRules(brand.data as Record<string, unknown>),
+      brandRules: brandRules(prepared.brandSnapshot),
       model, apiKey });
     if (report.result === "fail" && report.patch.length > 0) {
       try { applyCriticPatch(prepared.ir, report.patch); }

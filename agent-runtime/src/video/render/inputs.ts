@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { renderTimingsFromReceipts } from "../audio/render-timings.js";
+import { videoBrandSnapshot } from "../brand-snapshot.js";
 import { parseRuntimeIR } from "../validate.js";
 
 type Project = { id: string; client_id: string; stage: string;
   ir_version: number; audio_ir_version: number | null;
-  ir: unknown; music_path: string | null };
+  ir: unknown; music_path: string | null;
+  brand_snapshot: unknown; brand_snapshot_sha256: string | null };
 type Scene = { id: string; client_id: string; project_id: string;
   position: number; scene_key: string; narration: string;
   audio_path: string | null; duration_sec: number | null;
@@ -43,7 +45,7 @@ export async function buildVideoRenderInputs(input: {
 }) {
   const { sb, clientId, projectId } = input;
   const projectResult = await sb.from("video_projects")
-    .select("id,client_id,stage,ir_version,audio_ir_version,ir,music_path")
+    .select("id,client_id,stage,ir_version,audio_ir_version,ir,music_path,brand_snapshot,brand_snapshot_sha256")
     .eq("id", projectId).eq("client_id", clientId).maybeSingle();
   const project = projectResult.data as Project | null;
   if (projectResult.error || !project || project.id !== projectId
@@ -52,6 +54,11 @@ export async function buildVideoRenderInputs(input: {
     throw new Error("Video project is not in the exact timed state.");
   }
   const ir = parseRuntimeIR(project.ir);
+  const brandSnapshot = videoBrandSnapshot(project.brand_snapshot);
+  if (!project.brand_snapshot_sha256
+    || !/^[0-9a-f]{64}$/.test(project.brand_snapshot_sha256)) {
+    throw new Error("Video project brand snapshot has no exact digest.");
+  }
   const audioVersion = project.audio_ir_version ?? project.ir_version;
   if (!Number.isInteger(audioVersion) || audioVersion < 1
     || audioVersion > project.ir_version) {
@@ -130,14 +137,18 @@ export async function buildVideoRenderInputs(input: {
     maxAlignmentLoss: input.maxAlignmentLoss });
   await verifyCompletedAudio(sb, projectId, project.ir_version);
   const final = await sb.from("video_projects")
-    .select("stage,ir_version,audio_ir_version,ir,music_path")
+    .select("stage,ir_version,audio_ir_version,ir,music_path,brand_snapshot,brand_snapshot_sha256")
     .eq("id", projectId).eq("client_id", clientId).maybeSingle();
   if (final.error || final.data?.stage !== "timed"
     || final.data.ir_version !== project.ir_version
     || final.data.audio_ir_version !== project.audio_ir_version
     || final.data.music_path !== project.music_path
+    || final.data.brand_snapshot_sha256 !== project.brand_snapshot_sha256
+    || JSON.stringify(final.data.brand_snapshot) !==
+      JSON.stringify(project.brand_snapshot)
     || JSON.stringify(final.data.ir) !== JSON.stringify(project.ir)) {
     throw new Error("Video IR changed while render inputs were prepared.");
   }
-  return { ir, timings, projectId, irVersion: project.ir_version };
+  return { ir, timings, brandSnapshot,
+    projectId, irVersion: project.ir_version };
 }

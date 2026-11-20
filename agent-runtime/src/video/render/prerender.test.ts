@@ -46,6 +46,7 @@ function fixture(claimState = "claimed") {
   });
   const sb = { rpc, from } as unknown as SupabaseClient;
   const prepare = vi.fn(async () => ({ ir, irVersion: 1,
+    brandSnapshot: { colour_primary: "#123456" },
     timings: { scenes: ir.scenes.map((scene: { id: string }) => ({
       id: scene.id, audioSrc: "https://example.test/audio.mp3",
       durationSec: 2, words: [] })) } }));

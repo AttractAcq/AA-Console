@@ -99,6 +99,7 @@ export async function renderProjectAspect(input: {
         functionName: input.functionName, serveUrl: input.serveUrl,
         projectId: input.projectId, aspect: input.aspect,
         ir: prepared.ir, timings: prepared.timings,
+        brandSnapshot: prepared.brandSnapshot,
         onStarted: async (started) => {
           const filed = await input.sb.rpc("record_video_project_lambda_handle_v2", {
             p_attempt_id: attemptId, p_job_id: input.jobId,

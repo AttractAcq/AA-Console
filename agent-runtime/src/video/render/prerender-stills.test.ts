@@ -14,7 +14,8 @@ const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8]), Buffer.alloc(120),
   Buffer.from([0xff, 0xd9])]);
 const request = { region: "eu-central-1" as const,
   functionName: "remotion-test", serveUrl: "https://site.example.test",
-  aspect: "16:9" as const, ir, timings, projectId, irVersion: 1, attemptId };
+  aspect: "16:9" as const, ir, timings, projectId, irVersion: 1,
+  attemptId, brandSnapshot: { colour_primary: "#123456" } };
 
 describe("pre-render still sampling", () => {
   it("samples three exact frames per scene with transition overlap", () => {
@@ -52,7 +53,9 @@ describe("pre-render still sampling", () => {
     expect(frames.every((frame) => frame.jpeg.equals(jpeg))).toBe(true);
     expect(still.mock.calls[0]?.[0]).toMatchObject({ imageFormat: "jpeg",
       privacy: "private", forceWidth: 640,
-      composition: "VideoIR-16x9" });
+      composition: "VideoIR-16x9",
+      inputProps: expect.objectContaining({ brandSnapshot: {
+        colour_primary: "#123456" } }) });
   });
 
   it("fails a stale timing set before provider work", async () => {
@@ -61,6 +64,15 @@ describe("pre-render still sampling", () => {
       timings: { scenes: timings.scenes.slice(1) } },
     { still: still as never, download: vi.fn() as never }))
       .rejects.toThrow(/exact requested aspect and timing/);
+    expect(still).not.toHaveBeenCalled();
+  });
+
+  it("refuses malformed client brand tokens before the first paid still", async () => {
+    const still = vi.fn();
+    await expect(renderPreRenderStills({ ...request,
+      brandSnapshot: { video_tokens: { colours: { primary: "blue" } } } },
+    { still: still as never, download: vi.fn() as never }))
+      .rejects.toThrow(/brand snapshot/);
     expect(still).not.toHaveBeenCalled();
   });
 

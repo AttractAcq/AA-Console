@@ -1,6 +1,7 @@
 import { downloadMedia } from "@remotion/lambda";
 import { getRenderProgress, renderMediaOnLambda } from "@remotion/lambda/client";
 import type { AwsRegion } from "@remotion/lambda";
+import { videoBrandSnapshot } from "../brand-snapshot.js";
 
 export type LambdaRenderHandle = { region: AwsRegion; functionName: string;
   renderId: string; bucketName: string; outName: string;
@@ -107,6 +108,7 @@ export async function startLambdaRender(input: {
   region: AwsRegion; functionName: string; serveUrl: string;
   projectId: string; aspect: "16:9" | "9:16" | "1:1";
   ir: unknown; timings: unknown;
+  brandSnapshot: Record<string, unknown>;
   onStarted: (handle: LambdaRenderHandle) => Promise<void>;
 }, deps: Transport = transport): Promise<LambdaRenderHandle> {
   if (!/^[a-zA-Z0-9_-]{1,64}$/.test(input.functionName)
@@ -115,13 +117,15 @@ export async function startLambdaRender(input: {
     || !input.serveUrl.startsWith("https://")) {
     throw new Error("Lambda render deployment identity is incomplete.");
   }
+  videoBrandSnapshot(input.brandSnapshot);
   const outName = `${input.projectId}-${input.aspect.replace(":", "x")}.mp4`;
   let started: Awaited<ReturnType<typeof renderMediaOnLambda>>;
   try {
     started = await deps.start({ region: input.region,
     functionName: input.functionName, serveUrl: input.serveUrl,
     composition: `VideoIR-${input.aspect.replace(":", "x")}`,
-    inputProps: { ir: input.ir, timings: input.timings, aspect: input.aspect },
+    inputProps: { ir: input.ir, timings: input.timings,
+      aspect: input.aspect, brandSnapshot: input.brandSnapshot },
     codec: "h264", crf: 18, audioCodec: "aac", audioBitrate: "192k",
     framesPerLambda: 60, privacy: "private", outName,
     maxRetries: 1, logLevel: "error" });

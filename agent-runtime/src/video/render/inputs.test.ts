@@ -21,7 +21,9 @@ function fixture(options: { tamper?: boolean; secondCheckFails?: boolean;
   }
   const project = { id: projectId, client_id: clientId,
     stage: "timed", ir_version: options.visualVersion ?? 2,
-    audio_ir_version: 2, ir: currentIr, music_path: null };
+    audio_ir_version: 2, ir: currentIr, music_path: null,
+    brand_snapshot: { colour_primary: "#123456" },
+    brand_snapshot_sha256: "a".repeat(64) };
   const scenes = currentIr.scenes.map((source: { id: string; narration: string },
     index: number) => {
     const version = options.revisedScene && index === 1 ? 3 : 2;
@@ -80,6 +82,7 @@ describe("render input preflight", () => {
     const result = await buildVideoRenderInputs({ sb: db.sb,
       clientId, projectId, maxAlignmentLoss: 0.25 });
     expect(result.irVersion).toBe(2);
+    expect(result.brandSnapshot).toEqual({ colour_primary: "#123456" });
     expect(result.timings.scenes.map((scene) => scene.id))
       .toEqual(["s01", "s02", "s03"]);
     expect(db.download).toHaveBeenCalledTimes(3);

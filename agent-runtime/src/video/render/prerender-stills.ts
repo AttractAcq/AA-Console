@@ -1,6 +1,7 @@
 import { renderStillOnLambda } from "@remotion/lambda/client";
 import type { AwsRegion } from "@remotion/lambda";
 import { parseRuntimeIR } from "../validate.js";
+import { videoBrandSnapshot } from "../brand-snapshot.js";
 import type { SceneTiming } from "../audio/timing.js";
 import type { VideoAspect } from "./probe.js";
 
@@ -90,6 +91,7 @@ export async function renderPreRenderStills(input: {
   region: AwsRegion; functionName: string; serveUrl: string;
   aspect: VideoAspect; ir: unknown;
   timings: { scenes: SceneTiming[] }; projectId: string;
+  brandSnapshot: Record<string, unknown>;
   irVersion: number; attemptId: string;
 }, deps: { still: Still; download: Download } = {
   still: renderStillOnLambda, download: fetch,
@@ -101,6 +103,7 @@ export async function renderPreRenderStills(input: {
     || !Number.isInteger(input.irVersion) || input.irVersion < 1) {
     throw new Error("Pre-render still request lacks exact deployment or attempt identity.");
   }
+  videoBrandSnapshot(input.brandSnapshot);
   const frames = new Array<PreRenderFrame>(points.length);
   let next = 0;
   await Promise.all(Array.from({ length: Math.min(6, points.length) }, async () => {
@@ -111,7 +114,7 @@ export async function renderPreRenderStills(input: {
         functionName: input.functionName, serveUrl: input.serveUrl,
         composition: `VideoIR-${input.aspect.replace(":", "x")}`,
         inputProps: { ir: input.ir, timings: input.timings,
-          aspect: input.aspect },
+          aspect: input.aspect, brandSnapshot: input.brandSnapshot },
         frame: point.frame, imageFormat: "jpeg", privacy: "private",
         forceWidth: 640, maxRetries: 0,
         outName: `${input.projectId}-v${input.irVersion}-${input.attemptId}`

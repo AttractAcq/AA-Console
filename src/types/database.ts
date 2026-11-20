@@ -30298,6 +30298,8 @@ export type Database = {
           aspects: string[]
           audience: string | null
           audio_ir_version: number | null
+          brand_snapshot: Json | null
+          brand_snapshot_sha256: string | null
           brief_id: string | null
           campaign_id: string | null
           client_id: string
@@ -30330,6 +30332,8 @@ export type Database = {
           aspects?: string[]
           audience?: string | null
           audio_ir_version?: number | null
+          brand_snapshot?: Json | null
+          brand_snapshot_sha256?: string | null
           brief_id?: string | null
           campaign_id?: string | null
           client_id: string
@@ -30362,6 +30366,8 @@ export type Database = {
           aspects?: string[]
           audience?: string | null
           audio_ir_version?: number | null
+          brand_snapshot?: Json | null
+          brand_snapshot_sha256?: string | null
           brief_id?: string | null
           campaign_id?: string | null
           client_id?: string
@@ -43465,6 +43471,8 @@ export type Database = {
           aspects: string[]
           audience: string | null
           audio_ir_version: number | null
+          brand_snapshot: Json | null
+          brand_snapshot_sha256: string | null
           brief_id: string | null
           campaign_id: string | null
           client_id: string

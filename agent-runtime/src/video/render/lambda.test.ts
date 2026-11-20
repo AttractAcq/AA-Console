@@ -34,13 +34,16 @@ describe("Lambda render transport", () => {
     const result = await startLambdaRender({ region: handle.region,
       functionName: handle.functionName, serveUrl: "https://site.example.test",
       projectId, aspect: "16:9", ir: { version: 1 },
-      timings: { scenes: [] }, onStarted }, mock.deps);
+      timings: { scenes: [] }, brandSnapshot: { colour_primary: "#123456" },
+      onStarted }, mock.deps);
     expect(result).toEqual(handle);
     expect(onStarted).toHaveBeenCalledWith(handle);
     expect(mock.start).toHaveBeenCalledWith(expect.objectContaining({
       composition: "VideoIR-16x9", privacy: "private", codec: "h264",
       audioCodec: "aac", audioBitrate: "192k", framesPerLambda: 60,
-      outName: handle.outName }));
+      outName: handle.outName,
+      inputProps: expect.objectContaining({ brandSnapshot: {
+        colour_primary: "#123456" } }) }));
     expect(mock.progress).not.toHaveBeenCalled();
   });
 
@@ -73,7 +76,18 @@ describe("Lambda render transport", () => {
     await expect(startLambdaRender({ region: handle.region,
       functionName: handle.functionName, serveUrl: "https://site.example.test",
       projectId, aspect: "16:9", ir: {}, timings: {},
+      brandSnapshot: {},
       onStarted: async () => {} }, uncertain.deps))
       .rejects.toBeInstanceOf(LambdaRenderStartUnknownError);
+  });
+
+  it("refuses an invalid brand snapshot before starting Lambda", async () => {
+    const mock = mockTransport();
+    await expect(startLambdaRender({ region: handle.region,
+      functionName: handle.functionName, serveUrl: "https://site.example.test",
+      projectId, aspect: "16:9", ir: {}, timings: {},
+      brandSnapshot: { video_tokens: { colours: { primary: "blue" } } },
+      onStarted: async () => {} }, mock.deps)).rejects.toThrow(/brand snapshot/);
+    expect(mock.start).not.toHaveBeenCalled();
   });
 });
