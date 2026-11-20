@@ -29,8 +29,9 @@ describe("scene audio timing", () => {
     expect(() => sceneTimingFromAlignment({ ...base, audioDurationSec: 1 }))
       .toThrow(/invalid word timing/);
   });
-  it("refuses scenes too long for the renderer tail and missing scene positions", () => {
-    expect(() => sceneTimingFromAlignment({ ...base, audioDurationSec: 25 }))
+  it("accepts the physical audio tail within 25 seconds and refuses longer scenes", () => {
+    expect(sceneTimingFromAlignment({ ...base, audioDurationSec: 25 }).durationSec).toBe(25);
+    expect(() => sceneTimingFromAlignment({ ...base, audioDurationSec: 25.01 }))
       .toThrow(/duration or alignment quality/);
     const first = sceneTimingFromAlignment(base);
     expect(() => videoTimings([first, { ...first, id: "s03" },

@@ -28,7 +28,7 @@ describe("per-scene narration pipeline", () => {
       });
       expect(result.attempts).toBe(1);
       // MP3 encoder delay/padding can move the probed duration by a few frames.
-      expect(Math.abs(result.durationSec - 4)).toBeLessThan(0.1);
+      expect(Math.abs(result.durationSec - 4.4)).toBeLessThan(0.1);
       expect(Math.abs(result.measuredLufs + 16)).toBeLessThanOrEqual(1);
       expect(result.audioSha256).toMatch(/^[0-9a-f]{64}$/);
       expect(align.mock.calls[0]?.[0]).toEqual(result.mp3);

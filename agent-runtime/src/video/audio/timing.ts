@@ -14,7 +14,7 @@ export function sceneTimingFromAlignment(input: {
 }): SceneTiming {
   if (!/^s\d{2}$/.test(input.sceneId) || !input.audioSrc.trim()
     || !Number.isFinite(input.audioDurationSec)
-    || input.audioDurationSec <= 0 || input.audioDurationSec > 24.6
+    || input.audioDurationSec <= 0 || input.audioDurationSec > 25
     || !Number.isFinite(input.maxLoss) || input.maxLoss < 0
     || input.alignment.loss > input.maxLoss) {
     throw new Error(`${input.sceneId}: audio duration or alignment quality is invalid.`);

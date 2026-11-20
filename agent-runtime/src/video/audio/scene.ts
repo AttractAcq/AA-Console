@@ -38,7 +38,7 @@ export async function produceSceneAudio(input: {
       const raw = await dependencies.synthesize(input.narration);
       await writeFile(inputPath, raw, { flag: "wx" });
       const normalized = await (dependencies.normalise ?? normaliseTo)(inputPath,
-        outputPath, -16);
+        outputPath, -16, { trimLeadingSilenceOverSec: 0.15, padTailSec: 0.4 });
       const mp3 = await readFile(outputPath);
       if (mp3.length < 100 || mp3.length > 20 * 1024 * 1024) {
         throw new Error(`${input.sceneId}: normalised audio size is invalid.`);

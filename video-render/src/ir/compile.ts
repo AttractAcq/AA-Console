@@ -104,7 +104,10 @@ export function compile(rawIR: unknown, rawTimings: unknown): Timeline {
     if (timing.id !== scene.id) throw new Error(`Timing ${index + 1} must refer to ${scene.id}`);
     if (timing.words.some((word) => word.endSec > timing.durationSec)) throw new Error(`${scene.id}: word timing exceeds audio duration`);
     if (timing.words.some((word, i) => i > 0 && word.startSec < timing.words[i - 1]!.startSec)) throw new Error(`${scene.id}: word timings must be ordered`);
-    const durationInFrames = Math.max(Math.ceil((timing.durationSec + AUDIO_TAIL_SEC) * FPS), Math.ceil((scene.minDurationSec ?? 2) * FPS));
+    // Production MP3s already contain the 400 ms silence tail. Silent fixtures
+    // have no file, so the compiler supplies their visual tail instead.
+    const durationInFrames = Math.max(Math.ceil((timing.durationSec
+      + (timing.audioSrc === null ? AUDIO_TAIL_SEC : 0)) * FPS), Math.ceil((scene.minDurationSec ?? 2) * FPS));
     if (durationInFrames > 25 * FPS) throw new Error(`${scene.id}: compiled scene exceeds 25 seconds`);
     if (index > 0 && scene.transitionIn !== "cut") from -= TRANSITION_FRAMES;
     const props = fillRevealTimes(scene.component, registry[scene.component].schema.parse(scene.props), timing.words, timing.durationSec);

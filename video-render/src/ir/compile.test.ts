@@ -76,6 +76,17 @@ describe("video IR", () => {
       musicSrc: null });
   });
 
+  it("counts an audio file's physical tail once and keeps captions on its aligned words", () => {
+    const withAudio = structuredClone(timings);
+    withAudio.scenes[0].audioSrc = "client-media/s01.mp3";
+    withAudio.scenes[0].durationSec = timings.scenes[0].durationSec + 0.4;
+    const timeline = compile(fixture, withAudio);
+    expect(timeline.scenes[0].durationInFrames).toBe(416);
+    expect(timeline.scenes[0].audioDurationInFrames).toBe(416);
+    expect(timeline.scenes[0].captions).toEqual(compile(fixture, timings).scenes[0].captions);
+    expect(timeline.totalFrames).toBe(3600);
+  });
+
   it("uses aligned phrases and falls back to a deterministic reveal when absent", () => {
     const aligned = structuredClone(timings);
     aligned.scenes[2].words = [
