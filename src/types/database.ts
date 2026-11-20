@@ -29494,6 +29494,156 @@ export type Database = {
           },
         ]
       }
+      video_project_music_attempts_v1: {
+        Row: {
+          client_id: string
+          created_at: string
+          enabled: boolean
+          failure_code: string | null
+          finished_at: string | null
+          ir_version: number
+          job_id: string
+          project_id: string
+          prompt: string | null
+          requested: boolean
+          requested_ms: number | null
+          state: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          enabled: boolean
+          failure_code?: string | null
+          finished_at?: string | null
+          ir_version: number
+          job_id: string
+          project_id: string
+          prompt?: string | null
+          requested: boolean
+          requested_ms?: number | null
+          state: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          enabled?: boolean
+          failure_code?: string | null
+          finished_at?: string | null
+          ir_version?: number
+          job_id?: string
+          project_id?: string
+          prompt?: string | null
+          requested?: boolean
+          requested_ms?: number | null
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_project_music_attempts_v1_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_music_attempts_v1_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_project_music_attempts_v1_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_project_music_attempts_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_project_music_attempts_v1_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "video_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_project_music_receipts_v1: {
+        Row: {
+          audio_sha256: string
+          client_id: string
+          created_at: string
+          duration_sec: number
+          file_bytes: number
+          ir_version: number
+          measured_lufs: number
+          object_id: string
+          object_updated_at: string
+          object_version: string | null
+          project_id: string
+          prompt: string
+          requested_ms: number
+          song_id: string | null
+          storage_path: string
+        }
+        Insert: {
+          audio_sha256: string
+          client_id: string
+          created_at?: string
+          duration_sec: number
+          file_bytes: number
+          ir_version: number
+          measured_lufs: number
+          object_id: string
+          object_updated_at: string
+          object_version?: string | null
+          project_id: string
+          prompt: string
+          requested_ms: number
+          song_id?: string | null
+          storage_path: string
+        }
+        Update: {
+          audio_sha256?: string
+          client_id?: string
+          created_at?: string
+          duration_sec?: number
+          file_bytes?: number
+          ir_version?: number
+          measured_lufs?: number
+          object_id?: string
+          object_updated_at?: string
+          object_version?: string | null
+          project_id?: string
+          prompt?: string
+          requested_ms?: number
+          song_id?: string | null
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_project_music_receipts_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_project_music_receipts_v1_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "video_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       video_projects: {
         Row: {
           aspects: string[]
@@ -40104,6 +40254,17 @@ export type Database = {
         Args: { p_attempt_id: string; p_claim_key: string }
         Returns: boolean
       }
+      begin_video_project_music_v1: {
+        Args: {
+          p_enabled: boolean
+          p_ir_version: number
+          p_job_id: string
+          p_project_id: string
+          p_prompt: string
+          p_requested_ms: number
+        }
+        Returns: Json
+      }
       begin_video_scene_audio_attempt_v1: {
         Args: {
           p_ir_version: number
@@ -40950,6 +41111,25 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      commit_video_project_music_v1: {
+        Args: {
+          p_audio_sha256: string
+          p_duration_sec: number
+          p_file_bytes: number
+          p_ir_version: number
+          p_job_id: string
+          p_measured_lufs: number
+          p_object_id: string
+          p_object_updated_at: string
+          p_object_version: string
+          p_project_id: string
+          p_prompt: string
+          p_requested_ms: number
+          p_song_id: string
+          p_storage_path: string
+        }
+        Returns: string
       }
       commit_video_scene_audio_v1: {
         Args: {
@@ -43569,6 +43749,15 @@ export type Database = {
       fail_source_video_edit: {
         Args: { p_error: string; p_request_id: string }
         Returns: undefined
+      }
+      fail_video_project_music_v1: {
+        Args: {
+          p_code: string
+          p_ir_version: number
+          p_job_id: string
+          p_project_id: string
+        }
+        Returns: boolean
       }
       finish_console_invitation_send_v6: {
         Args: {
@@ -46292,6 +46481,16 @@ export type Database = {
         }
         Returns: string
       }
+      record_video_project_music_cost_v1: {
+        Args: {
+          p_ir_version: number
+          p_job_id: string
+          p_project_id: string
+          p_requested_ms: number
+          p_usd: number
+        }
+        Returns: string
+      }
       record_video_render_candidate: {
         Args: {
           p_asset_id: string
@@ -48755,6 +48954,14 @@ export type Database = {
       }
       video_client_approval_email_state: {
         Args: { p_asset_id: string }
+        Returns: Json
+      }
+      video_project_music_storage_exists_v1: {
+        Args: { p_ir_version: number; p_project_id: string }
+        Returns: boolean
+      }
+      video_project_music_storage_identity_v1: {
+        Args: { p_ir_version: number; p_project_id: string }
         Returns: Json
       }
       video_project_source_current_v1: {

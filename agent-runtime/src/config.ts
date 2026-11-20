@@ -100,6 +100,8 @@ export interface RuntimeConfig {
   /** Fixed narrator for the code-rendered video route; both are optional until release. */
   elevenLabsApiKey?: string | null;
   elevenLabsVoiceId?: string | null;
+  /** Optional instrumental generation; false until a governed provider release. */
+  elevenLabsMusicEnabled?: boolean;
   imageModel: string;
   /** Reel keyframes can use a precision-first model without changing static creative. */
   reelImageModel: string;
@@ -352,6 +354,8 @@ export function loadConfig(): RuntimeConfig {
     openaiApiKey: optionalEnv("OPENAI_API_KEY") ?? null,
     elevenLabsApiKey: optionalEnv("ELEVENLABS_API_KEY") ?? null,
     elevenLabsVoiceId: optionalEnv("ELEVENLABS_VOICE_ID") ?? null,
+    elevenLabsMusicEnabled:
+      (optionalEnv("ELEVENLABS_MUSIC_ENABLED") ?? "false").toLowerCase() === "true",
     // Not pinned in code: the correct id is a provider fact that changes
     // faster than this repo does, so a wrong one is a config edit.
     imageModel: optionalEnv("OPENAI_IMAGE_MODEL") ?? "gpt-image-2",

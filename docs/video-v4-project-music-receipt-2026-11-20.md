@@ -1,0 +1,11 @@
+# V4 project music outcome and receipt
+
+Migration 672 makes music a project-level outcome after all exact scene audio receipts are verified. The project stays in `timing` until one music outcome is `filed`, `failed`, or `skipped`. The service-only attempt is unique per project and IR version. A second scene job sees an existing attempt and never calls the provider again; an interrupted `started` attempt remains visible for manual reconciliation.
+
+When the IR requests music and `ELEVENLABS_MUSIC_ENABLED=true`, the winning worker verifies the current source, scene durations and absent Storage target. It composes one instrumental bed, records the published list-price estimate immediately after a successful provider response, normalizes to -24 LUFS, uploads without overwrite, downloads and hashes the stored bytes, checks the Storage object identity twice, and commits an exact IR receipt. A provider, credential, media, cost, or Storage failure writes a terminal reason and allows narration-only rendering. The default flag is off. The cost is an estimate until reconciled with the ElevenLabs account ledger.
+
+The requested bed length is the compiled 30 fps scene duration plus two seconds, capped at five minutes. The renderer may loop a shorter bed for a longer video; loop quality and final sound mix require listening review. The source file can probe slightly over five minutes because of MP3 encoder padding, so verified bytes allow up to 301 seconds.
+
+Local evidence: 24 focused runtime tests passed, including mocked success, skip, provider/cost failures, concurrent attempt, Storage read-back and no double call. Runtime typecheck/build passed. The exact migration 672 passed disposable clean and released-to-current schema replays, catalog, generated types, B006 lock order, V2–V4 rollback fixtures, and Phase 9 scoped reads. The project music fixture verified one cost row, exact Storage identity, stage transition, stalled-attempt visibility, stale-object rejection, and browser role denial. Evidence: `/private/tmp/aa-video-v4-672-music-evidence-final-operator/`.
+
+No ElevenLabs request, hosted video migration, production Storage object, billable action, final MP4, or outward switch change occurred. The `video_audio` agent remains paused. V4 full-video caption and audio QA, V5–V8 and operational acceptance remain open.

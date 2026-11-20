@@ -7,6 +7,7 @@ import type { AgentJobRow } from "../../queue.js";
 import { elevenLabsUsd } from "../../usage/cost.js";
 import { ElevenLabsHttpError } from "../../video/audio/elevenlabs.js";
 import { fileSceneAudio } from "../../video/audio/file-scene.js";
+import { finishProjectMusic } from "../../video/audio/project-music.js";
 import { elevenLabsSceneDependencies, produceSceneAudio,
   SceneAudioQualityError, type SceneAudio } from "../../video/audio/scene.js";
 
@@ -27,6 +28,7 @@ export async function runVideoAudioJobWithProducer(
   sb: SupabaseClient, config: RuntimeConfig, agent: AgentRow,
   job: AgentJobRow, produce: Produce,
   file: typeof fileSceneAudio = fileSceneAudio,
+  finishMusic: typeof finishProjectMusic = finishProjectMusic,
 ): Promise<JobResult> {
   const params = job.params ?? {};
   if (job.agent_key !== "video_audio" || job.input_table !== "video_scenes"
@@ -73,9 +75,14 @@ export async function runVideoAudioJobWithProducer(
     const done = await sb.rpc("complete_video_audio_project_v1", {
       p_project_id: projectId, p_ir_version: irVersion,
     });
-    return done.error ? { ok: false, retryable: false,
-      failureMessage: "Stored video audio changed before completion." }
-      : { ok: true, retryable: false };
+    if (done.error) return { ok: false, retryable: false,
+      failureMessage: "Stored video audio changed before completion." };
+    if (done.data === true) {
+      try { await finishMusic({ sb, config, job, projectId, irVersion }); }
+      catch { return { ok: false, retryable: false,
+        failureMessage: "Video music outcome is unresolved; inspect its attempt." }; }
+    }
+    return { ok: true, retryable: false };
   }
   if (project.stage !== "timing" || scene.audio_path !== null) {
     return { ok: false, retryable: false,
@@ -135,6 +142,7 @@ export async function runVideoAudioJobWithProducer(
       p_project_id: projectId, p_ir_version: irVersion,
     });
     if (done.error) throw new Error("Audio completion guard failed.");
+    if (done.data === true) await finishMusic({ sb, config, job, projectId, irVersion });
     return { ok: true, retryable: false };
   } catch (error) {
     if (error instanceof ElevenLabsHttpError && error.retryable) {

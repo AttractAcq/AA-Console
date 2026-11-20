@@ -33,7 +33,7 @@ const audio = { mp3, alignment: { loss: 0.1, words: [{
 
 function fixture(options: { scene?: Record<string, unknown>;
   project?: Record<string, unknown>; receipt?: Record<string, unknown> | null;
-  exists?: boolean; rpcError?: string } = {}) {
+  exists?: boolean; rpcError?: string; complete?: boolean } = {}) {
   const scene = { id: sceneId, project_id: projectId, client_id: clientId,
     scene_key: "s01", narration, audio_path: null, ...options.scene };
   const project = { id: projectId, client_id: clientId,
@@ -64,7 +64,7 @@ function fixture(options: { scene?: Record<string, unknown>;
         return { data: "f6666666-6666-4666-8666-666666666666", error: null };
       }
       if (name === "complete_video_audio_project_v1") {
-        return { data: false, error: null };
+        return { data: options.complete ?? false, error: null };
       }
       throw new Error(`Unexpected RPC ${name}`);
     }),
@@ -166,5 +166,19 @@ describe("paused-by-default scene audio worker contract", () => {
     expect(result).toMatchObject({ ok: false, retryable: false });
     expect(produce).toHaveBeenCalledTimes(1);
     expect(file).not.toHaveBeenCalled();
+  });
+  it("starts one project music outcome only after every scene receipt is complete", async () => {
+    const { sb } = fixture({ complete: true });
+    const finishMusic = vi.fn().mockResolvedValue(undefined);
+    const result = await runVideoAudioJobWithProducer(sb, config, agent,
+      job, vi.fn().mockResolvedValue(audio), vi.fn(), finishMusic);
+    expect(result).toMatchObject({ ok: true });
+    expect(finishMusic).toHaveBeenCalledWith(expect.objectContaining({
+      projectId, irVersion: 1, job }));
+    const pending = fixture({ complete: false });
+    finishMusic.mockClear();
+    await runVideoAudioJobWithProducer(pending.sb, config, agent,
+      job, vi.fn().mockResolvedValue(audio), vi.fn(), finishMusic);
+    expect(finishMusic).not.toHaveBeenCalled();
   });
 });

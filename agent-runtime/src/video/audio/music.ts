@@ -67,7 +67,8 @@ export async function composeMusic(input: { apiKey: string; prompt: string;
 /** Normalize a generated instrumental bed; caller owns Storage and fallback. */
 export async function prepareMusicBed(input: { apiKey: string; mood: string;
   tone: string; videoDurationSec: number;
-  compose?: typeof composeMusic; normalise?: typeof normaliseTo }): Promise<MusicBed> {
+  compose?: typeof composeMusic; normalise?: typeof normaliseTo;
+  onComposition?: (result: ComposedMusic) => Promise<void> }): Promise<MusicBed> {
   const prompt = musicPrompt(input.mood, input.tone);
   const requestedLengthMs = musicLengthMs(input.videoDurationSec);
   const work = await mkdtemp(join(tmpdir(), "aa-video-music-"));
@@ -75,6 +76,7 @@ export async function prepareMusicBed(input: { apiKey: string; mood: string;
     const composed = await (input.compose ?? composeMusic)({
       apiKey: input.apiKey, prompt, requestedLengthMs,
     });
+    await input.onComposition?.(composed);
     const rawPath = join(work, "raw.mp3");
     const bedPath = join(work, "bed.mp3");
     await writeFile(rawPath, composed.mp3, { flag: "wx" });

@@ -55,8 +55,10 @@ describe("instrumental video music", () => {
       const raw = await readFile(source);
       const compose = vi.fn().mockResolvedValue({ mp3: raw,
         songId: "song-fixture", modelId: "music_v2_5", requestedLengthMs: 5000 });
+      const onComposition = vi.fn().mockResolvedValue(undefined);
       const bed = await prepareMusicBed({ apiKey: "managed-test-key",
-        mood: "warm piano", tone: "calm", videoDurationSec: 5, compose });
+        mood: "warm piano", tone: "calm", videoDurationSec: 5,
+        compose, onComposition });
       expect(bed.songId).toBe("song-fixture");
       expect(bed.sha256).toMatch(/^[0-9a-f]{64}$/);
       expect(Math.abs(bed.measuredLufs + 24)).toBeLessThanOrEqual(1);
@@ -64,6 +66,19 @@ describe("instrumental video music", () => {
       expect(bed.loopRequired).toBe(true);
       expect(compose).toHaveBeenCalledWith(expect.objectContaining({
         requestedLengthMs: 7000, prompt: expect.stringContaining("no vocals") }));
+      expect(onComposition).toHaveBeenCalledWith(expect.objectContaining({
+        songId: "song-fixture", modelId: "music_v2_5" }));
     } finally { await rm(dir, { recursive: true, force: true }); }
   }, 60_000);
+  it("stops preparation when a successful provider response cannot be receipted", async () => {
+    const compose = vi.fn().mockResolvedValue({ mp3: fakeMp3,
+      songId: null, modelId: "music_v2_5", requestedLengthMs: 5000 });
+    const normalise = vi.fn();
+    await expect(prepareMusicBed({ apiKey: "managed-test-key",
+      mood: "warm piano", tone: "calm", videoDurationSec: 5,
+      compose, normalise,
+      onComposition: vi.fn().mockRejectedValue(new Error("Cost receipt unavailable")) }))
+      .rejects.toThrow(/Cost receipt unavailable/);
+    expect(normalise).not.toHaveBeenCalled();
+  });
 });
