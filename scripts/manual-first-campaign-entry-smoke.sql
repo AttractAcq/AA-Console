@@ -22,6 +22,7 @@ declare organic public.client_campaigns%rowtype;
   replayed_revision public.client_campaigns%rowtype;
   organic_manifest public.campaign_manifest_versions%rowtype;
   paid_manifest public.campaign_manifest_versions%rowtype;
+  organic_sweep_id uuid; paid_sweep_id uuid;
   readiness jsonb;
 begin
   organic:=public.create_standalone_campaign_plan_v11(
@@ -74,7 +75,38 @@ begin
     or exists(select 1 from public.opportunity_links where campaign_id=paid.id) then
     raise exception 'Standalone paid channel or module selection was not stored'; end if;
   update public.client_campaigns set built_at=now(),objective='Reach local homeowners',
-    audience='Local homeowners' where id in (organic.id,paid.id);
+    audience='Local homeowners',content_count=1,
+    organic_content_count=case when id=organic.id then 1 else 0 end,
+    paid_content_count=case when id=paid.id then 1 else 0 end,
+    channels=case when id=organic.id then array['instagram']::text[]
+      else array['meta']::text[] end,
+    budget=case when id=paid.id then 100 else null end
+    where id in (organic.id,paid.id);
+  perform public.set_campaign_content_spec_v7(organic.id,
+    '[{"route":"organic","platform":"instagram","media_type":"image","content_format":"single"}]'::jsonb);
+  perform public.set_campaign_content_spec_v7(paid.id,
+    '[{"route":"paid","platform":"facebook","media_type":"image","content_format":"single"}]'::jsonb);
+  -- The fixture supplies the planner's output; mark its queued jobs completed
+  -- so the real upstream dependency remains in force for the sweep request.
+  update public.agent_jobs set status='completed',completed_at=now()
+    where agent_key='campaign_plan' and input_id in (organic.id,paid.id);
+  perform public.approve_campaign_plan_v6(organic.id);
+  perform public.approve_campaign_plan_v6(paid.id);
+  organic_sweep_id:=public.request_campaign_sweep_v6(organic.id);
+  paid_sweep_id:=public.request_campaign_sweep_v6(paid.id);
+  if public.campaign_sweep_blocker_v6(organic.id) is not null
+    or public.campaign_sweep_blocker_v6(paid.id) is not null
+    or organic_sweep_id is null or paid_sweep_id is null
+    or (select count(*) from public.agent_jobs
+      where agent_key='campaign_sweep' and input_id in (organic.id,paid.id))<>2 then
+    raise exception 'Approved standalone plans did not queue their own sweep'; end if;
+  begin
+    update public.client_campaigns set core_message='Changed after approval' where id=paid.id;
+    perform public.request_campaign_sweep_v6(paid.id);
+    raise exception 'Changed paid plan queued another sweep';
+  exception when raise_exception then
+    if sqlerrm not like '%changed after it was approved%' then raise; end if;
+  end;
   perform set_config('request.jwt.claim.role','service_role',true);
   select * into organic_manifest from public.create_typed_campaign_manifest_v11(
     organic.id,'organic-package',false);

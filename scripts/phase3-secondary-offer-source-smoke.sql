@@ -31,7 +31,7 @@ declare o public.market_opportunities%rowtype;
   clone_id uuid; revision_id uuid; legacy_id uuid; unsourced_id uuid;
   approval_id uuid; request_id uuid; rights_request uuid; rights_id uuid;
   unsupported_version public.service_offer_versions%rowtype;
-  unsupported_request_id uuid; h text; job_id uuid;
+  unsupported_request_id uuid; h text; job_id uuid; sweep_job_id uuid;
   equation jsonb:=jsonb_build_object(
     'dream_outcome','A garage ready for training',
     'dream_outcome_boost','Insulation makes winter training practical',
@@ -208,6 +208,23 @@ begin
     or not exists(select 1 from public.agent_jobs j
       where j.agent_key='campaign_plan' and j.input_id=manual_campaign.id) then
     raise exception 'Atomic sourced creation lost its inputs, lineage or planner job'; end if;
+  update public.client_campaigns set built_at=now(),
+    objective='Book winter garage appointments',audience='Local buyers',
+    content_count=2,organic_content_count=1,paid_content_count=1,
+    channels=array['instagram','meta']::text[],budget=100
+    where id=manual_campaign.id;
+  perform public.set_campaign_content_spec_v7(manual_campaign.id,
+    '[{"route":"organic","platform":"instagram","media_type":"image","content_format":"single"},
+      {"route":"paid","platform":"facebook","media_type":"image","content_format":"single"}]'::jsonb);
+  update public.agent_jobs set status='completed',completed_at=now()
+    where agent_key='campaign_plan' and input_id=manual_campaign.id;
+  perform public.approve_campaign_plan_v6(manual_campaign.id);
+  sweep_job_id:=public.request_campaign_sweep_v6(manual_campaign.id);
+  if public.campaign_sweep_blocker_v6(manual_campaign.id) is not null
+    or sweep_job_id is null
+    or (select count(*) from public.agent_jobs
+      where agent_key='campaign_sweep' and input_id=manual_campaign.id)<>1 then
+    raise exception 'Approved both-route opportunity plan did not queue one sweep'; end if;
   atomic_revision:=public.create_sourced_campaign_revision_v7(
     campaign.id,'Revised winter direction',v.id);
   if atomic_revision.cloned_from_campaign_id is distinct from campaign.id
