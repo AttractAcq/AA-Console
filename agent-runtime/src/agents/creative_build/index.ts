@@ -59,7 +59,7 @@ import {
 import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
 import { attestCreativeAssetBytes } from "../../creative/attest-asset-route.js";
-import { reusableGeneratedAsset } from "./generatedAsset.js";
+import { reusableFramedRenderAsset, reusableGeneratedAsset } from "./generatedAsset.js";
 import { compositionNote, frameVerdict, isNearlyBlank, measureComposition } from "./screen.js";
 
 class RecruitmentApprovalHold extends Error {}
@@ -637,6 +637,31 @@ export async function runCreativeBuildJob(
     if (!(error instanceof RecruitmentApprovalHold)) throw error;
     await fail(error.message);
     return { ok: false, retryable: false, failureMessage: error.message };
+  }
+
+  // A previous attempt may have filed the complete set, then failed while
+  // attesting bytes or saving its final status. Recover that exact asset
+  // before another concept or frame call can change files under review.
+  if (isFramed) {
+    const existingAssetId = await reusableFramedRenderAsset(
+      sb, String(job.client_id), typed.id, renderId,
+      openingShots ? "video" : "image", openingShots ? "reel" : typed.content_format,
+    );
+    if (existingAssetId) {
+      await attestCreativeAssetBytes(sb, String(job.client_id), existingAssetId);
+      await sb.from("creative_renders").update({
+        status: "done", asset_id: existingAssetId, error: null,
+        updated_at: new Date().toISOString(),
+      }).eq("id", renderId);
+      await sb.from("creative_generations").update({
+        stage: "done", asset_id: existingAssetId, error: null,
+        updated_at: new Date().toISOString(),
+      }).eq("id", generationId);
+      await markBriefComplete(sb, typed.id);
+      await appendEvent(sb, job.id, "Verified the existing framed asset after a partial render attempt; no new image was generated.");
+      if (!openingShots && !remake) await handOffToSlot(sb, job, "creative_build");
+      return { ok: true, retryable: false };
+    }
   }
 
   // ---- stage one: the concept -------------------------------------------

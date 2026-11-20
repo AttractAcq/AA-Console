@@ -1,11 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
-import { reusableGeneratedAsset } from "./generatedAsset.js";
+import { reusableFramedRenderAsset, reusableGeneratedAsset } from "./generatedAsset.js";
 
 function client(rows: Array<Record<string, unknown>>) {
   const query = {
     select: () => query,
     eq: () => query,
+    like: () => query,
     limit: async () => ({ data: rows, error: null }),
   };
   return { from: () => query } as unknown as SupabaseClient;
@@ -30,6 +31,30 @@ describe("generated asset retry", () => {
       [pending, { ...pending, id: "asset-2" }],
     ]) {
       await expect(find(client(rows))).rejects.toThrow();
+    }
+  });
+});
+
+describe("framed render retry", () => {
+  const findFramed = (sb: SupabaseClient) => reusableFramedRenderAsset(
+    sb, "client-1", "brief-1", "render-1", "image", "carousel",
+  );
+  const framed = { ...pending, content_format: "carousel" };
+
+  it("reuses only the one pending framed asset at this render path", async () => {
+    expect(await findFramed(client([]))).toBeNull();
+    expect(await findFramed(client([framed]))).toBe("asset-1");
+  });
+
+  it("holds a mismatched, reviewed or ambiguous framed asset", async () => {
+    for (const rows of [
+      [{ ...framed, content_format: "story" }],
+      [{ ...framed, media_type: "video" }],
+      [{ ...framed, review_status: "approved" }],
+      [{ ...framed, archived_at: "2026-11-20T00:00:00Z" }],
+      [framed, { ...framed, id: "asset-2" }],
+    ]) {
+      await expect(findFramed(client(rows))).rejects.toThrow();
     }
   });
 });
