@@ -34,6 +34,7 @@ import { OfferStrategyPanel } from "./strategy/OfferStrategyPanel";
 import { MoneyModelStrategyPanel } from "./strategy/MoneyModelStrategyPanel";
 import { GenerationPanel } from "./ideation/GenerationPanel";
 import { DailyProductionOverview } from "./ideation/DailyProductionOverview";
+import { CampaignProductionOverview } from "./ideation/CampaignProductionOverview";
 import { ContentArchivePanel } from "./archive/ContentArchivePanel";
 import { ARCHIVE_DOMAINS, SimpleArchivePanel } from "./archive/SimpleArchivePanel";
 import { BriefsPanel } from "./ideation/BriefsPanel";
@@ -124,7 +125,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   // belonged to a page that walked one asset through stages, and these are
   // four queues.
   "content-production-factory": {
-    generation: () => <><DailyProductionOverview /><GenerationPanel showJourney={false} /></>,
+    generation: () => <><CampaignProductionOverview /><DailyProductionOverview /><GenerationPanel showJourney={false} /></>,
     briefs: () => <BriefsPanel showJourney={false} />,
     // Create is the assets nobody has signed off, not the briefs waiting for
     // one: a brief with nothing made from it stays in Briefs, where
