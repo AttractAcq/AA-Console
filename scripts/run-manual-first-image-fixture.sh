@@ -59,7 +59,17 @@ if PGPASSWORD=postgres psql -X -qAt -v ON_ERROR_STOP=1 \
     -f scripts/manual-first-image-lineage-smoke.sql \
     >"$run_dir/image-fixture.private.log" 2>&1; then
   printf 'passed\n' >"$evidence_dir/image-lineage.status.txt"
-  echo "Disposable image-lineage fixture passed at migration $actual_head. Evidence: $evidence_dir"
+  remaining="$(PGPASSWORD=postgres psql -X -qAt -v ON_ERROR_STOP=1 \
+    -h 127.0.0.1 -p "$((port_base + 2))" -U postgres -d postgres \
+    -c "select (select count(*) from public.clients where name='Manual image lineage fixture') + (select count(*) from public.client_campaigns where name='Two route image fixture')")"
+  printf '%s\n' "$remaining" >"$evidence_dir/remaining-fixture-rows.txt"
+  if [[ "$remaining" != "0" ]]; then
+    printf 'failed\n' >"$evidence_dir/rollback.status.txt"
+    echo 'The rollback fixture left client or campaign rows.' >&2
+    exit 1
+  fi
+  printf 'passed\n' >"$evidence_dir/rollback.status.txt"
+  echo "Disposable image-lineage fixture and rollback passed at migration $actual_head. Evidence: $evidence_dir"
 else
   printf 'failed\n' >"$evidence_dir/image-lineage.status.txt"
   grep -E 'ERROR:|psql:' "$run_dir/image-fixture.private.log" | tail -3 >&2 || true
