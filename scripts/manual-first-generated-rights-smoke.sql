@@ -7,10 +7,15 @@ insert into public.profiles(id,role,email) values
   ('a1630000-0000-4000-8000-000000000001','admin','rights-admin@example.invalid');
 insert into public.clients(id,name,initials) values
   ('b1630000-0000-4000-8000-000000000001','Generated rights fixture','GR');
+insert into public.client_briefs(id,client_id,title,media_type,content_format,target_platform)
+values ('b1630000-0000-4000-8000-000000000002',
+  'b1630000-0000-4000-8000-000000000001','Generated image brief',
+  'image','single','instagram');
 insert into public.client_media_assets
-  (id,client_id,media_type,content_format,title,storage_path,edit_stage)
+  (id,client_id,brief_id,media_type,content_format,title,storage_path,edit_stage)
 values ('c1630000-0000-4000-8000-000000000001',
-  'b1630000-0000-4000-8000-000000000001','image','single','Generated image',
+  'b1630000-0000-4000-8000-000000000001',
+  'b1630000-0000-4000-8000-000000000002','image','single','Generated image',
   'rights-fixture/generated.png','review_ready');
 insert into storage.objects(id,bucket_id,name,version) values
   ('d1630000-0000-4000-8000-000000000001','client-media',
@@ -21,9 +26,10 @@ select public.attest_creative_storage_bytes_v6(
   'c1630000-0000-4000-8000-000000000001','rights-fixture/generated.png',
   repeat('a',64),18,'d1630000-0000-4000-8000-000000000001','v1',
   (select updated_at from storage.objects where name='rights-fixture/generated.png'));
-insert into public.creative_generations(id,client_id,media_type)
+insert into public.creative_generations(id,client_id,brief_id,media_type)
 values ('e1630000-0000-4000-8000-000000000001',
-  'b1630000-0000-4000-8000-000000000001','image');
+  'b1630000-0000-4000-8000-000000000001',
+  'b1630000-0000-4000-8000-000000000002','image');
 insert into public.creative_renders(id,generation_id,client_id,status,asset_id)
 values ('f1630000-0000-4000-8000-000000000001',
   'e1630000-0000-4000-8000-000000000001',
