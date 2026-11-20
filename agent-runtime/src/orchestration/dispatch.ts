@@ -31,6 +31,7 @@ import { runSourceVideoEditJob } from "../agents/source_video_edit/index.js";
 import { runMotionDesignJob } from "../agents/motion_design/index.js";
 import { runVideoScriptJob } from "../agents/video_script/index.js";
 import { runVideoAudioJob } from "../agents/video_audio/index.js";
+import { runVideoRenderJob } from "../agents/video_render/index.js";
 import { runVideoRepurposeJob } from "../agents/video_repurpose/index.js";
 import { runRepurposeClipJob } from "../agents/video_repurpose/clip-job.js";
 import { runIdeaSelectJob } from "../agents/idea_select/index.js";
@@ -164,6 +165,9 @@ const RUNNERS: Record<string, JobRunner> = {
   video_script: runVideoScriptJob,
   // Paused by default. Each accepted storyboard queues one exact-scene job.
   video_audio: runVideoAudioJob,
+  // Paused registry row; requires the exact Lambda deployment and hosted
+  // candidate migration before a worker can claim it.
+  video_render: runVideoRenderJob,
   video_repurpose_insights: runVideoRepurposeJob,
   repurpose_clip_extract: runRepurposeClipJob,
   idea_select: runIdeaSelectJob,
@@ -266,5 +270,6 @@ export async function dispatchJob(
   }
   // Computed here rather than inside each runner so every agent is bounded by
   // construction, including any added later that forgets to ask.
-  return runner(sb, config, agent, job, deadlineFromNow(config));
+  return runner(sb, config, agent, job,
+    deadlineFromNow(config, job.agent_key));
 }

@@ -14,6 +14,17 @@ import type { RuntimeConfig } from "../config.js";
  * Anchored at the moment dispatch hands the job to its runner, so a retry
  * gets a fresh deadline and time spent loading context counts against it.
  */
-export function deadlineFromNow(config: RuntimeConfig): number {
-  return Date.now() + config.maxJobSeconds * 1000;
+export function maxJobSecondsForAgent(config: RuntimeConfig,
+  agentKey?: string): number {
+  // One video job may render three separate aspects. Its provider handles are
+  // durable, so a recycled worker resumes rather than starting another paid
+  // render. Keep this exception scoped to that one agent.
+  return agentKey === "video_render"
+    ? Math.max(config.maxJobSeconds, 4 * 60 * 60)
+    : config.maxJobSeconds;
+}
+
+export function deadlineFromNow(config: RuntimeConfig,
+  agentKey?: string): number {
+  return Date.now() + maxJobSecondsForAgent(config, agentKey) * 1000;
 }

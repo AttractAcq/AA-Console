@@ -47,6 +47,7 @@ export async function renderProjectAspect(input: {
   aspect: "16:9" | "9:16" | "1:1";
   region: AwsRegion; functionName: string; serveUrl: string;
   localPath: string; maxAlignmentLoss: number;
+  observationDeadlineMs?: number;
 }, deps: Dependencies = dependencies): Promise<{
   attemptId: string; handle: LambdaRenderHandle;
   outputPath: string; sizeInBytes: number; probe: ProjectRenderProbe;
@@ -133,7 +134,9 @@ export async function renderProjectAspect(input: {
     throw new VideoRenderUncertainError(attemptId,
       `existing attempt state ${state} cannot start again`);
   }
-  const downloaded = await deps.resume({ handle, localPath: input.localPath });
+  const downloaded = await deps.resume({ handle, localPath: input.localPath,
+    ...(input.observationDeadlineMs === undefined ? {}
+      : { deadlineMs: input.observationDeadlineMs }) });
   const mastered = await deps.master({ sourcePath: downloaded.outputPath,
     outputPath: downloaded.outputPath.replace(/\.mp4$/, "-master.mp4") });
   const probe = await deps.probe({ path: mastered.outputPath,

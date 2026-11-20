@@ -22,6 +22,7 @@ export async function renderAndFileProjectAspect(input: {
   irVersion: number; aspect: VideoAspect;
   region: AwsRegion; functionName: string; serveUrl: string;
   localPath: string; maxAlignmentLoss: number;
+  observationDeadlineMs?: number;
 }, deps: Dependencies = defaults): Promise<{ candidateId: string;
   probeResult: "pass" | "fail"; resumed: boolean }> {
   const prior = await input.sb.from("video_project_render_candidates_v1")

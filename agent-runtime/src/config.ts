@@ -50,6 +50,10 @@ export interface RuntimeConfig {
   schemaParityReadToken: string | null;
   schemaParityProductionRef: string | null;
   schemaParityStagingRef: string | null;
+  /** Exact code-rendered video Lambda deployment. Missing values hold its paused worker. */
+  remotionAwsRegion: string | null;
+  remotionFunctionName: string | null;
+  remotionServeUrl: string | null;
   /** Ceiling on Master AI spend across every conversation in one UTC day. */
   masterAiDailyLimitUsd: number;
   /** Ceiling on Master AI spend within a single conversation, all time. */
@@ -301,6 +305,9 @@ export function loadConfig(): RuntimeConfig {
     schemaParityReadToken: optionalEnv("AA_SCHEMA_PARITY_READ_TOKEN") ?? null,
     schemaParityProductionRef: optionalEnv("AA_SCHEMA_PARITY_PRODUCTION_REF") ?? null,
     schemaParityStagingRef: optionalEnv("AA_SCHEMA_PARITY_STAGING_REF") ?? null,
+    remotionAwsRegion: optionalEnv("REMOTION_AWS_REGION") ?? null,
+    remotionFunctionName: optionalEnv("REMOTION_FUNCTION_NAME") ?? null,
+    remotionServeUrl: optionalEnv("REMOTION_SERVE_URL") ?? null,
     // Calibrated against real use rather than guessed: 13 turns had cost
     // $1.15 in total, the dearest single turn $0.16, and the busiest day
     // $1.10. These sit far above that, so they never interrupt ordinary

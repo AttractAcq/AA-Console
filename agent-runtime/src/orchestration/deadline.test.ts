@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { deadlineFromNow } from "./deadline.js";
+import { deadlineFromNow, maxJobSecondsForAgent } from "./deadline.js";
 import type { RuntimeConfig } from "../config.js";
 
 const config = (maxJobSeconds: number) => ({ maxJobSeconds }) as RuntimeConfig;
@@ -29,5 +29,13 @@ describe("deadlineFromNow", () => {
     vi.setSystemTime(31_000);
     const retry = deadlineFromNow(config(60));
     expect(retry - first).toBe(30_000);
+  });
+
+  it("allows only the multi-aspect video worker a longer bounded lease", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    expect(maxJobSecondsForAgent(config(1800), "video_render")).toBe(14_400);
+    expect(deadlineFromNow(config(1800), "video_render")).toBe(14_400_000);
+    expect(deadlineFromNow(config(1800), "video_audio")).toBe(1_800_000);
   });
 });

@@ -19,6 +19,7 @@ import {
 } from "./queue.js";
 import { getAgent } from "./orchestration/registry.js";
 import { dispatchJob, hasRunner, registeredAgentKeys } from "./orchestration/dispatch.js";
+import { maxJobSecondsForAgent } from "./orchestration/deadline.js";
 import { failSlot, slotIdOf } from "./engine/slot.js";
 import { logger } from "./logging/logger.js";
 
@@ -102,7 +103,8 @@ export async function runOneJob(
   await markJobRunning(sb, job.id, leaseOwner);
   await appendEvent(sb, job.id, `${agent.name} started.`, "info", { agent_key: job.agent_key });
 
-  const renewal = startLeaseRenewal(sb, config, job.id, leaseOwner);
+  const renewal = startLeaseRenewal(sb, config, job.id, leaseOwner,
+    job.agent_key);
 
   try {
     const result = await dispatchJob(sb, config, agent, job);
@@ -178,6 +180,7 @@ function startLeaseRenewal(
   config: RuntimeConfig,
   jobId: string,
   leaseOwner: string,
+  agentKey: string,
 ): { stop: () => void } {
   // A third of the lease gives two chances to renew before it lapses.
   const intervalMs = Math.max(10_000, Math.floor((config.leaseSeconds * 1000) / 3));
@@ -191,12 +194,13 @@ function startLeaseRenewal(
     // the job. The stale run cannot corrupt anything when it finally returns,
     // because every write asserts it still owns the lease.
     const ageSeconds = Math.round((Date.now() - startedAt) / 1000);
-    if (ageSeconds > config.maxJobSeconds) {
+    const maxJobSeconds = maxJobSecondsForAgent(config, agentKey);
+    if (ageSeconds > maxJobSeconds) {
       logger.error("job_lease_renewal_capped", {
         jobId,
         leaseOwner,
         ageSeconds,
-        maxJobSeconds: config.maxJobSeconds,
+        maxJobSeconds,
         reason: "job exceeded its maximum age; letting the lease lapse so it can be reclaimed",
       });
       clearInterval(interval);
