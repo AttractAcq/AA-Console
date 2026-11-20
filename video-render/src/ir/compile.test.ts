@@ -72,7 +72,8 @@ describe("video IR", () => {
     expect(() => compile(lateReveal, timings)).toThrow("reading time");
     const music = structuredClone(fixture);
     music.music.enabled = true;
-    expect(() => compile(music, timings)).toThrow("Enabled music requires a source");
+    expect(compile(music, timings)).toMatchObject({ music: { enabled: true },
+      musicSrc: null });
   });
 
   it("uses aligned phrases and falls back to a deterministic reveal when absent", () => {

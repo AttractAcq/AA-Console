@@ -92,7 +92,8 @@ function chapterTitle(component: ComponentName, props: Record<string, unknown>):
 export function compile(rawIR: unknown, rawTimings: unknown): Timeline {
   const ir = parseIR(rawIR);
   const timings = TimingsSchema.parse(rawTimings);
-  if (ir.music.enabled && !timings.musicSrc) throw new Error("Enabled music requires a source in timings");
+  // The requested music remains in the IR for audit. Music generation is
+  // optional: a failed or disabled bed renders narration without a bed.
   if (timings.scenes.length !== ir.scenes.length) throw new Error("Timings must contain one entry for every IR scene");
 
   let from = 0;
