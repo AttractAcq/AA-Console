@@ -30,6 +30,10 @@ describe("video IR", () => {
     const result = validateIR(badProps);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.problems.some((problem) => problem.startsWith("scenes.2.props."))).toBe(true);
+    const badProcess = structuredClone(fixture);
+    const processIndex = badProcess.scenes.findIndex((scene) => scene.component === "ProcessDiagram");
+    badProcess.scenes[processIndex]!.props = { nodes: [null], edges: [null] };
+    expect(validateIR(badProcess).ok).toBe(false);
 
     const duplicateId = structuredClone(fixture);
     duplicateId.scenes[1].id = "s01";

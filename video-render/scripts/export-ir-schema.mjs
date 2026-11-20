@@ -53,6 +53,8 @@ try {
     await mkdir(resolve(root, "dist"), { recursive: true });
     await writeFile(resolve(root, "dist", name), content);
   }
+  await writeOrCheck(resolve(repoRoot, "agent-runtime/src/video/semantic.ts"),
+    await readFile(resolve(root, "src/ir/semantic.ts"), "utf8"));
 } finally {
   await rm(tempDir, { recursive: true, force: true });
 }
