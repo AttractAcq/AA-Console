@@ -18,6 +18,7 @@ const agent = { agent_key: 'brief' } as AgentRow;
 const existing = { id: 'brief', client_id: 'client', source_idea_id: 'idea', title: 'Human edited' };
 function database(options: { existing?: typeof existing; conflict?: boolean; error?: string; wrongOwner?: boolean;
   proof?: Record<string, unknown>; idea?: Record<string, unknown>; pillar?: Record<string, unknown>;
+  brand?: Record<string, unknown>;
   selectionCurrent?: boolean } = {}) {
   let saved: Record<string, unknown> | undefined = options.existing;
   const insert = vi.fn(async (row: Record<string, unknown>) => {
@@ -37,6 +38,7 @@ function database(options: { existing?: typeof existing; conflict?: boolean; err
       maybeSingle: async () => ({ error: null, data: table === 'client_briefs' ? saved ?? null
         : table === 'client_proof_assets' ? options.proof ?? null
         : table === 'client_content_pillars' ? options.pillar ?? null
+        : table === 'client_brand_profiles' ? options.brand ?? null
         : table === 'client_ideas' ? { id: 'idea', title: 'Idea', media_type: 'image', ...options.idea } : { name: 'Client' } }),
       insert,
     };
@@ -140,5 +142,16 @@ describe('exact idea sources in a production brief', () => {
     const revoked = database({idea:{proof_id:'proof-1'},proof:{...proof,usage_rights:'restricted'}});
     expect((await run(revoked.sb)).ok).toBe(false);
     expect(model).not.toHaveBeenCalled();
+  });
+
+  it('uses the recorded visual brand in a still-image brief', async () => {
+    const db = database({brand:{colour_primary:'#123456',colour_secondary:null,
+      colour_accent:null,colour_background:null,colour_text:null,
+      font_heading:'Inter',font_body:null,imagery_style:'Clean diagrams',
+      lighting:null,mood:null,composition_notes:null,never_do:'No gradients'}});
+    expect((await run(db.sb)).ok).toBe(true);
+    const prompt = String(model.mock.calls[0]?.[0]?.prompt ?? '');
+    expect(prompt).toContain('exactly #123456');
+    expect(prompt).toContain('No gradients');
   });
 });

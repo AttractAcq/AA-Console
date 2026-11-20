@@ -23,7 +23,7 @@ import { isMultiFrame } from "../../content/format.js";
 import { loadIdentity, identityWriterBlock } from "../identity.js";
 import { loadUsableProof, renderProof, proofIdForRef } from "../proof.js";
 import { completeMissingFinalReelCaption, reelBriefProblem, reelCopyProblem, reelPlannerNote } from "./shots.js";
-import { loadBrandProfile } from "../creative_build/brand.js";
+import { brandConceptBlock, loadBrandProfile } from "../creative_build/brand.js";
 import { loadCampaignBriefContext } from "./campaign-context.js";
 
 export async function runBriefJob(
@@ -193,7 +193,8 @@ export async function runBriefJob(
   const contentFormat = idea.content_format ?? "single";
   const reelProblem = reelBriefProblem(contentFormat, idea.media_type);
   if (reelProblem) return { ok: false, retryable: false, failureMessage: reelProblem };
-  const visualBrand = contentFormat === "reel" ? await loadBrandProfile(sb, job.client_id) : null;
+  const visualBrand = idea.media_type === "image" || contentFormat === "reel"
+    ? await loadBrandProfile(sb, job.client_id) : null;
 
   const submitTool = briefSubmitTool(
     idea.media_type,
@@ -236,6 +237,7 @@ ${contentFormat === "reel"
 BRAND STRATEGY — hold this point of view, respect what it says to avoid
 ${strategy || "(none on file)"}
 ${visualBrand?.never_do ? `\nVISUAL BRAND EXCLUSIONS — these override any idea or shot suggestion\n${visualBrand.never_do}\n` : ""}
+${idea.media_type === "image" ? `\nVISUAL BRAND FOR THIS IMAGE — apply these recorded colours, type and treatments\n${brandConceptBlock(visualBrand)}\n` : ""}
 ${contentFormat === "reel" && visualBrand ? `
 VISUAL BRAND PROFILE — authoritative for the rendered reel
 Primary: ${visualBrand.colour_primary ?? "unspecified"}; secondary: ${visualBrand.colour_secondary ?? "unspecified"}; accent: ${visualBrand.colour_accent ?? "unspecified"}; background: ${visualBrand.colour_background ?? "unspecified"}; text: ${visualBrand.colour_text ?? "unspecified"}.
