@@ -10,6 +10,8 @@ values ('f1111111-1111-4111-8111-111111111111','admin',
   'video-audio-admin@example.invalid');
 insert into public.clients(id,name,initials)
 values ('f2222222-2222-4222-8222-222222222222','Video audio fixture','VA');
+insert into public.client_brand_profiles(client_id,narrator_voice_id)
+values ('f2222222-2222-4222-8222-222222222222','brand-voice');
 select set_config('request.jwt.claim.sub',
   'f1111111-1111-4111-8111-111111111111',true);
 select set_config('request.jwt.claim.role','authenticated',true);
@@ -32,6 +34,23 @@ begin
     'The exact operator prompt is the reviewed source.');
   perform set_config('request.jwt.claim.role','service_role',true);
   update public.video_projects set stage='timing',ir_version=1 where id=p.id;
+  update public.client_brand_profiles set narrator_voice_id='later-voice'
+    where client_id=p.client_id;
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  begin
+    perform public.bind_video_project_voice_v1(p.id,1,'default-voice');
+    raise exception 'Browser bound a project narrator';
+  exception when insufficient_privilege then null; end;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  if public.bind_video_project_voice_v1(p.id,1,'default-voice')
+      is distinct from 'brand-voice'
+    or public.bind_video_project_voice_v1(p.id,1,'changed-default')
+      is distinct from 'brand-voice' then
+    raise exception 'Started narrator changed with a live brand or default edit'; end if;
+  begin
+    update public.video_projects set voice_id='later-voice' where id=p.id;
+    raise exception 'Bound narrator was editable';
+  exception when check_violation then null; end;
   insert into public.video_scenes(project_id,client_id,position,scene_key,
     component,props,narration)
   values(p.id,p.client_id,1,'s01','TitleCard','{}'::jsonb,'Hello.')
@@ -75,29 +94,35 @@ begin
   if (public.video_scene_audio_storage_identity_v1(p.id,s.id)->>'object_id')::uuid
     is distinct from o.id then
     raise exception 'Storage inspection did not bind the exact object'; end if;
+  begin
+    perform public.commit_video_scene_audio_v1(p.id,s.id,1,narration_hash,
+      audio_hash,path,1024,o.id,o.version,o.updated_at,words,0.05,
+      2.2,-16,'other-voice',1);
+    raise exception 'Wrong narrator voice committed';
+  exception when check_violation then null; end;
   perform set_config('request.jwt.claim.role','authenticated',true);
   begin
     perform public.commit_video_scene_audio_v1(p.id,s.id,1,narration_hash,
       audio_hash,path,1024,o.id,o.version,o.updated_at,words,0.05,
-      2.2,-16,'narrator-1',1);
+      2.2,-16,'brand-voice',1);
     raise exception 'Browser committed scene audio';
   exception when insufficient_privilege then null; end;
   perform set_config('request.jwt.claim.role','service_role',true);
   begin
     perform public.commit_video_scene_audio_v1(p.id,s.id,1,
       repeat('b',64),audio_hash,path,1024,o.id,o.version,o.updated_at,
-      words,0.05,2.2,-16,'narrator-1',1);
+      words,0.05,2.2,-16,'brand-voice',1);
     raise exception 'Wrong narration hash committed';
   exception when invalid_parameter_value then null; end;
   if exists(select 1 from public.video_scene_audio_receipts_v1
     where scene_id=s.id) then raise exception 'Failed commit left a receipt'; end if;
   if public.commit_video_scene_audio_v1(p.id,s.id,1,narration_hash,
       audio_hash,path,1024,o.id,o.version,o.updated_at,words,0.05,
-      2.2,-16,'narrator-1',1) is distinct from s.id then
+      2.2,-16,'brand-voice',1) is distinct from s.id then
     raise exception 'Commit returned the wrong scene'; end if;
   if public.commit_video_scene_audio_v1(p.id,s.id,1,narration_hash,
       audio_hash,path,1024,o.id,o.version,o.updated_at,words,0.05,
-      2.2,-16,'narrator-1',1) is distinct from s.id then
+      2.2,-16,'brand-voice',1) is distinct from s.id then
     raise exception 'Exact replay was not idempotent'; end if;
   if (select audio_path from public.video_scenes where id=s.id)
       is distinct from path or
@@ -107,14 +132,14 @@ begin
   begin
     perform public.commit_video_scene_audio_v1(p.id,s.id,1,narration_hash,
       repeat('c',64),path,1024,o.id,o.version,o.updated_at,
-      words,0.05,2.2,-16,'narrator-1',1);
+      words,0.05,2.2,-16,'brand-voice',1);
     raise exception 'Different replay was accepted';
   exception when check_violation then null; end;
   update storage.objects set version='v2' where id=o.id;
   begin
     perform public.commit_video_scene_audio_v1(p.id,s.id,1,narration_hash,
       audio_hash,path,1024,o.id,o.version,o.updated_at,words,0.05,
-      2.2,-16,'narrator-1',1);
+      2.2,-16,'brand-voice',1);
     raise exception 'Replaced object was accepted';
   exception when check_violation then null; end;
   if (select count(*) from public.video_scene_audio_receipts_v1

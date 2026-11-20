@@ -39,6 +39,9 @@ begin
   update public.video_projects set stage='timing',ir_version=1,
     ir='{"music":{"enabled":true,"mood":"warm piano"},"scenes":[{"id":"s01"},{"id":"s02"},{"id":"s03"}]}'::jsonb
     where id=p.id;
+  if public.bind_video_project_voice_v1(p.id,1,'narrator-1')
+      is distinct from 'narrator-1' then
+    raise exception 'Project narrator was not bound'; end if;
   for entry in select value from jsonb_array_elements(
     '[{"key":"s01","narration":"Hello one."},
       {"key":"s02","narration":"Hello two."},

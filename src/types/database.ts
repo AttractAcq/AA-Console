@@ -30327,6 +30327,7 @@ export type Database = {
           target_length_sec: number
           tone: string
           updated_at: string
+          voice_id: string | null
         }
         Insert: {
           aspects?: string[]
@@ -30361,6 +30362,7 @@ export type Database = {
           target_length_sec?: number
           tone?: string
           updated_at?: string
+          voice_id?: string | null
         }
         Update: {
           aspects?: string[]
@@ -30395,6 +30397,7 @@ export type Database = {
           target_length_sec?: number
           tone?: string
           updated_at?: string
+          voice_id?: string | null
         }
         Relationships: [
           {
@@ -41108,6 +41111,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      bind_video_project_voice_v1: {
+        Args: {
+          p_default_voice_id: string
+          p_ir_version: number
+          p_project_id: string
+        }
+        Returns: string
+      }
       book_appointment_v6: {
         Args: {
           p_booked_via: string
@@ -43500,6 +43511,7 @@ export type Database = {
           target_length_sec: number
           tone: string
           updated_at: string
+          voice_id: string | null
         }
         SetofOptions: {
           from: "*"

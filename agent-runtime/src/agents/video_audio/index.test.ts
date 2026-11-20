@@ -33,7 +33,8 @@ const audio = { mp3, alignment: { loss: 0.1, words: [{
 
 function fixture(options: { scene?: Record<string, unknown>;
   project?: Record<string, unknown>; receipt?: Record<string, unknown> | null;
-  exists?: boolean; rpcError?: string; complete?: boolean } = {}) {
+  exists?: boolean; rpcError?: string; complete?: boolean;
+  brandVoice?: string; boundVoice?: string } = {}) {
   const scene = { id: sceneId, project_id: projectId, client_id: clientId,
     scene_key: "s01", narration, audio_path: null, ...options.scene };
   const project = { id: projectId, client_id: clientId,
@@ -47,9 +48,15 @@ function fixture(options: { scene?: Record<string, unknown>;
           : name === "video_projects" ? project : receipt, error: null }) };
       return query;
     },
-    rpc: vi.fn(async (name: string) => {
+    rpc: vi.fn(async (name: string, args?: Record<string, unknown>) => {
       calls.push(name);
       if (options.rpcError === name) return { data: null, error: { message: "held" } };
+      if (name === "bind_video_project_voice_v1") {
+        const voice = options.brandVoice ?? options.boundVoice
+          ?? args?.p_default_voice_id;
+        return voice ? { data: voice, error: null }
+          : { data: null, error: { message: "missing voice" } };
+      }
       if (name === "video_scene_audio_upload_target_v1") {
         return { data: { ir_version: 1, scene_key: "s01",
           narration_sha256: narrationSha256, storage_path: path }, error: null };
@@ -85,7 +92,8 @@ describe("paused-by-default scene audio worker contract", () => {
       onSynthesis: expect.any(Function) });
     expect(file).toHaveBeenCalledWith(expect.objectContaining({
       sceneId, projectId, irVersion: 1, voiceId: "fixed-voice", audio }));
-    expect(calls).toEqual(["video_scene_audio_upload_target_v1",
+    expect(calls).toEqual(["bind_video_project_voice_v1",
+      "video_scene_audio_upload_target_v1",
       "video_scene_audio_storage_exists_v1",
       "begin_video_scene_audio_attempt_v1", "complete_video_audio_project_v1"]);
   });
@@ -93,12 +101,43 @@ describe("paused-by-default scene audio worker contract", () => {
     const { sb, calls } = fixture({ scene: { audio_path: path }, receipt: {
       scene_id: sceneId, project_id: projectId, client_id: clientId,
       ir_version: 1, narration_sha256: narrationSha256, storage_path: path,
+      voice_id: "fixed-voice",
     } });
     const produce = vi.fn();
     expect(await runVideoAudioJobWithProducer(sb, config, agent,
       job, produce, vi.fn())).toMatchObject({ ok: true });
     expect(produce).not.toHaveBeenCalled();
-    expect(calls).toEqual(["complete_video_audio_project_v1"]);
+    expect(calls).toEqual(["bind_video_project_voice_v1",
+      "complete_video_audio_project_v1"]);
+  });
+  it("uses the started client's narrator for every scene and keeps a bound default", async () => {
+    const branded = fixture({ brandVoice: "client-voice" });
+    const produce = vi.fn().mockResolvedValue(audio);
+    const file = vi.fn();
+    expect(await runVideoAudioJobWithProducer(branded.sb, config, agent,
+      job, produce, file)).toMatchObject({ ok: true });
+    expect(produce).toHaveBeenCalledWith(expect.objectContaining({
+      voiceId: "client-voice" }));
+    expect(file).toHaveBeenCalledWith(expect.objectContaining({
+      voiceId: "client-voice" }));
+    const bound = fixture({ boundVoice: "original-default" });
+    produce.mockClear();
+    expect(await runVideoAudioJobWithProducer(bound.sb,
+      { ...config, elevenLabsVoiceId: "changed-default" }, agent,
+      job, produce, vi.fn())).toMatchObject({ ok: true });
+    expect(produce).toHaveBeenCalledWith(expect.objectContaining({
+      voiceId: "original-default" }));
+  });
+  it("holds a receipt from a different narrator before completing the project", async () => {
+    const { sb, calls } = fixture({ scene: { audio_path: path }, receipt: {
+      scene_id: sceneId, project_id: projectId, client_id: clientId,
+      ir_version: 1, narration_sha256: narrationSha256, storage_path: path,
+      voice_id: "other-voice",
+    } });
+    expect(await runVideoAudioJobWithProducer(sb, config, agent,
+      job, vi.fn(), vi.fn())).toMatchObject({ ok: false,
+        failureMessage: expect.stringContaining("receipt") });
+    expect(calls).not.toContain("complete_video_audio_project_v1");
   });
   it("holds stale scene identity and an orphaned Storage file before spending", async () => {
     const produce = vi.fn();

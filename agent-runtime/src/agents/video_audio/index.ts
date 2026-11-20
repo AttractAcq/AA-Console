@@ -14,7 +14,8 @@ import { elevenLabsSceneDependencies, produceSceneAudio,
 type Scene = { id: string; project_id: string; client_id: string;
   scene_key: string; narration: string; audio_path: string | null };
 type Receipt = { scene_id: string; project_id: string; client_id: string;
-  ir_version: number; narration_sha256: string; storage_path: string };
+  ir_version: number; narration_sha256: string; storage_path: string;
+  voice_id: string };
 type Produce = (input: { sceneId: string; narration: string;
   maxAlignmentLoss: number; apiKey: string; voiceId: string;
   onSynthesis: (attempt: number) => Promise<void> }) => Promise<SceneAudio>;
@@ -64,11 +65,21 @@ export async function runVideoAudioJobWithProducer(
     return { ok: false, retryable: false,
       failureMessage: "Video audio job no longer matches the exact scene." };
   }
+  const binding = await sb.rpc("bind_video_project_voice_v1", {
+    p_project_id: projectId, p_ir_version: irVersion,
+    p_default_voice_id: config.elevenLabsVoiceId,
+  });
+  const voiceId = binding.data;
+  if (binding.error || typeof voiceId !== "string" || !voiceId.trim()) {
+    return { ok: false, retryable: false,
+      failureMessage: "Project narrator voice is not bound to the started brand." };
+  }
   if (receipt) {
     if (receipt.scene_id !== scene.id || receipt.project_id !== projectId
       || receipt.client_id !== job.client_id || receipt.ir_version !== irVersion
       || receipt.narration_sha256 !== params.narration_sha256
-      || receipt.storage_path !== scene.audio_path) {
+      || receipt.storage_path !== scene.audio_path
+      || receipt.voice_id !== voiceId) {
       return { ok: false, retryable: false,
         failureMessage: "Existing video audio receipt does not match the scene." };
     }
@@ -106,9 +117,8 @@ export async function runVideoAudioJobWithProducer(
       failureMessage: "Video audio file already exists without a receipt or Storage preflight failed." };
   }
   const apiKey = config.elevenLabsApiKey;
-  const voiceId = config.elevenLabsVoiceId;
   const maxLoss = agent.config.max_alignment_loss;
-  if (!apiKey || !voiceId || !validLoss(maxLoss)) {
+  if (!apiKey || !validLoss(maxLoss)) {
     return { ok: false, retryable: false,
       failureMessage: "Video narrator credentials or reviewed alignment policy are unavailable." };
   }

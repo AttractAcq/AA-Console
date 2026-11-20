@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "4809695d899f48a403191f5070047a57c9f4c54c4b035266bcbe88e906c83456",
-  "generatedTypesSha256": "d5732e9f69a4fe078718dc1d6fcb0c1fa12a689833a2dca4a31ec9799e703cb0",
-  "generatedSchemaBodySha256": "4f7a034ced71a4fccc0ffab7bcf21fda45eca3e183874f0949f849ed23fb9f79",
+  "migrationSourceDigest": "d41dae44c4270815632599d23d503facf584cdf4539ea2e564ce941fee654981",
+  "generatedTypesSha256": "c6f78286c9b1325ab881bd296fdcf54e7df33cc90698fec1d19f6dc427c882f8",
+  "generatedSchemaBodySha256": "d645b981672a080c075c942d058ce9bb2b6b9912ec2b434e6d24b16626b04dbf",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4924,6 +4924,13 @@
       "filename": "20261124060100_686_video_project_brand_snapshot.sql",
       "sha256": "0e1650dd8603a95003c1eece417213a136533d5e8199242f57a476831991645d",
       "trimmedMd5": "44776ead588bc0bbb1dbb0a15f83f1cf"
+    },
+    {
+      "version": "20261124060200",
+      "name": "687_video_project_voice_binding",
+      "filename": "20261124060200_687_video_project_voice_binding.sql",
+      "sha256": "2ca03dd60e10950cc386cddacea57ac35e0559cefdae166263f4943793f754e8",
+      "trimmedMd5": "b01cba839105da6ec1d9b2af49ea789a"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
