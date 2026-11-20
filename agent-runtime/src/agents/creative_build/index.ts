@@ -58,6 +58,7 @@ import {
 } from "./frameRemake.js";
 import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
+import { registerStoredAssetBytes } from "./assetBytes.js";
 import { compositionNote, frameVerdict, isNearlyBlank, measureComposition } from "./screen.js";
 
 class RecruitmentApprovalHold extends Error {}
@@ -882,14 +883,16 @@ Call ${submitTool.name} once when you are done.`;
 
     const path = `${job.client_id}/generated/${renderId}.md`;
     const document = [`# ${String(concept.headline ?? typed.title)}`, "", body, "", `**Call to action:** ${String(concept.call_to_action ?? "")}`].join("\n");
+    const documentBytes = Buffer.from(document, "utf8");
     const { error: uploadError } = await sb.storage
       .from(BUCKET)
-      .upload(path, Buffer.from(document, "utf8"), {
+      .upload(path, documentBytes, {
         contentType: "text/markdown", upsert: true, cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS,
       });
     if (uploadError) throw new Error(`Could not store the copy: ${uploadError.message}`);
 
     const assetId = await insertAsset(sb, job, typed, path, "text");
+    await registerStoredAssetBytes(sb, BUCKET, assetId, path, documentBytes);
     await sb
       .from("creative_renders")
       .update({
@@ -1281,6 +1284,7 @@ Call ${submitTool.name} once when you are done.`;
   if (uploadError) throw new Error(`Could not store the image: ${uploadError.message}`);
 
   const assetId = await insertAsset(sb, job, typed, path, "image");
+  await registerStoredAssetBytes(sb, BUCKET, assetId, path, final.bytes);
   await sb
     .from("creative_renders")
     .update({
