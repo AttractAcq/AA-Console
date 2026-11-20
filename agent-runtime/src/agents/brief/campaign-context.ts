@@ -15,6 +15,13 @@ export async function loadCampaignBriefContext(
     return { text: "", blocker: "The idea's campaign is missing or belongs to another client." };
   if (campaign.campaign_kind && (!campaign.plan_approved_at || !campaign.plan_approved_fingerprint))
     return { text: "", blocker: "The campaign plan is not approved for content production." };
+  if (campaign.campaign_kind) {
+    const { data: blocker, error } = await sb.rpc("campaign_sweep_blocker_v6", {
+      p_campaign_id: campaign.id,
+    });
+    if (error) throw new Error(`Could not verify current campaign plan: ${error.message}`);
+    if (blocker) return { text: "", blocker: String(blocker) };
+  }
 
   let offer: unknown = null;
   if (campaign.offer_version_id) {

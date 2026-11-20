@@ -22,8 +22,10 @@ function source(overrides: Record<string, unknown> = {}) {
       maybeSingle: async () => ({ data: records[table] ?? null, error: null }) };
     return chain;
   });
-  const rpc = vi.fn(async () => ({ data: { id: "offer-1", version: 3, promise: "A verified service promise",
-    price_amount: 100, content_hash: "offer-hash-1" }, error: null }));
+  const rpc = vi.fn(async (name: string): Promise<{ data: unknown; error: null }> => name === "campaign_sweep_blocker_v6"
+    ? { data: null, error: null }
+    : { data: { id: "offer-1", version: 3, promise: "A verified service promise",
+      price_amount: 100, content_hash: "offer-hash-1" }, error: null });
   return { sb: { from, rpc } as unknown as SupabaseClient, from, rpc, records };
 }
 
@@ -41,6 +43,7 @@ describe("campaign brief source", () => {
     expect(result.text).toContain("plan-hash-1");
     expect(result.text).toContain("A verified service promise");
     expect(result.text).toContain("A system has stopped working");
+    expect(db.rpc).toHaveBeenCalledWith("campaign_sweep_blocker_v6", { p_campaign_id: "campaign-1" });
     expect(db.rpc).toHaveBeenCalledWith("capture_campaign_offer_v6", { p_campaign_id: "campaign-1" });
   });
 
@@ -59,6 +62,11 @@ describe("campaign brief source", () => {
     expect((await loadCampaignBriefContext(missingLink.sb, "client-1", "campaign-1")).blocker)
       .toMatch(/no valid client-owned/);
 
+    const changedPlan = source();
+    changedPlan.rpc.mockResolvedValueOnce({ data: "This plan changed after it was approved.", error: null });
+    expect((await loadCampaignBriefContext(changedPlan.sb, "client-1", "campaign-1")).blocker)
+      .toMatch(/changed after/);
+
     const revokedOpportunity = source();
     revokedOpportunity.records.market_opportunities!.status = "rejected";
     expect((await loadCampaignBriefContext(revokedOpportunity.sb, "client-1", "campaign-1")).blocker)
@@ -70,11 +78,13 @@ describe("campaign brief source", () => {
     const result = await loadCampaignBriefContext(standalone.sb, "client-1", "campaign-1");
     expect(result.blocker).toBeNull();
     expect(result.text).toContain("Do not invent an offer or price");
-    expect(standalone.rpc).not.toHaveBeenCalled();
+    expect(standalone.rpc).not.toHaveBeenCalledWith("capture_campaign_offer_v6", expect.anything());
 
     const mismatch = source();
-    mismatch.rpc.mockResolvedValueOnce({ data: { id: "offer-2", version: 3,
-      promise: "Another offer", price_amount: 100, content_hash: "other-hash" }, error: null });
+    mismatch.rpc.mockImplementation(async (name: string) => name === "campaign_sweep_blocker_v6"
+      ? { data: null, error: null }
+      : { data: { id: "offer-2", version: 3, promise: "Another offer",
+        price_amount: 100, content_hash: "other-hash" }, error: null });
     expect((await loadCampaignBriefContext(mismatch.sb, "client-1", "campaign-1")).blocker)
       .toMatch(/exact campaign offer version/);
   });
