@@ -2,16 +2,30 @@
   "name": "@aa/video-render",
   "private": true,
   "type": "module",
-  "engines": { "node": "22.x" },
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/export-brand-schema.mjs && node scripts/export-brand-fixture.mjs",
+    "studio": "remotion studio src/index.ts",
+    "compositions": "remotion compositions src/index.ts",
     "test": "vitest run"
   },
   "dependencies": {
+    "@remotion/captions": "4.0.545",
+    "@remotion/cli": "4.0.545",
+    "@remotion/media": "4.0.545",
+    "@remotion/renderer": "4.0.545",
+    "@remotion/transitions": "4.0.545",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.545",
     "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
     "typescript": "~6.0.2",
     "vitest": "^4.1.11"
   }
