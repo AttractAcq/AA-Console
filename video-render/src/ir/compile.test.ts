@@ -68,5 +68,17 @@ describe("video IR", () => {
     ];
     const reveal = compile(fixture, aligned).scenes[2]?.props.revealAt;
     expect(reveal).toEqual([0, 13.46 * 0.65 / 3, 13.46 * 0.65 * 2 / 3]);
+
+    const kinetic = structuredClone(fixture);
+    kinetic.scenes[2].component = "KineticHeadline";
+    kinetic.scenes[2].props = { words: ["real", "buying", "moment"] };
+    kinetic.scenes[2].narration = "A real buying moment.";
+    aligned.scenes[2].words = [
+      { text: "A", startSec: 0, endSec: 0.2 },
+      { text: "real", startSec: 0.3, endSec: 0.5 },
+      { text: "buying", startSec: 0.6, endSec: 0.8 },
+      { text: "moment.", startSec: 0.9, endSec: 1.2 },
+    ];
+    expect(compile(kinetic, aligned).scenes[2]?.props.revealAt).toEqual([0.3, 0.6, 0.9]);
   });
 });
