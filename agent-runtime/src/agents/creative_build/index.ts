@@ -65,7 +65,7 @@ import { compositionNote, frameVerdict, isNearlyBlank, measureComposition } from
 class RecruitmentApprovalHold extends Error {}
 
 /** Review ambiguous compositions; prevent an almost-empty frame being filed. */
-async function noteComposition(
+export async function noteComposition(
   sb: SupabaseClient,
   jobId: string,
   bytes: Buffer,
@@ -75,8 +75,9 @@ async function noteComposition(
   try {
     measured = await measureComposition(bytes);
   } catch {
-    // A decoder quirk should not lose an otherwise usable paid render.
-    return;
+    // A file the decoder cannot open cannot be previewed or reviewed as an
+    // image, even if the provider returned a successful response.
+    throw new RenderError("The generated frame is not a readable image. Rebuild this frame.", false);
   }
   const blank = isNearlyBlank(measured);
   await appendEvent(sb, jobId, `${label}: ${compositionNote(measured)}`,
