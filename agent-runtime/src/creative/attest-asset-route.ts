@@ -96,7 +96,7 @@ async function attestCreativeFrames(sb: SupabaseClient, clientId: string, assetI
 
 /** Verify the current Storage object and register the digest of its bytes. */
 export async function attestCreativeAssetBytes(
-  sb: SupabaseClient, clientId: string, assetId: string,
+  sb: SupabaseClient, clientId: string, assetId: string, expectedBytes?: Buffer,
 ): Promise<void> {
   const first = await sb.rpc("creative_storage_identity_v6", { p_asset_id: assetId });
   if (first.error || !validIdentity(first.data, clientId, assetId)) {
@@ -116,6 +116,10 @@ export async function attestCreativeAssetBytes(
     digest.update(value);
   }
   if (bytes === 0) throw new AttestationError("The asset file is empty.", 409);
+  const sha256 = digest.digest("hex");
+  if (expectedBytes && sha256 !== createHash("sha256").update(expectedBytes).digest("hex")) {
+    throw new AttestationError("Stored creative bytes differ from the generated file.", 409);
+  }
   const second = await sb.rpc("creative_storage_identity_v6", { p_asset_id: assetId });
   if (second.error || !validIdentity(second.data, clientId, assetId)
     || second.data.storage_path !== first.data.storage_path
@@ -126,7 +130,7 @@ export async function attestCreativeAssetBytes(
   }
   const attested = await sb.rpc("attest_creative_storage_bytes_v6", {
     p_asset_id: assetId, p_storage_path: first.data.storage_path,
-    p_sha256: digest.digest("hex"), p_file_bytes: bytes,
+    p_sha256: sha256, p_file_bytes: bytes,
     p_object_id: first.data.object_id,
     p_object_version: first.data.object_version,
     p_object_updated_at: first.data.object_updated_at,

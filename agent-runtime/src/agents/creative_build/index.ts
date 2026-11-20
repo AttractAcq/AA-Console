@@ -58,7 +58,7 @@ import {
 } from "./frameRemake.js";
 import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
-import { registerStoredAssetBytes } from "./assetBytes.js";
+import { attestCreativeAssetBytes } from "../../creative/attest-asset-route.js";
 import { compositionNote, frameVerdict, isNearlyBlank, measureComposition } from "./screen.js";
 
 class RecruitmentApprovalHold extends Error {}
@@ -892,7 +892,7 @@ Call ${submitTool.name} once when you are done.`;
     if (uploadError) throw new Error(`Could not store the copy: ${uploadError.message}`);
 
     const assetId = await insertAsset(sb, job, typed, path, "text");
-    await registerStoredAssetBytes(sb, BUCKET, assetId, path, documentBytes);
+    await attestCreativeAssetBytes(sb, String(job.client_id), assetId, documentBytes);
     await sb
       .from("creative_renders")
       .update({
@@ -1014,6 +1014,7 @@ Call ${submitTool.name} once when you are done.`;
       p_frames: finished,
     });
     if (saveError) throw new Error(`Could not file the rebuilt ${typed.content_format}: ${saveError.message}`);
+    await attestCreativeAssetBytes(sb, String(job.client_id), remadeId as string);
 
     await sb
       .from("creative_renders")
@@ -1157,6 +1158,7 @@ Call ${submitTool.name} once when you are done.`;
       p_frames: filedFrames,
     });
     if (saveError) throw new Error(`Could not file the ${filedFormat}: ${saveError.message}`);
+    await attestCreativeAssetBytes(sb, String(job.client_id), framedId as string);
 
     await sb
       .from("creative_renders")
@@ -1284,7 +1286,7 @@ Call ${submitTool.name} once when you are done.`;
   if (uploadError) throw new Error(`Could not store the image: ${uploadError.message}`);
 
   const assetId = await insertAsset(sb, job, typed, path, "image");
-  await registerStoredAssetBytes(sb, BUCKET, assetId, path, final.bytes);
+  await attestCreativeAssetBytes(sb, String(job.client_id), assetId, final.bytes);
   await sb
     .from("creative_renders")
     .update({
