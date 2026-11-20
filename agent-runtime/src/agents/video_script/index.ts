@@ -133,23 +133,24 @@ export async function runVideoScriptJobWithCompletion(
         failureMessage: "Video source changed during writing; output was not stored.",
         usage: incurredUsage };
     }
-    const saved = await sb.from("video_projects").update({
-      ir: review.ir, ir_version: project.ir_version + 1,
-      script: { scene_sources: review.sceneSources,
-        source_digest: project.source_digest,
-        writer_source_digest: storyboard.sourceDigest,
-        unsourced: storyboard.unsourced,
-        writer_attempts: storyboard.attempts,
-        independent_review: { accepted: review.accepted,
-          reasons: review.reasons, edits: review.edits } },
-      stage: "needs_human",
-      stage_error: review.accepted
+    const packet = { scene_sources: review.sceneSources,
+      source_digest: project.source_digest,
+      writer_source_digest: storyboard.sourceDigest,
+      unsourced: storyboard.unsourced,
+      writer_attempts: storyboard.attempts,
+      independent_review: { accepted: review.accepted,
+        reasons: review.reasons, edits: review.edits } };
+    const saved = await sb.rpc("commit_video_storyboard_v1", {
+      p_project_id: project.id, p_job_id: job.id,
+      p_expected_ir_version: project.ir_version,
+      p_ir: review.ir, p_script: packet,
+      p_stage_error: review.accepted
         ? "Independent review passed; renderer compile and human claim review pending."
         : `Independent review held: ${review.reasons.join("; ").slice(0, 700)}`,
-    }).eq("id", project.id).eq("client_id", project.client_id)
-      .eq("job_id", job.id).eq("stage", "scripting")
-      .eq("ir_version", project.ir_version).select("id").maybeSingle();
-    if (saved.error || !saved.data) throw new Error("Video storyboard version changed before save.");
+    });
+    if (saved.error || saved.data !== project.ir_version + 1) {
+      throw new Error("Video storyboard or sources changed before scene commit.");
+    }
     await appendEvent(sb, job.id, review.accepted
       ? `Reviewed storyboard stored for renderer and human review (${review.ir.scenes.length} scenes).`
       : "Storyboard held after independent review.");

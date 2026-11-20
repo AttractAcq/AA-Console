@@ -40792,6 +40792,17 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      commit_video_storyboard_v1: {
+        Args: {
+          p_expected_ir_version: number
+          p_ir: Json
+          p_job_id: string
+          p_project_id: string
+          p_script: Json
+          p_stage_error: string
+        }
+        Returns: number
+      }
       complete_daily_recovery_alert: {
         Args: {
           p_alert_id: string

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "ba384ff1d6b19d45468170438910a7513f4d7db438dcea031964413cdf340b4f",
-  "generatedTypesSha256": "7c0e7f28d2b8d9f794718ddbb87761fdfc999384ba937ee9e3f3b89a5bd84508",
-  "generatedSchemaBodySha256": "93aa77cd28da20dccd41d67b001fe44d58e3c3012668070a2cc8bdc5aa2597e0",
+  "migrationSourceDigest": "5d80d7c073abee39cf82a356a3cc9a832c6fc77b57e124a041c6c3187d9d4b88",
+  "generatedTypesSha256": "f6491ff705cd4a004bb2310d79edd5166044ac47de8ad8ffef985b86c8a8b438",
+  "generatedSchemaBodySha256": "96cc22d8750d376d1aebff134d9ac21a0e06c1199f0a9d77d484108ff94ee229",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4791,6 +4791,13 @@
       "filename": "20261124054200_667_video_script_start.sql",
       "sha256": "8957b89387846599d20c7c7d82b1a0a8b9a670faaf5003ae530654ec8a777643",
       "trimmedMd5": "0a8afac559cd5140fa7aa8c4cb85ca42"
+    },
+    {
+      "version": "20261124054300",
+      "name": "668_video_storyboard_scene_commit",
+      "filename": "20261124054300_668_video_storyboard_scene_commit.sql",
+      "sha256": "d2c900bb3d9051e32890b1f992095cb74199a0637891191ce7f8e0736e25d508",
+      "trimmedMd5": "c776094b5b63e1a040acef2f86cd351e"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

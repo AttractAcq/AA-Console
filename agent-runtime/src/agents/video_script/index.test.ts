@@ -26,6 +26,7 @@ function store(current: boolean[]) {
       text: "The operator reviews the exact version before release." }],
   };
   const costCalls: unknown[] = [];
+  const commitCalls: unknown[] = [];
   const sb = {
     rpc: vi.fn(async (name: string, args: unknown) => {
       if (name === "video_project_source_current_v1") {
@@ -33,6 +34,13 @@ function store(current: boolean[]) {
       }
       if (name === "record_video_project_cost_v1") {
         costCalls.push(args); return { data: "cost-1", error: null };
+      }
+      if (name === "commit_video_storyboard_v1") {
+        const packet = args as Record<string, unknown>;
+        commitCalls.push(packet);
+        Object.assign(project, { ir: packet.p_ir, script: packet.p_script,
+          ir_version: 1, stage: "needs_human", stage_error: packet.p_stage_error });
+        return { data: 1, error: null };
       }
       throw new Error(`Unexpected RPC ${name}`);
     }),
@@ -58,7 +66,7 @@ function store(current: boolean[]) {
       return query;
     },
   };
-  return { sb: sb as unknown as SupabaseClient, project, costCalls };
+  return { sb: sb as unknown as SupabaseClient, project, costCalls, commitCalls };
 }
 
 describe("video script job source and cost gates", () => {
@@ -84,7 +92,7 @@ describe("video script job source and cost gates", () => {
     expect(costCalls).toHaveLength(1);
   });
   it("stores a valid draft for review once and treats job replay as idempotent", async () => {
-    const { sb, project, costCalls } = store([true, true, true]);
+    const { sb, project, costCalls, commitCalls } = store([true, true, true]);
     const complete = vi.fn().mockResolvedValue({ text: JSON.stringify({ ir: fixture,
       sceneSources: fixture.scenes.map((scene: { id: string }) => ({
         sceneId: scene.id, sourceIds: ["source-1"],
@@ -105,6 +113,7 @@ describe("video script job source and cost gates", () => {
     expect(complete).toHaveBeenCalledTimes(1);
     expect(review).toHaveBeenCalledTimes(1);
     expect(costCalls).toHaveLength(2);
+    expect(commitCalls).toHaveLength(1);
   });
   it("records both model calls and holds an invalid independent review", async () => {
     const { sb, project, costCalls } = store([true, true]);
