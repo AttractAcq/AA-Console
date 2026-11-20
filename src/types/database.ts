@@ -45832,6 +45832,10 @@ export type Database = {
         }
         Returns: number
       }
+      queue_video_render_v1: {
+        Args: { p_ir_version: number; p_project_id: string }
+        Returns: string
+      }
       reap_stale_campaign_action_claims: { Args: never; Returns: number }
       reap_stale_lead_magnet_deliveries: { Args: never; Returns: number }
       reap_stale_outbound_claims: { Args: never; Returns: number }

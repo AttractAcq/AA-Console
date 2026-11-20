@@ -74,10 +74,13 @@ begin
     raise exception 'Video audio completion failed'; end if;
   if (select stage from public.video_projects where id=p.id)<>'timed' then
     raise exception 'Video did not reach timed stage'; end if;
-  insert into public.agent_jobs(agent_key,client_id,input_table,input_id,
-    created_by,params)
-  values('video_render',p.client_id,'video_projects',p.id,p.started_by,
-    jsonb_build_object('ir_version',1)) returning id into render_job;
+  render_job:=public.queue_video_render_v1(p.id,1);
+  if render_job is distinct from public.queue_video_render_v1(p.id,1) then
+    raise exception 'Render queue replay created another job'; end if;
+  begin
+    perform public.queue_video_render_v1(p.id,2);
+    raise exception 'Stale render IR was queued';
+  exception when check_violation then null; end;
   begin
     perform public.claim_video_project_render_v1(p.id,render_job,1,'1:1');
     raise exception 'Unrequested aspect was claimed';
@@ -120,6 +123,10 @@ begin
   if result->>'state' is distinct from 'already_uncertain' then
     raise exception 'Uncertain render could be restarted'; end if;
   perform set_config('request.jwt.claim.role','authenticated',true);
+  begin
+    perform public.queue_video_render_v1(p.id,1);
+    raise exception 'Browser queued an external render';
+  exception when insufficient_privilege then null; end;
   begin
     perform public.claim_video_project_render_v1(p.id,render_job,1,'16:9');
     raise exception 'Browser claimed an external render';

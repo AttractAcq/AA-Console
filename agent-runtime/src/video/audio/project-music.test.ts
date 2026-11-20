@@ -31,10 +31,11 @@ const scenes = [1, 2, 3].map((position) => ({
   transition_in: "cut",
 }));
 
-function projectDb(options: { state?: string; musicEnabled?: boolean;
+function projectDb(options: { state?: string; stage?: string; musicEnabled?: boolean;
   providerError?: boolean; costError?: boolean } = {}) {
   const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
-  const project = { id: projectId, client_id: clientId, stage: "timing",
+  const project = { id: projectId, client_id: clientId,
+    stage: options.stage ?? "timing",
     ir_version: 1, tone: "calm",
     ir: { music: { enabled: options.musicEnabled ?? true, mood: "warm piano" },
       scenes: [1, 2, 3] } };
@@ -62,6 +63,9 @@ function projectDb(options: { state?: string; musicEnabled?: boolean;
         || name === "complete_video_audio_project_v1") {
         return { data: true, error: null };
       }
+      if (name === "queue_video_render_v1") {
+        return { data: "f7777777-7777-4777-8777-777777777777", error: null };
+      }
       throw new Error(`Unexpected RPC ${name}`);
     }),
   } as unknown as SupabaseClient;
@@ -83,7 +87,8 @@ describe("project-level optional music", () => {
       prepare });
     expect(prepare).not.toHaveBeenCalled();
     expect(calls.map((call) => call.name)).toEqual([
-      "begin_video_project_music_v1", "complete_video_audio_project_v1"]);
+      "begin_video_project_music_v1", "complete_video_audio_project_v1",
+      "queue_video_render_v1"]);
     expect(calls[0]?.args).toMatchObject({ p_enabled: false,
       p_prompt: null, p_requested_ms: null });
   });
@@ -101,7 +106,7 @@ describe("project-level optional music", () => {
       "begin_video_project_music_v1",
       "video_project_music_storage_exists_v1",
       "record_video_project_music_cost_v1",
-      "complete_video_audio_project_v1"]);
+      "complete_video_audio_project_v1", "queue_video_render_v1"]);
     expect(calls[2]?.args).toMatchObject({ p_requested_ms: 14_000,
       p_usd: 0.035 });
     expect(file).toHaveBeenCalledWith(expect.objectContaining({
@@ -114,6 +119,14 @@ describe("project-level optional music", () => {
       prepare });
     expect(prepare).not.toHaveBeenCalled();
     expect(calls.map((call) => call.name)).toEqual(["begin_video_project_music_v1"]);
+  });
+  it("queues the already timed project without revisiting the provider", async () => {
+    const { sb, calls } = projectDb({ stage: "timed" });
+    const prepare = vi.fn();
+    await finishProjectMusic({ sb, config, job, projectId, irVersion: 1,
+      prepare });
+    expect(prepare).not.toHaveBeenCalled();
+    expect(calls.map((call) => call.name)).toEqual(["queue_video_render_v1"]);
   });
   it("records provider and cost failures and completes narration-only", async () => {
     const provider = projectDb();

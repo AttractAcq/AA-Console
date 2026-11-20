@@ -153,7 +153,18 @@ export async function finishProjectMusic(input: {
   }
   const ir = project.ir as { music?: { enabled?: boolean; mood?: string };
     scenes: unknown[] };
-  if (project.stage === "timed") return;
+  const queueRender = async (): Promise<void> => {
+    const queued = await sb.rpc("queue_video_render_v1", {
+      p_project_id: projectId, p_ir_version: irVersion,
+    });
+    if (queued.error || typeof queued.data !== "string") {
+      throw new Error("Timed video could not queue its exact render job.");
+    }
+  };
+  if (project.stage === "timed") {
+    await queueRender();
+    return;
+  }
   const scenes = scenesResult.data as Scene[] | null;
   if (!scenes || ir.scenes.length !== scenes.length
     || typeof ir.music?.enabled !== "boolean") {
@@ -182,6 +193,7 @@ export async function finishProjectMusic(input: {
     if (done.error || done.data !== true) {
       throw new Error("Music outcome could not advance verified scene audio.");
     }
+    await queueRender();
   };
   if (state === "skipped" || state === "already_filed"
     || state === "already_failed" || state === "already_skipped") {
