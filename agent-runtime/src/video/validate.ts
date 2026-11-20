@@ -4,7 +4,13 @@ import { semanticProblems } from "./semantic.js";
 
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 const checkShape = ajv.compile(irSchema);
-export type RuntimeIR = Parameters<typeof semanticProblems>[0];
+export type RuntimeIR = Parameters<typeof semanticProblems>[0] & {
+  version: 1;
+  title: string;
+  audience: string;
+  tone: "calm" | "confident" | "energetic";
+  music: { enabled: boolean; mood: string };
+};
 export type RuntimeIRValidation =
   | { ok: true; ir: RuntimeIR }
   | { ok: false; problems: string[] };
