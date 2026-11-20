@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { SafeArea, centeredTextRegion, useStage } from "../primitives/Stage.js";
+import { ICONS, IconNameSchema } from "../primitives/icons.js";
 
 export const name = "ProcessDiagram";
 export const schema = z.strictObject({
-  nodes: z.array(z.strictObject({ id: z.string().regex(/^[a-z][a-z0-9_]*$/), label: z.string().trim().min(1).max(24) })).min(2).max(7),
+  nodes: z.array(z.strictObject({ id: z.string().regex(/^[a-z][a-z0-9_]*$/), label: z.string().trim().min(1).max(24), icon: IconNameSchema.optional() })).min(2).max(7),
   edges: z.array(z.strictObject({ from: z.string(), to: z.string(), label: z.string().trim().max(20).optional() })).min(1).max(9),
 }).superRefine((value, ctx) => {
   const ids = new Set(value.nodes.map((node) => node.id));
@@ -38,10 +39,10 @@ export function Component(props: Props) {
   const { theme, aspect } = useStage();
   const layers = layoutLayers(props);
   const vertical = aspect === "9:16";
-  const labels = new Map(props.nodes.map((node) => [node.id, node.label]));
+  const nodes = new Map(props.nodes.map((node) => [node.id, node]));
   return <SafeArea style={{ display: "flex", flexDirection: vertical ? "column" : "row", justifyContent: "center", alignItems: "center", gap: vertical ? 12 : 18 }}>
     {layers.map((layer, index) => <div key={index} style={{ flex: 1, display: "flex", flexDirection: vertical ? "column" : "row", justifyContent: "center", alignItems: "center", gap: 18, width: vertical ? "100%" : undefined }}>
-      {layer.map((id) => <div key={id} style={{ flex: 1, minWidth: 0, padding: vertical ? 24 : 30, borderRadius: theme.tokens.radii.card, background: theme.tokens.colours.surface, border: `3px solid ${theme.tokens.colours.secondary}`, textAlign: "center", fontSize: vertical ? 31 : 34, fontWeight: 750 }}>{labels.get(id)}</div>)}
+      {layer.map((id) => { const node = nodes.get(id)!; const Icon = node.icon ? ICONS[node.icon] : null; return <div key={id} style={{ flex: 1, minWidth: 0, padding: vertical ? 24 : 30, borderRadius: theme.tokens.radii.card, background: theme.tokens.colours.surface, border: `3px solid ${theme.tokens.colours.secondary}`, textAlign: "center", fontSize: vertical ? 31 : 34, fontWeight: 750, display: "flex", alignItems: "center", justifyContent: "center", gap: 14 }}>{Icon && <Icon size={vertical ? 31 : 34} color={theme.tokens.colours.secondary} strokeWidth={2.5} />}{node.label}</div>; })}
       {index < layers.length - 1 && <div aria-hidden style={{ color: theme.tokens.colours.secondary, fontSize: 46 }}>{vertical ? "↓" : "→"}</div>}
     </div>)}
   </SafeArea>;

@@ -1,4 +1,5 @@
 import { bundle } from "@remotion/bundler";
+import { enableTailwind } from "@remotion/tailwind-v4";
 import { getCompositions, openBrowser, renderStill } from "@remotion/renderer";
 import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
@@ -11,7 +12,7 @@ const root = resolve(import.meta.dirname, "..");
 const snapshotRoot = join(root, "tests", "__snapshots__");
 const serveUrl = await bundle({
   entryPoint: join(root, "src", "index.ts"),
-  webpackOverride: (config) => ({ ...config, resolve: { ...config.resolve, extensionAlias: { ...config.resolve?.extensionAlias, ".js": [".tsx", ".ts", ".js"] } } }),
+  webpackOverride: (config) => enableTailwind({ ...config, resolve: { ...config.resolve, extensionAlias: { ...config.resolve?.extensionAlias, ".js": [".tsx", ".ts", ".js"] } } }),
 });
 const browser = await openBrowser("chrome", { browserExecutable });
 let checked = 0;
@@ -19,6 +20,7 @@ const failures = [];
 try {
   const compositions = await getCompositions({ serveUrl, puppeteerInstance: browser });
   for (const composition of compositions) {
+    if (composition.id.startsWith("Gold-")) continue;
     const [component, aspect] = composition.id.match(/^(.*)-(16x9|9x16|1x1)$/)?.slice(1) ?? [];
     if (!component || !aspect) throw new Error(`Unexpected composition ID: ${composition.id}`);
     const frames = composition.durationInFrames === 1 ? [["10", 0], ["50", 0], ["90", 0]] : [["10", 15], ["50", 75], ["90", 135]];

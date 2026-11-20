@@ -22,6 +22,7 @@ describe("video component catalogue", () => {
     expect(() => validateComponentProps("TitleCard", { title: "x".repeat(61) })).toThrow();
     expect(() => validateComponentProps("SectionCard", { index: 10, title: "Invalid" })).toThrow();
     expect(() => validateComponentProps("Outro", { headline: "Done", cta: "Act", unreviewedUrl: "x" })).toThrow();
+    expect(() => validateComponentProps("BulletReveal", { items: ["One", "Two"], icon: "UnlistedIcon" })).toThrow();
   });
 
   it("fixes a 30 fps layout for all three aspects", () => {

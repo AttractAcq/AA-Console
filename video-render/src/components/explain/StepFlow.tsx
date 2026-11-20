@@ -1,10 +1,11 @@
 import { interpolate, useCurrentFrame } from "remotion";
 import { z } from "zod";
 import { SafeArea, centeredTextRegion, useStage } from "../primitives/Stage.js";
+import { ICONS, IconNameSchema } from "../primitives/icons.js";
 
 export const name = "StepFlow";
 export const schema = z.strictObject({
-  steps: z.array(z.strictObject({ label: z.string().trim().min(1).max(28), detail: z.string().trim().max(60).optional() })).min(2).max(6),
+  steps: z.array(z.strictObject({ label: z.string().trim().min(1).max(28), detail: z.string().trim().max(60).optional(), icon: IconNameSchema.optional() })).min(2).max(6),
   direction: z.enum(["auto", "horizontal", "vertical"]).default("auto"),
 });
 export type Props = z.infer<typeof schema>;
@@ -18,7 +19,7 @@ export function Component({ steps, direction }: Props) {
     {steps.map((step, index) => {
       const opacity = interpolate(frame, [index * 10, index * 10 + 12], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
       return <div key={index} style={{ flex: 1, display: "flex", flexDirection: vertical ? "row" : "column", gap: 18, alignItems: vertical ? "center" : "flex-start", justifyContent: "center", padding: vertical ? 24 : 30, borderRadius: theme.tokens.radii.card, background: theme.tokens.colours.surface, border: `2px solid ${theme.tokens.colours.accent}`, opacity }}>
-        <div style={{ flex: "none", width: 65, height: 65, display: "grid", placeItems: "center", borderRadius: 999, background: theme.tokens.colours.primary, color: "#FFFFFF", fontSize: 31, fontWeight: 800 }}>{index + 1}</div>
+        <div style={{ flex: "none", width: 65, height: 65, display: "grid", placeItems: "center", borderRadius: 999, background: theme.tokens.colours.primary, color: "#FFFFFF", fontSize: 31, fontWeight: 800 }}>{step.icon ? (() => { const Icon = ICONS[step.icon]; return <Icon size={36} strokeWidth={2.5} />; })() : index + 1}</div>
         <div><div style={{ fontSize: vertical ? 40 : 38, fontWeight: 800 }}>{step.label}</div>{step.detail && <div style={{ marginTop: 12, fontSize: vertical ? 27 : 28, lineHeight: 1.25, color: theme.tokens.colours.muted }}>{step.detail}</div>}</div>
       </div>;
     })}

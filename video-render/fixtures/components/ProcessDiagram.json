@@ -2,19 +2,23 @@
   "nodes": [
     {
       "id": "signal",
-      "label": "Buying signal"
+      "label": "Buying signal",
+      "icon": "Target"
     },
     {
       "id": "offer",
-      "label": "Relevant offer"
+      "label": "Relevant offer",
+      "icon": "Sparkles"
     },
     {
       "id": "review",
-      "label": "Human review"
+      "label": "Human review",
+      "icon": "ShieldCheck"
     },
     {
       "id": "release",
-      "label": "Release"
+      "label": "Release",
+      "icon": "ArrowRight"
     }
   ],
   "edges": [

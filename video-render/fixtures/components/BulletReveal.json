@@ -4,5 +4,6 @@
     "Find the buying signal",
     "Match the offer to the need",
     "Review each asset before launch"
-  ]
+  ],
+  "icon": "CircleCheck"
 }

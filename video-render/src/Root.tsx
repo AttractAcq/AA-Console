@@ -1,4 +1,5 @@
 import { Composition } from "remotion";
+import "./style.css";
 import { z } from "zod";
 import { AA_THEME, AspectSchema, DIMENSIONS, Stage } from "./components/primitives/Stage.js";
 import { registry, type ComponentName } from "./ir/registry.js";
