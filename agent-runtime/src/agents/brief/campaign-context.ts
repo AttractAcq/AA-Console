@@ -46,8 +46,11 @@ export async function loadCampaignBriefContext(
     if (error) throw new Error(`Could not load campaign opportunity: ${error.message}`);
     if (!data || data.client_id !== clientId)
       return { text: "", blocker: "The campaign market opportunity is missing or belongs to another client." };
-    if (!["approved", "active", "learning", "scaling"].includes(data.status)
-      || !data.approved_content_hash)
+    const { data: approval, error: approvalError } = await sb.from("opportunity_approval_state_v6")
+      .select("opportunity_id, client_id, approval_current")
+      .eq("opportunity_id", data.id).maybeSingle();
+    if (approvalError) throw new Error(`Could not verify campaign opportunity approval: ${approvalError.message}`);
+    if (!approval || approval.client_id !== clientId || approval.approval_current !== true)
       return { text: "", blocker: "The campaign market opportunity no longer has a current approval." };
     opportunity = data;
   }

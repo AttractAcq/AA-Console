@@ -16,6 +16,8 @@ function source(overrides: Record<string, unknown> = {}) {
       micro_market: "Households with failed systems", buying_situation: "A system has stopped working",
       core_problem: "No service", desired_outcome: "Restored service", positioning: "Fast diagnosis",
       purchase_trigger: "Recent failure", approved_content_hash: "opportunity-hash-1" },
+    opportunity_approval_state_v6: { opportunity_id: "opportunity-1", client_id: "client-1",
+      approval_current: true },
   };
   const from = vi.fn((table: string) => {
     const chain = { select: () => chain, eq: () => chain,
@@ -68,7 +70,7 @@ describe("campaign brief source", () => {
       .toMatch(/changed after/);
 
     const revokedOpportunity = source();
-    revokedOpportunity.records.market_opportunities!.status = "rejected";
+    revokedOpportunity.records.opportunity_approval_state_v6!.approval_current = false;
     expect((await loadCampaignBriefContext(revokedOpportunity.sb, "client-1", "campaign-1")).blocker)
       .toMatch(/no longer has a current approval/);
   });
