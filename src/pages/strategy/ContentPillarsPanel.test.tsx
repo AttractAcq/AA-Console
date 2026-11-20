@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -95,7 +95,7 @@ describe("a set that already exists", () => {
   // Replacing a set means retiring it first — a decision, not a button.
   it("does not offer to generate over it", async () => {
     render(<ContentPillarsPanel />);
-    expect(await screen.findByDisplayValue("Honest proof")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Honest proof" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Generate with AI/i })).not.toBeInTheDocument();
   });
 
@@ -110,16 +110,33 @@ describe("a set that already exists", () => {
     await waitFor(() => expect(update).toHaveBeenCalledWith({ active: false }));
   });
 
-  it("saves an edited boundary on blur", async () => {
+  it("opens a pillar-specific editor and saves its fields together", async () => {
     render(<ContentPillarsPanel />);
     await userEvent.click(await screen.findByRole("button", { name: "Honest proof" }));
-    const box = await screen.findByLabelText(/What does not for Honest proof/i);
+    await userEvent.click(screen.getByRole("button", { name: "Edit Honest proof" }));
+    const box = await screen.findByRole("textbox", { name: "What does not" });
     await userEvent.clear(box);
     await userEvent.type(box, "Anything without a named source.");
-    await userEvent.tab();
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() =>
-      expect(update).toHaveBeenCalledWith({ does_not_belong: "Anything without a named source." }),
+      expect(update).toHaveBeenCalledWith(expect.objectContaining({
+        name: "Honest proof", does_not_belong: "Anything without a named source.", target_share: 50,
+      })),
     );
+  });
+
+  it("keeps the editor open with its correction after a failed save", async () => {
+    update.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: { message: "permission denied" } }) });
+    render(<ContentPillarsPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: "Honest proof" }));
+    await userEvent.click(screen.getByRole("button", { name: "Edit Honest proof" }));
+    const box = screen.getByRole("textbox", { name: "What does not" });
+    await userEvent.clear(box);
+    await userEvent.type(box, "Named source required.");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await within(screen.getByRole("dialog")).findByRole("alert"))
+      .toHaveTextContent("permission denied");
+    expect(box).toHaveValue("Named source required.");
   });
 
   it("warns when the shares stop adding up", async () => {

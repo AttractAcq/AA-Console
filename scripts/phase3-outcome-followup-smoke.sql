@@ -17,8 +17,8 @@ declare lead_id uuid; consent_id uuid; config_id uuid; link_id uuid; event_id uu
   delivery public.proof_request_deliveries%rowtype; review public.proof_delivery_reviews_v6%rowtype;
   preview jsonb; request_id uuid;
 begin
-  insert into public.client_leads(client_id,name,email,stage,sale_value)
-  values('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Customer','customer@example.invalid','lead',1000)
+  insert into public.client_leads(client_id,name,email,stage,sale_value,sale_currency)
+  values('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Customer','customer@example.invalid','lead',1000,'ZAR')
   returning id into lead_id;
   begin
     insert into public.proof_outcome_followup_consents_v7
@@ -49,9 +49,9 @@ begin
   returning id into link_id;
   begin
     insert into public.proof_request_deliveries(id,client_id,config_id,link_id,event_key,
-      recipient,channel,subject,message,capture_url,outcome_lead_id,outcome_consent_id,outcome_event_id)
+      recipient,channel,sender_ref,subject,message,capture_url,outcome_lead_id,outcome_consent_id,outcome_event_id)
     values(gen_random_uuid(),'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',config_id,link_id,'outcome:unverified',
-      'customer@example.invalid','email','Outcome request','Please share your experience',
+      'customer@example.invalid','email','resend:Proof <proof@example.invalid>','Outcome request','Please share your experience',
       'https://example.invalid/proof',lead_id,consent_id,event_id);
     raise exception 'Unverified service outcome produced a request' using errcode='XX000';
   exception when sqlstate '23514' then null; end;
@@ -68,9 +68,9 @@ begin
   update public.proof_service_outcomes_v7 set verified_by='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     verified_at=now() where id=event_id;
   insert into public.proof_request_deliveries(id,client_id,config_id,link_id,event_key,
-    recipient,channel,subject,message,capture_url,outcome_lead_id,outcome_consent_id,outcome_event_id)
+    recipient,channel,sender_ref,subject,message,capture_url,outcome_lead_id,outcome_consent_id,outcome_event_id)
   values(gen_random_uuid(),'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',config_id,link_id,'outcome:test',
-    'customer@example.invalid','email','Outcome request','Please share your experience',
+    'customer@example.invalid','email','resend:Proof <proof@example.invalid>','Outcome request','Please share your experience',
     'https://example.invalid/proof',lead_id,consent_id,event_id) returning * into delivery;
   if not public.proof_outcome_followup_ready_v7(delivery) then
     raise exception 'Current outcome and consent were held'; end if;
@@ -112,7 +112,7 @@ begin
     'https://example.invalid/proof') returning * into delivery;
   insert into public.proof_delivery_reviews_v6(delivery_id,client_id)
   values(delivery.id,delivery.client_id) returning * into review;
-  if public.proof_delivery_preview_v6(review) ? 'outcome_lead_id' then
-    raise exception 'Existing proof request preview unexpectedly changed'; end if;
+  if public.proof_delivery_preview_v6(review) is not null then
+    raise exception 'Unsent sender-free legacy request became reviewable'; end if;
 end $checks$;
 rollback;

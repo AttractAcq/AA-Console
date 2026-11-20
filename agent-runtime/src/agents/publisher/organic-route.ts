@@ -46,21 +46,24 @@ export async function requireOrganicRoute(
 
   const { data: idea, error: ideaError } = await sb
     .from("client_ideas")
-    .select("id, client_id, campaign_id")
+    .select("id, client_id, campaign_id, acquisition_route")
     .eq("id", slot.idea_id)
     .maybeSingle();
   if (ideaError) throw new PublishError("Could not verify the post's idea route.", true);
-  if (!idea || idea.client_id !== claim.client_id || !idea.campaign_id) {
+  if (!idea || idea.client_id !== claim.client_id || !idea.campaign_id ||
+      idea.acquisition_route !== "organic") {
     throw new PublishError("The claimed post has no current, explicit organic route.", false);
   }
 
   const { data: campaign, error: campaignError } = await sb
     .from("client_campaigns")
-    .select("id, client_id, acquisition_mode")
+    .select("id, client_id, acquisition_mode, runs_organic")
     .eq("id", idea.campaign_id)
     .maybeSingle();
   if (campaignError) throw new PublishError("Could not verify the post's campaign route.", true);
-  if (!campaign || campaign.client_id !== claim.client_id || campaign.acquisition_mode !== "organic") {
+  if (!campaign || campaign.client_id !== claim.client_id ||
+      !campaign.runs_organic ||
+      !["organic", "both"].includes(campaign.acquisition_mode)) {
     throw new PublishError("The claimed post has no current, explicit organic route.", false);
   }
 }

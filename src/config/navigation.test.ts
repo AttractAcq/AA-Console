@@ -74,12 +74,10 @@ describe("client delivery navigation", () => {
     // render a bar with nothing in it.
     expect(v6ModuleNodes.filter((node) => node.tabs?.length === 0)).toEqual([]);
     expect(v6ModuleNodes.filter((node) => !node.tabs).map((node) => node.id))
-      .toEqual(["campaign-factory"]);
-    // Three tabs are archived rather than deleted, per Alex on 31 October:
-    // the notes call Placements and Rights "not as important ... both need to
-    // be discontinued", and Opt-ins "isnt necissary to track". Their panels
-    // still compile; only the route in is gone. Pinned here so a reinstated
-    // tab is a deliberate act rather than a merge artefact.
+      .toEqual(["market-opportunities", "campaign-factory"]);
+    // Distribution Log exposes the placement history and rights/removal work
+    // on one tab. Lead Magnet Opt-ins remains folded into its row detail and
+    // Sales OS Capture.
     // Lead Magnet Studio is down to its one page (phase 3 item 7): Build was
     // this table with a create button above it, and Delivery's three parts
     // went to the Dashboard switch panel, the row detail and the row detail
@@ -87,7 +85,9 @@ describe("client delivery navigation", () => {
     expect(v6ModuleNodes.find((node) => node.id === "lead-magnet-studio")?.tabs?.map((tab) => tab.id))
       .toEqual(["magnets"]);
     expect(v6ModuleNodes.find((node) => node.id === "proof-distribution")?.tabs?.map((tab) => tab.id))
-      .toEqual(["destinations"]);
+      .toEqual(["destinations", "placements"]);
+    expect(v6ModuleNodes.find((node) => node.id === "proof-distribution")?.tabs?.map((tab) => tab.label))
+      .toEqual(["Destinations", "Distribution Log"]);
   });
 });
 
@@ -99,10 +99,9 @@ describe("Offer Strategy belongs to Strategy, not Offer Studio", () => {
     const offerStudio = v6ModuleNodes.find((node) => node.id === "offer-studio");
     expect(intelligence?.tabs?.map((tab) => tab.id)).toContain("offer-strategy");
     expect(offerStudio?.tabs?.map((tab) => tab.id)).not.toContain("offer-strategy");
-    // Offer Studio is now Offers (the single operating page) plus Versions,
-    // which keeps the existing version and claims form reachable. Live use
-    // folded into the Offers rows.
-    expect(offerStudio?.tabs?.map((tab) => tab.id)).toEqual(["offers", "versions"]);
+    // Build keeps the existing version and claims form reachable, while
+    // live-use drift remains visible in the Offers rows.
+    expect(offerStudio?.tabs?.map((tab) => tab.id)).toEqual(["offers", "build"]);
   });
 });
 

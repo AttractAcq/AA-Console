@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -17,6 +17,7 @@ import { ProofDistributionPanel } from "./ProofDistributionPanel";
 const rpc = vi.fn();
 const requestProofPublish = vi.fn();
 const navigate = vi.fn();
+const currentClient = vi.hoisted(() => ({ id: "c1" }));
 
 const DESTINATIONS = [
   {
@@ -39,7 +40,11 @@ const state = {
   coverage: [] as Record<string, unknown>[],
   events: [] as Record<string, unknown>[],
   integrations: [] as Record<string, unknown>[],
+  providerReads: [] as Record<string, unknown>[],
   publishing: false,
+  placementReadOverride: null as null | ((clientId: string | null) => Promise<{
+    data: Record<string, unknown>[]; error: null;
+  }>),
 };
 
 function result(table: string) {
@@ -49,6 +54,7 @@ function result(table: string) {
     case "client_integrations": return { data: state.integrations, error: null };
     case "proof_placements": return { data: state.placements, error: null };
     case "proof_placement_retraction_receipts_v6": return { data: state.retractionReceipts, error: null };
+    case "proof_placement_provider_read_latest_v8": return { data: state.providerReads, error: null };
     case "proof_placement_due": return { data: state.due, error: null };
     case "proof_placement_events": return { data: state.events, error: null };
     case "proof_surface_coverage": return { data: state.coverage, error: null };
@@ -59,20 +65,25 @@ function result(table: string) {
 }
 
 const from = vi.fn((table: string) => {
+  let requestedClient: string | null = null;
   const payload = () => Promise.resolve(result(table));
   const chain: Record<string, unknown> = {
     maybeSingle: payload,
     order: () => table === "proof_placement_events" || table === "proof_placements" ? chain : payload(),
-    range: payload,
+    range: () => table === "proof_placements" && state.placementReadOverride
+      ? state.placementReadOverride(requestedClient) : payload(),
     upsert: payload,
     then: (...a: Parameters<Promise<unknown>["then"]>) => payload().then(...a),
   };
-  chain.eq = () => chain;
+  chain.eq = (field: string, value: string) => {
+    if (field === "client_id") requestedClient = value;
+    return chain;
+  };
   chain.select = () => chain;
   return chain;
 });
 
-vi.mock("react-router-dom", () => ({ useParams: () => ({ clientId: "c1" }), useNavigate: () => navigate }));
+vi.mock("react-router-dom", () => ({ useParams: () => ({ clientId: currentClient.id }), useNavigate: () => navigate }));
 vi.mock("../../lib/supabase", () => ({
   supabase: {
     from: (...a: unknown[]) => from(...(a as [string])),
@@ -99,6 +110,7 @@ const placement = (over: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
+  currentClient.id = "c1";
   state.coverage = [];
   vi.clearAllMocks();
   rpc.mockResolvedValue({ data: null, error: null });
@@ -109,7 +121,9 @@ beforeEach(() => {
   state.clientDestinations = [];
   state.events = [];
   state.integrations = [];
+  state.providerReads = [];
   state.publishing = false;
+  state.placementReadOverride = null;
 });
 
 describe("destinations", () => {
@@ -146,6 +160,46 @@ describe("destinations", () => {
 });
 
 describe("placements", () => {
+  it("clears the previous client's placement rows as soon as the client changes", async () => {
+    state.placements = [placement({ external_id: "client-one-provider-id" })];
+    const view = render(<ProofDistributionPanel tab="placements" />);
+    expect(await screen.findByText(/client-one-provider-id/)).toBeInTheDocument();
+
+    currentClient.id = "c2";
+    state.placements = [];
+    view.rerender(<ProofDistributionPanel tab="placements" />);
+    expect(screen.queryByText(/client-one-provider-id/)).not.toBeInTheDocument();
+    expect(await screen.findByText(/No placements yet/)).toBeInTheDocument();
+  });
+
+  it("ignores a previous client's placement read that finishes after the new client loads", async () => {
+    let finishOld!: (result: { data: Record<string, unknown>[]; error: null }) => void;
+    const oldRead = new Promise<{ data: Record<string, unknown>[]; error: null }>((resolve) => {
+      finishOld = resolve;
+    });
+    state.placementReadOverride = (id) => id === "c1"
+      ? oldRead : Promise.resolve({ data: [], error: null });
+    const view = render(<ProofDistributionPanel tab="placements" />);
+    await waitFor(() => expect(from).toHaveBeenCalledWith("proof_placements"));
+
+    currentClient.id = "c2";
+    view.rerender(<ProofDistributionPanel tab="placements" />);
+    expect(await screen.findByText(/No placements yet/)).toBeInTheDocument();
+    await act(async () => {
+      finishOld({ data: [placement({ external_id: "stale-client-provider-id" })], error: null });
+      await oldRead;
+    });
+    expect(screen.queryByText(/stale-client-provider-id/)).not.toBeInTheDocument();
+  });
+
+  it("keeps rights and removal coverage beside the distribution log", async () => {
+    render(<ProofDistributionPanel tab="placements" />);
+    expect(await screen.findByRole("heading", { name: "Where this proof actually is" }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Distribution log" }))
+      .toBeInTheDocument();
+  });
+
   it("shows exact payload, rights, provider result and the append-only event trail", async () => {
     state.placements = [placement({ status: "verified", external_id: "provider-42",
       external_url: "https://directory.example/proof/42", verified_at: "2026-11-16T12:00:00Z" })];
@@ -304,6 +358,59 @@ describe("rights", () => {
 });
 
 describe("asking for the decision", () => {
+  it("shows provider GET separately and requests a read only for a known post ID", async () => {
+    const externalId = "accounts/123/locations/456/localPosts/7";
+    state.placements = [placement({ destination_key: "google_business_profile",
+      status: "uncertain", external_id: externalId })];
+    state.providerReads = [{ id: "read-1", placement_id: "pl1", external_id: externalId,
+      payload_hash: "a".repeat(64), result: "live_exact_text", provider_state: "LIVE", provider_url: null,
+      checked_at: new Date().toISOString() }];
+    render(<ProofDistributionPanel tab="placements" />);
+    expect(await screen.findByText(/Provider GET: live exact text/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Actions for / }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Read provider post" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith(
+      "request_proof_placement_readback_v8", { p_placement_id: "pl1" }));
+    expect(rpc).not.toHaveBeenCalledWith("record_proof_placed", expect.anything());
+  });
+
+  it("offers human confirmation only for a fresh exact LIVE text read", async () => {
+    const externalId = "accounts/123/locations/456/localPosts/7";
+    state.placements = [placement({ destination_key: "google_business_profile",
+      status: "uncertain", external_id: externalId })];
+    state.providerReads = [{ id: "read-1", placement_id: "pl1", external_id: externalId,
+      payload_hash: "a".repeat(64), result: "live_exact_text", provider_state: "LIVE",
+      provider_url: null, checked_at: new Date().toISOString() }];
+    render(<ProofDistributionPanel tab="placements" />);
+    await userEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Confirm provider presence" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith(
+      "resolve_proof_placement_readback_v8", { p_placement_id: "pl1", p_read_id: "read-1" }));
+  });
+
+  it("keeps a live media read held until its bytes are verified", async () => {
+    const externalId = "accounts/123/locations/456/localPosts/7";
+    state.placements = [placement({ destination_key: "google_business_profile",
+      status: "uncertain", external_id: externalId, asset_id: "media-1", proof_id: null })];
+    state.providerReads = [{ id: "read-1", placement_id: "pl1", external_id: externalId,
+      payload_hash: "a".repeat(64), result: "live_media_unverified", provider_state: "LIVE",
+      provider_url: null, checked_at: new Date().toISOString() }];
+    render(<ProofDistributionPanel tab="placements" />);
+    await userEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
+    expect(screen.queryByRole("menuitem", { name: "Confirm provider presence" })).not.toBeInTheDocument();
+  });
+
+  it("does not show an old payload read as current provider evidence", async () => {
+    const externalId = "accounts/123/locations/456/localPosts/7";
+    state.placements = [placement({ destination_key: "google_business_profile",
+      status: "placed", external_id: externalId })];
+    state.providerReads = [{ id: "read-1", placement_id: "pl1", external_id: externalId,
+      payload_hash: "b".repeat(64), result: "live_exact_text", provider_state: "LIVE",
+      provider_url: null, checked_at: "2026-11-19T00:00:00Z" }];
+    render(<ProofDistributionPanel tab="placements" />);
+    expect(await screen.findByText(/Provider GET: stale observation/)).toBeInTheDocument();
+    expect(screen.queryByText(/Provider GET: live exact text/)).not.toBeInTheDocument();
+  });
   it("offers the campaign-level ask only for a placement that belongs to a campaign", async () => {
     state.placements = [placement({ status: "drafted" })];
     render(<ProofDistributionPanel tab="placements" />);
@@ -341,6 +448,17 @@ describe("asking for the decision", () => {
     expect(await screen.findByText(/refused the post \(403\)/)).toBeInTheDocument();
     expect(screen.queryByText("Nothing")).not.toBeInTheDocument();
   });
+
+  it("shows an uncertain provider outcome as an inspection hold", async () => {
+    state.placements = [placement({ status: "uncertain",
+      destination_key: "google_business_profile", attempts: 1,
+      last_error: "Business Profile POST outcome is unknown; inspect the location before another attempt.",
+    })];
+    render(<ProofDistributionPanel tab="placements" />);
+    expect(await screen.findByText(/POST outcome is unknown/)).toBeInTheDocument();
+    expect(screen.getByText("uncertain")).toBeInTheDocument();
+    expect(screen.queryByText("Nothing")).not.toBeInTheDocument();
+  });
 });
 
 
@@ -372,7 +490,7 @@ describe("where this proof actually is", () => {
     render(<ProofDistributionPanel tab="rights" />);
     expect(await screen.findByText("Where this proof actually is")).toBeTruthy();
     expect(screen.getByText("organic_social, main_website")).toBeTruthy();
-    expect(screen.getByText("1 of 1 piece(s) of proof are live somewhere.")).toBeTruthy();
+    expect(screen.getByText("1 of 1 piece(s) of proof are recorded on a surface without confirmed removal.")).toBeTruthy();
   });
 
   it("leads with proof that is live on lapsed rights", async () => {
@@ -380,12 +498,12 @@ describe("where this proof actually is", () => {
       coverage({ proof_asset_id: "p2", title: "A clean one", problem: null }),
       coverage({
         usage_rights: "not_cleared",
-        problem: "This proof is live somewhere and its rights are not_cleared.",
+        problem: "This proof is still recorded on a surface and its rights are not_cleared. Confirm removal before clearing it.",
       }),
     ];
     render(<ProofDistributionPanel tab="rights" />);
     expect(
-      await screen.findByText("This proof is live somewhere and its rights are not_cleared."),
+      await screen.findByText("This proof is still recorded on a surface and its rights are not_cleared. Confirm removal before clearing it."),
     ).toBeTruthy();
     const alerts = screen.getAllByRole("alert").map((a) => a.textContent);
     expect(alerts.some((t) => t?.includes("1 piece(s) of proof need attention"))).toBe(true);
@@ -404,6 +522,6 @@ describe("where this proof actually is", () => {
     render(<ProofDistributionPanel tab="rights" />);
     expect(await screen.findByText("nowhere")).toBeTruthy();
     expect(screen.getByText(/has not published, so it is not live anywhere yet/)).toBeTruthy();
-    expect(screen.getByText("0 of 1 piece(s) of proof are live somewhere.")).toBeTruthy();
+    expect(screen.getByText("0 of 1 piece(s) of proof are recorded on a surface without confirmed removal.")).toBeTruthy();
   });
 });

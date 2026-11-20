@@ -7,12 +7,17 @@ insert into public.profiles(id,role,email) values
  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','admin','activation-admin@example.invalid');
 insert into public.clients(id,name,initials) values
  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Activation fixture','AF');
+-- Campaign-source setup in this rollback fixture does not exercise the
+-- separate Intelligence prerequisite for the planner worker.
+update public.agents set requires_upstream='{}' where agent_key='campaign_plan';
 select set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claims',
  '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal1"}',true);
 do $checks$
 declare o public.market_opportunities%rowtype; offer_id uuid;
+ secondary_offer public.service_offers%rowtype;
+ offer_version public.service_offer_versions%rowtype;
  approval_id uuid; activation_id uuid; newer_id uuid; source_id uuid;
 begin
  insert into public.service_offers(client_id,service_name)
@@ -36,6 +41,12 @@ begin
  perform public.approve_opportunity_v6(o.id,approval_id);
  if not public.opportunity_approval_current_v6(o.id) then
   raise exception 'Existing opportunity approval changed when activation columns were added'; end if;
+ secondary_offer:=public.create_secondary_offer_v7(o.id);
+ offer_version:=public.create_service_offer_version_v6(o.client_id,
+  secondary_offer.service_name,'Homeowners with unused garages',
+  'A garage ready for training',array['Insulation'],array['Gym equipment'],
+  null,null,null,'[]'::jsonb,'activation-fixture-offer',secondary_offer.id);
+ perform public.approve_service_offer_version_v6(offer_version.id);
  begin
   perform public.set_opportunity_status_v6(o.id,'active');
   raise exception 'Direct active status bypassed activation Inbox';
@@ -53,7 +64,7 @@ begin
  exception when insufficient_privilege then null; end;
  perform set_config('request.jwt.claims',
   '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
- perform public.create_campaign_from_opportunity_v6(o.id,'organic');
+ perform public.create_campaign_from_opportunity_v7(o.id,offer_version.id,'organic');
  if public.opportunity_activation_source_state_v6(activation_id)<>'superseded'
   or not public.opportunity_approval_current_v6(o.id)
   then raise exception 'New campaign did not stale activation while preserving opportunity approval'; end if;

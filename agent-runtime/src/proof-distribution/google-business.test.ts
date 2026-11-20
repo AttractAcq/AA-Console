@@ -91,7 +91,7 @@ describe("what it sends", () => {
 
   it("includes media and a call to action only when the placement carries them", async () => {
     const fetchImpl = vi.fn(async () =>
-      new Response(JSON.stringify({ name: "n", searchUrl: "https://g.co/p" }), { status: 200 }),
+      new Response(JSON.stringify({ name: "accounts/123/locations/456/localPosts/9", searchUrl: "https://g.co/p" }), { status: 200 }),
     ) as unknown as typeof fetch;
 
     const result = await createLocalPost({
@@ -116,13 +116,22 @@ describe("what it sends", () => {
     });
     expect(result.externalUrl).toBe("https://g.co/p");
   });
+
+  it("drops a provider URL outside Google's HTTPS hosts", async () => {
+    const result = await createLocalPost({ ...base, fetchImpl: ok({
+      name: "accounts/123/locations/456/localPosts/9",
+      searchUrl: "javascript:alert(1)",
+    }) });
+    expect(result.externalUrl).toBeNull();
+  });
 });
 
-describe("which failures may be tried again", () => {
-  it("retries a rate limit and a server error", async () => {
+describe("which POST outcomes require inspection", () => {
+  it("holds a timeout, rate limit and server error as uncertain", async () => {
     for (const status of [408, 429, 500, 503]) {
       const error = await refusal({ ...base, fetchImpl: ok("slow down", status) });
-      expect(error.retryable, `${status} should be retryable`).toBe(true);
+      expect(error.retryable, `${status} must not be retried`).toBe(false);
+      expect(error.uncertain, `${status} is an unknown POST outcome`).toBe(true);
     }
   });
 
@@ -132,17 +141,19 @@ describe("which failures may be tried again", () => {
     for (const status of [400, 401, 403, 404]) {
       const error = await refusal({ ...base, fetchImpl: ok("no", status) });
       expect(error.retryable, `${status} should not be retryable`).toBe(false);
+      expect(error.uncertain).toBe(false);
       expect(error.message).toContain(String(status));
     }
   });
 
-  it("retries a request that got no response at all", async () => {
+  it("holds a request that got no response at all", async () => {
     const fetchImpl = vi.fn(async () => {
       throw new Error("socket hang up");
     }) as unknown as typeof fetch;
     const error = await refusal({ ...base, fetchImpl });
-    expect(error.retryable).toBe(true);
-    expect(error.message).toContain("socket hang up");
+    expect(error.retryable).toBe(false);
+    expect(error.uncertain).toBe(true);
+    expect(error.message).not.toContain("socket hang up");
   });
 
   it("treats an accepted post with no id as a failure to go and look at", async () => {
@@ -150,6 +161,15 @@ describe("which failures may be tried again", () => {
     // that could retract it.
     const error = await refusal({ ...base, fetchImpl: ok({ searchUrl: "https://g.co/p" }) });
     expect(error.retryable).toBe(false);
+    expect(error.uncertain).toBe(true);
     expect(error.message).toContain("Check the profile");
+  });
+
+  it("holds a response naming a different location", async () => {
+    const error = await refusal({ ...base, fetchImpl: ok({
+      name: "accounts/999/locations/888/localPosts/7",
+    }) });
+    expect(error.uncertain).toBe(true);
+    expect(error.externalId).toBe("accounts/999/locations/888/localPosts/7");
   });
 });

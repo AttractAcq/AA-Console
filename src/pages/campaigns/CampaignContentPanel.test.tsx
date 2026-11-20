@@ -138,13 +138,14 @@ it("uses the existing combined RPC for campaign briefing", async () => {
   expect(await screen.findByRole("status")).toHaveTextContent("Brief queued");
 });
 
-it("only marks approved assets ready and reuses the normal review RPC", async () => {
+it("marks creative approval without implying publication and reuses the normal review RPC", async () => {
   show();
   expect(await screen.findByText("Awaiting approval")).toBeInTheDocument();
-  expect(screen.getByText("0 ready to distribute · 2 pieces planned · 1 campaign ideas")).toBeInTheDocument();
+  expect(screen.getByText("0 creative approved · 2 pieces planned · 1 campaign ideas")).toBeInTheDocument();
   reviewStatus = "approved";
   fireEvent.click(screen.getByRole("button", { name: "Approve asset" }));
-  expect(await screen.findByText("Ready to distribute")).toBeInTheDocument();
+  expect(await screen.findByText("Creative approved")).toBeInTheDocument();
+  expect(screen.queryByText("Ready to distribute")).not.toBeInTheDocument();
   expect(rpc).toHaveBeenCalledWith("review_media_asset", { p_asset_id: "asset-1", p_decision: "approved" });
 });
 
@@ -178,6 +179,14 @@ it("requires a rejection reason and surfaces review failures", async () => {
 // as three flat lists, a campaign with twelve ideas buried its single brief
 // below all of them, and a briefed idea gave no sign its brief existed.
 describe("the content chain, grouped by piece", () => {
+  it("shows only the selected route positions in the typed campaign table", async () => {
+    ideas = [idea, { ...idea, id: "idea-2", campaign_position: 2,
+      title: "Paid search offer" }];
+    show({ layout: "v2", routePositions: [2], contentCount: 1 });
+    expect(await screen.findByRole("button", { name: /Paid search offer/ })).toBeInTheDocument();
+    expect(screen.queryByText("WhatsApp photo triage")).not.toBeInTheDocument();
+    expect(screen.getByText("0 creative approved · 1 planned · 1 ideas")).toBeInTheDocument();
+  });
   it("shows a brief underneath the idea it was written from", async () => {
     show();
     const ideaCard = (await screen.findByText("WhatsApp photo triage")).closest("div.rounded-md");

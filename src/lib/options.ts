@@ -52,19 +52,34 @@ export async function loadApprovedAssets(): Promise<Option[]> {
   }));
 }
 
-export async function loadBriefs(): Promise<Option[]> {
-  const { data } = await supabase
+export async function loadBriefs(clientId: string): Promise<Option[]> {
+  const { data, error } = await supabase
     .from("client_briefs")
-    .select("id, brief_ref, title, clients(name)")
+    .select("id, brief_ref, title")
+    .eq("client_id", clientId)
     .order("created_at", { ascending: false })
     .limit(200);
-  return (data ?? []).map((b) => {
-    const client = (b as { clients?: { name: string } | null }).clients;
-    return {
-      value: b.id,
-      label: `${b.brief_ref ?? "—"} · ${b.title}${client ? ` (${client.name})` : ""}`,
-    };
-  });
+  if (error) throw error;
+  return (data ?? []).map((b) => ({
+    value: b.id,
+    label: `${b.brief_ref ?? "—"} · ${b.title}`,
+  }));
+}
+
+/** Exact workflow requests that a human assignment may fulfill. The server
+ * verifies the selected brief belongs to the run and piece before binding. */
+export async function loadProductionDemands(clientId: string, briefId: string, search = ""): Promise<Option[]> {
+  let query = supabase.from("assignable_production_demands_v7")
+    .select("demand_kind, demand_id, piece_key, destination, requested_at")
+    .eq("client_id", clientId).eq("brief_id", briefId);
+  const term = search.trim().slice(0, 80).replaceAll("%", "\\%").replaceAll("_", "\\_");
+  if (term) query = query.ilike("piece_key", `%${term}%`);
+  const { data, error } = await query.order("requested_at", { ascending: false }).limit(200);
+  if (error) throw error;
+  return (data ?? []).filter((d) => d.demand_id).map((d) => ({
+    value: `${d.demand_kind}:${d.demand_id}`,
+    label: `${d.demand_kind} · ${d.piece_key} · ${d.destination ?? "unspecified"} · ${d.requested_at?.slice(0, 10) ?? "date unknown"} · ${d.demand_id!.slice(0, 8)}`,
+  }));
 }
 
 export async function loadAgents(): Promise<Option[]> {

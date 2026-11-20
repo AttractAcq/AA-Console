@@ -12,6 +12,7 @@ import {
   LIVE_STATUSES, MODE_HINT,
   createPlacement, fetchClientDestinations, fetchDestinations,
   fetchPlacementDue, fetchPlacements, fetchPlacementEvents, fetchRetractionReceipts,
+  fetchProofProviderReads, requestProofProviderRead, resolveProofProviderRead,
   markPlacedByHand, recordRetracted, auditLegacyRetraction,
   requestApproval, setDestinationEnabled, setProofPublishingEnabled,
   fetchProofSurfaceCoverage,
@@ -19,6 +20,7 @@ import {
   type ClientDestination, type Destination, type Placement, type PlacementDue,
   type DestinationIntegration,
   type RetractionReceipt, type PlacementEvent,
+  type ProofProviderRead,
   type ProofSurfaceCoverage,
 } from "../../lib/proofDistribution";
 
@@ -31,15 +33,13 @@ import {
  * "where is this testimonial used" and "this permission expired, what do we
  * pull" were both unanswerable.
  *
- * Three tabs, and they are three questions:
+ * Two tabs answer the operating questions:
  *
  *   Destinations  where can proof go, and is this client switched on for it
- *   Placements    what is going where, and what is stopping each one
- *   Rights        what is live, on whose permission, and what has to come down
+ *   Distribution Log  what went where, with its rights, blockers and history
  *
- * Rights is the tab that justifies the rest. A placement is cheap to make and
- * expensive to forget, and permission ending is the moment the record earns
- * its keep.
+ * The former Rights view stays in the log because permission ending while a
+ * placement is live still needs a visible removal task.
  */
 
 type Tab = "destinations" | "placements" | "rights";
@@ -78,11 +78,16 @@ function auditLegacyProofRemoval(
 
 export function ProofDistributionPanel({ tab }: { tab: Tab }) {
   const { clientId } = useParams<{ clientId: string }>();
+  return <ClientProofDistributionPanel key={clientId ?? "no-client"} clientId={clientId} tab={tab} />;
+}
+
+function ClientProofDistributionPanel({ clientId, tab }: { clientId: string | undefined; tab: Tab }) {
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [clientDestinations, setClientDestinations] = useState<ReadonlyMap<string, ClientDestination>>(new Map());
   const [integrations, setIntegrations] = useState<DestinationIntegration[]>([]);
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [retractionReceipts, setRetractionReceipts] = useState<ReadonlyMap<string, RetractionReceipt>>(new Map());
+  const [providerReads, setProviderReads] = useState<ReadonlyMap<string, ProofProviderRead>>(new Map());
   const [due, setDue] = useState<ReadonlyMap<string, PlacementDue>>(new Map());
   const [proof, setProof] = useState<ProofAsset[]>([]);
   const [publishingOn, setPublishingOn] = useState(false);
@@ -97,11 +102,12 @@ export function ProofDistributionPanel({ tab }: { tab: Tab }) {
       return;
     }
     try {
-      const [all, mine, rows, receipts, blockers, proofRows, settings, connected] = await Promise.all([
+      const [all, mine, rows, receipts, providerReadRows, blockers, proofRows, settings, connected] = await Promise.all([
         fetchDestinations(),
         fetchClientDestinations(clientId),
         fetchPlacements(clientId),
         fetchRetractionReceipts(clientId),
+        fetchProofProviderReads(clientId),
         fetchPlacementDue(clientId),
         fetchProofAssets(clientId),
         supabase.from("client_engine_settings")
@@ -115,6 +121,7 @@ export function ProofDistributionPanel({ tab }: { tab: Tab }) {
       setIntegrations((connected.data ?? []) as DestinationIntegration[]);
       setPlacements(rows);
       setRetractionReceipts(receipts);
+      setProviderReads(providerReadRows);
       setDue(blockers);
       setProof(proofRows);
       setPublishingOn(Boolean((settings.data as { proof_publishing_enabled?: boolean } | null)?.proof_publishing_enabled));
@@ -176,17 +183,33 @@ export function ProofDistributionPanel({ tab }: { tab: Tab }) {
         />
       )}
       {tab === "placements" && (
-        <PlacementsTab
-          placements={placements}
-          retractionReceipts={retractionReceipts}
-          due={due}
-          destinations={destinations}
-          proof={proof}
-          titleOf={titleOf}
-          busy={busy}
-          loading={loading}
-          onAct={act}
-        />
+        <div className="space-y-8">
+          <RightsTab
+            placements={placements}
+            retractionReceipts={retractionReceipts}
+            due={due}
+            proof={proof}
+            titleOf={titleOf}
+            busy={busy}
+            loading={loading}
+            onAct={act}
+          />
+          <section className="space-y-3" aria-label="Distribution log">
+            <h3 className="font-semibold">Distribution log</h3>
+            <PlacementsTab
+              placements={placements}
+              retractionReceipts={retractionReceipts}
+              providerReads={providerReads}
+              due={due}
+              destinations={destinations}
+              proof={proof}
+              titleOf={titleOf}
+              busy={busy}
+              loading={loading}
+              onAct={act}
+            />
+          </section>
+        </div>
       )}
       {tab === "rights" && (
         <RightsTab
@@ -332,10 +355,11 @@ function DestinationsTab({
 }
 
 function PlacementsTab({
-  placements, retractionReceipts, due, destinations, proof, titleOf, busy, loading, onAct,
+  placements, retractionReceipts, providerReads, due, destinations, proof, titleOf, busy, loading, onAct,
 }: {
   placements: Placement[];
   retractionReceipts: ReadonlyMap<string, RetractionReceipt>;
+  providerReads: ReadonlyMap<string, ProofProviderRead>;
   due: ReadonlyMap<string, PlacementDue>;
   destinations: Destination[];
   proof: ProofAsset[];
@@ -382,6 +406,14 @@ function PlacementsTab({
       emptyLabel={loading ? "Loading placements…" : "No placements yet"}
       rows={placements.map((placement) => {
         const blocker = due.get(placement.id)?.blocker ?? null;
+        const latestRead = providerReads.get(placement.id);
+        const exactLiveRead = latestRead?.result === "live_exact_text"
+          && latestRead.provider_state === "LIVE"
+          && latestRead.external_id === placement.external_id
+          && latestRead.payload_hash === placement.payload_hash
+          && Number.isFinite(Date.parse(latestRead.checked_at))
+          && Date.now() - Date.parse(latestRead.checked_at) >= 0
+          && Date.now() - Date.parse(latestRead.checked_at) < 60 * 60 * 1000;
         const mode = modeOf(placement.destination_key);
         return [
           <span key="p">
@@ -412,8 +444,10 @@ function PlacementsTab({
                 last_error. Showing "Nothing" there said the opposite of the
                 truth. */}
             {blocker ??
-              (placement.status === "failed" && placement.last_error
-                ? placement.last_error
+              (placement.status === "uncertain"
+                ? placement.last_error ?? "Provider outcome unknown. Inspect the destination before another attempt."
+                : placement.status === "failed" && placement.last_error
+                  ? placement.last_error
                 : LIVE_STATUSES.has(placement.status)
                   ? "Live"
                   : "Nothing")}
@@ -427,6 +461,17 @@ function PlacementsTab({
               "No external URL"
             )}
             {placement.external_id && <span className="block break-all">ID: {placement.external_id}</span>}
+            {providerReads.get(placement.id) && (
+              <span className="block text-muted-foreground">
+                {providerReads.get(placement.id)?.external_id !== placement.external_id
+                  || providerReads.get(placement.id)?.payload_hash !== placement.payload_hash
+                  ? "Provider GET: stale observation for an earlier ID or payload"
+                  : `Provider GET: ${providerReads.get(placement.id)?.result.replace(/_/g, " ")}${
+                    providerReads.get(placement.id)?.provider_state
+                      ? ` (${providerReads.get(placement.id)?.provider_state})` : ""}`}
+                {` · ${dayOrDash(providerReads.get(placement.id)?.checked_at ?? null)}`}
+              </span>
+            )}
             <span className="block text-muted-foreground">Placed {dayOrDash(placement.placed_at)} · verified {dayOrDash(placement.verified_at)}</span>
           </span>,
           <span key="r" className="text-xs">
@@ -452,6 +497,20 @@ function PlacementsTab({
             name={`${titleOf(placement.source_proof_id)} at ${labelOf(placement.destination_key)}`}
             busy={busy === placement.id}
             items={[
+              ...(placement.destination_key === "google_business_profile"
+                && placement.external_id
+                && ["uncertain", "placed", "verified"].includes(placement.status)
+                ? [{ label: "Read provider post",
+                    onSelect: () => void onAct(placement.id,
+                      () => requestProofProviderRead(placement.id),
+                      "Read-only provider check requested. Refresh for its result.") }]
+                : []),
+              ...(exactLiveRead && ["uncertain", "placed"].includes(placement.status)
+                ? [{ label: "Confirm provider presence",
+                    onSelect: () => void onAct(placement.id,
+                      () => resolveProofProviderRead(placement.id, latestRead!.id),
+                      "Provider presence reviewed; rights and placement status refreshed.") }]
+                : []),
               ...(placement.status === "drafted"
                 ? [{
                     label: "Ask for approval",
@@ -755,7 +814,7 @@ function SurfaceCoverage() {
       )}
 
       <DataTable
-        columns={["Proof", "Rights", "Live on", "Bound, not published", "Problem"]}
+        columns={["Proof", "Rights", "Present or removal pending", "Bound, not published", "Problem"]}
         emptyLabel={loading ? "Loading…" : "No proof has reached a surface yet"}
         rows={coverage.map((row) => [
           <span key="p">
@@ -787,7 +846,7 @@ function SurfaceCoverage() {
 
       {!loading && coverage.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          {placed.length} of {coverage.length} piece(s) of proof are live somewhere.
+          {placed.length} of {coverage.length} piece(s) of proof are recorded on a surface without confirmed removal.
         </p>
       )}
     </section>

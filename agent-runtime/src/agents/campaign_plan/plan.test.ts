@@ -14,6 +14,7 @@ import {
   routeVolumes,
   planSummary,
   resolveNeeds,
+  fixedOperatorModules,
   MAX_CONTENT,
   type CampaignPlan,
 } from "./plan.js";
@@ -119,6 +120,41 @@ describe("planner crash recovery", () => {
       "bind_campaign_planned_ideas_v7", "capture_campaign_intelligence_snapshot_v6", "capture_campaign_offer_v6",
       "create_campaign_manifest_v6", "attach_campaign_manifest_intelligence_v6",
       "attach_campaign_offer_v6",
+    ]);
+  });
+
+  it("finalizes a typed standalone plan with its selected-module manifest", async () => {
+    const campaign = {
+      id: "campaign-1", client_id: "client-1", acquisition_mode: "organic",
+      campaign_kind: "standalone_organic", offer_version_id: null,
+      built_at: "2026-10-16T10:00:00Z", content_ideas_generated_at: null,
+      ideate_on_plan: false, job_id: "job-1", content_spec_id: "spec-1",
+      content_count: 1, needs_lead_magnet: false,
+    };
+    const rpc = vi.fn(async (name: string) => {
+      if (name === "capture_campaign_intelligence_snapshot_v6")
+        return { data: { id: "snapshot-1" }, error: null };
+      if (name === "create_typed_campaign_manifest_v11")
+        return { data: { id: "manifest-1" }, error: null };
+      return { data: null, error: null };
+    });
+    const sb = {
+      from: () => ({ select: () => ({ eq: () => ({ eq: () => ({
+        maybeSingle: async () => ({ data: campaign, error: null }),
+      }) }) }) }),
+      rpc,
+    } as unknown as Parameters<typeof runCampaignPlanJob>[0];
+    const result = await runCampaignPlanJob(
+      sb, {} as Parameters<typeof runCampaignPlanJob>[1],
+      {} as Parameters<typeof runCampaignPlanJob>[2],
+      { id: "job-1", client_id: "client-1", input_table: "client_campaigns",
+        input_id: "campaign-1" } as Parameters<typeof runCampaignPlanJob>[3],
+      Date.now() + 60_000,
+    );
+    expect(result).toMatchObject({ ok: true });
+    expect(rpc.mock.calls.map(([name]) => name)).toEqual([
+      "capture_campaign_intelligence_snapshot_v6", "create_typed_campaign_manifest_v11",
+      "attach_campaign_manifest_intelligence_v6",
     ]);
   });
 });
@@ -342,6 +378,17 @@ function idea(over: Record<string, unknown> = {}) {
     ...over,
   };
 }
+
+describe("operator-selected campaign modules", () => {
+  it("preserves explicit typed selections even when the planner proposes extra work", () => {
+    const proposal = good({ needs_landing_page: true, needs_sales_agent: true,
+      needs_lead_magnet: true });
+    const selected = { needs_landing_page: false, needs_sales_agent: true,
+      needs_lead_magnet: false };
+    expect(fixedOperatorModules("standalone_paid", selected, proposal)).toMatchObject(selected);
+    expect(fixedOperatorModules(null, selected, proposal)).toEqual(proposal);
+  });
+});
 
 describe("resolveNeeds", () => {
   const model = { needs_landing_page: true, needs_sales_agent: true };

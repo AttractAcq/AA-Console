@@ -31,10 +31,10 @@ import { CampaignInputsPanel } from "./intelligence/CampaignInputsPanel";
 import { BrandingStrategyPanel } from "./strategy/BrandingStrategyPanel";
 import { ContentPillarsPanel } from "./strategy/ContentPillarsPanel";
 import { OfferStrategyPanel } from "./strategy/OfferStrategyPanel";
-import { ServiceOffersPanel } from "./offer/ServiceOffersPanel";
 import { MoneyModelStrategyPanel } from "./strategy/MoneyModelStrategyPanel";
 import { GenerationPanel } from "./ideation/GenerationPanel";
 import { DailyProductionOverview } from "./ideation/DailyProductionOverview";
+import { CampaignProductionOverview } from "./ideation/CampaignProductionOverview";
 import { ContentArchivePanel } from "./archive/ContentArchivePanel";
 import { ARCHIVE_DOMAINS, SimpleArchivePanel } from "./archive/SimpleArchivePanel";
 import { BriefsPanel } from "./ideation/BriefsPanel";
@@ -110,12 +110,6 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     "offer-strategy": () => <OfferStrategyPanel />,
     "money-model-strategy": () => <MoneyModelStrategyPanel />,
   },
-  "market-opportunities": {
-    discover: () => <MarketOpportunitiesPanel view="discover" />,
-    evaluate: () => <MarketOpportunitiesPanel view="evaluate" />,
-    strategize: () => <MarketOpportunitiesPanel view="strategize" />,
-    activate: () => <MarketOpportunitiesPanel view="activate" />,
-  },
   "proof-distribution": {
     destinations: () => <ProofDistributionPanel tab="destinations" />,
     placements: () => <ProofDistributionPanel tab="placements" />,
@@ -131,7 +125,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   // belonged to a page that walked one asset through stages, and these are
   // four queues.
   "content-production-factory": {
-    generation: () => <><DailyProductionOverview /><GenerationPanel showJourney={false} /></>,
+    generation: () => <><CampaignProductionOverview /><DailyProductionOverview /><GenerationPanel showJourney={false} /></>,
     briefs: () => <BriefsPanel showJourney={false} />,
     // Create is the assets nobody has signed off, not the briefs waiting for
     // one: a brief with nothing made from it stays in Briefs, where
@@ -160,8 +154,8 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     reporting: () => <OrganicReportingPanel />,
   },
   "offer-studio": {
-    offers: () => <OfferStudioPanel />,
-    versions: () => <ServiceOffersPanel />,
+    offers: () => <OfferStudioPanel view="offers" />,
+    build: () => <OfferStudioPanel view="build" />,
   },
   "website-studio": {
     sites: () => <SitesPanel />,
@@ -260,6 +254,7 @@ const nodePanels: Record<string, () => ReactNode> = {
   // called "dashboard" but they are different pages
   "delivery-dashboard": () => <ClientDashboardPanel />,
   "campaign-factory": () => <CampaignExecutionPanel />,
+  "market-opportunities": () => <MarketOpportunitiesPanel />,
   onboarding: () => <OnboardingPanel />,
   contact: () => <ContactPanel />,
   brand: () => <BrandPanel />,
@@ -282,8 +277,15 @@ function getPanelBody(
 }
 
 export function Page({ node }: { node: NavNode }) {
-  const [searchParams, setSearchParams] = useSearchParams();
   const { clientId } = useParams<{ clientId: string }>();
+  // Router parameter changes can reuse this element. Remount the full panel
+  // tree so a previous client's forms, rows and late local reads cannot stay
+  // on screen while the next client loads.
+  return <PageContent key={`${node.id}:${clientId ?? "agency"}`} node={node} clientId={clientId} />;
+}
+
+function PageContent({ node, clientId }: { node: NavNode; clientId: string | undefined }) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   // `?view=` is Intelligence OS's two halves. It used to carry v1/v2 as well,
@@ -293,10 +295,13 @@ export function Page({ node }: { node: NavNode }) {
     ? node.tabs?.filter((tab) => strategyTabIds.has(tab.id) === (view === "strategy"))
     : node.tabs;
   const requestedTab = searchParams.get("tab");
+  const resolvedTab = node.id === "proof-distribution" && requestedTab === "rights"
+    ? "placements" : node.id === "offer-studio" && requestedTab === "versions"
+      ? "build" : requestedTab;
   const assetLibrary = node.id === "content-production-factory"
     && requestedTab !== null && LEGACY_LIBRARY_TABS.has(requestedTab);
   const activeTab =
-    tabs && (tabs.find((t) => t.id === (assetLibrary ? "assets" : requestedTab)) ?? tabs[0]);
+    tabs && (tabs.find((t) => t.id === (assetLibrary ? "assets" : resolvedTab)) ?? tabs[0]);
   const v6Intelligence = node.id === "intelligence-os";
   const exportModule: ExportModule | null = v6Intelligence
     ? view === "strategy" ? "strategy" : "intelligence"

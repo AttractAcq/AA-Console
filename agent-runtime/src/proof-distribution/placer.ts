@@ -251,40 +251,40 @@ export async function runProofPlacerJob(
   let failed = 0;
 
   for (const placement of claimed) {
+    let acknowledged: { externalId: string; externalUrl: string | null } | null = null;
     try {
-      const result = await place(sb, placement);
+      acknowledged = await place(sb, placement);
       const { error: recordError } = await sb.rpc("record_proof_placed", {
         p_placement_id: placement.placement_id,
-        p_external_id: result.externalId,
-        p_external_url: result.externalUrl,
+        p_external_id: acknowledged.externalId,
+        p_external_url: acknowledged.externalUrl,
       } as never);
-      // It is out there. A failure to record leaves the row claimed for the
-      // reaper, which abandons it and says to go and look at the profile --
-      // wrong, but visible, and the right instruction.
-      if (recordError) throw new Error(`Placed, but could not record it: ${recordError.message}`);
+      if (recordError) throw new PlacementTransportError(
+        "Business Profile acknowledged the post, but its local receipt could not be recorded; inspect the location.",
+        false, true);
 
       placed += 1;
-      await appendEvent(sb, job.id, `${placement.destination_key}: placed.`, "info", {
-        placement_id: placement.placement_id,
-        external_id: result.externalId,
-        external_url: result.externalUrl,
-      });
-      logger.info("proof_placed", {
-        jobId: job.id,
-        placementId: placement.placement_id,
-        destination: placement.destination_key,
-      });
     } catch (thrown) {
       failed += 1;
       const retryable = thrown instanceof PlacementTransportError ? thrown.retryable : false;
+      const uncertain = Boolean(acknowledged)
+        || thrown instanceof PlacementTransportError && thrown.uncertain;
       const reason = safeProviderErrorMessage(thrown instanceof Error ? thrown.message : String(thrown));
-      const { error: failError } = await sb.rpc("record_proof_placement_failure", {
-        p_placement_id: placement.placement_id,
-        p_reason: reason,
-        p_retryable: retryable,
-      } as never);
+      const { error: failError } = uncertain
+        ? await sb.rpc("record_proof_placement_uncertain_v8", {
+          p_placement_id: placement.placement_id,
+          p_reason: reason,
+          p_external_id: acknowledged?.externalId
+            ?? (thrown instanceof PlacementTransportError ? thrown.externalId : null),
+          p_external_url: acknowledged?.externalUrl ?? null,
+        } as never)
+        : await sb.rpc("record_proof_placement_failure", {
+          p_placement_id: placement.placement_id,
+          p_reason: reason,
+          p_retryable: retryable,
+        } as never);
       if (failError) {
-        logger.error("proof_placement_failure_unrecorded", {
+        logger.error(uncertain ? "proof_placement_uncertain_unrecorded" : "proof_placement_failure_unrecorded", {
           jobId: job.id,
           placementId: placement.placement_id,
           message: failError.message,
@@ -292,9 +292,30 @@ export async function runProofPlacerJob(
       }
       await appendEvent(sb, job.id, `${placement.destination_key}: ${reason}`, "warn", {
         placement_id: placement.placement_id,
-        retryable,
+        retryable: !uncertain && retryable,
+        uncertain,
+      });
+      continue;
+    }
+    // Queue-event recording is separate from the provider effect. Its failure
+    // cannot turn a recorded placement into a failed or retryable POST.
+    try {
+      await appendEvent(sb, job.id, `${placement.destination_key}: placed.`, "info", {
+        placement_id: placement.placement_id,
+        external_id: acknowledged.externalId,
+        external_url: acknowledged.externalUrl,
+      });
+    } catch (error) {
+      logger.warn("proof_placement_job_event_unrecorded", {
+        jobId: job.id, placementId: placement.placement_id,
+        message: safeProviderErrorMessage(error instanceof Error ? error.message : "unknown"),
       });
     }
+    logger.info("proof_placed", {
+      jobId: job.id,
+      placementId: placement.placement_id,
+      destination: placement.destination_key,
+    });
   }
 
   await appendEvent(sb, job.id, `${placed} placed, ${failed} not.`, failed > 0 ? "warn" : "info", {

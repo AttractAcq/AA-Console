@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import { ProductionAttemptComparison } from "../../components/ProductionAttemptComparison";
 
 type RoutePackage = { id: string; route: string; version: number };
 type Work = {
@@ -31,7 +32,9 @@ type Piece = {
 const controlClass = "rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50";
 
 /** Current route-package progress. Workflow QA is internal; review remains human. */
-export function CampaignSweepWork({ clientId, campaignId }: { clientId: string; campaignId: string }) {
+export function CampaignSweepWork({ clientId, campaignId, route }: {
+  clientId: string; campaignId: string; route?: "paid" | "organic";
+}) {
   const [pieces, setPieces] = useState<Piece[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -69,7 +72,7 @@ export function CampaignSweepWork({ clientId, campaignId }: { clientId: string; 
     if (!work.length) {
       setPieces([]); setError(null); setLoading(false); return;
     }
-    const countsResult = await supabase.from("production_demand_counts_v7")
+    const countsResult = await supabase.from("production_demand_counts_v8")
       .select("demand_id, attempts, produced, rejected, revised, workflow_accepted, human_approved")
       .eq("client_id", clientId).eq("demand_kind", "campaign")
       .in("demand_id", work.map((row) => row.id));
@@ -128,6 +131,8 @@ export function CampaignSweepWork({ clientId, campaignId }: { clientId: string; 
     void refresh();
   };
 
+  const visiblePieces = route ? pieces.filter((piece) => piece.route === route) : pieces;
+
   return <section className="mt-4 rounded-lg border border-border bg-card p-4" aria-label="Campaign production work">
     <div className="flex items-center justify-between gap-2">
       <h3 className="font-semibold">Campaign production work</h3>
@@ -136,8 +141,8 @@ export function CampaignSweepWork({ clientId, campaignId }: { clientId: string; 
     {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
     {notice && <p role="status" className="mt-2 text-xs">{notice}</p>}
     {loading && <p className="mt-2 text-xs text-muted-foreground">Loading work…</p>}
-    {!loading && !error && !pieces.length && <p className="mt-2 text-xs text-muted-foreground">No production pieces have been swept into the current route packages.</p>}
-    {pieces.length > 0 && <ol className="mt-3 space-y-3">{pieces.map(({ work, route, version, steps, counts }) => {
+    {!loading && !error && !visiblePieces.length && <p className="mt-2 text-xs text-muted-foreground">No production pieces have been swept into the current route packages.</p>}
+    {visiblePieces.length > 0 && <ol className="mt-3 space-y-3">{visiblePieces.map(({ work, route, version, steps, counts }) => {
       const blocked = steps.filter((step) => step.status === "blocked" || step.status === "failed");
       const shownState = work.effective_state ?? work.state;
       return <li key={work.id} className="rounded-md border border-border p-3 text-sm">
@@ -145,6 +150,7 @@ export function CampaignSweepWork({ clientId, campaignId }: { clientId: string; 
           <p className="font-medium">{work.item_key.replaceAll("_", " ")} · {route} v{version}</p>
           <span className="text-xs">{shownState.replaceAll("_", " ")}</span>
         </div>
+        <p className="mt-1 break-all text-xs text-muted-foreground">Request ID: <code>{work.id}</code></p>
         <p className="mt-1 text-xs text-muted-foreground">
           {[work.expected_output.platform, work.expected_output.media_type,
             work.expected_output.content_format].filter(Boolean).join(" · ")}
@@ -153,6 +159,8 @@ export function CampaignSweepWork({ clientId, campaignId }: { clientId: string; 
         {counts && <p className="mt-1 text-xs text-muted-foreground">
           1 requested · {counts.produced} produced · {counts.rejected} failed or rejected attempts · {counts.revised} revised · {counts.workflow_accepted} passed workflow QA · {counts.human_approved} human approved
         </p>}
+        {counts && <ProductionAttemptComparison clientId={clientId}
+          demandId={work.id} count={counts.attempts} />}
         {shownState === "ready_for_review" && <p className="mt-2 text-xs">Internal QA passed. Review the exact asset before distribution.</p>}
         {(work.effective_blocker ?? work.blocker) && <p className="mt-2 text-xs text-destructive">{work.effective_blocker ?? work.blocker}</p>}
         {blocked.map((step) => <div key={step.id} className="mt-2 flex flex-wrap items-center gap-2 text-xs">

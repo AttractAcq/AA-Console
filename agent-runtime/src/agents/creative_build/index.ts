@@ -58,12 +58,14 @@ import {
 } from "./frameRemake.js";
 import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
+import { attestCreativeAssetBytes } from "../../creative/attest-asset-route.js";
+import { reusableFramedRenderAsset, reusableGeneratedAsset } from "./generatedAsset.js";
 import { compositionNote, frameVerdict, isNearlyBlank, measureComposition } from "./screen.js";
 
 class RecruitmentApprovalHold extends Error {}
 
 /** Review ambiguous compositions; prevent an almost-empty frame being filed. */
-async function noteComposition(
+export async function noteComposition(
   sb: SupabaseClient,
   jobId: string,
   bytes: Buffer,
@@ -73,8 +75,9 @@ async function noteComposition(
   try {
     measured = await measureComposition(bytes);
   } catch {
-    // A decoder quirk should not lose an otherwise usable paid render.
-    return;
+    // A file the decoder cannot open cannot be previewed or reviewed as an
+    // image, even if the provider returned a successful response.
+    throw new RenderError("The generated frame is not a readable image. Rebuild this frame.", false);
   }
   const blank = isNearlyBlank(measured);
   await appendEvent(sb, jobId, `${label}: ${compositionNote(measured)}`,
@@ -637,6 +640,31 @@ export async function runCreativeBuildJob(
     return { ok: false, retryable: false, failureMessage: error.message };
   }
 
+  // A previous attempt may have filed the complete set, then failed while
+  // attesting bytes or saving its final status. Recover that exact asset
+  // before another concept or frame call can change files under review.
+  if (isFramed) {
+    const existingAssetId = await reusableFramedRenderAsset(
+      sb, String(job.client_id), typed.id, renderId,
+      openingShots ? "video" : "image", openingShots ? "reel" : typed.content_format,
+    );
+    if (existingAssetId) {
+      await attestCreativeAssetBytes(sb, String(job.client_id), existingAssetId);
+      await sb.from("creative_renders").update({
+        status: "done", asset_id: existingAssetId, error: null,
+        updated_at: new Date().toISOString(),
+      }).eq("id", renderId);
+      await sb.from("creative_generations").update({
+        stage: "done", asset_id: existingAssetId, error: null,
+        updated_at: new Date().toISOString(),
+      }).eq("id", generationId);
+      await markBriefComplete(sb, typed.id);
+      await appendEvent(sb, job.id, "Verified the existing framed asset after a partial render attempt; no new image was generated.");
+      if (!openingShots && !remake) await handOffToSlot(sb, job, "creative_build");
+      return { ok: true, retryable: false };
+    }
+  }
+
   // ---- stage one: the concept -------------------------------------------
   await appendEvent(
     sb,
@@ -882,14 +910,17 @@ Call ${submitTool.name} once when you are done.`;
 
     const path = `${job.client_id}/generated/${renderId}.md`;
     const document = [`# ${String(concept.headline ?? typed.title)}`, "", body, "", `**Call to action:** ${String(concept.call_to_action ?? "")}`].join("\n");
+    const existingAssetId = await reusableGeneratedAsset(sb, String(job.client_id), typed.id, path, "text");
+    const documentBytes = Buffer.from(document, "utf8");
     const { error: uploadError } = await sb.storage
       .from(BUCKET)
-      .upload(path, Buffer.from(document, "utf8"), {
+      .upload(path, documentBytes, {
         contentType: "text/markdown", upsert: true, cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS,
       });
     if (uploadError) throw new Error(`Could not store the copy: ${uploadError.message}`);
 
-    const assetId = await insertAsset(sb, job, typed, path, "text");
+    const assetId = existingAssetId ?? await insertAsset(sb, job, typed, path, "text");
+    await attestCreativeAssetBytes(sb, String(job.client_id), assetId, documentBytes);
     await sb
       .from("creative_renders")
       .update({
@@ -1011,6 +1042,7 @@ Call ${submitTool.name} once when you are done.`;
       p_frames: finished,
     });
     if (saveError) throw new Error(`Could not file the rebuilt ${typed.content_format}: ${saveError.message}`);
+    await attestCreativeAssetBytes(sb, String(job.client_id), remadeId as string);
 
     await sb
       .from("creative_renders")
@@ -1154,6 +1186,7 @@ Call ${submitTool.name} once when you are done.`;
       p_frames: filedFrames,
     });
     if (saveError) throw new Error(`Could not file the ${filedFormat}: ${saveError.message}`);
+    await attestCreativeAssetBytes(sb, String(job.client_id), framedId as string);
 
     await sb
       .from("creative_renders")
@@ -1273,6 +1306,7 @@ Call ${submitTool.name} once when you are done.`;
   }
 
   const path = `${job.client_id}/generated/${renderId}.${final.extension}`;
+  const existingAssetId = await reusableGeneratedAsset(sb, String(job.client_id), typed.id, path, "image");
   const { error: uploadError } = await sb.storage
     .from(BUCKET)
     .upload(path, final.bytes, {
@@ -1280,7 +1314,8 @@ Call ${submitTool.name} once when you are done.`;
     });
   if (uploadError) throw new Error(`Could not store the image: ${uploadError.message}`);
 
-  const assetId = await insertAsset(sb, job, typed, path, "image");
+  const assetId = existingAssetId ?? await insertAsset(sb, job, typed, path, "image");
+  await attestCreativeAssetBytes(sb, String(job.client_id), assetId, final.bytes);
   await sb
     .from("creative_renders")
     .update({

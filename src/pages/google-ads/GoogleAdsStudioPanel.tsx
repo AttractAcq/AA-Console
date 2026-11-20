@@ -7,6 +7,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { dayOrDash } from "../../lib/contentRecords";
 import { enqueueAgentJob, supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
+import { PaidOperatorBundles } from "../distribution/PaidOperatorBundles";
 import { GoogleOperatorBundlePanel } from "./GoogleOperatorBundlePanel";
 import { GoogleAdsReadPanel } from "./GoogleAdsReadPanel";
 
@@ -48,6 +49,10 @@ interface Derived {
  */
 export function GoogleAdsStudioPanel({ tab }: { tab: Tab }) {
   const { clientId } = useParams<{ clientId: string }>();
+  return <GoogleAdsStudioForClient key={clientId ?? "no-client"} clientId={clientId} tab={tab} />;
+}
+
+function GoogleAdsStudioForClient({ clientId, tab }: { clientId: string | undefined; tab: Tab }) {
   const [due, setDue] = useState<SheetDue[]>([]);
   const [sheets, setSheets] = useState<Sheet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,7 +123,7 @@ export function GoogleAdsStudioPanel({ tab }: { tab: Tab }) {
       {tab === "sheet" && (
         <div className="space-y-4">
           <p className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
-            Google search copy still needs a human writer and keyword research. The exact manual operator bundle below can be reviewed for handoff; the automated Google Ads build remains held.
+            Campaign-bound Google search copy can be produced and reviewed in the campaign flow. Keyword research remains a human operator task. The manual sheet bundle below remains available for a separate handoff; the automated Google Ads build remains held.
           </p>
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="font-semibold">The build a person does by hand</h3>
@@ -259,6 +264,7 @@ export function GoogleAdsStudioPanel({ tab }: { tab: Tab }) {
               )}
             </section>
           )}
+          <PaidOperatorBundles clientId={clientId} platform="google" />
           <GoogleOperatorBundlePanel sheets={sheets} />
         </div>
       )}

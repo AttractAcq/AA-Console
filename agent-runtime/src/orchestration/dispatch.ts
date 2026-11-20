@@ -36,10 +36,12 @@ import { runCopywriterJob } from "../agents/copywriter/index.js";
 import { runTokenHealthJob } from "../agents/token_health/index.js";
 import { runQaJob } from "../agents/qa/index.js";
 import { runPublisherJob } from "../agents/publisher/index.js";
+import { runOrganicReadbackReconciliationJob } from "../agents/organic_readback_reconciler/index.js";
 import { runCampaignActionJob } from "../campaigns/actions/executor.js";
 import { runCampaignBudgetReconciliationJob } from "../campaigns/actions/budget-reconciliation-job.js";
 import { runCampaignPageReconciliationJob } from "../campaigns/actions/page-reconciliation-job.js";
 import { runProofPlacerJob } from "../proof-distribution/placer.js";
+import { runProofPlacementReadbackJob } from "../proof-distribution/readback-job.js";
 import { runLeadMagnetCourierJob } from "../lead-magnets/courier.js";
 import { runOutboundCourierJob } from "../outbound/courier.js";
 import { runNurtureSequencerJob } from "../outbound/sequencer.js";
@@ -51,7 +53,9 @@ import { runMetaProfileReconciliationJob } from "../profiles/meta-profile-reconc
 import { runGoogleReplySenderJob } from "../google-profile/reply-job.js";
 import { runGoogleReplyReconciliationJob } from "../google-profile/reply-reconciliation-job.js";
 import { runGoogleAdsSheetJob } from "../agents/google_ads_sheet/index.js";
+import { runGoogleSearchCopyJob } from "../agents/google_search_copy/index.js";
 import { runGoogleAdsReadJob } from "../agents/google_ads_read/index.js";
+import { runGoogleProfileMetricsReadJob } from "../agents/google_profile_metrics_read/index.js";
 import { runMetaAdsReadJob } from "../agents/meta_ads_read/index.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
 import { runClientApprovalDispatchJob } from "../agents/client_approval_dispatch/index.js";
@@ -170,6 +174,7 @@ const RUNNERS: Record<string, JobRunner> = {
   // client: two switches, so turning it on for one account is not turning
   // it on for every account.
   publisher: runPublisherJob,
+  organic_readback_reconciler: runOrganicReadbackReconciliationJob,
   // Held before any generic claim. The released SQL claim has no atomic
   // handler-owned action-key filter; a separate registry read can race a
   // support-bit change. CAMPAIGN_ACTIONS_ENABLED does not lift the hold.
@@ -179,6 +184,7 @@ const RUNNERS: Record<string, JobRunner> = {
   // without agreeing to their customer's words going on a third party's
   // profile.
   proof_placer: runProofPlacerJob,
+  proof_placement_reconciler: runProofPlacementReadbackJob,
   // Keeping the one promise this system makes directly to a stranger: the
   // exact file somebody approved, once. Re-hashes the bytes before every
   // send, because a path can be overwritten after it is approved.
@@ -214,7 +220,9 @@ const RUNNERS: Record<string, JobRunner> = {
   // object written out for a hand build. Reads only, calls nothing, and holds
   // no credential — so it works precisely when the automated path does not.
   google_ads_sheet: runGoogleAdsSheetJob,
+  google_search_copy: runGoogleSearchCopyJob,
   google_ads_read: runGoogleAdsReadJob,
+  google_profile_metrics_read: runGoogleProfileMetricsReadJob,
   meta_ads_read: runMetaAdsReadJob,
   // outcome until that product decision is made.
 };

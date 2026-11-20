@@ -19,7 +19,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   createCampaignFromOpportunity,
+  fetchOpportunityOfferVersions,
   fetchOpportunities,
+  fetchOpportunityOutputs,
   fetchReadiness,
   fetchOpportunityApprovalStates,
   fetchOpportunityActivationStates,
@@ -27,14 +29,19 @@ const {
   fetchStageTemplates,
   setStageTemplate,
   fetchOpenProposals,
+  fetchEvaluationInputHash,
+  fetchStrategyReviewHash,
   acceptScoreProposal,
+  acceptStrategyProposal,
   rejectProposal,
   requestEvaluation,
   requestStrategy,
   rpc,
 } = vi.hoisted(() => ({
   createCampaignFromOpportunity: vi.fn(),
+  fetchOpportunityOfferVersions: vi.fn(),
   fetchOpportunities: vi.fn(),
+  fetchOpportunityOutputs: vi.fn(),
   fetchReadiness: vi.fn(),
   fetchOpportunityApprovalStates: vi.fn(),
   fetchOpportunityActivationStates: vi.fn(),
@@ -42,7 +49,10 @@ const {
   fetchStageTemplates: vi.fn(),
   setStageTemplate: vi.fn(),
   fetchOpenProposals: vi.fn(),
+  fetchEvaluationInputHash: vi.fn(),
+  fetchStrategyReviewHash: vi.fn(),
   acceptScoreProposal: vi.fn(),
+  acceptStrategyProposal: vi.fn(),
   rejectProposal: vi.fn(),
   requestEvaluation: vi.fn(),
   requestStrategy: vi.fn(),
@@ -57,7 +67,9 @@ vi.mock("../../lib/opportunities", async () => {
   return {
     ...actual,
     createCampaignFromOpportunity,
+    fetchOpportunityOfferVersions,
     fetchOpportunities,
+    fetchOpportunityOutputs,
     fetchReadiness,
     fetchOpportunityApprovalStates,
     fetchOpportunityActivationStates,
@@ -67,7 +79,10 @@ vi.mock("../../lib/opportunities", async () => {
     fetchStageTemplates,
     setStageTemplate,
     fetchOpenProposals,
+    fetchEvaluationInputHash,
+    fetchStrategyReviewHash,
     acceptScoreProposal,
+    acceptStrategyProposal,
     rejectProposal,
     requestEvaluation,
     requestStrategy,
@@ -119,17 +134,91 @@ const readiness = (over: Record<string, unknown> = {}) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  search.value = "";
   fetchOpportunities.mockResolvedValue([opportunity()]);
+  fetchOpportunityOutputs.mockResolvedValue(new Map());
   fetchReadiness.mockResolvedValue(readiness());
   fetchOpportunityApprovalStates.mockResolvedValue(new Map([["opp-1", "current"]]));
   fetchOpportunityActivationStates.mockResolvedValue(new Map([["opp-1", "current"]]));
   createCampaignFromOpportunity.mockResolvedValue({ id: "camp-1", name: "Garage-to-Gym Conversion" });
+  fetchOpportunityOfferVersions.mockResolvedValue([{ id: "version-1", label: "Garage v1" }]);
   fetchOpenProposals.mockResolvedValue([]);
+  fetchEvaluationInputHash.mockResolvedValue("a".repeat(64));
+  fetchStrategyReviewHash.mockResolvedValue("b".repeat(64));
   acceptScoreProposal.mockResolvedValue(undefined);
+  acceptStrategyProposal.mockResolvedValue(undefined);
   rejectProposal.mockResolvedValue(undefined);
   requestEvaluation.mockResolvedValue(undefined);
   requestStrategy.mockResolvedValue(undefined);
   rpc.mockResolvedValue({ data: "approval-1", error: null });
+});
+
+describe("single-page opportunity flow", () => {
+  it("shows linked offers and campaigns on the selected record", async () => {
+    search.value = "opportunity=opp-1";
+    fetchOpportunityOutputs.mockResolvedValue(new Map([["opp-1", {
+      offers: [{ id: "offer-1", name: "Garage Refit", kind: "secondary" }],
+      campaigns: [{ id: "campaign-1", name: "Winter Refit", status: "planning", archived: false }],
+    }]]));
+    render(<MarketOpportunitiesPanel />);
+    const linked = await screen.findByRole("region", { name: "Linked work" });
+    expect(within(linked).getByRole("link", { name: "Garage Refit" }))
+      .toHaveAttribute("href", "/clients/client-1/delivery/offer-studio?offer=offer-1");
+    expect(within(linked).getByRole("link", { name: "Winter Refit" }))
+      .toHaveAttribute("href", "/clients/client-1/delivery/campaign-factory/campaign-1");
+  });
+
+  it("shows an unavailable state when linked work cannot be read", async () => {
+    search.value = "opportunity=opp-1";
+    fetchOpportunityOutputs.mockRejectedValue(new Error("permission denied"));
+    render(<MarketOpportunitiesPanel />);
+    expect(await screen.findByRole("alert", { name: "" })).toHaveTextContent("Links unavailable: permission denied");
+    expect(screen.queryByText("No linked offers or campaigns yet.")).not.toBeInTheDocument();
+  });
+
+  it("searches buying situations and filters opportunity status", async () => {
+    fetchOpportunities.mockResolvedValue([
+      opportunity(),
+      opportunity({
+        id: "opp-2", name: "Clinic Relaunch", status: "active",
+        micro_market: "Patients returning to a new clinic",
+        buying_situation: "They need a local appointment",
+      }),
+    ]);
+    render(<MarketOpportunitiesPanel />);
+    const table = await screen.findByRole("table");
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search opportunities" }), "local appointment");
+    expect(within(table).getByRole("button", { name: "Clinic Relaunch" })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Garage-to-Gym Conversion" })).not.toBeInTheDocument();
+    await userEvent.clear(screen.getByRole("searchbox", { name: "Search opportunities" }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Status" }), "active");
+    expect(within(table).getByRole("button", { name: "Clinic Relaunch" })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Garage-to-Gym Conversion" })).not.toBeInTheDocument();
+  });
+
+  it("shows the overview and the selected record together", async () => {
+    search.value = "opportunity=opp-1";
+    render(<MarketOpportunitiesPanel />);
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Garage-to-Gym Conversion details" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /evaluate/i })).toHaveAttribute("aria-current", "step");
+    expect(screen.getByText("Latest score")).toBeInTheDocument();
+  });
+
+  it("opens the selected activation record from an old tab link", async () => {
+    search.value = "tab=activate&opportunity=opp-1";
+    render(<MarketOpportunitiesPanel />);
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /activate/i })).toHaveAttribute("aria-current", "step");
+    expect(screen.getByText("Open proof gaps")).toBeInTheDocument();
+  });
+
+  it("opens evaluation from a campaign link", async () => {
+    search.value = "view=evaluate&opportunity=opp-1";
+    render(<MarketOpportunitiesPanel />);
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /evaluate/i })).toHaveAttribute("aria-current", "step");
+  });
 });
 
 /** What the Evaluate agent writes: factors, their reasoning, and the case. */
@@ -141,6 +230,7 @@ const scoreProposal = (over: Record<string, unknown> = {}) => ({
   payload: {
     factors: { economic_value: 90 },
     reasoning: { economic_value: "Highest-margin job they do." },
+    input_hash: "a".repeat(64),
   },
   rationale: "Strong value, proof is the gap.",
   proposed_by: "opportunity_evaluate",
@@ -150,6 +240,25 @@ const scoreProposal = (over: Record<string, unknown> = {}) => ({
   resolved_by: null,
   resolved_at: null,
   rejection_reason: null,
+  ...over,
+});
+
+const strategyProposal = (over: Record<string, unknown> = {}) => scoreProposal({
+  id: "prop-strategy",
+  kind: "strategy",
+  payload: {
+    fields: {
+      core_problem: "No training space",
+      desired_outcome: "A home gym",
+      purchase_trigger: "Winter",
+      entry_awareness: "problem_aware",
+      positioning: "The room you already own",
+      conversion_action: "Book a survey",
+    },
+    review_hash: "b".repeat(64),
+  },
+  rationale: "The garage has unused capacity.",
+  proposed_by: "opportunity_strategise",
   ...over,
 });
 
@@ -228,15 +337,17 @@ describe("creating the campaign", () => {
     await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
 
     expect(
-      await screen.findByText(/cannot be changed afterwards/),
+      await screen.findByText(/choice is fixed after creation/),
     ).toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText(/Route/), "paid");
+    await user.selectOptions(await screen.findByLabelText(/Approved secondary offer version/), "version-1");
     await user.selectOptions(screen.getByLabelText(/Paid platform/), "meta");
     await user.click(screen.getByRole("button", { name: "Create and plan" }));
 
     await waitFor(() =>
       expect(createCampaignFromOpportunity).toHaveBeenCalledWith({
         opportunityId: "opp-1",
+        offerVersionId: "version-1",
         acquisitionMode: "paid",
         paidPlatform: "meta",
         name: "",
@@ -265,12 +376,14 @@ describe("creating the campaign", () => {
     await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
 
     await user.selectOptions(screen.getByLabelText(/Route/), "both");
+    await user.selectOptions(await screen.findByLabelText(/Approved secondary offer version/), "version-1");
     await user.selectOptions(screen.getByLabelText(/Paid platform/), "google");
     await user.click(screen.getByRole("button", { name: "Create and plan" }));
 
     await waitFor(() =>
       expect(createCampaignFromOpportunity).toHaveBeenCalledWith({
         opportunityId: "opp-1",
+        offerVersionId: "version-1",
         acquisitionMode: "both",
         paidPlatform: "google",
         name: "",
@@ -284,6 +397,7 @@ describe("creating the campaign", () => {
     const user = userEvent.setup();
     await openActions();
     await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
+    await user.selectOptions(await screen.findByLabelText(/Approved secondary offer version/), "version-1");
     await user.selectOptions(screen.getByLabelText(/Route/), "both");
     await user.click(screen.getByRole("button", { name: "Create and plan" }));
 
@@ -291,10 +405,23 @@ describe("creating the campaign", () => {
     expect(createCampaignFromOpportunity).not.toHaveBeenCalled();
   });
 
+  it("holds campaign creation when this opportunity has no signed secondary offer", async () => {
+    fetchOpportunityOfferVersions.mockResolvedValue([]);
+    const user = userEvent.setup();
+    await openActions();
+    await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
+    await user.selectOptions(screen.getByLabelText(/Route/), "organic");
+    await user.click(screen.getByRole("button", { name: "Create and plan" }));
+    expect(await screen.findByText(/No signed secondary offer version/)).toBeInTheDocument();
+    expect(createCampaignFromOpportunity).not.toHaveBeenCalled();
+    expect(enqueueAgentJob).not.toHaveBeenCalled();
+  });
+
   it("asks for a platform before letting a paid campaign through", async () => {
     const user = userEvent.setup();
     await openActions();
     await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
+    await user.selectOptions(await screen.findByLabelText(/Approved secondary offer version/), "version-1");
     await user.selectOptions(screen.getByLabelText(/Route/), "paid");
     await user.click(screen.getByRole("button", { name: "Create and plan" }));
 
@@ -309,6 +436,7 @@ describe("creating the campaign", () => {
     );
     await openActions();
     await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
+    await user.selectOptions(await screen.findByLabelText(/Approved secondary offer version/), "version-1");
     await user.selectOptions(screen.getByLabelText(/Route/), "organic");
     await user.click(screen.getByRole("button", { name: "Create and plan" }));
 
@@ -500,7 +628,7 @@ describe("the Discover table carries the whole progression", () => {
     fetchOpportunities.mockResolvedValue([opportunity({ status: "active" })]);
     render(<MarketOpportunitiesPanel view="discover" />);
     expect(await screen.findByRole("columnheader", { name: "Status" })).toBeInTheDocument();
-    expect(screen.getByText("active")).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "active" })).toBeInTheDocument();
   });
 });
 
@@ -610,9 +738,39 @@ describe("asking an agent, and deciding on what it says", () => {
     search.value = "opportunity=opp-1";
     fetchOpenProposals.mockResolvedValue([scoreProposal()]);
     render(<MarketOpportunitiesPanel view="evaluate" />);
-    await userEvent.click(await screen.findByRole("button", { name: "Accept this score" }));
+    const accept = await screen.findByRole("button", { name: "Accept this score" });
+    await waitFor(() => expect(accept).toBeEnabled());
+    await userEvent.click(accept);
     await waitFor(() => expect(acceptScoreProposal).toHaveBeenCalledWith("prop-1"));
     expect(acceptScoreProposal).toHaveBeenCalledTimes(1);
+  });
+
+  it("holds a score when its source fingerprint changed", async () => {
+    search.value = "opportunity=opp-1";
+    fetchOpenProposals.mockResolvedValue([scoreProposal()]);
+    fetchEvaluationInputHash.mockResolvedValue("b".repeat(64));
+    render(<MarketOpportunitiesPanel view="evaluate" />);
+    expect(await screen.findByText("Evaluation inputs changed. Request a new evaluation.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Accept this score" })).toBeDisabled();
+  });
+
+  it("holds historical and unreadable score sources", async () => {
+    search.value = "opportunity=opp-1";
+    fetchOpenProposals.mockResolvedValue([scoreProposal({
+      payload: { factors: { economic_value: 90 }, reasoning: {}, input_hash: null },
+    })]);
+    render(<MarketOpportunitiesPanel view="evaluate" />);
+    expect(await screen.findByText("This older proposal has no source snapshot. Request a new evaluation.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Accept this score" })).toBeDisabled();
+  });
+
+  it("keeps acceptance held when the current source check fails", async () => {
+    search.value = "opportunity=opp-1";
+    fetchOpenProposals.mockResolvedValue([scoreProposal()]);
+    fetchEvaluationInputHash.mockRejectedValue(new Error("Read unavailable"));
+    render(<MarketOpportunitiesPanel view="evaluate" />);
+    expect(await screen.findByText("Source check unavailable: Read unavailable")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Accept this score" })).toBeDisabled();
   });
 
   it("requires a reason before rejecting", async () => {
@@ -625,23 +783,31 @@ describe("asking an agent, and deciding on what it says", () => {
     prompt.mockRestore();
   });
 
-  it("sends a strategy proposal to the editors rather than offering one-click apply", async () => {
-    // Those six fields already have editors in the Strategise view. A second
-    // write path for them would be two places to change the same thing.
+  it("reviews and corrects the exact strategy proposal in Strategise", async () => {
     search.value = "opportunity=opp-1";
-    fetchOpenProposals.mockResolvedValue([
-      scoreProposal({
-        id: "prop-2",
-        kind: "strategy",
-        payload: { fields: { positioning: "The room you already own" } },
-        proposed_by: "opportunity_strategise",
-      }),
-    ]);
-    render(<MarketOpportunitiesPanel view="evaluate" />);
-    expect(await screen.findByText("A strategy is proposed")).toBeInTheDocument();
-    expect(screen.getByText("The room you already own")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Accept this score" })).not.toBeInTheDocument();
-    expect(screen.getByText(/Apply these in the Strategise view/)).toBeInTheDocument();
+    fetchOpenProposals.mockResolvedValue([strategyProposal()]);
+    render(<MarketOpportunitiesPanel view="strategize" />);
+    const card = within((await screen.findByText("Review proposed strategy fields")).closest("section")!);
+    expect(card.getByText("The garage has unused capacity.")).toBeInTheDocument();
+    const accept = card.getByRole("button", { name: "Apply reviewed fields" });
+    await waitFor(() => expect(accept).toBeEnabled());
+    await userEvent.clear(card.getByRole("textbox", { name: "Problem" }));
+    await userEvent.type(card.getByRole("textbox", { name: "Problem" }), "No room to train");
+    await userEvent.type(card.getByRole("textbox", { name: "Review note (optional)" }), "Corrected the wording");
+    await userEvent.click(accept);
+    await waitFor(() => expect(acceptStrategyProposal).toHaveBeenCalledWith(
+      "prop-strategy", expect.objectContaining({ core_problem: "No room to train" }),
+      "Corrected the wording",
+    ));
+  });
+
+  it("holds a strategy proposal when its review snapshot is stale", async () => {
+    search.value = "opportunity=opp-1";
+    fetchOpenProposals.mockResolvedValue([strategyProposal()]);
+    fetchStrategyReviewHash.mockResolvedValue("c".repeat(64));
+    render(<MarketOpportunitiesPanel view="strategize" />);
+    expect(await screen.findByText("Strategy sources changed. Request a new strategy run.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply reviewed fields" })).toBeDisabled();
   });
 
   it("shows only the open proposals for the opportunity in front of you", async () => {

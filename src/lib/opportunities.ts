@@ -101,6 +101,75 @@ export async function fetchOpportunities(clientId: string): Promise<Opportunity[
   return (data ?? []) as unknown as Opportunity[];
 }
 
+export interface OpportunityOutputs {
+  offers: Array<{ id: string; name: string; kind: string }>;
+  campaigns: Array<{ id: string; name: string; status: string; archived: boolean }>;
+}
+
+/** Candidate signed secondary versions; the creation RPC rechecks source currency. */
+export async function fetchOpportunityOfferVersions(clientId: string, opportunityId: string): Promise<Array<{ id: string; label: string }>> {
+  const [links, offers, versions, signoffs] = await Promise.all([
+    supabase.from("opportunity_links").select("offer_id")
+      .eq("client_id", clientId).eq("opportunity_id", opportunityId).eq("role", "offer"),
+    supabase.from("service_offers").select("id,service_name,kind").eq("client_id", clientId),
+    supabase.from("service_offer_versions").select("id,offer_id,version,promise").eq("client_id", clientId),
+    supabase.from("service_offer_signoffs").select("offer_version_id").eq("client_id", clientId),
+  ]);
+  const error = links.error ?? offers.error ?? versions.error ?? signoffs.error;
+  if (error) throw new Error(error.message);
+  const linked = new Set((links.data ?? []).map((row) => row.offer_id));
+  const names = new Map((offers.data ?? [])
+    .filter((offer) => offer.kind === "secondary" && linked.has(offer.id))
+    .map((offer) => [offer.id, offer.service_name]));
+  const latest = new Map<string, number>();
+  for (const version of versions.data ?? []) {
+    if (names.has(version.offer_id)) latest.set(version.offer_id,
+      Math.max(latest.get(version.offer_id) ?? 0, version.version));
+  }
+  const signed = new Set((signoffs.data ?? []).map((row) => row.offer_version_id));
+  return (versions.data ?? [])
+    .filter((version) => names.has(version.offer_id) && signed.has(version.id)
+      && version.version === latest.get(version.offer_id))
+    .map((version) => ({ id: version.id,
+      label: `${names.get(version.offer_id)} v${version.version} · ${version.promise.slice(0, 90)}` }));
+}
+
+/** Client-scoped references made from an opportunity, including archived campaigns. */
+export async function fetchOpportunityOutputs(clientId: string): Promise<Map<string, OpportunityOutputs>> {
+  const [linksResult, offersResult, campaignsResult] = await Promise.all([
+    supabase.from("opportunity_links")
+      .select("opportunity_id,role,offer_id,campaign_id").eq("client_id", clientId),
+    supabase.from("service_offers")
+      .select("id,service_name,kind").eq("client_id", clientId),
+    supabase.from("client_campaigns")
+      .select("id,name,status,archived_at").eq("client_id", clientId),
+  ]);
+  const error = linksResult.error ?? offersResult.error ?? campaignsResult.error;
+  if (error) throw new Error(error.message);
+
+  const offers = new Map((offersResult.data ?? []).map((offer) => [offer.id, offer]));
+  const campaigns = new Map((campaignsResult.data ?? []).map((campaign) => [campaign.id, campaign]));
+  const outputs = new Map<string, OpportunityOutputs>();
+  for (const link of linksResult.data ?? []) {
+    if (link.role !== "offer" && link.role !== "campaign") continue;
+    const current = outputs.get(link.opportunity_id) ?? { offers: [], campaigns: [] };
+    if (link.role === "offer" && link.offer_id) {
+      const offer = offers.get(link.offer_id);
+      if (!offer) throw new Error("A linked offer could not be read.");
+      current.offers.push({ id: offer.id, name: offer.service_name, kind: offer.kind });
+    } else if (link.role === "campaign" && link.campaign_id) {
+      const campaign = campaigns.get(link.campaign_id);
+      if (!campaign) throw new Error("A linked campaign could not be read.");
+      current.campaigns.push({
+        id: campaign.id, name: campaign.name, status: campaign.status,
+        archived: campaign.archived_at !== null,
+      });
+    }
+    outputs.set(link.opportunity_id, current);
+  }
+  return outputs;
+}
+
 export async function fetchOpportunityApprovalStates(clientId: string): Promise<Map<string, string>> {
   const { data, error } = await supabase.from("opportunity_approval_state_v6")
     .select("opportunity_id,approval_state")
@@ -243,11 +312,10 @@ export const CLASSIFICATION_HINT: Record<string, string> = {
 /**
  * Create one campaign from this opportunity, on one route.
  *
- * The reasoning, the linked offer version and the link back are the
- * database's to assemble: migration 232 composes the brief from the
- * opportunity's own fields so that every caller gets the same brief from the
- * same opportunity, and re-reads readiness rather than trusting the approval
- * that happened weeks ago.
+ * The reasoning and link back are the database's to assemble. The v7 writer
+ * binds the selected, signed secondary offer version and composes the brief
+ * from the opportunity's current fields. It re-reads approval and readiness
+ * rather than trusting an earlier screen load.
  *
  * It deliberately does not plan the campaign. Planning is a job with a cost,
  * and the caller queues it in the same breath it would for a hand-made
@@ -255,12 +323,14 @@ export const CLASSIFICATION_HINT: Record<string, string> = {
  */
 export async function createCampaignFromOpportunity(args: {
   opportunityId: string;
+  offerVersionId: string;
   acquisitionMode: "organic" | "paid" | "both";
   paidPlatform?: "meta" | "google" | null;
   name?: string | null;
 }): Promise<{ id: string; name: string }> {
-  const { data, error } = await supabase.rpc("create_campaign_from_opportunity_v6", {
+  const { data, error } = await supabase.rpc("create_campaign_from_opportunity_v7", {
     p_opportunity_id: args.opportunityId,
+    p_offer_version_id: args.offerVersionId,
     p_acquisition_mode: args.acquisitionMode,
     // Both optional arguments are left out rather than passed as null. They
     // default to null in SQL, and the generated type says optional rather
@@ -422,6 +492,39 @@ export async function fetchOpenProposals(clientId: string): Promise<OpportunityP
     .order("proposed_at", { ascending: false });
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+export async function fetchEvaluationInputHash(opportunityId: string): Promise<string> {
+  const { data, error } = await supabase.rpc("opportunity_evaluation_input_hash_v7", {
+    p_opportunity_id: opportunityId,
+  });
+  if (error) throw new Error(error.message);
+  if (typeof data !== "string" || !/^[0-9a-f]{64}$/.test(data)) {
+    throw new Error("The current evaluation inputs could not be checked.");
+  }
+  return data;
+}
+
+export async function fetchStrategyReviewHash(opportunityId: string): Promise<string> {
+  const { data, error } = await supabase.rpc("opportunity_strategy_input_hash_v7", {
+    p_opportunity_id: opportunityId,
+  });
+  if (error) throw new Error(error.message);
+  if (typeof data !== "string" || !/^[0-9a-f]{64}$/.test(data)) {
+    throw new Error("The current strategy sources could not be checked.");
+  }
+  return data;
+}
+
+export async function acceptStrategyProposal(
+  proposalId: string, fields: Record<string, string>, note?: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("accept_opportunity_strategy_proposal_v7", {
+    p_proposal_id: proposalId,
+    p_fields: fields,
+    ...(note?.trim() ? { p_note: note.trim() } : {}),
+  });
+  if (error) throw new Error(error.message);
 }
 
 export async function requestEvaluation(clientId: string, opportunityId: string): Promise<void> {

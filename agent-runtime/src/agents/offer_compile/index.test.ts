@@ -20,12 +20,19 @@ const good = () => ({
   promise: "A garage you can train in, without losing the storage you need",
   inclusions: ["Insulation and damp-proofing", "Rubber flooring", "Lighting and power"],
   exclusions: ["Gym equipment", "Planning permission where required"],
+  value_equation: {
+    dream_outcome: "A usable garage gym", dream_outcome_boost: "Designed for the available space",
+    likelihood: "The build follows a reviewed plan", likelihood_mechanism: "Survey and scoped plan",
+    time_delay: "Installation follows the agreed plan", delay_reduction_steps: ["Survey before build"],
+    effort_sacrifice: "One planning call", effort_reduction_steps: ["Builder handles the work"],
+    risk_reversal: "", bonuses: [], scarcity: "", urgency: "", delivery_limits: "",
+  },
 });
 
 it("uses a strict Anthropic object schema for compiled offers", () => {
   expect(submitTool.inputSchema.additionalProperties).toBe(false);
   expect(submitTool.inputSchema.required).toEqual([
-    "service_name", "audience", "promise", "inclusions", "exclusions",
+    "service_name", "audience", "promise", "inclusions", "exclusions", "value_equation",
   ]);
 });
 
@@ -44,6 +51,7 @@ it("passes the complete RPC signature and keeps unverified economics empty", () 
     p_currency: null,
     p_delivery_cost_estimate: null,
     p_claims: [],
+    p_value_equation: checked.valueEquation,
     p_idempotency_key: "job-1:1",
   });
 });
@@ -110,6 +118,7 @@ describe("a usable offer", () => {
       promise: good().promise,
       inclusions: ["Insulation"],
       exclusions: good().exclusions,
+      valueEquation: good().value_equation,
     });
   });
 });
@@ -159,5 +168,14 @@ describe("what it refuses", () => {
       .toEqual({ error: "The offer came back in a shape this cannot read." });
     expect(validateOffer("an offer"))
       .toEqual({ error: "The offer came back in a shape this cannot read." });
+  });
+
+  it("holds a value equation with missing evidence or malformed bonuses", () => {
+    const missing = good();
+    missing.value_equation.likelihood_mechanism = "";
+    expect(validateOffer(missing)).toHaveProperty("error", expect.stringContaining("likelihood mechanism"));
+    const malformed = good();
+    malformed.value_equation.bonuses = [{ name: "Fast setup", value: "Included", delivery_limit: 3 }] as never[];
+    expect(validateOffer(malformed)).toHaveProperty("error", expect.stringContaining("Each bonus"));
   });
 });

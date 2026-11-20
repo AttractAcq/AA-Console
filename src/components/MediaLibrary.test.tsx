@@ -3,15 +3,18 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { rpc, from, useParams, fetchClientAssets, signPaths, fetchTextBodies } = vi.hoisted(() => ({
+const { rpc, from, useParams, fetchClientAssets, signPaths, fetchTextBodies,
+  requestOrdinaryMediaReview } = vi.hoisted(() => ({
   rpc: vi.fn(),
   from: vi.fn(),
   useParams: vi.fn(),
   fetchClientAssets: vi.fn(),
   signPaths: vi.fn(),
   fetchTextBodies: vi.fn(),
+  requestOrdinaryMediaReview: vi.fn(),
 }));
 vi.mock("../lib/supabase", () => ({ supabase: { rpc, from } }));
+vi.mock("../lib/creativeReview", () => ({ requestOrdinaryMediaReview }));
 vi.mock("react-router-dom", async (original) => ({
   ...(await original<typeof import("react-router-dom")>()), useParams,
 }));
@@ -41,6 +44,7 @@ beforeEach(() => {
   signPaths.mockResolvedValue(new Map());
   fetchTextBodies.mockResolvedValue(new Map());
   rpc.mockResolvedValue({ error: null });
+  requestOrdinaryMediaReview.mockResolvedValue("review-1");
   fetchClientAssets.mockResolvedValue([asset()]);
   const reviews = {
     select: () => reviews,
@@ -74,7 +78,7 @@ describe("approving from the library", () => {
   });
   it("offers the decision on a pending asset", async () => {
     render(<MediaLibrary mediaType="image" />);
-    expect(await screen.findByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Submit for review" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
   });
 
@@ -85,16 +89,30 @@ describe("approving from the library", () => {
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
   });
 
-  it("approves through the same RPC every other screen uses", async () => {
+  it("requests exact review for a pending single-file image", async () => {
     render(<MediaLibrary mediaType="image" />);
-    await userEvent.click(await screen.findByRole("button", { name: "Approve" }));
-    await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("review_media_asset", {
-        p_asset_id: "a1",
-        p_decision: "approved",
-        p_reason: undefined,
-      }),
-    );
+    await userEvent.click(await screen.findByRole("button", { name: "Submit for review" }));
+    await waitFor(() => expect(requestOrdinaryMediaReview)
+      .toHaveBeenCalledWith("client-1", "a1"));
+    expect(rpc).not.toHaveBeenCalledWith("review_media_asset", expect.anything());
+  });
+
+  it("requests exact review of a generated image's finished render", async () => {
+    fetchClientAssets.mockResolvedValue([asset({ render_path: "p/render.png" })]);
+    render(<MediaLibrary mediaType="image" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Submit for review" }));
+    await waitFor(() => expect(requestOrdinaryMediaReview)
+      .toHaveBeenCalledWith("client-1", "a1"));
+    expect(rpc).not.toHaveBeenCalledWith("review_media_asset", expect.anything());
+  });
+
+  it("routes pending carousel creative through exact review", async () => {
+    fetchClientAssets.mockResolvedValue([asset({ content_format: "carousel" })]);
+    render(<MediaLibrary mediaType="image" contentFormat="carousel" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Submit for review" }));
+    await waitFor(() => expect(requestOrdinaryMediaReview)
+      .toHaveBeenCalledWith("client-1", "a1"));
+    expect(rpc).not.toHaveBeenCalledWith("review_media_asset", expect.anything());
   });
 
   // A rejection with no reason sends the maker back with nothing to act on.
@@ -123,10 +141,41 @@ describe("approving from the library", () => {
   });
 
   it("shows a refusal rather than appearing to succeed", async () => {
-    rpc.mockResolvedValue({ error: { message: "Not permitted for this client" } });
+    requestOrdinaryMediaReview.mockRejectedValue(new Error("Not permitted for this client"));
     render(<MediaLibrary mediaType="image" />);
-    await userEvent.click(await screen.findByRole("button", { name: "Approve" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Submit for review" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/Not permitted/i);
+  });
+
+  it("offers a new exact review for an approved file with a stale signoff", async () => {
+    fetchClientAssets.mockResolvedValue([asset({ review_status: "approved", human_approved_at: "2026-09-10T01:00:00Z" })]);
+    const signoffs = { select: () => signoffs, eq: async () => ({
+      data: [{ asset_id: "a1", current_signoff: false }], error: null,
+    }) };
+    from.mockImplementation((table: string) => table === "ordinary_media_current_status_v6"
+      ? signoffs : table === "client_media_frames" ? {
+        select: () => ({ in: async () => ({ data: [], error: null }) }),
+      } : null);
+    render(<MediaLibrary mediaType="image" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Request new review" }));
+    await waitFor(() => expect(requestOrdinaryMediaReview)
+      .toHaveBeenCalledWith("client-1", "a1"));
+  });
+
+  it("offers new review for a stale approved story sequence", async () => {
+    fetchClientAssets.mockResolvedValue([asset({ content_format: "story",
+      review_status: "approved", human_approved_at: "2026-09-10T01:00:00Z" })]);
+    const signoffs = { select: () => signoffs, eq: async () => ({
+      data: [{ asset_id: "a1", current_signoff: false }], error: null,
+    }) };
+    from.mockImplementation((table: string) => table === "ordinary_media_current_status_v6"
+      ? signoffs : table === "client_media_frames" ? {
+        select: () => ({ in: async () => ({ data: [], error: null }) }),
+      } : null);
+    render(<MediaLibrary mediaType="image" contentFormat="story" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Request new review" }));
+    await waitFor(() => expect(requestOrdinaryMediaReview)
+      .toHaveBeenCalledWith("client-1", "a1"));
   });
 });
 
@@ -149,7 +198,7 @@ describe("regenerating an asset", () => {
   it("offers approve and reject instead while it is still pending", async () => {
     fetchClientAssets.mockResolvedValue([withStatus("pending")]);
     render(<MediaLibrary mediaType="image" />);
-    expect(await screen.findByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Submit for review" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Regenerate/i })).not.toBeInTheDocument();
   });
 

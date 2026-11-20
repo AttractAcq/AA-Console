@@ -28,7 +28,7 @@ function hasAdCopy(asset: CampaignAsset): boolean {
   return [asset.ad_primary_text, asset.ad_headline, asset.ad_link_url, asset.ad_cta].some((v) => (v ?? "").trim() !== "");
 }
 
-export function CampaignContentPanel({ clientId, campaignId, contentCount, builtAt, contentIdeasGeneratedAt, template = null, mirrorsTemplate = null, onChanged, refreshToken, layout = "v1" }: {
+export function CampaignContentPanel({ clientId, campaignId, contentCount, builtAt, contentIdeasGeneratedAt, template = null, mirrorsTemplate = null, onChanged, refreshToken, layout = "v1", routePositions }: {
   clientId: string;
   campaignId: string;
   /** The campaign template, which decides which Meta buttons an ad may carry. */
@@ -40,13 +40,16 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
   onChanged: () => void;
   refreshToken?: unknown;
   layout?: "v1" | "v2";
+  /** One-based positions from the reviewed route-specific content specification. */
+  routePositions?: number[];
 }) {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [briefs, setBriefs] = useState<Brief[]>([]);
   const [assets, setAssets] = useState<CampaignAsset[]>([]);
   const [copying, setCopying] = useState<CampaignAsset | null>(null);
   const [landingUrl, setLandingUrl] = useState<string | null>(null);
-  const urls = useSignedPreviewPaths("client-media", assets.map((asset) => asset.storage_path));
+  const urls = useSignedPreviewPaths("client-media", assets.map((asset) =>
+    asset.render_path ?? asset.storage_path));
   const [artifactPackages, setArtifactPackages] = useState<{ briefs: Map<string, string>; assets: Map<string, string>; versions: Map<string, number> }>({ briefs: new Map(), assets: new Map(), versions: new Map() });
   const [building, setBuilding] = useState<Brief | null>(null);
   const [viewing, setViewing] = useState<Brief | null>(null);
@@ -137,7 +140,8 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
 
   const hasOrdinaryInboxRoute = (asset: CampaignAsset) =>
     (asset.media_type === "image" || asset.media_type === "text")
-      && asset.content_format === "single" && !asset.render_path;
+      && ["single", "carousel", "story"].includes(asset.content_format ?? "")
+      && ((asset.content_format ?? "single") === "single" || !asset.render_path);
   const requestCreativeReview = async (asset: CampaignAsset) => {
     if (!hasOrdinaryInboxRoute(asset)) {
       const result = await supabase.rpc("review_media_asset", {
@@ -202,6 +206,14 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
       return idea ? `idea:${idea.id}` : brief ? `brief:${brief.id}` : `asset:${asset.id}`;
     }),
   ).size;
+  const visibleIdeas = routePositions === undefined ? ideas : ideas.filter((idea) =>
+    idea.campaign_position !== null && routePositions.includes(idea.campaign_position));
+  const visibleIdeaIds = new Set(visibleIdeas.map((idea) => idea.id));
+  const visibleReady = routePositions === undefined ? ready : new Set(
+    assets.filter((asset) => asset.review_status === "approved" && asset.storage_path)
+      .map((asset) => asset.brief_id ? briefById.get(asset.brief_id)?.source_idea_id : null)
+      .filter((id): id is string => typeof id === "string" && visibleIdeaIds.has(id)),
+  ).size;
   const busyFor = (id: string, action: BusyAction) => busy?.id === id && busy.action === action;
 
   /**
@@ -217,7 +229,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
         Preview {asset.title ?? "asset"}
       </button>
       <span className="text-xs text-muted-foreground">
-        {asset.review_status === "approved" ? "Ready to distribute" : asset.review_status === "pending" ? "Awaiting approval" : "Rejected"}
+        {asset.review_status === "approved" ? "Creative approved" : asset.review_status === "pending" ? "Awaiting approval" : "Rejected"}
       </span>
       {/* Only an approved single image can be built as a Meta ad. Copy on
           it is what puts it into the campaign's next build. */}
@@ -240,7 +252,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
     <BriefDetailModal brief={viewing} open={viewing !== null} onClose={() => setViewing(null)} />
     <ApproveAndBuildModal brief={building} open={building !== null} onClose={() => setBuilding(null)} onDone={() => { void refresh(); onChanged(); setNotice("Production queued. Assets will appear here for approval."); }} />
     <AdCopyModal asset={copying} brief={copying?.brief_id ? briefById.get(copying.brief_id) ?? null : null} landingUrl={landingUrl} allowedCtas={allowedCtas(template, mirrorsTemplate)} open={copying !== null} onClose={() => setCopying(null)} onSaved={() => { setNotice("Ad copy saved. This asset is in the next Meta build."); void refresh(); }} />
-    <MediaDetailModal asset={preview} url={preview ? urls.get(preview.storage_path) : undefined} open={preview !== null} onClose={() => setPreview(null)} />
+    <MediaDetailModal asset={preview} url={preview ? urls.get(preview.render_path ?? preview.storage_path) : undefined} open={preview !== null} onClose={() => setPreview(null)} onChanged={() => { void refresh(); onChanged(); }} />
   </>;
 
   const v2AssetActions = (asset: CampaignAsset) => <div className="flex flex-wrap gap-2">
@@ -254,7 +266,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
 
   const v2Preview = (asset: CampaignAsset | undefined) => {
     if (!asset) return <span className="text-muted-foreground">Awaiting asset</span>;
-    const url = urls.get(asset.storage_path);
+    const url = urls.get(asset.render_path ?? asset.storage_path);
     return <button type="button" onClick={() => setPreview(asset)} aria-label={`Preview ${asset.title ?? "asset"}`}>
       {asset.media_type === "image" && url ? <img src={url} alt={asset.title ?? "Campaign asset"} className="h-16 w-24 rounded object-cover" />
         : asset.media_type === "video" && url ? <video src={url} className="h-16 w-24 rounded object-cover" muted preload="metadata" />
@@ -269,13 +281,13 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
   };
 
   if (layout === "v2") return <section className="mt-4 space-y-3" aria-label="Campaign content production">
-    <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-semibold">Content production</h3><p className="text-xs text-muted-foreground">{ready} ready to distribute · {contentCount} planned · {ideas.length} ideas</p></div><button type="button" className={buttonClass} onClick={() => void refresh()}>Refresh content</button></div>
+    <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-semibold">Content production</h3><p className="text-xs text-muted-foreground">{visibleReady} creative approved · {contentCount} planned · {visibleIdeas.length} ideas</p></div><button type="button" className={buttonClass} onClick={() => void refresh()}>Refresh content</button></div>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
     {contentCount > 0 && builtAt && !contentIdeasGeneratedAt && <button type="button" className={buttonClass} disabled={busy !== null || loading} onClick={() => void act(() => supabase.rpc("enqueue_agent_job", { p_agent_key: "campaign_plan", p_client_id: clientId, p_input_table: "client_campaigns", p_input_id: campaignId }), "Queued campaign ideas.", { id: campaignId, action: "plan" })}>Generate campaign ideas</button>}
     {contentCount > 0 && !builtAt && <p className="text-xs text-muted-foreground">Run the planner to generate campaign content.</p>}
     {loading ? <p className="text-sm text-muted-foreground">Loading content…</p> : <div className="overflow-x-auto rounded-lg border border-border bg-card"><table className="w-full text-left text-sm"><thead className="border-b border-border bg-muted/40"><tr><th className="p-3">Content piece</th><th className="p-3">Preview</th><th className="p-3">Stage</th><th className="p-3">Brief</th><th className="p-3">Actions</th></tr></thead><tbody>
-      {ideas.map((idea) => {
+      {visibleIdeas.map((idea) => {
         const linkedBriefs = briefsByIdea.get(idea.id) ?? [];
         const linkedAssets = linkedBriefs.flatMap((brief) => assetsByBrief.get(brief.id) ?? []) as CampaignAsset[];
         const newest = linkedAssets[linkedAssets.length - 1];
@@ -284,9 +296,10 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
           {open && <tr className="border-b border-border bg-muted/20"><td colSpan={5} className="p-3"><p className="text-xs text-muted-foreground">{idea.body ?? idea.source_question ?? "No idea detail recorded."}{idea.strategic_reason && ` · ${idea.strategic_reason}`}</p>{linkedBriefs.length === 0 && <p className="mt-2 text-xs text-muted-foreground">{idea.status === "briefed" ? "Brief being written." : "No brief yet."}</p>}{linkedBriefs.map((brief) => <div key={brief.id} className="mt-3 border-l border-border pl-3"><div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">Brief</span><button type="button" className="text-brand-strong hover:underline" onClick={() => setViewing(brief)}>{brief.title}</button><span className="text-xs text-muted-foreground">{brief.status.replaceAll("_", " ")}</span>{(brief.status === "draft" || brief.status === "approved") && <button type="button" className={buttonClass} onClick={() => setBuilding(brief)}>Approve &amp; Build</button>}</div>{(assetsByBrief.get(brief.id) ?? []).map((asset) => <div key={asset.id} className="mt-2 flex flex-wrap items-center gap-2 border-l border-border pl-3 text-xs"><span>Asset version · {asset.title ?? "Untitled"} · {asset.review_status} · {packageForAsset(asset as CampaignAsset)}</span>{v2Preview(asset)}<button type="button" className={buttonClass} aria-expanded={openAssetActions === asset.id} onClick={() => setOpenAssetActions(openAssetActions === asset.id ? null : asset.id)}>Actions</button>{openAssetActions === asset.id && v2AssetActions(asset as CampaignAsset)}</div>)}</div>)}</td></tr>}
         </Fragment>;
       })}
-      {looseBriefs.map((brief) => <tr key={brief.id} className="border-b border-border"><td className="p-3">Unlinked brief · {brief.title}</td><td className="p-3">{v2Preview((assetsByBrief.get(brief.id) ?? [])[0] as CampaignAsset | undefined)}</td><td className="p-3">{brief.status.replaceAll("_", " ")}</td><td className="p-3"><button type="button" className={buttonClass} onClick={() => setViewing(brief)}>Brief</button></td><td className="p-3">{(brief.status === "draft" || brief.status === "approved") && <button type="button" className={buttonClass} onClick={() => setBuilding(brief)}>Approve &amp; Build</button>}{(assetsByBrief.get(brief.id) ?? []).map((asset) => <div key={asset.id} className="mt-2 border-t border-border pt-2"><p className="text-xs">{asset.title ?? "Untitled asset"} · {asset.review_status} · {packageForAsset(asset as CampaignAsset)}</p>{v2AssetActions(asset as CampaignAsset)}</div>)}</td></tr>)}
-      {looseAssets.map((asset) => <tr key={asset.id} className="border-b border-border"><td className="p-3">Unlinked asset · {asset.title ?? "Untitled"}<span className="block text-xs text-muted-foreground">{packageForAsset(asset)}</span></td><td className="p-3">{v2Preview(asset)}</td><td className="p-3">{asset.review_status}</td><td className="p-3">—</td><td className="p-3">{v2AssetActions(asset)}</td></tr>)}
-      {assets.length === 0 && briefs.length === 0 && ideas.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No campaign content yet.</td></tr>}
+      {routePositions !== undefined && visibleIdeas.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No planned content for this route yet. Check the campaign plan or Content Production.</td></tr>}
+      {routePositions === undefined && looseBriefs.map((brief) => <tr key={brief.id} className="border-b border-border"><td className="p-3">Unlinked brief · {brief.title}</td><td className="p-3">{v2Preview((assetsByBrief.get(brief.id) ?? [])[0] as CampaignAsset | undefined)}</td><td className="p-3">{brief.status.replaceAll("_", " ")}</td><td className="p-3"><button type="button" className={buttonClass} onClick={() => setViewing(brief)}>Brief</button></td><td className="p-3">{(brief.status === "draft" || brief.status === "approved") && <button type="button" className={buttonClass} onClick={() => setBuilding(brief)}>Approve &amp; Build</button>}{(assetsByBrief.get(brief.id) ?? []).map((asset) => <div key={asset.id} className="mt-2 border-t border-border pt-2"><p className="text-xs">{asset.title ?? "Untitled asset"} · {asset.review_status} · {packageForAsset(asset as CampaignAsset)}</p>{v2AssetActions(asset as CampaignAsset)}</div>)}</td></tr>)}
+      {routePositions === undefined && looseAssets.map((asset) => <tr key={asset.id} className="border-b border-border"><td className="p-3">Unlinked asset · {asset.title ?? "Untitled"}<span className="block text-xs text-muted-foreground">{packageForAsset(asset)}</span></td><td className="p-3">{v2Preview(asset)}</td><td className="p-3">{asset.review_status}</td><td className="p-3">—</td><td className="p-3">{v2AssetActions(asset)}</td></tr>)}
+      {routePositions === undefined && assets.length === 0 && briefs.length === 0 && ideas.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No campaign content yet.</td></tr>}
     </tbody></table></div>}
     {rejecting && <div className="rounded-md border border-border p-3"><label className="text-sm">Reason for rejecting {rejecting.title ?? "asset"}<textarea className="mt-2 block w-full rounded-md border border-input bg-background p-2" value={reason} onChange={(event) => setReason(event.target.value)} /></label><div className="mt-2 flex gap-2"><button type="button" className={buttonClass} disabled={busy !== null || !reason.trim()} onClick={() => { const asset = rejecting; void act(() => supabase.rpc("review_media_asset", { p_asset_id: asset.id, p_decision: "rejected", p_reason: reason.trim() }), "Asset rejected with feedback.", { id: asset.id, action: "approve" }); setRejecting(null); }}>Confirm rejection</button><button type="button" className={buttonClass} onClick={() => setRejecting(null)}>Cancel</button></div></div>}
     {modals}
@@ -294,7 +307,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
 
   return <section className="mt-4 space-y-3 border-t border-border pt-4" aria-label="Campaign content production">
     <h4 className="text-sm font-semibold">Content production</h4>
-    <p className="text-xs text-muted-foreground">{ready} ready to distribute · {contentCount} pieces planned · {ideas.length} campaign ideas</p>
+    <p className="text-xs text-muted-foreground">{ready} creative approved · {contentCount} pieces planned · {ideas.length} campaign ideas</p>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
     {contentCount > 0 && builtAt && !contentIdeasGeneratedAt && <div className="rounded-md border border-border p-3">

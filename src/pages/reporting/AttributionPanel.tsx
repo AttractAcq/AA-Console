@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { DataTable } from "../../components/DataTable";
 import { EmptyState } from "../../components/EmptyState";
 import { supabase } from "../../lib/supabase";
 import { cn } from "../../lib/cn";
+import { BusinessProfileCoverage } from "./BusinessProfileCoverage";
 
 type Funnel = {
   leads: number;
@@ -11,9 +12,9 @@ type Funnel = {
   appointments: number;
   sales: number;
   lost: number;
-  pipeline_value: number;
-  sale_value: number;
-  cash_collected: number;
+  pipeline_value: number | null;
+  sale_value: number | null;
+  cash_collected: number | null;
   spend: number;
   lead_to_sale_pct: number | null;
   cost_per_lead: number | null;
@@ -28,7 +29,7 @@ type TopContent = {
   content_territory: string | null;
   leads: number;
   sales: number;
-  cash_collected: number;
+  cash_collected: number | null;
   spend: number;
   impressions: number;
 };
@@ -68,6 +69,7 @@ type Journey = {
   route_package_ids: string[];
   capture_submissions: number;
   unknown_route_submissions: number;
+  archived_at: string | null;
 };
 
 const WINDOWS = [
@@ -76,7 +78,10 @@ const WINDOWS = [
   { days: 90, label: "90 days" },
 ];
 
-const money = (v: number | null) => (v === null ? "—" : `R${Number(v).toLocaleString()}`);
+const amount = (v: number | null) => (v === null ? "—" : Number(v).toLocaleString());
+const spendMoney = (v: number | null, currency: string | null) =>
+  v === null ? "—" : currency === "ZAR" ? `R${Number(v).toLocaleString()}`
+    : `${currency ?? "currency unknown"} ${Number(v).toLocaleString()}`;
 
 /**
  * What caused what.
@@ -88,6 +93,10 @@ const money = (v: number | null) => (v === null ? "—" : `R${Number(v).toLocale
  */
 export function AttributionPanel() {
   const { clientId } = useParams<{ clientId: string }>();
+  return <ClientAttributionPanel key={clientId ?? "no-client"} clientId={clientId} />;
+}
+
+function ClientAttributionPanel({ clientId }: { clientId: string | undefined }) {
   const [days, setDays] = useState(30);
   const [funnel, setFunnel] = useState<Funnel | null>(null);
   const [top, setTop] = useState<TopContent[]>([]);
@@ -95,19 +104,24 @@ export function AttributionPanel() {
   const [journeys, setJourneys] = useState<Journey[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestGeneration = useRef(0);
+  const activeVisit = useRef(true);
 
   const refresh = useCallback(async () => {
+    const generation = ++requestGeneration.current;
+    const isCurrent = () => activeVisit.current && generation === requestGeneration.current;
     if (!clientId) {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
       return;
     }
-    setLoading(true);
+    if (isCurrent()) setLoading(true);
     const [f, t, c, j] = await Promise.all([
       supabase.rpc("acquisition_funnel", { p_client_id: clientId, p_days: days }),
       supabase.rpc("top_content_by_revenue", { p_client_id: clientId, p_limit: 10 }),
       supabase.rpc("acquisition_coverage_v8", { p_client_id: clientId, p_days: days }),
-      supabase.rpc("lead_journey_trace_v9", { p_client_id: clientId, p_days: days, p_limit: 50 }),
+      supabase.rpc("lead_journey_trace_v10", { p_client_id: clientId, p_days: days, p_limit: 50 }),
     ]);
+    if (!isCurrent()) return;
     if (f.error || t.error || c.error || j.error || !f.data?.[0] || !c.data?.[0]) {
       setError(f.error?.message ?? t.error?.message ?? c.error?.message ?? j.error?.message
         ?? "Attribution data is unavailable.");
@@ -123,10 +137,18 @@ export function AttributionPanel() {
   }, [clientId, days]);
 
   useEffect(() => {
+    activeVisit.current = true;
+    let cancelled = false;
     void refresh().catch((cause) => {
+      if (cancelled || !activeVisit.current) return;
       setError(cause instanceof Error ? cause.message : "Attribution data is unavailable.");
       setLoading(false);
     });
+    return () => {
+      cancelled = true;
+      activeVisit.current = false;
+      requestGeneration.current += 1;
+    };
   }, [refresh]);
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading attribution…</p>;
@@ -144,8 +166,8 @@ export function AttributionPanel() {
   const attributed = top.filter((r) => r.leads > 0).length;
   const noSpendRows = coverage?.spend_rows === 0;
   const mixedCurrencies = (coverage?.spend_currencies ?? 0) > 1;
-  const spendComparable = !!coverage && coverage.spend_rows > 0
-    && coverage.spend_currencies === 1 && coverage.spend_currency === "ZAR";
+  const singleSpendCurrency = !!coverage && coverage.spend_rows > 0
+    && coverage.spend_currencies === 1 && !!coverage.spend_currency;
 
   return (
     <div className="space-y-6">
@@ -169,11 +191,11 @@ export function AttributionPanel() {
 
       <section>
         <h2 className="mb-2 text-sm font-semibold text-foreground">Recorded lead journeys</h2>
-        <p className="mb-3 text-xs text-muted-foreground">Latest 50 non-test leads in this window. Route IDs record capture doors, not which route caused a sale or whether a provider action ran. Unknown links remain unknown; archived source records remain traceable. Lead sale and cash amounts have no stored currency.</p>
+        <p className="mb-3 text-xs text-muted-foreground">Latest 50 non-test leads in this window, including archived snapshots. Archived rows are historical and are excluded from the live funnel totals above. Route IDs record capture doors, not which route caused a sale or whether a provider action ran. Unknown links remain unknown. Lead money currencies are stored separately but are not shown in this journey view.</p>
         <DataTable columns={["Lead", "Source / route", "Campaign", "Opportunity / offer", "Asset / page / agent", "Outcome", "Recorded sale / cash"]}
           emptyLabel="No recorded lead journeys in this window."
           rows={journeys.map((j) => [
-            <span title={j.lead_id}>{j.lead_id.slice(0, 8)} · {new Date(j.lead_created_at).toLocaleDateString()}</span>,
+            <span title={j.lead_id}>{j.lead_id.slice(0, 8)} · {new Date(j.lead_created_at).toLocaleDateString()}{j.archived_at ? <><br />Archived {new Date(j.archived_at).toLocaleDateString()}</> : null}</span>,
             <span>{j.source_channel ?? "unknown"}<br />{j.route_package_ids.length
               ? j.route_package_ids.map((id) => <span key={id} title={id}>route {id.slice(0, 8)}<br /></span>)
               : "route unknown"}{j.unknown_route_submissions > 0 ? ` · ${j.unknown_route_submissions} unlinked capture${j.unknown_route_submissions === 1 ? "" : "s"}` : ""}</span>,
@@ -203,13 +225,14 @@ export function AttributionPanel() {
         <p>{coverage.spend_rows} spend ledger entries{coverage.spend_currency ? ` in ${coverage.spend_currency}` : ""}; latest {coverage.latest_spend_date ?? "unknown"}.</p>
         <p>Paid metric dates: {coverage.paid_metric_days}; latest {coverage.latest_paid_metric_date ?? "unknown"}. These rows do not by themselves prove an account read.</p>
         <p>Current Meta account read: {coverage.latest_meta_read_at ? new Date(coverage.latest_meta_read_at).toLocaleString() : "none"}. Current Google Ads read: {coverage.latest_google_read_at ? new Date(coverage.latest_google_read_at).toLocaleString() : "none"}.</p>
+        <BusinessProfileCoverage key={clientId} clientId={clientId} />
       </section>}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Cash collected</p>
+          <p className="text-sm text-muted-foreground">Cash collected · currency not shown</p>
           <p className="mt-1 text-2xl font-semibold text-card-foreground">
-            {money(funnel?.cash_collected ?? null)}
+            {amount(funnel?.cash_collected ?? null)}
           </p>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
@@ -226,17 +249,15 @@ export function AttributionPanel() {
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-sm text-muted-foreground">Cost per lead</p>
           <p className="mt-1 text-2xl font-semibold text-card-foreground">
-            {spendComparable ? money(funnel?.cost_per_lead ?? null) : "—"}
+            {singleSpendCurrency ? spendMoney(funnel?.cost_per_lead ?? null, coverage?.spend_currency ?? null) : "—"}
           </p>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-sm text-muted-foreground">Return on spend</p>
           <p className="mt-1 text-2xl font-semibold text-card-foreground">
-            {!spendComparable || funnel?.return_on_spend === null || funnel?.return_on_spend === undefined
-              ? "—"
-              : `${funnel.return_on_spend}×`}
+            —
           </p>
-          {spendComparable && <p className="mt-1 text-xs text-muted-foreground">Recorded cash divided by recorded spend in this window; this does not prove which ad caused a sale.</p>}
+          <p className="mt-1 text-xs text-muted-foreground">This view does not expose lead cash currency coverage, so it cannot display a verified return against spend.</p>
         </div>
       </div>
 
@@ -247,9 +268,7 @@ export function AttributionPanel() {
           No spend ledger entries are recorded in this window. Cost per lead and return on spend are unknown until spend coverage is checked; paid impressions are tracked separately. Connect Meta or Google Ads under Account → Integrations and reconcile provider results with the spend ledger. The recorded revenue above does not depend on an ads connection.
         </p>
       )}
-      {mixedCurrencies && <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">Spend entries use more than one currency. Cost per lead and return on spend are hidden until amounts are converted to one reviewed currency.</p>}
-      {coverage && coverage.spend_rows > 0 && !mixedCurrencies && coverage.spend_currency !== "ZAR"
-        && <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">Spend is recorded in {coverage.spend_currency ?? "an unknown currency"}; lead revenue has no stored currency. Cost per lead and return on spend are hidden until the amounts can be compared.</p>}
+      {mixedCurrencies && <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">Spend entries use more than one currency. Cost per lead is hidden until spend is converted to one reviewed currency; return on spend also needs a recorded cash currency.</p>}
 
       <div>
         <h2 className="mb-3 text-sm font-semibold text-foreground">
@@ -268,7 +287,7 @@ export function AttributionPanel() {
                 r.idea_title ?? "—",
                 String(r.leads),
                 String(r.sales),
-                money(r.cash_collected),
+                amount(r.cash_collected),
               ])}
             />
             <p className="mt-2 text-xs text-muted-foreground">

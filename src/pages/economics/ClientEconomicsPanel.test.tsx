@@ -60,10 +60,11 @@ const campaignRows = [
   { campaign_id: "c1", campaign_ref: "HD-C002", spend: 6000, leads: 2, customers: 1, revenue: 30000, cash_collected: 20000, cpl: 3000, cac: 6000, roas: 5 },
 ];
 
-function show(totals: Eco | null = healthy(), ch = channels, cp = campaignRows) {
+function show(totals: Eco | null = healthy(), ch: Eco[] = channels, cp: Eco[] = campaignRows, mr: Eco[] = []) {
   rpc.mockImplementation((name: string) => {
     if (name === "client_economics") return Promise.resolve({ data: totals ? [totals] : [], error: null });
     if (name === "client_economics_by_channel") return Promise.resolve({ data: ch, error: null });
+    if (name === "client_money_currency_breakdown") return Promise.resolve({ data: mr, error: null });
     return Promise.resolve({ data: cp, error: null });
   });
   insert.mockResolvedValue({ error: null });
@@ -79,7 +80,7 @@ function show(totals: Eco | null = healthy(), ch = channels, cp = campaignRows) 
 }
 
 const figure = (label: string) =>
-  screen.getByText(label).closest("div")?.parentElement as HTMLElement;
+  screen.getByRole("heading", { name: label }).closest("section") as HTMLElement;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -87,12 +88,15 @@ beforeEach(() => {
 });
 
 describe("headline economics", () => {
-  it("shows spend, revenue and the two return multiples", async () => {
+  it("shows spend in its currency without assigning that currency to lead revenue", async () => {
     show();
     expect(await screen.findByText("R10,000")).toBeInTheDocument();
-    expect(screen.getByText("R40,000")).toBeInTheDocument();
-    expect(screen.getByText("4.00×")).toBeInTheDocument();
-    expect(screen.getByText("2.00×")).toBeInTheDocument();
+    expect(within(figure("Revenue")).getByText("40,000")).toBeInTheDocument();
+    expect(within(figure("ROAS")).getByText("—")).toBeInTheDocument();
+    expect(within(figure("Cash ROAS")).getByText("—")).toBeInTheDocument();
+    expect(screen.queryByText("4.00×")).not.toBeInTheDocument();
+    expect(screen.queryByText("2.00×")).not.toBeInTheDocument();
+    expect(screen.getByText(/Lead money totals require one recorded currency/)).toBeInTheDocument();
     // R5,000 is CAC in the headline and also the Customers cost in the funnel
     // table below — both are correct, so scope to the headline panel.
     expect(within(figure("CAC")).getByText("R5,000")).toBeInTheDocument();
@@ -159,20 +163,52 @@ describe("breakdowns", () => {
     expect(await screen.findByText("(unattributed)")).toBeInTheDocument();
   });
 
-  it("does not print a ROAS for a bucket with no revenue", async () => {
+  it("does not print a ROAS for any bucket while lead revenue currency is unknown", async () => {
     show();
     await screen.findByText("(unattributed)");
     const table = screen.getByText("(unattributed)").closest("table") as HTMLElement;
-    // instagram has 5.00×; the unattributed row must not claim 0.00×.
-    expect(within(table).getByText("5.00×")).toBeInTheDocument();
+    expect(within(table).queryByText("5.00×")).not.toBeInTheDocument();
+    expect(within(table).getByText("30,000")).toBeInTheDocument();
+    expect(within(table).queryByText("R30,000")).not.toBeInTheDocument();
     expect(within(table).queryByText("0.00×")).not.toBeInTheDocument();
   });
 });
 
 describe("mixed currency", () => {
   it("refuses the ratios and says so loudly", async () => {
-    show(healthy({ mixed_currency: true, currency: null, roas: null, cash_roas: null, cac: null, cpl: null }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/mixes more than one currency/i);
+    show(healthy({ spend: null, mixed_currency: true, currency: null, roas: null, cash_roas: null, cac: null, cpl: null }),
+      [{ ...channels[0], spend: null, cpl: null }],
+      [{ ...campaignRows[0], spend: null, cpl: null }]);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/mixes more than one spend currency/i);
+    expect(within(figure("Spend")).getByText(/spend currencies are mixed/i)).toBeInTheDocument();
+    expect(within(figure("CAC")).getByText(/spend currencies are mixed/i)).toBeInTheDocument();
+    expect(screen.queryByText("NaN")).not.toBeInTheDocument();
+  });
+
+  it("does not render a missing lead currency total as zero or NaN", async () => {
+    show(healthy({ revenue: null, cash_collected: null, roas: null, cash_roas: null }),
+      [{ ...channels[0], revenue: null, cash_collected: null, roas: null }],
+      [{ ...campaignRows[0], revenue: null, cash_collected: null, roas: null }]);
+    await screen.findByText("R10,000");
+    expect(within(figure("Revenue")).getByText(/currency coverage is incomplete/i)).toBeInTheDocument();
+    expect(within(figure("Cash collected")).getByText(/currency coverage is incomplete/i)).toBeInTheDocument();
+    expect(screen.queryByText("NaN")).not.toBeInTheDocument();
+  });
+});
+
+describe("recorded currency breakdown", () => {
+  it("keeps ZAR, USD and unverified cash in separate rows", async () => {
+    show(healthy({ cash_collected: null, cash_roas: null }), channels, campaignRows, [
+      { kind: "cash", currency: "ZAR", record_count: 1, amount: 200 },
+      { kind: "cash", currency: "USD", record_count: 1, amount: 50 },
+      { kind: "cash", currency: null, record_count: 1, amount: 20 },
+    ]);
+    const section = (await screen.findByText("Money by recorded currency")).parentElement as HTMLElement;
+    expect(within(section).getByText("R200")).toBeInTheDocument();
+    expect(within(section).getByText("$50")).toBeInTheDocument();
+    expect(within(section).getByText("Unverified")).toBeInTheDocument();
+    expect(within(section).getByText("20")).toBeInTheDocument();
+    expect(within(figure("Cash collected")).getByText("—")).toBeInTheDocument();
   });
 });
 
@@ -201,11 +237,12 @@ describe("recording spend", () => {
     show();
     await userEvent.click(await screen.findByRole("button", { name: /record spend/i }));
     await userEvent.type(screen.getByLabelText(/amount/i), "2500");
+    await userEvent.type(screen.getByLabelText(/Spend currency/), "usd");
     await userEvent.type(screen.getByLabelText(/date spent/i), "2026-09-10");
     await userEvent.click(screen.getByRole("button", { name: "Record" }));
 
     expect(insert).toHaveBeenCalledWith(
-      expect.objectContaining({ client_id: "client-1", amount: 2500, source: "manual" }),
+      expect.objectContaining({ client_id: "client-1", amount: 2500, currency: "USD", source: "manual" }),
     );
   });
 });

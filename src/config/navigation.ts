@@ -426,10 +426,7 @@ export const v6ModuleNodes: NavNode[] = [
   // other order is how a business ends up with attractive campaigns that are
   // not rooted in anything somebody would actually buy.
   { id: "market-opportunities", label: "Market Opportunities", path: "market-opportunities",
-    icon: Compass, capability: "expanding", tabs: [
-      { id: "discover", label: "Discover" }, { id: "evaluate", label: "Evaluate" },
-      { id: "strategize", label: "Strategize" }, { id: "activate", label: "Activate" },
-    ] },
+    icon: Compass, capability: "expanding" },
   // No tabs on purpose: the page is one table of campaigns.
   { id: "campaign-factory", label: "Campaign Factory", path: "campaign-factory", icon: Megaphone,
     capability: "expanding" },
@@ -447,9 +444,9 @@ export const v6ModuleNodes: NavNode[] = [
   { id: "proof-distribution", label: "Proof Distribution", path: "proof-distribution", icon: Share2,
     capability: "expanding", tabs: [
       { id: "destinations", label: "Destinations" },
-      // Placements and Rights are archived: see docs/V6_1_ARCHIVED_SURFACES.md.
-      // Their panels still build; only the way in is gone, so v6.2 can delete
-      // the code without a second decision.
+      // The placement trail and removal work are the Distribution Log. The
+      // former Rights view is part of that log; it is not a third tab.
+      { id: "placements", label: "Distribution Log" },
     ] },
   { id: "content-distribution", label: "Organic Content Distribution", path: "content-distribution", icon: Share2,
     capability: "expanding", tabs: [
@@ -484,12 +481,10 @@ export const v6ModuleNodes: NavNode[] = [
     ] },
   { id: "offer-studio", label: "Offer Studio", path: "offer-studio", icon: Target,
     capability: "expanding", tabs: [
-      // One operating page, per the notes: a table of every offer with
-      // click-through detail and two create buttons. Live use folded into the
-      // rows, where a superseded-but-live version is named on its own offer.
-      // Versions keeps the existing version and claims form reachable.
+      // The source choice and version editor live in Build. Existing
+      // ?tab=versions links are resolved to Build by Page.
       { id: "offers", label: "Offers" },
-      { id: "versions", label: "Versions" },
+      { id: "build", label: "Build" },
       // Offer Strategy moved to Intelligence OS, Strategy half.
     ] },
   { id: "website-studio", label: "Website Studio", path: "website-studio", icon: Globe,

@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -13,12 +13,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * looks like "no keywords needed".
  */
 
-const { from, enqueueAgentJob } = vi.hoisted(() => ({ from: vi.fn(), enqueueAgentJob: vi.fn() }));
+const { from, enqueueAgentJob, route } = vi.hoisted(() => ({
+  from: vi.fn(), enqueueAgentJob: vi.fn(), route: { clientId: "client-1" },
+}));
 vi.mock("../../lib/supabase", () => ({ supabase: { from }, enqueueAgentJob }));
 vi.mock("./GoogleOperatorBundlePanel", () => ({ GoogleOperatorBundlePanel: () => null }));
 vi.mock("./GoogleAdsReadPanel", () => ({ GoogleAdsReadPanel: () => null }));
+vi.mock("../distribution/PaidOperatorBundles", () => ({
+  PaidOperatorBundles: ({ platform }: { platform: string }) =>
+    createElement("section", { "aria-label": `${platform} campaign operator bundles` }),
+}));
 vi.mock("react-router-dom", () => ({
-  useParams: () => ({ clientId: "client-1" }),
+  useParams: () => ({ clientId: route.clientId }),
   Link: ({ to, children }: { to: string; children: unknown }) =>
     createElement("a", { href: to }, children as never),
 }));
@@ -75,8 +81,34 @@ function database(due: unknown[], sheets: unknown[] = []) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  route.clientId = "client-1";
   database([row()]);
   enqueueAgentJob.mockResolvedValue("job-1");
+});
+
+describe("client-bound account display", () => {
+  it("removes the previous client's account while the new read is pending", async () => {
+    const view = render(<GoogleAdsStudioPanel tab="account" />);
+    expect(await screen.findByText("123-456-7890")).toBeInTheDocument();
+
+    let release!: (value: { data: unknown[]; error: null }) => void;
+    const pending = new Promise<{ data: unknown[]; error: null }>((resolve) => { release = resolve; });
+    from.mockImplementation(() => {
+      const chain: Record<string, unknown> = {};
+      Object.assign(chain, {
+        select: () => chain, eq: () => chain, order: () => chain,
+        limit: () => pending,
+        then: (...args: Parameters<Promise<unknown>["then"]>) => pending.then(...args),
+      });
+      return chain;
+    });
+    route.clientId = "client-2";
+    view.rerender(<GoogleAdsStudioPanel tab="account" />);
+    expect(screen.queryByText("123-456-7890")).not.toBeInTheDocument();
+
+    await act(async () => release({ data: [row({ client_id: "client-2", google_account: "987-654-3210" })], error: null }));
+    expect(await screen.findByText("987-654-3210")).toBeInTheDocument();
+  });
 });
 
 describe("it never claims it can build", () => {
@@ -103,6 +135,11 @@ describe("it never claims it can build", () => {
 });
 
 describe("the sheet is a sheet, not a plan", () => {
+  it("offers the campaign-bound Google handoff beside the manual sheet path", async () => {
+    render(<GoogleAdsStudioPanel tab="sheet" />);
+    expect(await screen.findByRole("region", { name: "google campaign operator bundles" })).toBeInTheDocument();
+  });
+
   it("shows every seed's note, so nobody reads it as research", async () => {
     database([row({ sheet_id: "sheet-1", sheet_version: 1, missing: ["keyword_research"] })], [sheet()]);
     render(<GoogleAdsStudioPanel tab="sheet" />);

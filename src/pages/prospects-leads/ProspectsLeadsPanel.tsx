@@ -24,10 +24,10 @@ type Stalled = {
 };
 
 const MANUAL_LEAD_FIELDS = new Set([
-  "name", "email", "phone", "owner_member_id", "next_action", "next_action_due", "opportunity_value",
+  "name", "email", "phone", "owner_member_id", "next_action", "next_action_due", "opportunity_value", "opportunity_currency",
 ]);
 
-const money = (v: number | null) => (v === null ? null : `R${Number(v).toLocaleString()}`);
+const amount = (v: number | null) => (v === null ? null : Number(v).toLocaleString());
 
 export function ProspectsLeadsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -57,7 +57,7 @@ export function ProspectsLeadsPanel() {
       supabase
         .from("client_leads")
         .select(
-          "id, name, contact, email, phone, stage, stage_at, next_action, next_action_due, opportunity_value, sale_value, cash_collected, source_channel, owner_member_id, appointment_at, appointment_outcome",
+          "id, name, contact, email, phone, stage, stage_at, next_action, next_action_due, opportunity_value, opportunity_currency, sale_value, sale_currency, cash_collected, cash_currency, source_channel, owner_member_id, appointment_at, appointment_outcome",
         )
         .eq("client_id", clientId)
         .order("stage_at", { ascending: false }),
@@ -110,8 +110,20 @@ export function ProspectsLeadsPanel() {
   if (loading) return <p className="text-sm text-muted-foreground">Loading pipeline…</p>;
 
   const open = leads.filter((l) => l.stage !== "cash" && l.stage !== "lost");
-  const pipelineValue = open.reduce((sum, l) => sum + Number(l.opportunity_value ?? 0), 0);
-  const collected = leads.reduce((sum, l) => sum + Number(l.cash_collected ?? 0), 0);
+  const opportunityRows = open.filter((lead) => Number(lead.opportunity_value ?? 0) > 0);
+  const opportunityCurrencies = new Set(opportunityRows.map((lead) => lead.opportunity_currency).filter((currency): currency is string => !!currency));
+  const opportunityComparable = opportunityRows.length > 0 && opportunityCurrencies.size === 1
+    && opportunityRows.every((lead) => !!lead.opportunity_currency);
+  const pipelineValue = opportunityComparable
+    ? `${[...opportunityCurrencies][0]} ${opportunityRows.reduce((sum, lead) => sum + Number(lead.opportunity_value), 0).toLocaleString()}`
+    : opportunityRows.length === 0 ? "0" : "—";
+  const cashRows = leads.filter((lead) => Number(lead.cash_collected ?? 0) > 0);
+  const cashCurrencies = new Set(cashRows.map((lead) => lead.cash_currency).filter((currency): currency is string => !!currency));
+  const cashComparable = cashRows.length > 0 && cashCurrencies.size === 1
+    && cashRows.every((lead) => !!lead.cash_currency);
+  const collected = cashComparable
+    ? `${[...cashCurrencies][0]} ${cashRows.reduce((sum, lead) => sum + Number(lead.cash_collected), 0).toLocaleString()}`
+    : cashRows.length === 0 ? "0" : "—";
   const selectedLead = leads.find((lead) => lead.id === selectedId) ?? null;
   const lost = leads.filter((lead) => lead.stage === "lost");
   const legacy = leads.filter((lead) => lead.stage === "lead" || lead.stage === "sale");
@@ -132,7 +144,7 @@ export function ProspectsLeadsPanel() {
       <p className="truncate text-sm font-medium text-foreground">{lead.name ?? "Unnamed"}</p>
       <p className="truncate text-xs text-muted-foreground">{lead.next_action ?? <span className="text-destructive">nothing scheduled</span>}</p>
       {(lead.opportunity_value != null || lead.source_channel) && <p className="mt-0.5 truncate text-xs text-muted-foreground">
-        {[money(lead.opportunity_value), lead.source_channel].filter(Boolean).join(" · ")}</p>}
+        {[lead.opportunity_value === null ? null : `${lead.opportunity_currency ? `${lead.opportunity_currency} ` : ""}${amount(lead.opportunity_value)}${lead.opportunity_currency ? "" : " (currency unrecorded)"}`, lead.source_channel].filter(Boolean).join(" · ")}</p>}
       <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(lead.id); }}
         aria-label={`Edit ${lead.name ?? "Unnamed"}`} className="mt-2 inline-flex items-center gap-1 text-xs text-brand-strong hover:underline">
         <Pencil className="h-3 w-3" aria-hidden="true" />Edit</button>
@@ -184,14 +196,16 @@ export function ProspectsLeadsPanel() {
         <div className="rounded-lg border border-border bg-card p-5">
           <span className="text-sm text-muted-foreground">Pipeline value</span>
           <p className="mt-2 text-2xl font-semibold text-card-foreground">
-            {money(pipelineValue) ?? "—"}
+            {pipelineValue}
           </p>
+          {opportunityRows.length > 0 && !opportunityComparable && <p className="text-xs text-muted-foreground">Mixed or unverified opportunity currencies; review individual leads.</p>}
         </div>
         <div className="rounded-lg border border-border bg-card p-5">
           <span className="text-sm text-muted-foreground">Cash collected</span>
           <p className="mt-2 text-2xl font-semibold text-card-foreground">
-            {money(collected) ?? "—"}
+            {collected}
           </p>
+          {cashRows.length > 0 && !cashComparable && <p className="text-xs text-muted-foreground">Mixed or unverified cash currencies; review individual leads.</p>}
         </div>
       </div>
 
@@ -269,7 +283,7 @@ export function ProspectsLeadsPanel() {
         onSubmit={async (v) => {
           if (!clientId) throw new Error("No client selected.");
           const details = leadFieldsPayload(v);
-          const { error } = await supabase.rpc("create_manual_lead", {
+          const { error } = await supabase.rpc("create_manual_lead_with_currency", {
             p_client_id: clientId,
             p_name: String(details.name),
             p_email: (details.email as string | null) ?? undefined,
@@ -278,6 +292,7 @@ export function ProspectsLeadsPanel() {
             p_next_action: (details.next_action as string | null) ?? undefined,
             p_next_action_due: (details.next_action_due as string | null) ?? undefined,
             p_opportunity_value: (details.opportunity_value as number | null) ?? undefined,
+            p_opportunity_currency: (details.opportunity_currency as string | null) ?? undefined,
           });
           if (error) throw error;
         }}

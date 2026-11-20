@@ -98,6 +98,8 @@ Nonsecret fixture JSON shape (`MarketingFixtures`, see `scripts/marketing-gate.t
   "approved_safe_fixtures": true,
   "client_id": "<Harbour UUID Marketing is granted>",
   "campaign_id": "<campaign UUID under that client>",
+  "approved_opportunity_id": "<currently approved and ready opportunity UUID under that client>",
+  "signed_secondary_offer_version_id": "<current signed secondary offer version sourced from that opportunity>",
   "generation_idea_id": "<content idea UUID under that client>",
   "revision_brief_id": "<brief UUID eligible for revision>",
   "pending_asset_id": "<asset UUID awaiting approval>",

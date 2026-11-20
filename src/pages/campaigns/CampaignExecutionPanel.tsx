@@ -3,7 +3,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
-import { fetchCampaignOrigins, type CampaignOrigin } from "../../lib/opportunities";
+import { fetchCampaignOrigins, fetchOpportunities, fetchOpportunityApprovalStates,
+  fetchOpportunityOfferVersions, fetchReadiness, type CampaignOrigin } from "../../lib/opportunities";
 import { fetchLaunchDue, type LaunchDue } from "../../lib/campaignLaunch";
 import { CampaignLaunchGate } from "./CampaignLaunchGate";
 import { FormModal } from "../../components/forms/FormModal";
@@ -14,7 +15,6 @@ import { supabase } from "../../lib/supabase";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 import {
   NO_TEMPLATE,
-  templateColumns,
   templateFor,
   templateOptions,
   templateSummary,
@@ -29,12 +29,14 @@ import { useCampaignV2Package } from "./useCampaignV2Package";
 import { CampaignSweepWork } from "./CampaignSweepWork";
 import { CampaignConversionWork } from "./CampaignConversionWork";
 import { CampaignPackageReadiness } from "./CampaignPackageReadiness";
+import { PaidOperatorBundles } from "../distribution/PaidOperatorBundles";
 
 type ContentSpecPiece = { route: string; platform: string; media_type: string; content_format: string };
 type PlannedIdea = { id: string; campaign_position: number | null; title: string; body: string | null };
 
 type Campaign = {
   id: string;
+  campaign_kind: "standalone_paid" | "standalone_organic" | "opportunity_campaign" | null;
   acquisition_mode: "legacy" | "organic" | "paid" | "both";
   paid_platform: "meta" | "google" | null;
   cloned_from_campaign_id: string | null;
@@ -75,6 +77,22 @@ type Campaign = {
   offer_version_id: string | null;
 };
 
+function campaignRouteLabel(campaign: Campaign): string {
+  if (campaign.acquisition_mode === "legacy") return "Legacy campaign";
+  if (campaign.acquisition_mode === "organic") return "Organic";
+  const paidChannel = campaign.paid_platform === "meta" ? "Meta Ads"
+    : campaign.paid_platform === "google" ? "Google Ads" : "Paid platform unknown";
+  return campaign.acquisition_mode === "both"
+    ? `Organic + Paid · ${paidChannel}` : `Paid · ${paidChannel}`;
+}
+
+function campaignKindLabel(campaign: Campaign): string {
+  if (campaign.campaign_kind === "standalone_paid") return "Standalone paid";
+  if (campaign.campaign_kind === "standalone_organic") return "Standalone organic";
+  if (campaign.campaign_kind === "opportunity_campaign") return "Opportunity campaign";
+  return "Legacy / unknown";
+}
+
 export type Requirement = {
   requirement: string;
   required: number;
@@ -84,18 +102,30 @@ export type Requirement = {
 };
 
 const FIELDS: FieldDef[] = [
+  { name: "campaign_kind", label: "Campaign type", kind: "select", required: true,
+    options: [{ value: "standalone_paid", label: "Standalone paid" },
+      { value: "standalone_organic", label: "Standalone organic" },
+      { value: "opportunity_campaign", label: "Opportunity campaign" }],
+    hint: "Choose the source and route before planning. Opportunity campaigns require approved market evidence." },
   { name: "name", label: "Campaign name", kind: "text", required: true },
   { name: "acquisition_mode", label: "Campaign route", kind: "select", required: true,
-    options: [{ value: "organic", label: "Organic" }, { value: "paid", label: "Paid" }],
-    hint: "One route per campaign. Clone it to run the same idea through the other route." },
+    showIf: { field: "campaign_kind", equals: ["opportunity_campaign"] },
+    options: [{ value: "organic", label: "Organic" }, { value: "paid", label: "Paid" },
+      { value: "both", label: "Organic + paid" }],
+    hint: "Choose either route or coordinate both. Each route has separate assets and approvals." },
   { name: "paid_platform", label: "Paid platform", kind: "select", required: true,
-    showIf: { field: "acquisition_mode", equals: ["paid"] },
+    showIf: [{ field: "campaign_kind", equals: ["opportunity_campaign"] },
+      { field: "acquisition_mode", equals: ["paid", "both"] }],
+    options: [{ value: "meta", label: "Meta Ads" }, { value: "google", label: "Google Ads (planned)" }] },
+  { name: "standalone_paid_platform", label: "Paid platform", kind: "select", required: true,
+    showIf: { field: "campaign_kind", equals: ["standalone_paid"] },
     options: [{ value: "meta", label: "Meta Ads" }, { value: "google", label: "Google Ads (planned)" }] },
   {
     name: "template",
     label: "Campaign template (optional)",
     kind: "select",
-    showIf: { field: "paid_platform", equals: ["meta"] },
+    showIf: [{ field: "campaign_kind", equals: ["opportunity_campaign"] },
+      { field: "paid_platform", equals: ["meta"] }],
     options: templateOptions(),
     hint: "Fixes the objective, the audience state it aims at and what has to be built, so the planner decides none of those. Leave it blank and the campaign is planned from the brief exactly as before.",
   },
@@ -190,6 +220,11 @@ function productionStage(campaign: Campaign, checks: Requirement[], isPlanning: 
 
 export function CampaignExecutionPanel() {
   const { clientId, campaignId } = useParams<{ clientId: string; campaignId?: string }>();
+  return <CampaignExecutionPanelContent key={`${clientId ?? "no-client"}:${campaignId ?? "list"}`} />;
+}
+
+function CampaignExecutionPanelContent() {
+  const { clientId, campaignId } = useParams<{ clientId: string; campaignId?: string }>();
   const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [contentSpec, setContentSpec] = useState<ContentSpecPiece[] | null>(null);
@@ -198,7 +233,22 @@ export function CampaignExecutionPanel() {
   const [readiness, setReadiness] = useState<Record<string, Requirement[]>>({});
   /** Why each campaign exists, where an opportunity says so. */
   const [origins, setOrigins] = useState<ReadonlyMap<string, CampaignOrigin>>(new Map());
+  const [originsState, setOriginsState] = useState<"loading" | "ready" | "error">("loading");
   const [newOpen, setNewOpen] = useState(false);
+  const [newOpportunityChoices, setNewOpportunityChoices] = useState<Array<{ id: string; label: string }>>([]);
+  const [newOpportunityId, setNewOpportunityId] = useState("");
+  const [newOpportunityError, setNewOpportunityError] = useState<string | null>(null);
+  const [newOfferChoices, setNewOfferChoices] = useState<Array<{ id: string; label: string }>>([]);
+  const [newOfferVersionId, setNewOfferVersionId] = useState("");
+  const [newOfferError, setNewOfferError] = useState<string | null>(null);
+  const [newCampaignKind, setNewCampaignKind] = useState("opportunity_campaign");
+  const [newStandaloneOfferChoices, setNewStandaloneOfferChoices] = useState<Array<{ id: string; label: string }>>([]);
+  const [newStandaloneOfferVersionId, setNewStandaloneOfferVersionId] = useState("");
+  const [newStandaloneOfferError, setNewStandaloneOfferError] = useState<string | null>(null);
+  const [newNeedsLandingPage, setNewNeedsLandingPage] = useState(false);
+  const [newNeedsSalesAgent, setNewNeedsSalesAgent] = useState(false);
+  const [newNeedsLeadMagnet, setNewNeedsLeadMagnet] = useState(false);
+  const [newCreationKey, setNewCreationKey] = useState(() => crypto.randomUUID());
   const [cloneSource, setCloneSource] = useState<Campaign | null>(null);
   const [proposing, setProposing] = useState(false);
   // The dialog's own pick, kept here so the generated draft can carry it into
@@ -214,15 +264,17 @@ export function CampaignExecutionPanel() {
   // template is not part of what the endpoint returns — it is the operator's
   // own pick, carried through so the form opens on it.
   const [aiDraft, setAiDraft] = useState<
-    { name: string; brief: string; template?: string } | null
+    { name: string; brief: string; template?: string; campaign_kind?: string } | null
   >(null);
   const newCampaignValues = useMemo(() => ({
+    campaign_kind: aiDraft?.campaign_kind ?? "opportunity_campaign",
     ...aiDraft,
     ...(aiDraft?.template ? { acquisition_mode: "paid", paid_platform: "meta" } : {}),
     ideate_on_plan: true,
   }), [aiDraft]);
   const [editing, setEditing] = useState<Campaign | null>(null);
   const [editingPlan, setEditingPlan] = useState<Campaign | null>(null);
+  const revisionKeys = useRef(new Map<string, string>());
   const [metaToolsOpenFor, setMetaToolsOpenFor] = useState<string | null>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [rowActions, setRowActions] = useState<string | null>(null);
@@ -247,6 +299,7 @@ export function CampaignExecutionPanel() {
     setReadinessError(null);
     setLoading(true);
     setReadiness({});
+    setOriginsState("loading");
     setContentSpec(null);
     setContentSpecError(null);
     setPlannedIdeas(null);
@@ -257,7 +310,7 @@ export function CampaignExecutionPanel() {
       const query = supabase
         .from("client_campaigns")
         .select(
-          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, content_spec_id, plan_approved_at, plan_approved_fingerprint, plan_review_note, needs_landing_page, needs_sales_agent, needs_lead_magnet, built_at, content_ideas_generated_at, ideate_on_plan, launched_at, created_at, template, mirrors_template, daily_budget, target_countries, conversion_event, meta_campaign_id, meta_ad_set_id, meta_built_at, acquisition_mode, paid_platform, cloned_from_campaign_id, offer_version_id",
+          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, content_spec_id, plan_approved_at, plan_approved_fingerprint, plan_review_note, needs_landing_page, needs_sales_agent, needs_lead_magnet, built_at, content_ideas_generated_at, ideate_on_plan, launched_at, created_at, template, mirrors_template, daily_budget, target_countries, conversion_event, meta_campaign_id, meta_ad_set_id, meta_built_at, acquisition_mode, paid_platform, cloned_from_campaign_id, offer_version_id, campaign_kind",
         )
         .eq("client_id", clientId)
         // A campaign somebody archived is over. It reads from the archive.
@@ -298,16 +351,21 @@ export function CampaignExecutionPanel() {
       // line absent rather than failing the load.
       void fetchCampaignOrigins(clientId)
         .then((found) => {
-          if (version === request.current) setOrigins(found);
-      // The launch verdict is read for the whole client at once: the campaigns
-      // list wants a live marker per row, not one request per campaign.
-      void fetchLaunchDue(clientId)
-        .then(setLaunchDue)
-        .catch(() => setLaunchDue(new Map()));
+          if (version === request.current) {
+            setOrigins(found);
+            setOriginsState("ready");
+          }
         })
         .catch(() => {
-          if (version === request.current) setOrigins(new Map());
+          if (version === request.current) {
+            setOrigins(new Map());
+            setOriginsState("error");
+          }
         });
+      // A failed lineage read must not suppress the independent launch verdict.
+      void fetchLaunchDue(clientId)
+        .then((found) => { if (version === request.current) setLaunchDue(found); })
+        .catch(() => { if (version === request.current) setLaunchDue(new Map()); });
 
       // Readiness is computed in the database from the real artifacts, never
       // stored — so it is fetched per campaign rather than read off a column.
@@ -374,30 +432,84 @@ export function CampaignExecutionPanel() {
   }, [newOpen, clientId]);
 
   useEffect(() => {
-    if ((!newOpen && !editingPlan) || !clientId) return;
+    if (!newOpen || !clientId) return;
     let cancelled = false;
-    setOffersFailed(false);
-    void (async () => {
-      const [offers, versions, signoffs] = await Promise.all([
-        supabase.from("service_offers").select("id, service_name").eq("client_id", clientId),
-        supabase.from("service_offer_versions").select("id, offer_id, version, promise").eq("client_id", clientId),
-        supabase.from("service_offer_signoffs").select("offer_version_id").eq("client_id", clientId),
-      ]);
+    setNewOpportunityChoices([]);
+    setNewOpportunityError(null);
+    void Promise.all([
+      fetchOpportunities(clientId), fetchOpportunityApprovalStates(clientId), fetchReadiness(clientId),
+    ]).then(([opportunities, approvals, readinessById]) => {
       if (cancelled) return;
-      if (offers.error || versions.error || signoffs.error) {
-        setOffersFailed(true);
-        setApprovedOfferChoices([]);
-        return;
-      }
+      setNewOpportunityChoices(opportunities
+        .filter((opportunity) => ["approved", "active", "learning", "scaling"].includes(opportunity.status)
+          && approvals.get(opportunity.id) === "current"
+          && readinessById.get(opportunity.id)?.blocker === null)
+        .map((opportunity) => ({ id: opportunity.id, label: opportunity.name })));
+    }).catch((cause) => {
+      if (!cancelled) setNewOpportunityError(cause instanceof Error ? cause.message : "Opportunities could not be loaded.");
+    });
+    return () => { cancelled = true; };
+  }, [newOpen, clientId]);
+
+  useEffect(() => {
+    if (!newOpen || !clientId || !newOpportunityId) return;
+    let cancelled = false;
+    setNewOfferChoices([]);
+    setNewOfferVersionId("");
+    setNewOfferError(null);
+    void fetchOpportunityOfferVersions(clientId, newOpportunityId).then((choices) => {
+      if (!cancelled) setNewOfferChoices(choices);
+    }).catch((cause) => {
+      if (!cancelled) setNewOfferError(cause instanceof Error ? cause.message : "Offer versions could not be loaded.");
+    });
+    return () => { cancelled = true; };
+  }, [newOpen, clientId, newOpportunityId]);
+
+  useEffect(() => {
+    if ((!newOpen && !editingPlan?.campaign_kind?.startsWith("standalone_")) || !clientId) return;
+    let cancelled = false;
+    setNewStandaloneOfferError(null);
+    void Promise.all([
+      supabase.from("service_offers").select("id,service_name,kind,archived_at").eq("client_id", clientId),
+      supabase.from("service_offer_versions").select("id,offer_id,version").eq("client_id", clientId),
+      supabase.from("service_offer_signoffs").select("offer_version_id").eq("client_id", clientId),
+    ]).then(([offers, versions, signoffs]) => {
+      if (cancelled) return;
+      const error = offers.error ?? versions.error ?? signoffs.error;
+      if (error) { setNewStandaloneOfferError(error.message); setNewStandaloneOfferChoices([]); return; }
       const signed = new Set((signoffs.data ?? []).map((row) => row.offer_version_id));
-      const names = new Map((offers.data ?? []).map((row) => [row.id, row.service_name]));
-      setApprovedOfferChoices((versions.data ?? [])
-        .filter((row) => signed.has(row.id))
-        .map((row) => ({ id: row.id,
-          label: `${names.get(row.offer_id) ?? "Service"} v${row.version} · ${row.promise.slice(0, 90)}` })));
-    })().catch(() => { if (!cancelled) setOffersFailed(true); });
+      const latest = new Map<string, number>();
+      for (const version of versions.data ?? []) {
+        latest.set(version.offer_id, Math.max(latest.get(version.offer_id) ?? 0, version.version));
+      }
+      const names = new Map((offers.data ?? []).filter((offer) => !offer.archived_at)
+        .map((offer) => [offer.id, `${offer.service_name} · ${offer.kind}`]));
+      setNewStandaloneOfferChoices((versions.data ?? [])
+        .filter((version) => signed.has(version.id) && latest.get(version.offer_id) === version.version
+          && names.has(version.offer_id))
+        .map((version) => ({ id: version.id,
+          label: `${names.get(version.offer_id)} · version ${version.version}` })));
+    }).catch((cause) => {
+      if (!cancelled) setNewStandaloneOfferError(cause instanceof Error ? cause.message : "Approved offers could not be loaded.");
+    });
     return () => { cancelled = true; };
   }, [newOpen, editingPlan, clientId]);
+
+  useEffect(() => {
+    if (!editingPlan || !clientId) return;
+    let cancelled = false;
+    const origin = origins.get(editingPlan.id);
+    setApprovedOfferChoices([]);
+    setOffersFailed(!origin);
+    if (origin) void fetchOpportunityOfferVersions(clientId, origin.opportunity_id)
+      .then((choices) => {
+        if (!cancelled) {
+          setApprovedOfferChoices(choices);
+          setOffersFailed(false);
+        }
+      }).catch(() => { if (!cancelled) setOffersFailed(true); });
+    return () => { cancelled = true; };
+  }, [editingPlan, clientId, origins]);
 
   const { inFlight, recentFailures } = useAgentJobs(clientId, () => {
     void refresh();
@@ -563,41 +675,60 @@ export function CampaignExecutionPanel() {
 
   /** A planned campaign can have approved creative and an immutable v6 package.
    * Regeneration therefore makes a linked revision and preserves the source. */
-  const createPlanRevision = async (campaign: Campaign, brief: string, changes?: { template: string; offerVersionId: string | null }) => {
+  const createPlanRevision = async (campaign: Campaign, brief: string, changes?: {
+    template: string; offerVersionId: string | null;
+    needsLandingPage?: boolean; needsSalesAgent?: boolean; needsLeadMagnet?: boolean;
+  }) => {
     if (!clientId) throw new Error("No client selected.");
-    if (changes && offersFailed) throw new Error("Approved offers could not be loaded.");
-    if (changes?.offerVersionId && !approvedOfferChoices.some((offer) => offer.id === changes.offerVersionId))
-      throw new Error("Choose an approved offer belonging to this client.");
+    if (campaign.campaign_kind) {
+      const standalone = campaign.campaign_kind.startsWith("standalone_");
+      const offerVersionId = changes ? changes.offerVersionId : campaign.offer_version_id;
+      if (!standalone && !offerVersionId) {
+        throw new Error("An opportunity campaign needs its current signed secondary offer version.");
+      }
+      if (offerVersionId && offerVersionId !== campaign.offer_version_id) {
+        const choices = standalone ? newStandaloneOfferChoices : approvedOfferChoices;
+        if ((standalone ? newStandaloneOfferError : offersFailed)
+          || !choices.some((offer) => offer.id === offerVersionId)) {
+          throw new Error("Choose a current approved offer version for this campaign.");
+        }
+      }
+      const template = standalone ? null : changes?.template ?? campaign.template;
+      if (template && !templateFor(template)) throw new Error("Choose a valid campaign template.");
+      const requestKey = revisionKeys.current.get(campaign.id) ?? crypto.randomUUID();
+      revisionKeys.current.set(campaign.id, requestKey);
+      const { data, error } = await supabase.rpc("create_typed_campaign_revision_v11", {
+        p_campaign_id: campaign.id,
+        p_name: campaign.name,
+        p_brief: brief,
+        p_offer_version_id: offerVersionId ?? "",
+        p_template: template ?? "",
+        p_needs_landing_page: changes?.needsLandingPage ?? campaign.needs_landing_page,
+        p_needs_sales_agent: changes?.needsSalesAgent ?? campaign.needs_sales_agent,
+        p_needs_lead_magnet: changes?.needsLeadMagnet ?? campaign.needs_lead_magnet,
+        p_idempotency_key: requestKey,
+      });
+      if (error) throw error;
+      revisionKeys.current.delete(campaign.id);
+      navigate(`/clients/${clientId}/delivery/campaign-factory/${data.id}`);
+      return;
+    }
+    if (changes && changes.offerVersionId !== campaign.offer_version_id && offersFailed)
+      throw new Error("Signed secondary offers for this opportunity could not be loaded.");
+    if (changes?.offerVersionId && changes.offerVersionId !== campaign.offer_version_id
+      && !approvedOfferChoices.some((offer) => offer.id === changes.offerVersionId))
+      throw new Error("Choose a current signed secondary offer from this campaign's approved opportunity.");
+    const offerVersionId = changes ? changes.offerVersionId : campaign.offer_version_id;
+    if (!offerVersionId) throw new Error("This campaign has no signed secondary offer. Link an approved opportunity and offer before revising it.");
     const nextTemplate = changes?.template ?? campaign.template;
     if (nextTemplate && !templateFor(nextTemplate)) throw new Error("Choose a valid campaign template.");
-    const { data, error } = await supabase.from("client_campaigns").insert({
-      client_id: clientId,
-      name: `${campaign.name.slice(0, 165)} · Plan revision ${new Date().toISOString().slice(0, 10)}`,
-      brief,
-      acquisition_mode: campaign.acquisition_mode,
-      paid_platform: campaign.paid_platform,
-      cloned_from_campaign_id: campaign.id,
-      offer_version_id: changes ? changes.offerVersionId : campaign.offer_version_id,
-      ideate_on_plan: campaign.ideate_on_plan,
-      ...(nextTemplate ? templateColumns(nextTemplate) ?? {} : {}),
-    }).select("id").single();
-    if (error) throw error;
-    // A revision must carry the same selected pillars into its new plan.
-    // Otherwise the planner silently changes the creative scope.
-    const selected = await supabase.from("campaign_content_pillars")
-      .select("pillar_id").eq("campaign_id", campaign.id);
-    if (selected.error) throw selected.error;
-    if (selected.data?.length) {
-      const copied = await supabase.from("campaign_content_pillars").insert(
-        selected.data.map(({ pillar_id }) => ({ campaign_id: data.id, pillar_id })),
-      );
-      if (copied.error) throw copied.error;
-    }
-    const queued = await supabase.rpc("enqueue_agent_job", {
-      p_agent_key: "campaign_plan", p_client_id: clientId,
-      p_input_table: "client_campaigns", p_input_id: data.id,
+    const { data, error } = await supabase.rpc("create_sourced_campaign_revision_v7", {
+      p_campaign_id: campaign.id,
+      p_brief: brief,
+      p_offer_version_id: offerVersionId,
+      p_template: nextTemplate || undefined,
     });
-    if (queued.error) throw queued.error;
+    if (error) throw error;
     navigate(`/clients/${clientId}/delivery/campaign-factory/${data.id}`);
   };
 
@@ -660,13 +791,25 @@ export function CampaignExecutionPanel() {
       ) : (
         campaignId ? visibleCampaigns.map((c) => {
           const reqs = readiness[c.id] ?? [];
-          const paid = c.acquisition_mode === "paid";
-          const tabs = paid ? [ ["plan", "Plan"], ["content", "Content"], ["landing-page", "Landing Page"], ["sales-agent", "Sales Agent"], ...(c.paid_platform === "meta" ? [["meta-ads", "Meta Ads"]] as const : []), ["launch", "Launch state"] ] as const : [ ["plan", "Plan"], ["content", "Content"], ["launch", "Launch state"] ] as const;
+          const paid = c.acquisition_mode === "paid" || c.acquisition_mode === "both";
+          const tabs: Array<[string, string]> = c.campaign_kind
+            ? [["plan", "Plan"],
+              ...(paid ? [["paid", "Paid"]] as Array<[string, string]> : []),
+              ...(c.acquisition_mode === "organic" || c.acquisition_mode === "both"
+                ? [["organic", "Organic"]] as Array<[string, string]> : []),
+              ...(c.needs_landing_page ? [["landing-page", "Landing Page"]] as Array<[string, string]> : []),
+              ...(c.needs_sales_agent ? [["sales-agent", "Sales Agent"]] as Array<[string, string]> : []),
+              ...(c.needs_lead_magnet ? [["lead-magnet", "Lead Magnet"]] as Array<[string, string]> : []),
+              ["launch", "Launch"]]
+            : paid ? [["plan", "Plan"], ["content", "Content"], ["landing-page", "Landing Page"],
+              ["sales-agent", "Sales Agent"], ...(c.paid_platform === "meta" ? [["meta-ads", "Meta Ads"]] as Array<[string, string]> : []),
+              ["launch", "Launch state"]]
+              : [["plan", "Plan"], ["content", "Content"], ["launch", "Launch state"]];
           return <div key={c.id}>
             <section className="rounded-lg border border-border bg-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div><div className="flex items-center gap-3"><h2 className="text-lg font-semibold">{c.name}</h2><span className={cn("rounded-full px-2 py-0.5 text-xs font-medium capitalize", STATUS_TONE[c.status] ?? "bg-muted text-muted-foreground")}>{c.status}</span></div>
-                  <p className="mt-1 text-xs text-muted-foreground">{c.acquisition_mode === "paid" ? `Paid · ${c.paid_platform === "meta" ? "Meta Ads" : "Google Ads"}` : c.acquisition_mode === "organic" ? "Organic" : "Legacy campaign"}
+                  <p className="mt-1 text-xs text-muted-foreground">{campaignKindLabel(c)} · {campaignRouteLabel(c)}
                     {c.cloned_from_campaign_id && <>{" · "}<Link className="text-brand-strong underline" to={`/clients/${clientId}/delivery/campaign-factory/${c.cloned_from_campaign_id}`}>Source campaign</Link></>}
                   </p></div>
                 <button type="button" className={buttonClass} onClick={() => setEditing(c)}>Edit campaign</button>
@@ -703,6 +846,18 @@ export function CampaignExecutionPanel() {
                   </div>
                 );
               })()}
+              {originsState === "ready" && !origins.has(c.id) && (
+                <p className="mt-3 rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+                  {c.campaign_kind?.startsWith("standalone_")
+                    ? "Standalone campaign. No market opportunity is required; any selected offer version is rechecked before production."
+                    : "No opportunity source is recorded for this campaign. It remains readable, but a new plan revision or route clone needs an approved opportunity and signed secondary offer."}
+                </p>
+              )}
+              {originsState === "error" && (
+                <p role="alert" className="mt-3 text-xs text-destructive">
+                  Campaign opportunity sources could not be read. Source-dependent actions remain unverified.
+                </p>
+              )}
               <dl className="mt-4 grid gap-4 border-t border-border pt-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
                 <div><dt className="text-muted-foreground">Brief</dt><dd className="whitespace-pre-wrap">{c.brief}</dd></div>
                 <div><dt className="text-muted-foreground">Objective</dt><dd>{c.objective ?? "Awaiting plan"}</dd></div>
@@ -724,11 +879,11 @@ export function CampaignExecutionPanel() {
               {packageState.manifest && <p className="mt-3 text-xs text-muted-foreground">New content links record the campaign package active when linked. Older links are marked as not version-bound; review the exact asset before requesting external approval.</p>}
               {packageState.approvals.length > 0 && <p className="mt-3 text-xs text-muted-foreground">Current-package approvals: {packageState.approvals.map((approval) => `${approval.action_key.replaceAll("_", " ")} · ${approval.status}`).join("; ")}</p>}
             </section>
-            {clientId && c.acquisition_mode !== "legacy" &&
+            {clientId && !c.campaign_kind && c.acquisition_mode !== "legacy" &&
               <CampaignPackageReadiness campaignId={c.id} clientId={clientId} />}
-            {clientId && c.acquisition_mode !== "legacy" &&
+            {clientId && !c.campaign_kind && c.acquisition_mode !== "legacy" &&
               <CampaignSweepWork clientId={clientId} campaignId={c.id} />}
-            {clientId && c.acquisition_mode !== "legacy"
+            {clientId && !c.campaign_kind && c.acquisition_mode !== "legacy"
               && (c.needs_landing_page || c.needs_sales_agent || c.needs_lead_magnet) &&
               <CampaignConversionWork clientId={clientId} campaignId={c.id}
                 needsPage={c.needs_landing_page} needsAgent={c.needs_sales_agent}
@@ -745,7 +900,7 @@ export function CampaignExecutionPanel() {
               <dl className="grid gap-4 rounded-lg border border-border bg-card p-4 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">Objective</dt><dd>{c.objective ?? "—"}</dd></div><div><dt className="text-muted-foreground">Audience</dt><dd>{c.audience ?? "—"}</dd></div><div><dt className="text-muted-foreground">Offer</dt><dd>{c.offer_summary ?? "—"}</dd></div><div><dt className="text-muted-foreground">Core message</dt><dd>{c.core_message ?? "—"}</dd></div><div><dt className="text-muted-foreground">Channels</dt><dd>{c.channels?.join(", ") || "—"}</dd></div><div><dt className="text-muted-foreground">Budget</dt><dd>{c.budget == null ? "—" : c.budget.toLocaleString()}</dd></div><div><dt className="text-muted-foreground">Dates</dt><dd>{c.starts_on ?? "—"} to {c.ends_on ?? "—"}</dd></div><div><dt className="text-muted-foreground">KPI</dt><dd>{c.kpi_metric ?? "—"}{c.kpi_target != null ? ` · target ${c.kpi_target}` : ""}</dd></div><div><dt className="text-muted-foreground">Content pieces</dt><dd>{c.content_count}</dd></div><div><dt className="text-muted-foreground">Required builds</dt><dd>{[c.needs_landing_page && "Landing page", c.needs_sales_agent && "Sales agent", c.needs_lead_magnet && "Lead magnet"].filter(Boolean).join(", ") || "None"}</dd></div></dl>
               {c.built_at && c.acquisition_mode !== "legacy" && <div className="flex flex-wrap items-center gap-3 text-xs">
                 <span>Lead magnet required: {c.needs_lead_magnet ? "Yes" : "No"}</span>
-                <button type="button" className={buttonClass}
+                {!c.campaign_kind && <button type="button" className={buttonClass}
                   disabled={busy || c.plan_approved_at !== null}
                   onClick={async () => {
                     setBusy(true); setProblem(null);
@@ -757,8 +912,9 @@ export function CampaignExecutionPanel() {
                     else { setNotice("Magnet requirement changed. Review and approve the plan."); void refresh(); }
                   }}>
                   {c.needs_lead_magnet ? "Remove magnet requirement" : "Require a lead magnet"}
-                </button>
-                {c.plan_approved_at !== null && <span className="text-muted-foreground">Regenerate the plan to change this requirement.</span>}
+                </button>}
+                {c.campaign_kind ? <span className="text-muted-foreground">Create a plan revision to change selected modules.</span>
+                  : c.plan_approved_at !== null && <span className="text-muted-foreground">Regenerate the plan to change this requirement.</span>}
               </div>}
               {c.acquisition_mode !== "legacy" && c.content_count > 0 && (
                 <div className="rounded-lg border border-border bg-card p-4 text-sm">
@@ -807,13 +963,13 @@ export function CampaignExecutionPanel() {
               {c.built_at && (
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4">
                   <div>
-                    <p className="text-sm font-medium">Sweep into work</p>
+                    <p className="text-sm font-medium">{c.campaign_kind ? "Generate selected assets" : "Sweep into work"}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {c.plan_approved_at === null
-                        ? "Approve the plan first. A sweep is the moment a plan becomes work, so it refuses an unreviewed one."
+                        ? "Approve the plan first. Generation uses the reviewed routes, formats and counts."
                         : sweeping.has(c.id)
                           ? "A sweep of this campaign is queued. One at a time, so two sweeps cannot compose the same steps twice."
-                          : `Prepares ${c.content_count} ${c.content_count === 1 ? "piece" : "pieces"} of planned content${c.needs_landing_page ? ", a page" : ""}${c.needs_sales_agent ? ", a sales agent" : ""}${c.needs_lead_magnet ? ", and a lead magnet PDF" : ""}. Each output stops for review before public use.`}
+                          : `Prepares ${c.content_count} ${c.content_count === 1 ? "piece" : "pieces"} of planned content${c.campaign_kind && contentSpec ? ` (${contentSpec.map((piece) => `${piece.route} ${piece.platform} ${piece.media_type} ${piece.content_format}`).join("; ")})` : ""}${c.needs_landing_page ? ", a page" : ""}${c.needs_sales_agent ? ", a sales agent" : ""}${c.needs_lead_magnet ? ", and a lead magnet PDF" : ""}. Each output stops for review before public use.`}
                     </p>
                   </div>
                   <button
@@ -822,20 +978,58 @@ export function CampaignExecutionPanel() {
                     disabled={busy || c.plan_approved_at === null || sweeping.has(c.id)}
                     onClick={() => void sweep(c)}
                   >
-                    {sweeping.has(c.id) ? "Sweeping…" : "Sweep into work"}
+                    {sweeping.has(c.id) ? "Sweeping…" : c.campaign_kind ? "Generate Assets" : "Sweep into work"}
                   </button>
                 </div>
               )}
             </section>}
-            {v2Tab === "launch" && (launchDue.get(c.id)
-              ? <section className="py-4" aria-label="Launch"><CampaignLaunchGate due={launchDue.get(c.id)!} /></section>
-              : <section className="py-4"><p className="text-sm text-muted-foreground">No launch verdict yet. A campaign needs a package before there is anything to launch.</p></section>)}
+            {v2Tab === "launch" && <>
+              {c.campaign_kind && clientId &&
+                <CampaignPackageReadiness campaignId={c.id} clientId={clientId} />}
+              {launchDue.get(c.id)
+                ? <section className="py-4" aria-label="Launch"><CampaignLaunchGate due={launchDue.get(c.id)!} /></section>
+                : <section className="py-4"><p className="text-sm text-muted-foreground">No launch verdict yet. A campaign needs a package before there is anything to launch.</p></section>}
+              {c.campaign_kind && paid && clientId
+                && (c.paid_platform === "meta" || c.paid_platform === "google") && (
+                <section className="py-4" aria-label="Launch paid operator pack">
+                  <PaidOperatorBundles clientId={clientId} platform={c.paid_platform} campaignId={c.id} />
+                </section>)}
+            </>}
             {v2Tab === "content" && clientId && <CampaignContentPanel key={`${clientId}:${c.id}:v2`} clientId={clientId} campaignId={c.id} contentCount={c.content_count} builtAt={c.built_at} contentIdeasGeneratedAt={c.content_ideas_generated_at} template={c.template} mirrorsTemplate={c.mirrors_template} onChanged={refresh} refreshToken={campaigns} layout="v2" />}
-            {paid && v2Tab === "landing-page" && clientId && <PageBuilderPanel key={c.id} clientId={clientId} campaignId={c.id} campaignName={c.name} />}
-            {paid && v2Tab === "sales-agent" && <SalesOverviewPanel key={c.id} campaignId={c.id} campaignName={c.name} />}
-            {paid && c.paid_platform === "meta" && v2Tab === "meta-ads" && clientId && <section className="py-4"><div className="rounded-lg border border-border bg-card p-4 text-sm"><h3 className="font-semibold">Meta activation</h3><p className="mt-2 text-xs text-muted-foreground">{packageState.manifest ? `Current package v${packageState.manifest.version}. ` : "A planned package is required. "}{packageState.approvals.filter((approval) => approval.action_key === "meta_ad_build").map((approval) => `Meta ad build approval: ${approval.status}. `).join("") || "No Meta build approval is recorded for this package. "}Prepare the build sheet and approved creative here. Creating Meta objects still awaits the exact-version approval executor.</p><Link className="mt-2 inline-block text-xs text-brand-strong underline" to={`/clients/${clientId}/delivery/approval-inbox?tab=campaign-actions`}>Open Approval Inbox</Link>{c.meta_campaign_id && <p className="mt-2 text-xs">Meta campaign {c.meta_campaign_id}{c.meta_ad_set_id ? ` · ad set ${c.meta_ad_set_id}` : " · ad set pending"}{c.meta_built_at ? ` · recorded ${new Date(c.meta_built_at).toLocaleString()}` : ""}</p>}</div><div className="mt-3 flex justify-end"><Button onClick={() => setMetaToolsOpenFor((open) => open === c.id ? null : c.id)}>Build functionality</Button></div>{metaToolsOpen && <MetaBuildSection clientId={clientId} campaign={c} building={inFlight.some((job) => job.agent_key === "meta_build" && job.input_id === c.id)} onChanged={() => { void refresh(); void packageState.refresh(); }} externalActionsAvailable={false} handBuildAvailable showSheetInline />}</section>}
+            {c.campaign_kind && (v2Tab === "paid" || v2Tab === "organic") && clientId && (
+              contentSpec ? <CampaignContentPanel key={`${clientId}:${c.id}:${v2Tab}`} clientId={clientId}
+                campaignId={c.id} contentCount={contentSpec.filter((piece) => piece.route === v2Tab).length}
+                routePositions={contentSpec.flatMap((piece, index) => piece.route === v2Tab ? [index + 1] : [])}
+                builtAt={c.built_at} contentIdeasGeneratedAt={c.content_ideas_generated_at}
+                template={c.template} mirrorsTemplate={c.mirrors_template} onChanged={refresh}
+                refreshToken={campaigns} layout="v2" />
+                : <p className="py-4 text-sm text-muted-foreground">The route content specification is awaiting the planner.</p>)}
+            {c.campaign_kind && (v2Tab === "paid" || v2Tab === "organic") && clientId && (
+              <CampaignSweepWork clientId={clientId} campaignId={c.id} route={v2Tab} />)}
+            {c.campaign_kind && v2Tab === "paid" && paid && clientId
+              && (c.paid_platform === "meta" || c.paid_platform === "google") && (
+              <section className="py-4" aria-label="Paid operator pack">
+                <PaidOperatorBundles clientId={clientId} platform={c.paid_platform} campaignId={c.id} />
+              </section>)}
+            {v2Tab === "landing-page" && clientId && (c.campaign_kind ? c.needs_landing_page : paid) && <>
+              {c.campaign_kind && <CampaignConversionWork clientId={clientId} campaignId={c.id}
+                needsPage needsAgent={false} visibleModule="page" />}
+              <PageBuilderPanel key={c.id} clientId={clientId} campaignId={c.id} campaignName={c.name} />
+            </>}
+            {v2Tab === "sales-agent" && (c.campaign_kind ? c.needs_sales_agent : paid) && <>
+              {c.campaign_kind && clientId && <CampaignConversionWork clientId={clientId} campaignId={c.id}
+                needsPage={false} needsAgent visibleModule="agent" />}
+              <SalesOverviewPanel key={c.id} campaignId={c.id} campaignName={c.name} />
+            </>}
+            {c.campaign_kind && v2Tab === "lead-magnet" && c.needs_lead_magnet && clientId && <>
+              <CampaignConversionWork clientId={clientId} campaignId={c.id}
+                needsPage={false} needsAgent={false} needsMagnet visibleModule="magnet" />
+              <Link className="mt-3 inline-block text-sm text-brand-strong underline"
+                to={`/clients/${clientId}/delivery/lead-magnet-studio`}>Open Lead Magnet Studio</Link>
+            </>}
+            {paid && c.paid_platform === "meta" && (v2Tab === "meta-ads" || v2Tab === "paid") && clientId && <section className="py-4"><div className="rounded-lg border border-border bg-card p-4 text-sm"><h3 className="font-semibold">Meta paid handoff</h3><p className="mt-2 text-xs text-muted-foreground">{packageState.manifest ? `Current package v${packageState.manifest.version}. ` : "A planned package is required. "}{packageState.approvals.filter((approval) => approval.action_key === "meta_ad_build").map((approval) => `Meta ad build approval: ${approval.status}. `).join("") || "No Meta build approval is recorded for this package. "}Prepare the build sheet and approved creative for the human paid operator here. Export is not ad activation.</p><Link className="mt-2 inline-block text-xs text-brand-strong underline" to={`/clients/${clientId}/delivery/approval-inbox?tab=campaign-actions`}>Open Approval Inbox</Link>{c.meta_campaign_id && <p className="mt-2 text-xs">Meta campaign {c.meta_campaign_id}{c.meta_ad_set_id ? ` · ad set ${c.meta_ad_set_id}` : " · ad set pending"}{c.meta_built_at ? ` · recorded ${new Date(c.meta_built_at).toLocaleString()}` : ""}</p>}</div><div className="mt-3 flex justify-end"><Button onClick={() => setMetaToolsOpenFor((open) => open === c.id ? null : c.id)}>Build functionality</Button></div>{metaToolsOpen && <MetaBuildSection clientId={clientId} campaign={c} building={inFlight.some((job) => job.agent_key === "meta_build" && job.input_id === c.id)} onChanged={() => { void refresh(); void packageState.refresh(); }} externalActionsAvailable={false} handBuildAvailable showSheetInline />}</section>}
           </div>;
-        }) : <div className="overflow-x-auto rounded-lg border border-border bg-card"><table className="w-full text-left text-sm"><thead className="border-b border-border bg-muted/40"><tr><th className="p-3">Campaign</th><th className="p-3">Route</th><th className="p-3">Type</th><th className="p-3">Date</th><th className="p-3">Status</th><th className="p-3">Production stage</th><th className="p-3">Actions</th></tr></thead><tbody>{visibleCampaigns.map((c) => <tr key={c.id} className="border-b border-border last:border-0"><td className="p-3"><Link className="font-medium text-brand-strong hover:underline" to={`/clients/${clientId}/delivery/campaign-factory/${c.id}`}>{c.name}</Link>{c.cloned_from_campaign_id && <span className="block text-xs text-muted-foreground">Revised or cloned from another campaign</span>}</td><td className="p-3">{c.acquisition_mode === "paid" ? `Paid · ${c.paid_platform === "meta" ? "Meta" : "Google"}` : c.acquisition_mode === "organic" ? "Organic" : "Legacy"}</td><td className="p-3">{c.acquisition_mode === "organic" ? "Organic" : c.acquisition_mode === "paid" ? "Paid" : "Not specified"}</td><td className="p-3">{new Date(c.created_at).toLocaleDateString()}</td><td className="p-3 capitalize">{c.status}</td><td className="p-3">{productionStage(c, readiness[c.id] ?? [], planning.has(c.id))}</td><td className="p-3"><button type="button" className={buttonClass} aria-expanded={rowActions === c.id} onClick={() => setRowActions(rowActions === c.id ? null : c.id)}>Actions</button>{rowActions === c.id && <CampaignActions campaign={c} checks={readiness[c.id] ?? []} busy={busy} planning={planning.has(c.id)} onChoose={(kind) => setConfirmAction({ campaign: c, kind })} />}</td></tr>)}</tbody></table></div>
+        }) : <div className="overflow-x-auto rounded-lg border border-border bg-card"><table className="w-full text-left text-sm"><thead className="border-b border-border bg-muted/40"><tr><th className="p-3">Campaign</th><th className="p-3">Route</th><th className="p-3">Source</th><th className="p-3">Type</th><th className="p-3">Date</th><th className="p-3">Status</th><th className="p-3">Production stage</th><th className="p-3">Actions</th></tr></thead><tbody>{visibleCampaigns.map((c) => <tr key={c.id} className="border-b border-border last:border-0"><td className="p-3"><Link className="font-medium text-brand-strong hover:underline" to={`/clients/${clientId}/delivery/campaign-factory/${c.id}`}>{c.name}</Link>{c.cloned_from_campaign_id && <span className="block text-xs text-muted-foreground">Revised or cloned from another campaign</span>}</td><td className="p-3">{campaignRouteLabel(c)}</td><td className="p-3">{originsState === "loading" ? "Checking…" : originsState === "error" ? "Unavailable" : origins.has(c.id) ? "Opportunity linked" : "No link recorded"}</td><td className="p-3">{campaignKindLabel(c)}</td><td className="p-3">{new Date(c.created_at).toLocaleDateString()}</td><td className="p-3 capitalize">{c.status}</td><td className="p-3">{productionStage(c, readiness[c.id] ?? [], planning.has(c.id))}</td><td className="p-3"><button type="button" className={buttonClass} aria-expanded={rowActions === c.id} onClick={() => setRowActions(rowActions === c.id ? null : c.id)}>Actions</button>{rowActions === c.id && <CampaignActions campaign={c} checks={readiness[c.id] ?? []} busy={busy} planning={planning.has(c.id)} onChoose={(kind) => setConfirmAction({ campaign: c, kind })} />}</td></tr>)}</tbody></table></div>
       )}
 
       <FormModal
@@ -843,20 +1037,77 @@ export function CampaignExecutionPanel() {
         onClose={() => {
           setNewOpen(false);
           setAiDraft(null);
+          setNewOpportunityId("");
+          setNewOfferVersionId("");
+          setChosenPillars([]);
+          setNewStandaloneOfferVersionId("");
+          setNewNeedsLandingPage(false);
+          setNewNeedsSalesAgent(false);
+          setNewNeedsLeadMagnet(false);
+          setNewCreationKey(crypto.randomUUID());
         }}
         title="New Campaign"
         draftKey={`campaign:${clientId}`}
-        intro="Queues the Campaign Planner. Select an approved service offer to bind its exact version to the plan and package. The planner needs the ICP and uses the client-wide offer strategy when no offer is selected."
-        fields={[...FIELDS, { name: "offer_version_id", label: "Approved service offer (optional)",
-          kind: "select", options: approvedOfferChoices.map((offer) => ({ value: offer.id, label: offer.label })),
-          hint: "The selected version is fixed for this campaign. Leave empty to use the client-wide offer strategy." } as FieldDef]}
+        intro="Choose the campaign type first. Opportunity campaigns need an approved market opportunity and its signed offer; standalone campaigns can use a current approved offer or plan from Strategy. The planner is queued after all inputs are saved."
+        fields={FIELDS}
+        onValuesChange={(values) => setNewCampaignKind(String(values.campaign_kind || "opportunity_campaign"))}
         extra={
-          offersFailed ? <p role="alert" className="text-sm text-destructive">
-            Approved offers could not be loaded. Try again before planning this campaign.
-          </p> : pillarsFailed ? (
+          <div className="space-y-3">
+            {newCampaignKind === "opportunity_campaign" && <>
+            <label className="block text-sm font-medium text-foreground">
+              Approved market opportunity
+              <select className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2"
+                value={newOpportunityId} onChange={(event) => {
+                  setNewOpportunityId(event.target.value);
+                  setNewOfferVersionId("");
+                  setNewOfferChoices([]);
+                }}>
+                <option value="">Select…</option>
+                {newOpportunityChoices.map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}
+              </select>
+            </label>
+            {newOpportunityError && <p role="alert" className="text-sm text-destructive">Opportunities unavailable: {newOpportunityError}</p>}
+            {!newOpportunityError && newOpportunityChoices.length === 0 &&
+              <p className="text-xs text-muted-foreground">No approved, ready opportunities are available for this client.</p>}
+            <label className="block text-sm font-medium text-foreground">
+              Signed secondary offer version
+              <select className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2"
+                value={newOfferVersionId} disabled={!newOpportunityId}
+                onChange={(event) => setNewOfferVersionId(event.target.value)}>
+                <option value="">Select…</option>
+                {newOfferChoices.map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}
+              </select>
+            </label>
+            {newOfferError && <p role="alert" className="text-sm text-destructive">Offer versions unavailable: {newOfferError}</p>}
+            {newOpportunityId && !newOfferError && newOfferChoices.length === 0 &&
+              <p className="text-xs text-muted-foreground">No signed secondary offer version is linked to this opportunity yet.</p>}
+            </>}
+            {newCampaignKind !== "opportunity_campaign" && <>
+              <label className="block text-sm font-medium text-foreground">Approved offer version (optional)
+                <select className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2"
+                  value={newStandaloneOfferVersionId}
+                  onChange={(event) => setNewStandaloneOfferVersionId(event.target.value)}>
+                  <option value="">Plan from current Strategy without an offer</option>
+                  {newStandaloneOfferChoices.map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}
+                </select>
+              </label>
+              {newStandaloneOfferError && <p role="alert" className="text-sm text-destructive">Approved offers unavailable: {newStandaloneOfferError}</p>}
+            </>}
+            <fieldset className="rounded-md border border-border p-3">
+              <legend className="px-1 text-sm font-medium text-card-foreground">Build with this campaign</legend>
+              <p className="mb-2 text-xs text-muted-foreground">Selected producers become plan requirements. Changing them later needs a new plan revision.</p>
+              {([[
+                "Landing page", newNeedsLandingPage, setNewNeedsLandingPage,
+              ], ["Sales agent", newNeedsSalesAgent, setNewNeedsSalesAgent],
+                ["Lead magnet", newNeedsLeadMagnet, setNewNeedsLeadMagnet]] as const).map(([label, checked, setChecked]) =>
+                <label key={label} className="flex items-center gap-2 py-1 text-sm">
+                  <input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} />{label}
+                </label>)}
+            </fieldset>
+            {pillarsFailed ? (
             <p role="alert" className="rounded-md border border-border p-3 text-sm text-destructive">
               Could not load this client&apos;s content pillars, so none can be picked. The campaign can
-              still be planned without them.
+              still be planned without pillars.
             </p>
           ) : pillars.length > 0 ? (
             <fieldset className="rounded-md border border-border p-3">
@@ -889,7 +1140,8 @@ export function CampaignExecutionPanel() {
                 ))}
               </div>
             </fieldset>
-          ) : null
+          ) : null}
+          </div>
         }
         submitLabel="Plan it"
         initialValues={newCampaignValues}
@@ -905,56 +1157,79 @@ export function CampaignExecutionPanel() {
         }
         onSubmit={async (v) => {
           if (!clientId) throw new Error("No client selected.");
-          if (offersFailed) throw new Error("Approved offers could not be loaded.");
-          if (v.offer_version_id && !approvedOfferChoices.some((offer) => offer.id === v.offer_version_id))
-            throw new Error("Choose an approved offer belonging to this client.");
-          const acquisitionMode = v.acquisition_mode;
-          const paidPlatform = acquisitionMode === "paid" ? v.paid_platform : null;
-          if (acquisitionMode !== "organic" && acquisitionMode !== "paid")
-            throw new Error("Choose an organic or paid route.");
-          if (acquisitionMode === "paid" && paidPlatform !== "meta" && paidPlatform !== "google")
-            throw new Error("Choose Meta Ads or Google Ads for this paid campaign.");
-          const { data, error } = await supabase
-            .from("client_campaigns")
-            .insert({
-              client_id: clientId,
-              name: (v.name as string).trim(),
-              brief: (v.brief as string).trim(),
-              acquisition_mode: acquisitionMode,
-              paid_platform: paidPlatform as "meta" | "google" | null,
-              offer_version_id: (v.offer_version_id as string) || null,
-              ideate_on_plan: v.ideate_on_plan !== false,
-              // Spread only when a template was picked. The columns arrive in
-              // migration 96, and a campaign planned without a template must
-              // keep working on a database that does not have them yet.
-              ...(acquisitionMode === "paid" && paidPlatform === "meta"
-                ? templateColumns(v.template as string) ?? {} : {}),
-            })
-            .select("id")
-            .single();
-          if (error) throw error;
-
-          if (chosenPillars.length > 0) {
-            const { error: pillarError } = await supabase.from("campaign_content_pillars").insert(
-              chosenPillars.map((pillar_id) => ({ campaign_id: data.id, pillar_id })),
-            );
-            // Fail before queueing. A campaign planned without the pillars
-            // somebody chose would generate the wrong content and look right.
-            if (pillarError) throw new Error(pillarError.message);
+          if (pillarsFailed && chosenPillars.length > 0)
+            throw new Error("Content pillars could not be checked.");
+          const kind = String(v.campaign_kind ?? "");
+          if (kind === "standalone_paid" || kind === "standalone_organic") {
+            if (newStandaloneOfferVersionId && (newStandaloneOfferError
+              || !newStandaloneOfferChoices.some((choice) => choice.id === newStandaloneOfferVersionId)))
+              throw new Error("Choose a current signed offer version or leave the offer empty.");
+            const paidPlatform = kind === "standalone_paid" ? String(v.standalone_paid_platform ?? "") : null;
+            if (kind === "standalone_paid" && paidPlatform !== "meta" && paidPlatform !== "google")
+              throw new Error("Choose Meta Ads or Google Ads for this paid campaign.");
+            const { error } = await supabase.rpc("create_standalone_campaign_plan_v11", {
+              p_client_id: clientId,
+              p_campaign_kind: kind,
+              p_name: String(v.name ?? "").trim(),
+              p_direction: String(v.brief ?? "").trim(),
+              p_ideate_on_plan: v.ideate_on_plan !== false,
+              p_paid_platform: paidPlatform as unknown as string,
+              p_offer_version_id: (newStandaloneOfferVersionId || null) as unknown as string,
+              p_needs_landing_page: newNeedsLandingPage,
+              p_needs_sales_agent: newNeedsSalesAgent,
+              p_needs_lead_magnet: newNeedsLeadMagnet,
+              p_pillar_ids: chosenPillars,
+              p_idempotency_key: newCreationKey,
+            });
+            if (error) throw new Error(error.message);
+            setNotice("Queued. The standalone campaign planner is writing the selected route.");
+            return;
           }
-
-          const { error: jobError } = await supabase.rpc("enqueue_agent_job", {
-            p_agent_key: "campaign_plan",
+          if (kind !== "opportunity_campaign") throw new Error("Choose a campaign type.");
+          if (newOpportunityError) throw new Error("Approved opportunities could not be loaded.");
+          if (!newOpportunityChoices.some((choice) => choice.id === newOpportunityId))
+            throw new Error("Choose a currently approved and ready market opportunity.");
+          if (newOfferError) throw new Error("Signed secondary offers could not be loaded.");
+          if (!newOfferChoices.some((choice) => choice.id === newOfferVersionId))
+            throw new Error("Choose a signed secondary offer version linked to that opportunity.");
+          const acquisitionMode = v.acquisition_mode;
+          const paid = acquisitionMode === "paid" || acquisitionMode === "both";
+          const paidPlatform = paid ? v.paid_platform : null;
+          if (acquisitionMode !== "organic" && acquisitionMode !== "paid" && acquisitionMode !== "both")
+            throw new Error("Choose an organic, paid, or combined route.");
+          if (paid && paidPlatform !== "meta" && paidPlatform !== "google")
+            throw new Error("Choose Meta Ads or Google Ads for this paid campaign.");
+          const chosenTemplate = paidPlatform === "meta" ? (v.template as string) : "";
+          if (chosenTemplate && !templateFor(chosenTemplate))
+            throw new Error("Choose a known campaign template.");
+          const { error } = await supabase.rpc("create_opportunity_campaign_plan_v11", {
             p_client_id: clientId,
-            p_input_table: "client_campaigns",
-            p_input_id: data.id,
+            p_opportunity_id: newOpportunityId,
+            p_offer_version_id: newOfferVersionId,
+            p_name: (v.name as string).trim(),
+            p_direction: (v.brief as string).trim(),
+            p_acquisition_mode: acquisitionMode,
+            p_ideate_on_plan: v.ideate_on_plan !== false,
+            p_paid_platform: (paid ? paidPlatform : null) as unknown as string,
+            p_template: (chosenTemplate || null) as unknown as string,
+            p_pillar_ids: chosenPillars,
+            p_needs_landing_page: newNeedsLandingPage,
+            p_needs_sales_agent: newNeedsSalesAgent,
+            p_needs_lead_magnet: newNeedsLeadMagnet,
           });
-          if (jobError) throw new Error(jobError.message);
+          if (error) throw new Error(error.message);
           setNotice("Queued. The planner is writing the campaign now.");
         }}
         onSaved={() => {
           setAiDraft(null);
           setChosenPillars([]);
+          setNewOpportunityId("");
+          setNewOfferVersionId("");
+          setNewStandaloneOfferVersionId("");
+          setNewNeedsLandingPage(false);
+          setNewNeedsSalesAgent(false);
+          setNewNeedsLeadMagnet(false);
+          setNewCreationKey(crypto.randomUUID());
           void refresh();
         }}
       />
@@ -990,11 +1265,21 @@ export function CampaignExecutionPanel() {
         open={editingPlan !== null}
         onClose={() => setEditingPlan(null)}
         title="Edit and regenerate plan"
-        intro="Saving creates a new campaign revision and asks the planner to apply these directions. Review the generated plan before building; existing assets and approvals stay with the original campaign. Select a different approved offer or Meta template here when that binding must change."
+        intro="Saving creates a new campaign revision and asks the planner to apply these directions. Review the generated plan before building; existing assets and approvals stay with the original campaign."
         fields={[
           { name: "brief", label: "Campaign brief", kind: "textarea", rows: 4, required: true },
-          ...(editingPlan?.acquisition_mode === "paid" && editingPlan.paid_platform === "meta" ? [{ name: "template", label: "Meta template", kind: "select", options: templateOptions() } as FieldDef] : []),
-          { name: "offer_version_id", label: "Approved service offer", kind: "select", options: approvedOfferChoices.map((offer) => ({ value: offer.id, label: offer.label })) },
+          ...(editingPlan?.campaign_kind?.startsWith("standalone_") ? []
+            : editingPlan?.acquisition_mode === "paid" && editingPlan.paid_platform === "meta"
+              ? [{ name: "template", label: "Meta template", kind: "select", options: templateOptions() } as FieldDef] : []),
+          { name: "offer_version_id", label: editingPlan?.campaign_kind?.startsWith("standalone_")
+            ? "Approved offer version (optional)" : "Signed secondary offer for this opportunity",
+          kind: "select", options: (editingPlan?.campaign_kind?.startsWith("standalone_")
+            ? newStandaloneOfferChoices : approvedOfferChoices).map((offer) => ({ value: offer.id, label: offer.label })) },
+          ...(editingPlan?.campaign_kind ? [
+            { name: "needs_landing_page", label: "Build landing page", kind: "toggle" } as FieldDef,
+            { name: "needs_sales_agent", label: "Build sales agent", kind: "toggle" } as FieldDef,
+            { name: "needs_lead_magnet", label: "Build lead magnet", kind: "toggle" } as FieldDef,
+          ] : []),
           { name: "objective", label: "Objective", kind: "textarea", rows: 2 },
           { name: "audience", label: "Audience", kind: "textarea", rows: 2 },
           { name: "offer_summary", label: "Offer", kind: "textarea", rows: 2 },
@@ -1009,6 +1294,9 @@ export function CampaignExecutionPanel() {
         ]}
         initialValues={editingPlan ? {
           brief: editingPlan.brief, template: editingPlan.template ?? "", offer_version_id: editingPlan.offer_version_id ?? "", objective: editingPlan.objective, audience: editingPlan.audience,
+          needs_landing_page: editingPlan.needs_landing_page,
+          needs_sales_agent: editingPlan.needs_sales_agent,
+          needs_lead_magnet: editingPlan.needs_lead_magnet,
           offer_summary: editingPlan.offer_summary, core_message: editingPlan.core_message,
           channels: editingPlan.channels?.join(", ") ?? "", budget: editingPlan.budget?.toString() ?? "",
           starts_on: editingPlan.starts_on, ends_on: editingPlan.ends_on,
@@ -1031,6 +1319,9 @@ export function CampaignExecutionPanel() {
           await createPlanRevision(editingPlan, `${brief}\n\nRequested plan direction:\n${planInstructions.join("\n")}`, {
             template: String(values.template ?? editingPlan.template ?? ""),
             offerVersionId: String(values.offer_version_id ?? "") || null,
+            needsLandingPage: Boolean(values.needs_landing_page),
+            needsSalesAgent: Boolean(values.needs_sales_agent),
+            needsLeadMagnet: Boolean(values.needs_lead_magnet),
           });
         }}
         onSaved={() => setEditingPlan(null)}
@@ -1137,7 +1428,8 @@ export function CampaignExecutionPanel() {
             // The template rides along so the form opens on the same choice
             // the proposal was written for. Losing it here would leave a
             // brief aimed at S1 sitting in a campaign with no template.
-            setAiDraft({ ...draft, template: proposeTemplate });
+            setAiDraft({ ...draft, template: proposeTemplate,
+              campaign_kind: newCampaignKind });
           }}
         />
       )}

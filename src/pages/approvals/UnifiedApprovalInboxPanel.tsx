@@ -14,8 +14,8 @@ import { HeldExternalJobs } from "./HeldExternalJobs";
 
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
-  "activation_switch", "campaign_action", "campaign_idea", "client_authority_assignment", "client_sales_entitlement", "creative_requirement", "engine_slot",
-  "gateway_tool", "global_engine_activation", "global_video_owner", "google_profile_change", "google_review_reply", "integration_grant", "lead_magnet", "message_template", "meta_profile_change", "metrics_backfill", "motion_render", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer", "video_seat",
+  "activation_switch", "archived_form_return", "archived_sales_return", "campaign_action", "campaign_idea", "client_authority_assignment", "client_sales_entitlement", "creative_requirement", "engine_slot",
+  "gateway_tool", "global_engine_activation", "global_video_owner", "google_profile_change", "google_review_reply", "integration_grant", "lead_magnet", "message_template", "meta_profile_change", "metrics_backfill", "motion_render", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "organic_publication", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer", "video_seat",
 ] as const;
 type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
 
@@ -308,6 +308,89 @@ function isGoogleOperatorBundleReady(request: UnifiedApprovalRequest, clientId: 
     && request.owner_role === "admin_or_active_client_manager";
 }
 
+function isGoogleSearchCopyReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "google_search_copy"
+    || request.client_id !== clientId || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || request.source_version !== request.artifact_hash
+    || !request.artifact_hash || !/^[0-9a-f]{64}$/.test(request.artifact_hash)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  return scope.copy_id === request.source_id && scope.client_id === clientId
+    && scope.campaign_id === preview.campaign_id
+    && scope.route_package_id === preview.route_package_id
+    && scope.work_item_id === preview.work_item_id
+    && scope.copy_hash === request.artifact_hash
+    && preview.copy_hash === request.artifact_hash
+    && Array.isArray(preview.headlines) && preview.headlines.length >= 3
+    && Array.isArray(preview.descriptions) && preview.descriptions.length >= 2
+    && typeof preview.rationale === "string" && preview.rationale.length >= 20
+    && request.destination === "google_ads:manual_operator_handoff"
+    && request.owner_role === "admin_or_active_client_manager";
+}
+
+function isPaidOperatorBundleReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "paid_operator_bundle"
+    || request.client_id !== clientId || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || request.source_version !== request.artifact_hash
+    || !request.artifact_hash || !/^[0-9a-f]{64}$/.test(request.artifact_hash)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  const source = preview.source;
+  if (!source || typeof source !== "object" || Array.isArray(source)) return false;
+  const packet = source as Record<string, unknown>;
+  return scope.bundle_id === request.source_id && scope.client_id === clientId
+    && scope.campaign_id === packet.campaign_id
+    && scope.package_id === packet.package_id
+    && scope.platform === packet.platform
+    && scope.snapshot_hash === request.artifact_hash
+    && typeof preview.operator === "string" && preview.operator.trim().length > 0
+    && typeof preview.budget_instruction === "string"
+    && preview.budget_instruction.trim().length > 0
+    && typeof preview.tracking_instruction === "string"
+    && preview.tracking_instruction.trim().length > 0
+    && (packet.platform !== "google" || (typeof preview.research_task === "string"
+      && preview.research_task.trim().length > 0))
+    && Array.isArray(packet.creative) && packet.creative.length > 0
+    && (packet.platform === "meta" || packet.platform === "google")
+    && request.destination === `${packet.platform}_ads:manual_operator_handoff`
+    && request.owner_role === "admin_or_active_client_manager";
+}
+
+function isOrganicPublicationReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "organic_publication"
+    || request.client_id !== clientId || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || request.source_version !== request.artifact_hash
+    || !request.artifact_hash || !/^[0-9a-f]{64}$/.test(request.artifact_hash)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  const rights = preview.rights as Record<string, unknown> | undefined;
+  const copy = preview.provider_copy as Record<string, unknown> | undefined;
+  const media = preview.media;
+  return scope.client_id === clientId && scope.scheduled_post_id === preview.scheduled_post_id
+    && scope.slot_id === preview.slot_id
+    && /^[0-9a-f]{64}$/.test(String(scope.source_snapshot_hash ?? ""))
+    && preview.client_id === clientId
+    && request.destination === `organic:${preview.platform}`
+    && request.account_ref === preview.account_ref
+    && request.owner_role === "client_media_reviewer"
+    && typeof preview.scheduled_at === "string" && !!preview.scheduled_at
+    && !!rights && ["client_owned", "licensed", "agency_owned"].includes(String(rights.usage_rights))
+    && !!copy && typeof copy.caption === "string" && !!copy.caption.trim()
+    && Array.isArray(media) && media.length > 0 && media.length <= 10
+    && media.every((item) => item && typeof item === "object"
+      && (item as Record<string, unknown>).frozen_bucket === "publication-media"
+      && /^[0-9a-f]{64}$/.test(String((item as Record<string, unknown>).sha256 ?? "")));
+}
+
 function isLeadMagnetApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   if (request.source_system !== "aa_console" || request.source_kind !== "lead_magnet"
     || request.client_id !== clientId || request.status !== "pending"
@@ -515,12 +598,30 @@ function isOrdinaryMediaReady(request: UnifiedApprovalRequest, clientId: string)
   const asset = preview.asset as Record<string, unknown>;
   const storage = preview.storage as Record<string, unknown>;
   const hash = request.artifact_hash;
+  const framed = asset.content_format === "carousel" || asset.content_format === "story";
+  const frames = preview.frames;
+  const framesReady = !framed || (Array.isArray(frames)
+    && frames.length >= (asset.content_format === "story" ? 1 : 2)
+    && frames.every((entry, index) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
+      const frame = entry as Record<string, unknown>;
+      return frame.position === index + 1 && typeof frame.frame_id === "string"
+        && typeof frame.storage_path === "string" && !!frame.storage_path
+        && typeof frame.file_sha256 === "string" && /^[0-9a-f]{64}$/.test(frame.file_sha256)
+        && typeof frame.file_bytes === "number" && frame.file_bytes > 0
+        && typeof frame.object_id === "string" && !!frame.object_id
+        && (frame.object_version === null || typeof frame.object_version === "string")
+        && typeof frame.object_updated_at === "string";
+    }) && (frames[0] as Record<string, unknown>).storage_path === asset.storage_path
+    && (frames[0] as Record<string, unknown>).file_sha256 === asset.file_sha256
+    && new Set(frames.map((entry) => (entry as Record<string, unknown>).storage_path)).size === frames.length);
   return typeof hash === "string" && /^[0-9a-f]{64}$/.test(hash)
     && typeof preview.request_token === "string" && !!preview.request_token
     && request.source_version === `${hash}:${preview.request_token}`
     && preview.client_id === clientId && preview.asset_id === asset.id
     && asset.client_id === clientId && (asset.media_type === "image" || asset.media_type === "text")
-    && asset.content_format === "single" && typeof asset.storage_path === "string"
+    && (asset.content_format === "single" || framed) && framesReady
+    && typeof asset.storage_path === "string"
     && !!asset.storage_path && typeof asset.file_sha256 === "string"
     && /^[0-9a-f]{64}$/.test(asset.file_sha256)
     && typeof asset.usage_rights === "string" && !!asset.usage_rights
@@ -546,6 +647,7 @@ function isProofDeliveryReady(request: UnifiedApprovalRequest, clientId: string)
     && request.source_version === `${hash}:${preview.request_token}`
     && preview.client_id === clientId && typeof preview.delivery_id === "string"
     && typeof preview.recipient === "string" && !!preview.recipient
+    && typeof preview.sender_ref === "string" && !!preview.sender_ref
     && typeof preview.message === "string" && !!preview.message
     && typeof preview.capture_url === "string" && !!preview.capture_url
     && ["email", "sms", "whatsapp"].includes(String(preview.channel))
@@ -1027,15 +1129,52 @@ function isEngineSlotReady(request: UnifiedApprovalRequest, clientId: string): b
   const slot = packet.slot as Record<string, unknown>;
   const asset = packet.asset as Record<string, unknown>;
   const storage = packet.storage as Record<string, unknown>;
+  const framed = asset.content_format === "carousel" || asset.content_format === "story";
+  const frames = packet.frames;
+  const reel = asset.media_type === "video" && asset.content_format === "reel";
+  const videoSeats = packet.video_seats && typeof packet.video_seats === "object"
+    && !Array.isArray(packet.video_seats) ? packet.video_seats as Record<string, unknown> : null;
+  const seatSignoffs = Array.isArray(videoSeats?.signoffs)
+    ? videoSeats.signoffs as Record<string, unknown>[] : [];
+  const videoSeatsReady = !reel || (!!videoSeats
+    && typeof asset.render_path === "string" && !!asset.render_path
+    && asset.edit_stage === "review_ready"
+    && typeof videoSeats.owner_user_id === "string" && !!videoSeats.owner_user_id
+    && typeof videoSeats.manager_user_id === "string" && !!videoSeats.manager_user_id
+    && ["owner", "manager", ...(videoSeats.client_user_id ? ["client"] : [])].every((role) =>
+      seatSignoffs.some((entry) => entry.role === role
+        && typeof entry.user_id === "string"
+        && entry.user_id === videoSeats[`${role}_user_id`]
+        && typeof entry.request_id === "string" && !!entry.request_id
+        && typeof entry.content_hash === "string"
+        && /^[0-9a-f]{64}$/.test(entry.content_hash as string))));
+  const framesReady = !framed || (Array.isArray(frames)
+    && frames.length >= (asset.content_format === "story" ? 1 : 2)
+    && frames.length <= 10
+    && frames.every((entry, index) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
+      const frame = entry as Record<string, unknown>;
+      return frame.position === index + 1 && typeof frame.frame_id === "string"
+        && typeof frame.storage_path === "string" && !!frame.storage_path
+        && typeof frame.file_sha256 === "string" && /^[0-9a-f]{64}$/.test(frame.file_sha256)
+        && typeof frame.file_bytes === "number" && frame.file_bytes > 0
+        && typeof frame.object_id === "string" && !!frame.object_id
+        && (frame.object_version === null || typeof frame.object_version === "string")
+        && typeof frame.object_updated_at === "string";
+    }) && (frames[0] as Record<string, unknown>).storage_path === asset.storage_path
+    && (frames[0] as Record<string, unknown>).file_sha256 === asset.file_sha256
+    && new Set(frames.map((entry) => (entry as Record<string, unknown>).storage_path)).size === frames.length);
   return typeof request.artifact_hash === "string"
     && /^[0-9a-f]{64}$/.test(request.artifact_hash)
     && request.source_version === scope.approval_entry_id
     && request.source_id === slot.id && slot.id === scope.slot_id
     && slot.asset_id === asset.id && asset.id === scope.asset_id
     && slot.platform === scope.platform && slot.scheduled_at === scope.scheduled_at
+    && slot.format === scope.format && slot.format === asset.content_format
     && packet.client_id === clientId && asset.client_id === clientId
-    && scope.client_id === clientId && asset.content_format === "single"
-    && (asset.media_type === "image" || asset.media_type === "text")
+    && scope.client_id === clientId
+    && (asset.content_format === "single" || framed || reel) && framesReady && videoSeatsReady
+    && (asset.media_type === "image" || asset.media_type === "text" || reel)
     && typeof asset.storage_path === "string" && !!asset.storage_path
     && typeof asset.file_sha256 === "string"
     && /^[0-9a-f]{64}$/.test(asset.file_sha256)
@@ -1050,6 +1189,9 @@ function isEngineSlotReady(request: UnifiedApprovalRequest, clientId: string): b
 
 function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignPreparationReady(request, clientId)
+    || isOrganicPublicationReady(request, clientId)
+    || isPaidOperatorBundleReady(request, clientId)
+    || isGoogleSearchCopyReady(request, clientId)
     || isGoogleOperatorBundleReady(request, clientId)
     || isCampaignRejectionReady(request, clientId)
     || isGoogleReplyRejectionReady(request, clientId)
@@ -1084,6 +1226,9 @@ function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): bo
 
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignPreparationReady(request, clientId)
+    || isOrganicPublicationReady(request, clientId)
+    || isPaidOperatorBundleReady(request, clientId)
+    || isGoogleSearchCopyReady(request, clientId)
     || isGoogleOperatorBundleReady(request, clientId)
     || isCampaignApprovalReady(request, clientId)
     || isGoogleReplyApprovalReady(request, clientId)
@@ -1205,18 +1350,31 @@ function RequestCard({ request, history, gatewayOutcome, executionEvidence, clie
     ? creativeSource as Record<string, unknown> : null;
   const creativePath = creativeAsset && (request.source_kind === "video_seat"
     || request.source_kind === "motion_render"
+    || (request.source_kind === "engine_slot" && creativeAsset.media_type === "video")
+    || (request.source_kind === "ordinary_media"
+      || request.source_kind === "engine_slot")
+      && (creativeAsset.content_format ?? "single") === "single" && creativeAsset.render_path
     ? creativeAsset.render_path : creativeAsset.storage_path);
   const creativeDownloadable = !!creativeAsset
     && typeof creativePath === "string" && !!creativePath
     && typeof creativeAsset.file_sha256 === "string";
+  const creativeFrames = (request.source_kind === "ordinary_media" || request.source_kind === "engine_slot")
+    && (creativeAsset?.content_format === "carousel" || creativeAsset?.content_format === "story")
+    && Array.isArray(request.source_kind === "engine_slot" ? creativePacket?.frames : creativePreview?.frames)
+    ? (request.source_kind === "engine_slot" ? creativePacket?.frames : creativePreview?.frames) as Record<string, unknown>[] : null;
   const canReject = !salesManagerCard && isRejectionReady(request, clientId);
   const canApprove = !salesManagerCard && isApprovalReady(request, clientId);
   const canRevoke = !manager && isGatewayToolRevocable(request, clientId);
-  const decisionLabel = request.source_kind === "google_review_reply"
+  const decisionLabel = request.source_kind === "archived_form_return"
+    ? "Returning form contact" : request.source_kind === "archived_sales_return"
+      ? "Returning sales-agent contact" : request.source_kind === "google_review_reply"
     ? "Google review reply" : request.source_kind === "recruitment_brief"
       ? "Recruitment brief" : request.source_kind === "client_sales_entitlement"
-        ? "Sales access" : request.source_kind === "campaign_preparation_package"
-          ? "Campaign preparation package" : request.source_kind === "google_operator_bundle"
+        ? "Sales access" : request.source_kind === "organic_publication"
+        ? "Organic publication package" : request.source_kind === "campaign_preparation_package"
+        ? "Campaign preparation package" : request.source_kind === "paid_operator_bundle"
+          ? "Paid operator bundle" : request.source_kind === "google_search_copy"
+          ? "Google search copy" : request.source_kind === "google_operator_bundle"
           ? "Google manual operator bundle" : request.source_kind === "service_offer"
           ? "Service offer" : request.source_kind === "lead_magnet"
             ? "Lead magnet" : request.source_kind === "sales_agent_public_use"
@@ -1350,18 +1508,37 @@ function RequestCard({ request, history, gatewayOutcome, executionEvidence, clie
       </div>}
 
       {creativeDownloadable && <div className="mt-4">
-        <p className="mb-2 text-xs text-muted-foreground">Download and inspect the exact creative file to unlock approval.</p>
+        <p className="mb-2 text-xs text-muted-foreground">
+          {creativeFrames ? `Download and inspect all ${creativeFrames.length} ordered frames to unlock approval.`
+            : "Download and inspect the exact creative file to unlock approval."}
+        </p>
+        {creativeFrames && <ol className="mb-3 list-inside list-decimal space-y-1 text-xs">
+          {creativeFrames.map((frame) => <li key={String(frame.frame_id)}>
+            <span className="font-medium">{String(frame.caption ?? `Frame ${frame.position}`)}</span>
+            <span className="ml-2 break-all font-mono text-muted-foreground">{String(frame.storage_path)} · {String(frame.file_sha256)}</span>
+          </li>)}
+        </ol>}
         <button type="button" className="rounded-lg border border-border px-4 py-2 text-sm"
-          onClick={() => void downloadVerifiedCreativeFile(
-            creativePath as string,
-            creativeAsset.file_sha256 as string,
-          ).then(() => { setDownloadedCreativeHash(`${request.id}:${request.artifact_hash}`); setDownloadError(null); })
-            .catch((cause: unknown) => setDownloadError(
-              cause instanceof Error ? cause.message : "Could not verify the creative file."))}>
-          Download and verify creative file
+          onClick={() => {
+            setDownloadedCreativeHash(null);
+            setDownloadError(null);
+            void (async () => {
+              if (creativeFrames) {
+                for (const frame of creativeFrames) {
+                  await downloadVerifiedCreativeFile(frame.storage_path as string, frame.file_sha256 as string);
+                }
+              } else {
+                await downloadVerifiedCreativeFile(creativePath as string, creativeAsset.file_sha256 as string);
+              }
+              setDownloadedCreativeHash(`${request.id}:${request.artifact_hash}`);
+            })().catch((cause: unknown) => setDownloadError(
+              cause instanceof Error ? cause.message : "Could not verify the creative file."));
+          }}>
+          {creativeFrames ? "Download and verify every frame" : "Download and verify creative file"}
         </button>
         {downloadedCreativeHash === `${request.id}:${request.artifact_hash}` && <p role="status" className="mt-2 text-xs">
-          The downloaded creative matched the byte hash on this card. Review its content before approval.
+          {creativeFrames ? "Every downloaded frame matched its byte hash and order on this card. Review the full sequence before approval."
+            : "The downloaded creative matched the byte hash on this card. Review its content before approval."}
         </p>}
         {downloadError && <p role="alert" className="mt-2 text-xs text-destructive">{downloadError}</p>}
       </div>}
@@ -1652,9 +1829,27 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             p_approved: decision === "approved",
             ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
           })
+        : request.source_kind === "organic_publication"
+          ? await supabase.rpc("decide_organic_publication_v7", {
+            p_package_id: request.source_id, p_request_id: request.id,
+            p_approved: decision === "approved",
+            ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+          })
+        : request.source_kind === "paid_operator_bundle"
+          ? await supabase.rpc("decide_paid_operator_bundle_v7", {
+            p_bundle_id: request.source_id, p_request_id: request.id,
+            p_approved: decision === "approved",
+            ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+          })
         : request.source_kind === "google_operator_bundle"
           ? await supabase.rpc("decide_google_operator_bundle_v7", {
             p_bundle_id: request.source_id, p_request_id: request.id,
+            p_approved: decision === "approved",
+            ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+          })
+        : request.source_kind === "google_search_copy"
+          ? await supabase.rpc("decide_google_search_copy_v7", {
+            p_copy_id: request.source_id, p_request_id: request.id,
             p_approved: decision === "approved",
             ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
           })

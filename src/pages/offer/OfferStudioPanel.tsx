@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { Button } from "../../components/Button";
 import { IndexDetail, type IndexColumn } from "../../components/index-detail/IndexDetail";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
+import { ServiceOffersPanel } from "./ServiceOffersPanel";
 
 type Offer = Database["public"]["Tables"]["service_offers"]["Row"];
 type Version = Database["public"]["Tables"]["service_offer_versions"]["Row"];
@@ -14,51 +15,25 @@ type Opportunity = Pick<Database["public"]["Tables"]["market_opportunities"]["Ro
 type SecondarySource = Database["public"]["Tables"]["secondary_offer_sources_v7"]["Row"];
 type MainSource = Database["public"]["Tables"]["main_offer_sources_v7"]["Row"];
 
-/**
- * Offer Studio, as one page.
- *
- * The notes: "There should just be a single page, where we can see all of the
- * offers, and then two buttons, one to create a main offer and one to create a
- * secondary offer ... The page should display all offers in a simple table
- * format with the ability to click on the offer to see more information as well
- * as actions to archive, edit, etc."
- *
- * Three tabs became one table. It uses the shared index-and-detail pattern, so
- * this page looks and behaves like Website Studio, Lead Magnet Studio, Sales OS
- * and Market Opportunities will.
- *
- * WHAT THE TWO BUTTONS WRITE
- *
- * A main offer is the business's own, compiled from offer strategy. A secondary
- * offer targets one micro-niche, compiled from that market opportunity. Nothing
- * in the schema distinguished them until migration 303, so the buttons had
- * nothing to say; they now set `kind`.
- *
- * WHAT STAYED
- *
- * The old Live use tab existed to answer one question: where is a superseded
- * version still live? That is a real question -- a client reprices, every new
- * asset is correct, and a PDF quoting last year's figure keeps going out -- so
- * it is not dropped. It moves into the row, where a drifting offer is named on
- * the offer it belongs to rather than in a separate list, and into the detail
- * for the specifics.
- *
- * The version form still lives in Service Offers, linked from the detail. The
- * compile agent the notes ask for -- one that assembles an offer from strategy
- * or from a micro-niche -- is runtime work and is not here yet, so for now the
- * inputs remain manual, which is what the notes call the suggested path anyway.
- */
-export function OfferStudioPanel() {
+/** Offers lists existing versions and live-use drift. Build starts from a
+ * reviewed baseline strategy or an approved opportunity, then uses the same
+ * version and approval records for manual and agent-generated drafts. */
+export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build" }) {
   const { clientId } = useParams<{ clientId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [offers, setOffers] = useState<Offer[]>([]);
   const [versions, setVersions] = useState<Version[]>([]);
   const [signoffs, setSignoffs] = useState<Signoff[]>([]);
   const [drift, setDrift] = useState<Drift[]>([]);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [approvedOpportunities, setApprovedOpportunities] = useState<Opportunity[]>([]);
   const [sources, setSources] = useState<SecondarySource[]>([]);
   const [mainSources, setMainSources] = useState<MainSource[]>([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState("");
+  const [buildSource, setBuildSource] = useState<"baseline" | "opportunity" | null>(null);
+  const [serviceName, setServiceName] = useState("");
   const [loading, setLoading] = useState(true);
+  const [readError, setReadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -87,16 +62,18 @@ export function OfferStudioPanel() {
       offerResult.error ?? versionResult.error ?? signoffResult.error ?? driftResult.error
       ?? opportunityResult.error ?? approvalResult.error ?? sourceResult.error ?? mainSourceResult.error;
     if (queryError) {
-      setError(queryError.message);
+      setReadError(queryError.message);
       return;
     }
-    setError(null);
+    setReadError(null);
     setOffers(offerResult.data ?? []);
     setVersions(versionResult.data ?? []);
     setSignoffs(signoffResult.data ?? []);
     setDrift(driftResult.data ?? []);
+    const allOpportunities = opportunityResult.data ?? [];
+    setOpportunities(allOpportunities);
     const currentIds = new Set((approvalResult.data ?? []).filter((row) => row.approval_current).map((row) => row.opportunity_id));
-    const current = (opportunityResult.data ?? []).filter((row) => currentIds.has(row.id));
+    const current = allOpportunities.filter((row) => currentIds.has(row.id));
     setApprovedOpportunities(current);
     setSources(sourceResult.data ?? []);
     setMainSources(mainSourceResult.data ?? []);
@@ -144,21 +121,35 @@ export function OfferStudioPanel() {
 
   async function create(kind: "main" | "secondary") {
     if (!clientId) return;
+    if (!serviceName.trim()) { setError("Name the business service before creating a manual draft."); return; }
     setBusy(kind);
     setError(null);
-    const { error: insertError } = kind === "secondary"
-      ? await supabase.rpc("create_secondary_offer_v7", { p_opportunity_id: selectedOpportunity })
-      : await supabase.rpc("create_main_offer_v7", { p_client_id: clientId });
+    const { data: created, error: insertError } = kind === "secondary"
+      ? await supabase.rpc("create_named_secondary_offer_v9", {
+        p_opportunity_id: selectedOpportunity, p_service_name: serviceName.trim(),
+      })
+      : await supabase.rpc("create_named_main_offer_v9", {
+        p_client_id: clientId, p_service_name: serviceName.trim(),
+      });
     setBusy(null);
     if (insertError) {
       setError(insertError.message);
       return;
     }
     await refresh();
+    if (created?.id) {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set("tab", "build");
+        next.set("offer", created.id);
+        return next;
+      });
+      setNotice("Source-bound offer created. Complete its draft version below, then request exact review.");
+    }
   }
 
   /**
-   * Ask the Offer Compiler for one instead of writing it yourself.
+ * Ask the Offer Compiler to draft the chosen service instead of writing it yourself.
    *
    * Main offers use Offer Strategy. Secondary offers use the selected approved
    * opportunity and are bound to its exact evidence version.
@@ -170,13 +161,16 @@ export function OfferStudioPanel() {
    */
   async function compile(kind: "main" | "secondary") {
     if (!clientId) return;
+    if (!serviceName.trim()) { setError("Name the business service before drafting with the agent."); return; }
     setBusy(`compile-${kind}`);
     setError(null);
-    const { data: jobId, error: rpcError } = await supabase.rpc("request_offer_compile_v6", {
+    const { data: jobId, error: rpcError } = await supabase.rpc("request_named_offer_compile_v9", {
       p_client_id: clientId,
       p_kind: kind,
-      p_source: kind === "main" ? "strategy" : "micro_niche",
-      p_opportunity_id: kind === "secondary" ? selectedOpportunity : undefined,
+      // The SQL function requires an explicit nullable UUID argument; generated
+      // RPC types represent that position as a non-null string.
+      p_opportunity_id: (kind === "secondary" ? selectedOpportunity : null) as unknown as string,
+      p_service_name: serviceName.trim(),
     });
     setBusy(null);
     if (rpcError) {
@@ -190,28 +184,73 @@ export function OfferStudioPanel() {
     if (jobId) setPendingCompiles((current) => [...current, { id: jobId, kind }]);
   }
 
+  async function setArchived(offer: Offer, archive: boolean) {
+    if (busy) return;
+    setBusy(offer.id); setError(null); setNotice(null);
+    const { error: rpcError } = await supabase.rpc("set_service_offer_archived_v10", {
+      p_offer_id: offer.id, p_archive: archive,
+    });
+    setBusy(null);
+    if (rpcError) { setError(rpcError.message); return; }
+    await refresh();
+    setNotice(archive
+      ? "Offer archived. Existing versions and campaign references remain readable; no new use is allowed until restoration."
+      : "Offer restored for new version and campaign use, subject to current source and approval checks.");
+  }
+
+  async function deleteEmptyDraft(offer: Offer) {
+    if (busy) return;
+    setBusy(offer.id); setError(null); setNotice(null);
+    const { error: rpcError } = await supabase.rpc("delete_empty_service_offer_v10", {
+      p_offer_id: offer.id,
+    });
+    setBusy(null);
+    if (rpcError) { setError(rpcError.message); return; }
+    await refresh();
+    setNotice("Empty draft deleted. Its deletion is recorded; no version or approval history was removed.");
+  }
+
   const versionsFor = (offer: Offer) => versions.filter((version) => version.offer_id === offer.id);
   const signedOff = (versionId: string) =>
     signoffs.some((signoff) => signoff.offer_version_id === versionId);
   /** Superseded and still live is the only row that needs doing something about today. */
   const driftingFor = (offer: Offer) =>
     drift.filter((row) => row.offer_id === offer.id && row.superseded === true && row.live === true);
+  const liveUsesFor = (offer: Offer) =>
+    drift.filter((row) => row.offer_id === offer.id && row.live === true);
 
+  const latestFor = (offer: Offer) => versionsFor(offer)[0] ?? null;
+  const activeOffers = offers.filter((offer) => offer.archived_at === null);
+  const archivedOffers = offers.filter((offer) => offer.archived_at !== null);
+  const proposedOffers = activeOffers.filter((offer) => {
+    const latest = latestFor(offer);
+    return !latest || !signedOff(latest.id);
+  });
+  const approvedOffers = activeOffers.filter((offer) => {
+    const latest = latestFor(offer);
+    return Boolean(latest && signedOff(latest.id));
+  });
   const columns: IndexColumn<Offer>[] = [
-    { label: "Offer", cell: (offer) => offer.service_name },
-    { label: "Kind", cell: (offer) => (offer.kind === "secondary" ? "Secondary" : "Main") },
-    {
-      label: "Versions",
-      cell: (offer) => {
-        const all = versionsFor(offer);
-        if (all.length === 0) return "none yet";
-        const latest = all[0]!;
-        return `v${latest.version}${signedOff(latest.id) ? ", signed off" : ", not signed off"}`;
-      },
-    },
+    { label: "Service", cell: (offer) => offer.service_name },
+    { label: "Status", cell: (offer) => latestFor(offer) ? (signedOff(latestFor(offer)!.id) ? "Signed off" : "Proposed") : "Needs draft" },
+    { label: "Opportunity", cell: (offer) => {
+      if (offer.kind !== "secondary") return "Baseline service";
+      const source = sources.find((row) => row.offer_id === offer.id);
+      return source ? opportunities.find((row) => row.id === source.opportunity_id)?.name
+        ?? source.opportunity_id : "Source unknown";
+    } },
+    { label: "Version", cell: (offer) => latestFor(offer) ? `v${latestFor(offer)!.version}` : "No version" },
+    { label: "Owner", cell: (offer) => {
+      const latest = latestFor(offer);
+      return signoffs.find((signoff) => signoff.offer_version_id === latest?.id)?.approved_by ?? "Not recorded";
+    } },
     {
       label: "Live elsewhere",
       cell: (offer) => {
+        if (offer.archived_at !== null) {
+          const live = liveUsesFor(offer);
+          return live.length ? `${live.length} recorded live use${live.length === 1 ? " remains" : "s remain"}` : "None recorded";
+        }
         const stale = driftingFor(offer);
         if (stale.length === 0) return "—";
         return (
@@ -225,6 +264,74 @@ export function OfferStudioPanel() {
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
+  }
+  if (readError) {
+    return <div role="alert" className="space-y-2 text-sm text-destructive">
+      <p>Offers are unavailable: {readError}</p>
+      <button type="button" onClick={() => void refresh()}>Retry</button>
+    </div>;
+  }
+
+  const selectedBuildOffer = activeOffers.find((offer) => offer.id === searchParams.get("offer"));
+  const selectedArchivedOffer = archivedOffers.find((offer) => offer.id === searchParams.get("offer"));
+  if (view === "build") {
+    const kind = buildSource === "opportunity" ? "secondary" : "main";
+    return <div className="space-y-4">
+      {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      <section className="space-y-4 rounded-lg border border-border bg-card p-5">
+        <h2 className="font-semibold">Build an offer</h2>
+        <p className="text-sm text-muted-foreground">Choose the source first. The draft remains proposed until its exact version is approved.</p>
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">Offer source</legend>
+          <label className="flex items-center gap-2 text-sm"><input type="radio" name="offer-source" checked={buildSource === "opportunity"}
+            onChange={() => setBuildSource("opportunity")} />Approved opportunity</label>
+          <label className="flex items-center gap-2 text-sm"><input type="radio" name="offer-source" checked={buildSource === "baseline"}
+            onChange={() => setBuildSource("baseline")} />Baseline service</label>
+        </fieldset>
+        {buildSource === "opportunity" && <label className="block text-sm">Approved opportunity
+          <select className="mt-1 block w-full rounded border border-border bg-background px-2 py-1" value={selectedOpportunity}
+            onChange={(event) => setSelectedOpportunity(event.target.value)}>
+            {approvedOpportunities.length === 0 && <option value="">No currently approved opportunity</option>}
+            {approvedOpportunities.map((opportunity) => <option key={opportunity.id} value={opportunity.id}>
+              {opportunity.name} — {opportunity.micro_market}</option>)}
+          </select>
+        </label>}
+        {buildSource === "baseline" && <p className="text-sm text-muted-foreground">Uses the current reviewed Offer Strategy. The chosen service stays bound to this offer's versions.</p>}
+        {buildSource && <label className="block text-sm">Business service
+          <input className="mt-1 block w-full rounded border border-border bg-background px-2 py-1"
+            maxLength={200} value={serviceName} onChange={(event) => setServiceName(event.target.value)}
+            placeholder="Name the service this offer sells" />
+        </label>}
+        <div className="flex flex-wrap gap-2">
+          <Button disabled={busy !== null || buildSource === null || !serviceName.trim() || (kind === "secondary" && !selectedOpportunity)}
+            onClick={() => void create(kind)}>{busy === kind ? "Creating…" : "Create manual draft"}</Button>
+          <Button disabled={busy !== null || buildSource === null || !serviceName.trim() || (kind === "secondary" && !selectedOpportunity)}
+            onClick={() => void compile(kind)} className="bg-muted text-foreground hover:bg-muted">
+            {busy === `compile-${kind}` ? "Queueing…" : "Draft with agent"}</Button>
+        </div>
+      </section>
+      {activeOffers.length > 0 && <label className="block text-sm">Continue an existing offer
+        <select className="mt-1 block w-full rounded border border-border bg-background px-2 py-1"
+          value={selectedBuildOffer?.id ?? ""}
+          onChange={(event) => setSearchParams((current) => {
+            const next = new URLSearchParams(current);
+            next.set("tab", "build");
+            if (event.target.value) next.set("offer", event.target.value);
+            else next.delete("offer");
+            return next;
+          })}>
+          <option value="">Choose an existing offer</option>
+          {activeOffers.map((offer) => <option key={offer.id} value={offer.id}>
+            {offer.service_name} · {offer.kind === "secondary" ? "opportunity" : "baseline"}
+          </option>)}
+        </select>
+      </label>}
+      {selectedArchivedOffer && <p role="status" className="text-sm text-muted-foreground">
+        This offer is archived. Restore it from Offers before drafting another version.
+      </p>}
+      {selectedBuildOffer && <ServiceOffersPanel selectedOfferId={selectedBuildOffer.id} />}
+    </div>;
   }
 
   return (
@@ -240,49 +347,22 @@ export function OfferStudioPanel() {
         </p>
       )}
       <IndexDetail<Offer>
-        title="Offers"
-        items={offers}
+        title="Proposed offers"
+        items={proposedOffers}
         columns={columns}
         paramKey="offer"
-        emptyLabel="No offers yet. Create a main offer for the business, or a secondary one for a micro-niche."
+        emptyLabel="No proposed offers. Open Build to make a baseline service or approved-opportunity offer."
         nameOf={(offer) => offer.service_name}
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="text-sm" htmlFor="secondary-offer-opportunity">Secondary offer opportunity</label>
-            <select id="secondary-offer-opportunity" className="rounded border border-border bg-background px-2 py-1 text-sm"
-              value={selectedOpportunity} onChange={(event) => setSelectedOpportunity(event.target.value)}>
-              {approvedOpportunities.length === 0 && <option value="">No currently approved opportunity</option>}
-              {approvedOpportunities.map((opportunity) => <option key={opportunity.id} value={opportunity.id}>{opportunity.name} — {opportunity.micro_market}</option>)}
-            </select>
-            <Button disabled={busy !== null} onClick={() => void create("main")}>
-              {busy === "main" ? "…" : "New main offer"}
-            </Button>
-            {/* Button is one style by design, so the secondary action is
-                distinguished with className rather than by widening a
-                component used across the console. */}
-            <Button
-              disabled={busy !== null || !selectedOpportunity}
-              onClick={() => void create("secondary")}
-              className="bg-muted text-foreground hover:bg-muted"
-            >
-              {busy === "secondary" ? "…" : "New secondary offer"}
-            </Button>
-            <Button
-              disabled={busy !== null}
-              onClick={() => void compile("main")}
-              className="bg-muted text-foreground hover:bg-muted"
-            >
-              {busy === "compile-main" ? "…" : "Compile a main offer"}
-            </Button>
-            <Button
-              disabled={busy !== null || !selectedOpportunity}
-              onClick={() => void compile("secondary")}
-              className="bg-muted text-foreground hover:bg-muted"
-            >
-              {busy === "compile-secondary" ? "…" : "Compile a secondary offer"}
-            </Button>
-          </div>
-        }
+        action={<Link to={`/clients/${clientId}/delivery/offer-studio?tab=build`}
+          className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">Build offer</Link>}
+        rowActions={(offer) => <span className="flex flex-wrap gap-3">
+          <Link to={`/clients/${clientId}/delivery/offer-studio?tab=build&offer=${offer.id}`}
+            className="text-brand-strong underline">Edit</Link>
+          <button type="button" disabled={busy !== null} onClick={() => void setArchived(offer,true)}
+            className="text-brand-strong underline disabled:opacity-50">Archive</button>
+          {versionsFor(offer).length === 0 && <button type="button" disabled={busy !== null}
+            onClick={() => void deleteEmptyDraft(offer)} className="text-destructive underline disabled:opacity-50">Delete empty draft</button>}
+        </span>}
         detail={(offer) => {
           const all = versionsFor(offer);
           const stale = driftingFor(offer);
@@ -293,7 +373,9 @@ export function OfferStudioPanel() {
               <p className="text-muted-foreground">
                 {offer.kind === "secondary"
                   ? "A secondary offer targets one micro-niche, and is compiled from that market opportunity."
-                  : "A main offer is the business's own, and is compiled from offer strategy."}
+                  : mainSource
+                    ? "This main offer is bound to reviewed Offer Strategy."
+                    : "This legacy main offer has no reviewed Offer Strategy snapshot bound."}
               </p>
 
               {offer.kind === "secondary" && (
@@ -310,6 +392,11 @@ export function OfferStudioPanel() {
               {offer.kind === "main" && mainSource && (
                 <p className="text-muted-foreground">
                   Source: reviewed Offer Strategy snapshot {mainSource.strategy_hash.slice(0, 12)}. Later source edits hold new sign-off and campaign use.
+                </p>
+              )}
+              {offer.kind === "main" && !mainSource && (
+                <p className="text-destructive">
+                  Source review is unverified for this historical offer. Inspect its evidence before new campaign use.
                 </p>
               )}
 
@@ -349,7 +436,7 @@ export function OfferStudioPanel() {
 
               <p>
                 <Link
-                  to={`/clients/${clientId}/delivery/offer-studio?tab=versions&offer=${offer.id}`}
+                  to={`/clients/${clientId}/delivery/offer-studio?tab=build&offer=${offer.id}`}
                   className="text-brand-strong underline-offset-2 hover:underline"
                 >
                   Edit versions and claims
@@ -358,6 +445,68 @@ export function OfferStudioPanel() {
             </div>
           );
         }}
+      />
+      <p className="text-xs text-muted-foreground">
+        Approved offers below have a recorded sign-off on their latest version. Current source and proof rights are checked again before campaign use.
+      </p>
+      <IndexDetail<Offer>
+        title="Approved offers"
+        items={approvedOffers}
+        columns={columns}
+        paramKey="offer"
+        emptyLabel="No latest offer version has a recorded sign-off."
+        nameOf={(offer) => offer.service_name}
+        rowActions={(offer) => <span className="flex flex-wrap gap-3">
+          <Link to={`/clients/${clientId}/delivery/offer-studio?tab=build&offer=${offer.id}`}
+            className="text-brand-strong underline">Revise</Link>
+          <button type="button" disabled={busy !== null} onClick={() => void setArchived(offer,true)}
+            className="text-brand-strong underline disabled:opacity-50">Archive</button>
+        </span>}
+        detail={(offer) => <div className="space-y-2 text-sm">
+          <p>Signed-off version v{latestFor(offer)?.version}. A later revision needs its own exact approval.</p>
+          <p>Source and proof rights are rechecked before new campaign use; a historical sign-off alone does not release a stale source.</p>
+          {offer.kind === "secondary" && sources.find((row) => row.offer_id === offer.id) && <p>
+            Source opportunity: <Link className="text-brand-strong underline"
+              to={`/clients/${clientId}/delivery/market-opportunities?opportunity=${sources.find((row) => row.offer_id === offer.id)?.opportunity_id}`}>
+              {opportunities.find((row) => row.id === sources.find((source) => source.offer_id === offer.id)?.opportunity_id)?.name ?? "Open opportunity"}
+            </Link>
+          </p>}
+          {driftingFor(offer).length > 0 && <div>
+            <p className="font-medium text-destructive">Superseded versions still live</p>
+            <ul className="space-y-1 text-muted-foreground">
+              {driftingFor(offer).map((row) => <li key={`${row.offer_version_id}-${row.record_id}-${row.surface}`}>
+                v{row.version} on {row.surface ?? "an unnamed surface"}
+                {row.label ? ` (${row.label})` : ""}
+                {row.live_note ? ` — ${row.live_note}` : ""}
+              </li>)}
+            </ul>
+          </div>}
+          <Link to={`/clients/${clientId}/delivery/offer-studio?tab=build&offer=${offer.id}`}
+            className="text-brand-strong underline">View versions and linked campaigns</Link>
+        </div>}
+      />
+      <IndexDetail<Offer>
+        title="Archived offers"
+        items={archivedOffers}
+        columns={columns}
+        paramKey="offer"
+        emptyLabel="No archived offers."
+        nameOf={(offer) => offer.service_name}
+        rowActions={(offer) => <button type="button" disabled={busy !== null}
+          onClick={() => void setArchived(offer,false)}
+          className="text-brand-strong underline disabled:opacity-50">Restore</button>}
+        detail={(offer) => <div className="space-y-2 text-sm">
+          <p>Archived {offer.archived_at}. Existing versions and campaign references remain readable.</p>
+          <p>Archive does not retract existing live use. {liveUsesFor(offer).length} recorded live use(s) remain.</p>
+          <p>New versions, sign-offs and campaign bindings are held until this offer is restored.</p>
+          <p>{versionsFor(offer).length} recorded version(s); {versionsFor(offer).filter((version) => signedOff(version.id)).length} signed off.</p>
+          <ul className="space-y-1">
+            {versionsFor(offer).map((version) => <li key={version.id}>
+              v{version.version} · {signedOff(version.id) ? "Signed off" : "Proposed"} · {version.promise} ·
+              <span className="font-mono text-xs"> {version.content_hash.slice(0, 16)}…</span>
+            </li>)}
+          </ul>
+        </div>}
       />
     </div>
   );

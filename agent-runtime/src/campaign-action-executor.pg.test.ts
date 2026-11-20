@@ -168,6 +168,7 @@ beforeEach(async () => {
   await db.exec(await sql("20261019090000_218_proof_distribution_spine.sql"));
   await db.exec(await sql("20261022090000_230_campaign_action_executor.sql"));
   await db.exec(await sql("20261022100000_231_proof_placement_execution.sql"));
+  await db.exec(await sql("20261124042800_593_proof_placement_uncertain_outcome.sql"));
 
   // Everything that makes an action possible, so each test can switch off
   // exactly the one thing it is about.
@@ -710,7 +711,7 @@ describe("the proof placement sweep", () => {
     });
   });
 
-  it("fails a stale claim without putting it back", async () => {
+  it("holds a stale claim as uncertain without putting it back", async () => {
     await draft("google_business_profile");
     await approved();
     const [claimed] = await claim();
@@ -729,8 +730,8 @@ describe("the proof placement sweep", () => {
     );
     // A retried review reply posts twice on a client's public profile, and
     // there is no unsending it.
-    expect(placement.status).toBe("failed");
-    expect(placement.last_error).toContain("Check the destination");
+    expect(placement.status).toBe("uncertain");
+    expect(placement.last_error).toContain("Inspect the destination");
     await asHuman();
   });
 

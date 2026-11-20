@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { RuntimeConfig } from "../../config.js";
@@ -10,7 +11,7 @@ import { PublishError } from "../../publishing/types.js";
 
 const agent = { agent_key: "publisher" } as unknown as AgentRow;
 const job = { id: "job-1", params: { limit: 5 } } as unknown as AgentJobRow;
-const on = { publishEnabled: true } as RuntimeConfig;
+const on = { publishEnabled: true, metaAppId: "app-1" } as RuntimeConfig;
 const off = { publishEnabled: false } as RuntimeConfig;
 
 const POST: ClaimedPost = {
@@ -39,6 +40,30 @@ const CAROUSEL: ClaimedPost = {
   frame_paths: ["assets/f1.png", "assets/f2.png", "assets/f3.png"],
 };
 
+function reviewedPacket(post: ClaimedPost) {
+  const paths = post.content_format === "carousel" || post.content_format === "story"
+    ? post.frame_paths ?? [] : [post.media_path ?? ""];
+  const source_paths = paths.map((path) => `${post.client_id}/${path}`);
+  const media = source_paths.map((source_path) => {
+    const bytes = Buffer.from(source_path);
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    return {
+      source_path, frozen_bucket: "publication-media",
+      frozen_path: `${post.client_id}/${sha256}`, sha256,
+      byte_size: bytes.length, mime_type: "image/png",
+    };
+  });
+  return { artifact_hash: "a".repeat(64), manifest: {
+    client_id: post.client_id, scheduled_post_id: post.post_id,
+    platform: post.platform, provider: "instagram", account_ref: "17841400000000000",
+    scheduled_at: post.scheduled_at, content_format: post.content_format,
+    media_type: post.media_type, source_paths, media,
+    provider_copy: { caption: `${post.caption}\n\n#proof`, first_comment: null },
+    copy: { alt_text: post.alt_text, link_url: post.link_url },
+    rights: { usage_rights: "client_owned" },
+  } };
+}
+
 function database(
   options: {
     claimed?: ClaimedPost[];
@@ -59,16 +84,22 @@ function database(
     routeReadError?: string;
     routePostReads?: Array<Record<string, unknown> | null>;
     prewriteDenied?: boolean;
+    prewriteArtifactHashes?: string[];
+    readbackRecordError?: string;
   } = {},
 ) {
   const events: Record<string, unknown>[] = [];
   const signCalls: Array<{ paths: string[]; ttl: number }> = [];
   let routePostReads = 0;
-  const rpc = vi.fn(async (name: string) => {
+  let prewriteReads = 0;
+  const rpc = vi.fn(async (name: string, args?: { p_post_id?: string }) => {
     if (name === "claim_posts_for_publishing") return { data: options.claimed ?? [POST], error: null };
-    if (name === "require_organic_publication_prewrite_v6") return options.prewriteDenied
-      ? { data: null, error: { message: "Exact Inbox approval missing" } }
-      : { data: { artifact_hash: "a".repeat(64) }, error: null };
+    if (name === "require_organic_publication_prewrite_v6") {
+      if (options.prewriteDenied) return { data: null, error: { message: "Exact Inbox approval missing" } };
+      const packet = reviewedPacket((options.claimed ?? [POST]).find((post) => post.post_id === args?.p_post_id) ?? POST);
+      packet.artifact_hash = options.prewriteArtifactHashes?.[prewriteReads++] ?? packet.artifact_hash;
+      return { data: packet, error: null };
+    }
     if (name === "integration_secret") {
       return { data: "token" in options ? options.token : "a-token", error: null };
     }
@@ -80,6 +111,9 @@ function database(
     }
     if (name === "record_proof_placement_for_post_v6" && options.lineageError) {
       return { data: null, error: { message: options.lineageError } };
+    }
+    if (name === "record_organic_provider_readback_v8" && options.readbackRecordError) {
+      return { data: null, error: { message: options.readbackRecordError } };
     }
     return { data: null, error: null };
   });
@@ -120,9 +154,11 @@ function database(
               id: "slot-1", client_id: POST.client_id, asset_id: POST.asset_id,
               platform: POST.platform, stage: "scheduled", idea_id: "idea-1",
             },
-            client_ideas: { id: filters.id, client_id: POST.client_id, campaign_id: "campaign-1" },
+            client_ideas: { id: filters.id, client_id: POST.client_id,
+              campaign_id: "campaign-1", acquisition_route: "organic" },
             client_campaigns: {
               id: filters.id, client_id: POST.client_id, acquisition_mode: "organic",
+              runs_organic: true,
             },
           };
           const overrides: Record<string, Record<string, unknown> | null | undefined> = {
@@ -158,10 +194,19 @@ function database(
   });
   const storage = {
     from: () => ({
+      download: async (path: string) => {
+        const packets = (options.claimed ?? [POST]).map(reviewedPacket);
+        const item = packets.flatMap((packet) => packet.manifest.media)
+          .find((entry) => entry.frozen_path === path);
+        return item
+          ? { data: new Blob([Buffer.from(item.source_path)], { type: "image/png" }), error: null }
+          : { data: null, error: { message: "missing frozen media" } };
+      },
       createSignedUrl: async (path: string, ttl: number) => {
         signCalls.push({ paths: [path], ttl });
+        const supplied = options.signedFrames?.[signCalls.length - 1];
         return {
-          data: { signedUrl: "signed" in options ? options.signed : "https://signed.example/a.png" },
+          data: { signedUrl: supplied?.signedUrl ?? ("signed" in options ? options.signed : `https://signed.example/${path}`) },
           error: null,
         };
       },
@@ -181,6 +226,9 @@ function database(
 }
 
 const publish = vi.fn();
+const preflightOk = vi.fn(async () => {});
+const readbackVerified = vi.fn(async () => ({ status: "verified" as const,
+  observedAccountRef: "17841400000000000", providerUrl: "https://www.instagram.com/p/1/" }));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -218,9 +266,32 @@ describe("the switch", () => {
 });
 
 describe("the sweep", () => {
+  it("stops before a provider write when live account preflight is refused", async () => {
+    const denied = vi.fn(async () => { throw new PublishError("Publication account mismatch.", false); });
+    const { sb, rpc } = database();
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: denied, readback: readbackVerified });
+    expect(denied).toHaveBeenCalledWith(expect.objectContaining({
+      platform: "instagram", accountId: "17841400000000000", expectedAppId: "app-1",
+    }));
+    expect(publish).not.toHaveBeenCalled();
+    expect(failureFor(rpc, POST.post_id)?.p_reason).toMatch(/account mismatch/);
+  });
+
+  it("records an ambiguous provider write as uncertain without queueing a retry", async () => {
+    publish.mockRejectedValueOnce(new PublishError("Public write outcome uncertain", false, true));
+    const { sb, rpc, events } = database();
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
+    expect(argsOf(rpc, "record_post_publish_uncertain_v7")).toMatchObject({
+      p_post_id: POST.post_id,
+      p_reason: expect.stringContaining("uncertain"),
+    });
+    expect(failureFor(rpc, POST.post_id)).toBeUndefined();
+    expect(events.some((e) => String(e.description).includes("Inspect the account"))).toBe(true);
+  });
+
   it("stops a legacy claimed Engine post before integration, token, media URL or provider write", async () => {
     const { sb, rpc, signCalls } = database({ prewriteDenied: true });
-    const result = await runPublisherJob(sb, on, agent, job);
+    const result = await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(result.ok).toBe(true);
     expect(rpc).toHaveBeenCalledWith("require_organic_publication_prewrite_v6", {
       p_post_id: POST.post_id,
@@ -232,17 +303,16 @@ describe("the sweep", () => {
   });
 
   it("uses the fixed provider fetch lifetime for a post and every carousel frame", async () => {
-    const { sb, signCalls } = database();
+    const { sb, signCalls } = database({ claimed: [CAROUSEL] });
     await prepare(sb, CAROUSEL);
-    expect(signCalls).toEqual([
-      { paths: ["assets/a.png"], ttl: 3600 },
-      { paths: ["assets/f1.png", "assets/f2.png", "assets/f3.png"], ttl: 3600 },
-    ]);
+    expect(signCalls).toEqual(reviewedPacket(CAROUSEL).manifest.media.map((item) => ({
+      paths: [item.frozen_path], ttl: 3600,
+    })));
   });
 
   it("publishes what it claimed and records it", async () => {
     const { sb, rpc } = database();
-    const result = await runPublisherJob(sb, on, agent, job);
+    const result = await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(result.ok).toBe(true);
 
     expect(publish).toHaveBeenCalledWith(
@@ -250,7 +320,7 @@ describe("the sweep", () => {
         postId: "post-1",
         accountId: "17841400000000000",
         accessToken: "a-token",
-        mediaUrl: "https://signed.example/a.png",
+        mediaUrl: `https://signed.example/${reviewedPacket(POST).manifest.media[0]!.frozen_path}`,
         mediaKind: "image",
         caption: "Five steps, one chain.\n\n#proof",
       }),
@@ -259,11 +329,36 @@ describe("the sweep", () => {
       "record_post_published",
       expect.objectContaining({ p_post_id: "post-1", p_external_id: "ig_1", p_external_url: "https://ig/p/1" }),
     );
+    expect(rpc).toHaveBeenCalledWith("record_organic_provider_readback_v8",
+      expect.objectContaining({ p_post_id: POST.post_id, p_frame_position: 0,
+        p_external_id: "ig_1", p_state: "verified" }));
+  });
+
+  it("keeps an acknowledged post out of retry when account read-back is unavailable", async () => {
+    const unavailable = vi.fn(async () => ({ status: "unavailable" as const,
+      observedAccountRef: null, providerUrl: null }));
+    const { sb, rpc } = database();
+    await runPublisherJob(sb, on, agent, job, undefined,
+      { preflight: preflightOk, readback: unavailable });
+    expect(argsOf(rpc, "record_post_published")).toMatchObject({ p_post_id: POST.post_id });
+    expect(argsOf(rpc, "record_organic_provider_readback_v8"))
+      .toMatchObject({ p_post_id: POST.post_id, p_state: "unavailable" });
+    expect(failureFor(rpc, POST.post_id)).toBeUndefined();
+    expect(publish).toHaveBeenCalledOnce();
+  });
+
+  it("does not retry an acknowledged post when read-back recording fails", async () => {
+    const { sb, rpc } = database({ readbackRecordError: "read-back ledger unavailable" });
+    await runPublisherJob(sb, on, agent, job, undefined,
+      { preflight: preflightOk, readback: readbackVerified });
+    expect(argsOf(rpc, "record_post_published")).toMatchObject({ p_post_id: POST.post_id });
+    expect(failureFor(rpc, POST.post_id)).toBeUndefined();
+    expect(publish).toHaveBeenCalledOnce();
   });
 
   it("says so and stops when nothing is due", async () => {
     const { sb, events } = database({ claimed: [] });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(publish).not.toHaveBeenCalled();
     expect(String(events[0]!.description)).toMatch(/Nothing is due/);
   });
@@ -274,7 +369,7 @@ describe("the sweep", () => {
     const second = { ...POST, post_id: "post-2" };
     publish.mockRejectedValueOnce(new PublishError("rate limited", true));
     const { sb, rpc } = database({ claimed: [POST, second] });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
 
     expect(failureFor(rpc, "post-1")).toMatchObject({ p_reason: "rate limited", p_retryable: true });
     expect(rpc).toHaveBeenCalledWith("record_post_published", expect.objectContaining({ p_post_id: "post-2" }));
@@ -283,7 +378,7 @@ describe("the sweep", () => {
   it("carries the adapter's verdict on whether to try again", async () => {
     publish.mockRejectedValueOnce(new PublishError("the token was revoked", false));
     const { sb, rpc } = database();
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(failureFor(rpc, "post-1")!.p_retryable).toBe(false);
   });
 
@@ -292,7 +387,7 @@ describe("the sweep", () => {
       "Bad media https://storage.example/storage/v1/object/sign/client-media/a.png?token=secret", false,
     ));
     const { sb, rpc, events } = database();
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(failureFor(rpc, "post-1")!.p_reason).toContain("details withheld");
     expect(JSON.stringify({ calls: rpc.mock.calls, events })).not.toContain("token=secret");
   });
@@ -300,16 +395,18 @@ describe("the sweep", () => {
   it("treats anything it does not recognise as not worth retrying", async () => {
     publish.mockRejectedValueOnce(new Error("something odd"));
     const { sb, rpc } = database();
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(failureFor(rpc, "post-1")).toMatchObject({ p_retryable: false });
   });
 
-  it("records a post it published but could not write down, so a person looks", async () => {
+  it("holds an acknowledged post as uncertain when its database record fails", async () => {
     const { sb, rpc } = database({ recordError: "deadlock" });
-    await runPublisherJob(sb, on, agent, job);
-    const failure = failureFor(rpc, "post-1")!;
-    expect(failure.p_reason).toMatch(/Published, but could not record it/);
-    expect(failure.p_retryable).toBe(false);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
+    expect(argsOf(rpc, "record_post_publish_uncertain_v7"))
+      .toMatchObject({ p_post_id: POST.post_id,
+        p_reason: expect.stringContaining("database record is uncertain") });
+    expect(failureFor(rpc, "post-1")).toBeUndefined();
+    expect(publish).toHaveBeenCalledOnce();
   });
 });
 
@@ -318,13 +415,15 @@ describe("what stops a post before anything is sent", () => {
     ["a paid scheduled post", { routePost: { channel: "paid" } }],
     ["a post without route lineage", { routeSlot: null }],
     ["a slot without a campaign idea", { routeIdea: { campaign_id: null } }],
+    ["a paid idea in a coordinated campaign", { routeIdea: { acquisition_route: "paid" },
+      routeCampaign: { acquisition_mode: "both", runs_organic: true } }],
     ["a paid campaign", { routeCampaign: { acquisition_mode: "paid" } }],
     ["a legacy campaign", { routeCampaign: { acquisition_mode: "legacy" } }],
     ["a mismatched slot asset", { routeSlot: { asset_id: "other-asset" } }],
     ["a post no longer claimed", { routePost: { publication_status: "scheduled" } }],
   ])("refuses %s before credentials, Storage or provider access", async (_case, options) => {
     const { sb, rpc, signCalls } = database(options);
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(publish).not.toHaveBeenCalled();
     expect(rpc.mock.calls.map((call) => call[0])).not.toContain("integration_secret");
     expect(signCalls).toEqual([]);
@@ -336,23 +435,63 @@ describe("what stops a post before anything is sent", () => {
 
   it("retries a route read outage without reaching the provider", async () => {
     const { sb, rpc, signCalls } = database({ routeReadError: "unavailable" });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(publish).not.toHaveBeenCalled();
     expect(signCalls).toEqual([]);
     expect(failureFor(rpc, "post-1")).toMatchObject({ p_retryable: true });
   });
 
+  it("accepts an explicitly organic idea in a coordinated campaign", async () => {
+    const { sb, rpc } = database({ routeCampaign: {
+      acquisition_mode: "both", runs_organic: true,
+    } });
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
+    expect(publish).toHaveBeenCalledOnce();
+    expect(argsOf(rpc, "record_post_published")).toMatchObject({ p_post_id: POST.post_id });
+  });
+
   it("rechecks after preparation, before an ordinary provider write", async () => {
     const { sb, rpc } = database({ routePostReads: [{}, { channel: "paid" }] });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(publish).not.toHaveBeenCalled();
     expect(failureFor(rpc, "post-1")).toMatchObject({ p_retryable: false });
+  });
+
+  it("stops before the provider write if live account preflight is refused", async () => {
+    const preflight = vi.fn(async () => {
+      throw new PublishError("The exact destination account was not verified.", false);
+    });
+    const { sb, rpc } = database();
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight, readback: readbackVerified });
+    expect(preflight).toHaveBeenCalledWith(expect.objectContaining({
+      platform: "instagram", accountId: "17841400000000000", expectedAppId: "app-1",
+    }));
+    expect(publish).not.toHaveBeenCalled();
+    expect(failureFor(rpc, "post-1")?.p_reason).toMatch(/destination account/);
+  });
+
+  it("refuses a changed reviewed package at the final prewrite check", async () => {
+    const { sb, rpc } = database({ prewriteArtifactHashes: ["a".repeat(64), "b".repeat(64)] });
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
+    expect(publish).not.toHaveBeenCalled();
+    expect(failureFor(rpc, "post-1")?.p_reason).toMatch(/Exact outgoing publication approval/);
+  });
+
+  it("refuses a frozen package for a different provider account", async () => {
+    const { sb, rpc, signCalls } = database({
+      integration: { credential_label: "other-account", meta_page_id: null, ad_account_id: null },
+    });
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
+    expect(publish).not.toHaveBeenCalled();
+    expect(rpc.mock.calls.map((call) => call[0])).not.toContain("integration_secret");
+    expect(failureFor(rpc, "post-1")?.p_reason).toMatch(/package does not match/);
+    expect(signCalls).toHaveLength(0);
   });
 
   it("names a platform with no adapter", async () => {
     vi.spyOn(registry, "adapterFor").mockReturnValue(null);
     const { sb, rpc } = database();
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(failureFor(rpc, "post-1")).toMatchObject({
       p_reason: expect.stringContaining("no adapter for instagram"),
       p_retryable: false,
@@ -362,7 +501,7 @@ describe("what stops a post before anything is sent", () => {
 
   it("names an integration with no account on it", async () => {
     const { sb, rpc } = database({ integration: { credential_label: null, meta_page_id: null, ad_account_id: null } });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(failureFor(rpc, "post-1")).toMatchObject({
       p_reason: expect.stringContaining("no credential label"),
       p_retryable: false,
@@ -371,7 +510,7 @@ describe("what stops a post before anything is sent", () => {
 
   it("names a missing credential", async () => {
     const { sb, rpc } = database({ token: null });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(failureFor(rpc, "post-1")!.p_reason).toMatch(/No usable instagram credential/);
   });
 
@@ -379,20 +518,20 @@ describe("what stops a post before anything is sent", () => {
     // The platform fetches this URL itself, so an unsigned one is a failure
     // before the post rather than a broken post.
     const { sb, rpc } = database({ signed: null });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(failureFor(rpc, "post-1")).toMatchObject({ p_retryable: true });
     expect(publish).not.toHaveBeenCalled();
   });
 
   it("refuses an asset with no file", async () => {
     const { sb, rpc } = database({ claimed: [{ ...POST, media_path: null }] });
-    await runPublisherJob(sb, on, agent, job);
-    expect(failureFor(rpc, "post-1")!.p_reason).toMatch(/no file to post/);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
+    expect(failureFor(rpc, "post-1")!.p_reason).toMatch(/Frozen publication frame/);
   });
 
   it("refuses copy that will not fit rather than truncating it", async () => {
     const { sb, rpc } = database({ claimed: [{ ...POST, caption: "a".repeat(3000) }] });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(failureFor(rpc, "post-1")!.p_reason).toMatch(/limit is 2200/);
     expect(publish).not.toHaveBeenCalled();
   });
@@ -401,23 +540,21 @@ describe("what stops a post before anything is sent", () => {
 describe("a shape made of frames", () => {
   it("hands the adapter every frame, in order, signed", async () => {
     const { sb } = database({ claimed: [CAROUSEL] });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
 
     const request = publish.mock.calls[0]![0] as {
       contentFormat: string;
       frames: Array<{ position: number; mediaUrl: string }>;
     };
     expect(request.contentFormat).toBe("carousel");
-    expect(request.frames).toEqual([
-      { position: 1, mediaUrl: "https://signed.example/assets/f1.png" },
-      { position: 2, mediaUrl: "https://signed.example/assets/f2.png" },
-      { position: 3, mediaUrl: "https://signed.example/assets/f3.png" },
-    ]);
+    expect(request.frames).toEqual(reviewedPacket(CAROUSEL).manifest.media.map((item, index) => ({
+      position: index + 1, mediaUrl: `https://signed.example/${item.frozen_path}`,
+    })));
   });
 
   it("leaves frames off a post that is not made of them", async () => {
     const { sb } = database();
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     const request = publish.mock.calls[0]![0] as Record<string, unknown>;
     expect(request.contentFormat).toBe("single");
     expect(request).not.toHaveProperty("frames");
@@ -430,10 +567,10 @@ describe("a shape made of frames", () => {
     const { sb, rpc } = database({
       claimed: [{ ...CAROUSEL, frame_paths: ["assets/only.png"] }],
     });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(publish).not.toHaveBeenCalled();
     expect(failureFor(rpc, "post-1")).toMatchObject({
-      p_reason: expect.stringContaining("1 frame to send"),
+      p_reason: expect.stringContaining("frame count is invalid"),
       p_retryable: false,
     });
   });
@@ -447,7 +584,7 @@ describe("a shape made of frames", () => {
         { signedUrl: "https://signed.example/assets/f3.png" },
       ],
     });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(publish).not.toHaveBeenCalled();
     expect(failureFor(rpc, "post-1")).toMatchObject({
       p_reason: expect.stringContaining("frame 2"),
@@ -459,10 +596,10 @@ describe("a shape made of frames", () => {
     const { sb, rpc } = database({
       claimed: [{ ...POST, content_format: "flipbook" }],
     });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(publish).not.toHaveBeenCalled();
     expect(failureFor(rpc, "post-1")).toMatchObject({
-      p_reason: expect.stringContaining('"flipbook"'),
+      p_reason: expect.stringContaining("package does not match"),
       p_retryable: false,
     });
   });
@@ -507,7 +644,7 @@ describe("a story, which is not one publication", () => {
 
   it("sends every frame as its own post and records each one as it lands", async () => {
     const { sb, rpc } = database({ claimed: [STORY] });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
 
     expect(publishFrame).toHaveBeenCalledTimes(3);
     expect(framesRecorded(rpc)).toEqual([
@@ -515,6 +652,9 @@ describe("a story, which is not one publication", () => {
       { p_position: 2, p_external_id: "ig_story_2" },
       { p_position: 3, p_external_id: "ig_story_3" },
     ]);
+    expect(rpc.mock.calls.filter((call) => call[0] === "record_organic_provider_readback_v8")
+      .map((call) => (call[1] as { p_frame_position: number }).p_frame_position))
+      .toEqual([1, 2, 3]);
     // The post carries the first frame's id, which is the one a person
     // following the link would expect to land on.
     expect(argsOf(rpc, "record_post_published")).toMatchObject({ p_external_id: "ig_story_1" });
@@ -525,7 +665,7 @@ describe("a story, which is not one publication", () => {
       claimed: [STORY],
       routePostReads: [{}, {}, { channel: "paid" }],
     });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(publishFrame).toHaveBeenCalledTimes(1);
     expect(framesRecorded(rpc).map((f) => f.p_position)).toEqual([1]);
     expect(failureFor(rpc, "post-1")).toMatchObject({ p_retryable: false });
@@ -539,7 +679,7 @@ describe("a story, which is not one publication", () => {
         { position: 2, external_id: "ig_story_2", external_url: null },
       ],
     });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
 
     // The whole point: a retry does not post the beginning of the story twice.
     expect(publishFrame).toHaveBeenCalledTimes(1);
@@ -553,7 +693,7 @@ describe("a story, which is not one publication", () => {
       .mockResolvedValueOnce({ ok: true, externalId: "ig_story_2", externalUrl: null })
       .mockRejectedValueOnce(new PublishError("The credential needs reconnecting.", false));
     const { sb, rpc } = database({ claimed: [STORY] });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
 
     // Two frames are live on the account, and two rows say so.
     expect(framesRecorded(rpc).map((f) => f.p_position)).toEqual([1, 2]);
@@ -565,17 +705,19 @@ describe("a story, which is not one publication", () => {
 
   it("stops the story when a frame cannot be recorded, rather than widening the gap", async () => {
     const { sb, rpc } = database({ claimed: [STORY], frameRecordError: "write failed" });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     // One frame out, unrecorded, and no second frame sent after it.
     expect(publishFrame).toHaveBeenCalledTimes(1);
-    expect(failureFor(rpc, "post-1")).toMatchObject({
-      p_reason: expect.stringContaining("could not be recorded"),
+    expect(argsOf(rpc, "record_post_publish_uncertain_v7")).toMatchObject({
+      p_post_id: POST.post_id,
+      p_reason: expect.stringContaining("database record is uncertain"),
     });
+    expect(failureFor(rpc, "post-1")).toBeUndefined();
   });
 
   it("does not send anything if it cannot find out what already went out", async () => {
     const { sb, rpc } = database({ claimed: [STORY], framesReadError: "unreachable" });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(publishFrame).not.toHaveBeenCalled();
     expect(failureFor(rpc, "post-1")).toMatchObject({ p_retryable: true });
   });
@@ -588,7 +730,7 @@ describe("a story, which is not one publication", () => {
       publish,
     });
     const { sb, rpc } = database({ claimed: [STORY] });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(publish).not.toHaveBeenCalled();
     expect(failureFor(rpc, "post-1")).toMatchObject({
       p_reason: expect.stringContaining("cannot send a story"),
@@ -600,7 +742,7 @@ describe("a story, which is not one publication", () => {
     const { sb, rpc } = database({
       claimed: [{ ...STORY, frame_paths: ["assets/only.png"] }],
     });
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(publishFrame).toHaveBeenCalledTimes(1);
     expect(failureFor(rpc, "post-1")).toBeUndefined();
   });
@@ -617,7 +759,7 @@ describe("a story, which is not one publication", () => {
 describe("recording the proof behind a published post", () => {
   it("records it after the publish, not before", async () => {
     const { sb, rpc } = database();
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
 
     const names = rpc.mock.calls.map((c) => c[0]);
     expect(names).toContain("record_proof_placement_for_post_v6");
@@ -631,13 +773,13 @@ describe("recording the proof behind a published post", () => {
   it("does not record it for a post that failed to publish", async () => {
     publish.mockRejectedValueOnce(new Error("Instagram said no"));
     const { sb, rpc } = database();
-    await runPublisherJob(sb, on, agent, job);
+    await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
     expect(rpc.mock.calls.map((c) => c[0])).not.toContain("record_proof_placement_for_post_v6");
   });
 
   it("warns but does not fail the post when the lineage row cannot be written", async () => {
     const { sb, rpc, events } = database({ lineageError: "placements are locked" });
-    const result = await runPublisherJob(sb, on, agent, job);
+    const result = await runPublisherJob(sb, on, agent, job, undefined, { preflight: preflightOk, readback: readbackVerified });
 
     // The post is out. Failing it here would publish it twice on the retry.
     expect(result.ok).toBe(true);

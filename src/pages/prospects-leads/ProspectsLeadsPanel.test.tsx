@@ -13,8 +13,8 @@ import { ProspectsLeadsPanel } from "./ProspectsLeadsPanel";
 const lead = (over: Record<string, unknown> = {}) => ({
   id: "lead-1", name: "Naledi K", contact: null, email: "naledi@example.com", phone: null,
   stage: "conversation", stage_at: "2026-09-01T00:00:00Z", next_action: "Send quote",
-  next_action_due: "2026-09-30", opportunity_value: 12000, sale_value: null,
-  cash_collected: null, source_channel: "Instagram reel", owner_member_id: null,
+  next_action_due: "2026-09-30", opportunity_value: 12000, opportunity_currency: null, sale_value: null, sale_currency: null,
+  cash_collected: null, cash_currency: null, source_channel: "Instagram reel", owner_member_id: null,
   appointment_at: null, appointment_outcome: null, ...over,
 });
 
@@ -62,11 +62,24 @@ describe("AA lead funnel", () => {
     await userEvent.type(within(dialog).getByLabelText(/^Name/), "New Prospect");
     await userEvent.type(within(dialog).getByLabelText("Email"), "new@example.com");
     await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_manual_lead", {
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_manual_lead_with_currency", {
       p_client_id: "client-1", p_name: "New Prospect", p_email: "new@example.com",
       p_phone: undefined, p_owner_member_id: undefined, p_next_action: undefined,
-      p_next_action_due: undefined, p_opportunity_value: undefined,
+      p_next_action_due: undefined, p_opportunity_value: undefined, p_opportunity_currency: undefined,
     }));
+  });
+
+  it("records an explicit currency with a new positive opportunity value", async () => {
+    show();
+    await screen.findByText("Naledi K");
+    await userEvent.click(screen.getByRole("button", { name: "Add Lead" }));
+    const dialog = screen.getByRole("dialog", { name: "Add Lead" });
+    await userEvent.type(within(dialog).getByLabelText(/^Name/), "Currency buyer");
+    await userEvent.type(within(dialog).getByLabelText("Opportunity value"), "250");
+    await userEvent.type(within(dialog).getByLabelText(/Opportunity currency/), "USD");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_manual_lead_with_currency",
+      expect.objectContaining({ p_opportunity_value: 250, p_opportunity_currency: "USD" })));
   });
 
   it("renders the nine stages in order and keeps Lost collapsed", async () => {
@@ -94,6 +107,27 @@ describe("AA lead funnel", () => {
     expect(screen.getByRole("button", { name: "Archive (1)" })).toBeInTheDocument();
   });
 
+  it("shows cash only with a single recorded currency and does not invent an opportunity currency", async () => {
+    show([lead({ cash_collected: 100, cash_currency: "USD" })]);
+    expect(await screen.findByText("USD 100")).toBeInTheDocument();
+    expect(screen.getByText(/Mixed or unverified opportunity currencies/)).toBeInTheDocument();
+    expect(screen.queryByText("R12,000")).not.toBeInTheDocument();
+  });
+
+  it("sums open opportunity values only when their currencies match", async () => {
+    show([lead({ opportunity_currency: "USD" }),
+      lead({ id: "lead-2", name: "Second", opportunity_value: 300, opportunity_currency: "USD" })]);
+    expect(await screen.findByText("USD 12,300")).toBeInTheDocument();
+    expect(screen.getByText(/USD 12,000/)).toBeInTheDocument();
+  });
+
+  it("holds a cash total when a legacy amount has no currency", async () => {
+    show([lead({ cash_collected: 100, cash_currency: "USD" }),
+      lead({ id: "lead-2", name: "Legacy", cash_collected: 50, cash_currency: null })]);
+    expect(await screen.findByText(/Mixed or unverified cash currencies/)).toBeInTheDocument();
+    expect(screen.queryByText("USD 150")).not.toBeInTheDocument();
+  });
+
   it("opens the same editor from the button and the card", async () => {
     show();
     await userEvent.click(await screen.findByRole("button", { name: "Edit Naledi K" }));
@@ -114,6 +148,33 @@ describe("AA lead funnel", () => {
     })));
     expect(await screen.findByText("Saved")).toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Edit Naledi K" })).toBeInTheDocument();
+  });
+
+  it("does not resend untouched sale and cash values when another detail changes", async () => {
+    show([lead({ sale_value: 3000, cash_collected: 1000, owner_member_id: "owner-a" })]);
+    await userEvent.click(await screen.findByRole("button", { name: "Edit Naledi K" }));
+    expect(screen.getByRole("button", { name: "Save details" })).toBeDisabled();
+    await userEvent.clear(screen.getByLabelText("Next action"));
+    await userEvent.type(screen.getByLabelText("Next action"), "Call tomorrow");
+    expect(screen.getByRole("button", { name: "Save details" })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "Save details" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("update_lead", {
+      p_lead_id: "lead-1", p_fields: { next_action: "Call tomorrow" },
+    }));
+  });
+
+  it("holds a positive sale edit until its currency is entered", async () => {
+    show([lead({ stage: "shown" })]);
+    await userEvent.click(await screen.findByRole("button", { name: "Edit Naledi K" }));
+    await userEvent.type(screen.getByLabelText("Sale value"), "3000");
+    await userEvent.click(screen.getByRole("button", { name: "Save details" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/sale currency is required/i);
+    expect(rpc).not.toHaveBeenCalledWith("update_lead", expect.anything());
+    await userEvent.type(screen.getByLabelText("Sale currency (ISO)"), "usd");
+    await userEvent.click(screen.getByRole("button", { name: "Save details" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("update_lead", {
+      p_lead_id: "lead-1", p_fields: { sale_value: 3000, sale_currency: "USD" },
+    }));
   });
 
   it("moves through advance_lead and requires a reason for Lost", async () => {
@@ -172,6 +233,8 @@ describe("AA lead funnel", () => {
     }]);
     await userEvent.click(await screen.findByRole("button", { name: "Archive (1)" }));
     expect(screen.getByText("Old prospect")).toBeInTheDocument();
+    expect(screen.getByText("500 (currency unrecorded)")).toBeInTheDocument();
+    expect(screen.queryByText("R500")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "View" }));
     expect(screen.getByText("Called")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Archive list/ }));

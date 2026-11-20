@@ -1,29 +1,32 @@
 import { describe, expect, it } from "vitest";
 import {
   auditCronCatalog, CRON_REGISTRY_HEAD, EXPECTED_CRON_SCHEDULES,
+  EXPECTED_INACTIVE_CRON_JOBS,
   type CronCatalogJob,
 } from "./cron-catalog.js";
 
 const installed = (): CronCatalogJob[] => Object.entries(EXPECTED_CRON_SCHEDULES).map(([name, schedule]) => ({
-  name, schedule, active: true,
+  name, schedule, active: !EXPECTED_INACTIVE_CRON_JOBS.has(name),
 }));
 
-describe("released cron schedule catalog", () => {
-  it("recognizes the 22 released schedules without claiming run success", () => {
+describe("candidate cron schedule catalog", () => {
+  it("recognizes the 23 candidate schedules without claiming run success", () => {
     const audit = auditCronCatalog(CRON_REGISTRY_HEAD, installed());
     expect(audit).toMatchObject({
-      state: "matches", expectedCount: 22, observedCount: 22, reason: null,
+      state: "matches", expectedCount: 23, observedCount: 23, reason: null,
     });
-    expect(audit.rows).toHaveLength(22);
+    expect(audit.rows).toHaveLength(23);
     expect(audit.rows.every((row) => row.issues.length === 0)).toBe(true);
     expect(audit.rows.find((row) => row.name === "engine-tick")?.expectedSchedule).toBe("7 * * * *");
     expect(audit.rows.find((row) => row.name === "profile-update-sweep")?.expectedSchedule).toBe("5,35 * * * *");
+    expect(audit.rows.find((row) => row.name === "organic-provider-readback-reconcile")?.observed[0]?.active).toBe(false);
   });
 
   it("distinguishes missing, duplicate, inactive and altered schedules", () => {
     const jobs = installed().filter((job) => job.name !== "engine-tick");
     jobs.find((job) => job.name === "publish-sweep")!.schedule = "* * * * *";
     jobs.find((job) => job.name === "token-health-daily")!.active = false;
+    jobs.find((job) => job.name === "organic-provider-readback-reconcile")!.active = true;
     jobs.push({ ...jobs.find((job) => job.name === "outbound-sweep")! });
     const audit = auditCronCatalog(CRON_REGISTRY_HEAD, jobs);
     expect(audit.state).toBe("drift");
@@ -32,6 +35,7 @@ describe("released cron schedule catalog", () => {
     expect(issue("publish-sweep")).toEqual(["schedule_mismatch"]);
     expect(issue("token-health-daily")).toEqual(["inactive"]);
     expect(issue("outbound-sweep")).toEqual(["duplicate"]);
+    expect(issue("organic-provider-readback-reconcile")).toEqual(["unexpectedly_active"]);
   });
 
   it("exposes unregistered entries, including anonymous names, as drift", () => {

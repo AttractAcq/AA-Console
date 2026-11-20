@@ -62,13 +62,73 @@ export function stageReached(row: ArchiveRow): ChainStage {
 /** Plain-language summary of where a piece stopped, for the list. */
 export function stageLabel(row: ArchiveRow): string {
   if (row.published > 0) {
-    return `Published${row.published > 1 ? ` ×${row.published}` : ""}`;
+    return `Publication recorded${row.published > 1 ? ` ×${row.published}` : ""}`;
   }
   if (row.scheduled > 0) return "Scheduled, not yet out";
 
   if (row.approved_assets > 0) return "Approved, not scheduled";
   if (row.assets > 0) return "Built, awaiting approval";
   return "Brief only";
+}
+
+/** A recorded publish transition is not a provider read-back. */
+export function publicationEvidence(post: {
+  published_at: string | null;
+  external_id: string | null;
+  external_url: string | null;
+}): string | null {
+  if (!post.published_at) return null;
+  return post.external_id || post.external_url
+    ? "External reference recorded; provider read-back unverified"
+    : "Publication recorded without an external reference; provider result unverified";
+}
+
+export type ArchiveMetricCoverage = {
+  linked_posts: number;
+  metric_rows: number;
+  posts_with_metrics: number;
+  cumulative_rows: number;
+  impression_rows: number;
+  reach_rows: number;
+  click_rows: number;
+  spend_rows: number;
+  currency_count: number;
+  missing_currency_rows: number;
+  currency: string | null;
+  first_metric_date: string | null;
+  last_metric_date: string | null;
+  last_fetched_at: string | null;
+};
+
+/** Show the current aggregate only alongside its source coverage. */
+export function archiveMetricPresentation(
+  totals: { impressions: number | null; reach: number | null; clicks: number | null; spend: number | null },
+  coverage: ArchiveMetricCoverage | null,
+): Record<string, string> {
+  if (!coverage) return {
+    metric_coverage: "unknown (coverage read unavailable)",
+    impressions: "unknown", reach: "unknown", clicks: "unknown", spend: "unknown",
+  };
+  const scope = coverage.metric_rows > 0
+    ? `${coverage.metric_rows} metric rows on ${coverage.posts_with_metrics}/${coverage.linked_posts} linked posts; ${coverage.first_metric_date ?? "unknown"} to ${coverage.last_metric_date ?? "unknown"}; fetched ${coverage.last_fetched_at ?? "unknown"}; provider completeness unverified`
+    : `${coverage.linked_posts} linked posts; no ingested metric rows`;
+  const metric = (value: number | null, observedRows: number, cumulativeSensitive = true) => {
+    if (observedRows === 0 || value === null) return "unknown (no ingested value)";
+    if (cumulativeSensitive && coverage.cumulative_rows > 0)
+      return `${value} (daily rows plus latest cumulative snapshot per source; coverage unverified)`;
+    return `${value} (recorded daily rows; coverage unverified)`;
+  };
+  const spend = coverage.spend_rows > 0 &&
+    (coverage.currency_count !== 1 || coverage.missing_currency_rows > 0)
+    ? "unknown (spend currency missing or mixed)"
+    : metric(totals.spend, coverage.spend_rows, false);
+  return {
+    metric_coverage: scope,
+    impressions: metric(totals.impressions, coverage.impression_rows),
+    reach: metric(totals.reach, coverage.reach_rows),
+    clicks: metric(totals.clicks, coverage.click_rows),
+    spend: spend.startsWith("unknown") ? spend : `${spend} ${coverage.currency}`,
+  };
 }
 
 export async function fetchArchive(clientId: string): Promise<ArchiveRow[]> {

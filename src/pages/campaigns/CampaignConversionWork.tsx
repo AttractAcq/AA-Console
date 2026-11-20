@@ -13,8 +13,9 @@ type Step = { id: string; step_key: string; status: string; blocker: string | nu
 const controlClass = "rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50";
 
 /** Plan-bound conversion drafts stop at human review, before any public use. */
-export function CampaignConversionWork({ clientId, campaignId, needsPage, needsAgent, needsMagnet = false }: {
+export function CampaignConversionWork({ clientId, campaignId, needsPage, needsAgent, needsMagnet = false, visibleModule }: {
   clientId: string; campaignId: string; needsPage: boolean; needsAgent: boolean; needsMagnet?: boolean;
+  visibleModule?: "page" | "agent" | "magnet";
 }) {
   const [work, setWork] = useState<Work[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
@@ -86,6 +87,10 @@ export function CampaignConversionWork({ clientId, campaignId, needsPage, needsA
   };
 
   const ordered = ["campaign_page", "campaign_sales_agent", "campaign_lead_magnet"];
+  const visibleKey = visibleModule === "page" ? "campaign_page"
+    : visibleModule === "agent" ? "campaign_sales_agent"
+      : visibleModule === "magnet" ? "campaign_lead_magnet" : null;
+  const visibleWork = visibleKey ? work.filter((item) => item.item_key === visibleKey) : work;
   return <section className="mt-4 rounded-lg border border-border bg-card p-4" aria-label="Campaign conversion work">
     <div className="flex items-center justify-between gap-2">
       <h3 className="font-semibold">Campaign conversion work</h3>
@@ -94,10 +99,10 @@ export function CampaignConversionWork({ clientId, campaignId, needsPage, needsA
     {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
     {notice && <p role="status" className="mt-2 text-xs">{notice}</p>}
     {loading && <p className="mt-2 text-xs text-muted-foreground">Loading conversion work…</p>}
-    {!loading && !error && !work.length && <p className="mt-2 text-xs text-muted-foreground">
+    {!loading && !error && !visibleWork.length && <p className="mt-2 text-xs text-muted-foreground">
       No plan-bound conversion drafts have been swept yet. Required: {[needsPage && "page", needsAgent && "sales agent", needsMagnet && "lead magnet"].filter(Boolean).join(" and ")}.
     </p>}
-    {work.length > 0 && <ol className="mt-3 space-y-3">{[...work]
+    {visibleWork.length > 0 && <ol className="mt-3 space-y-3">{[...visibleWork]
       .sort((a, b) => ordered.indexOf(a.item_key) - ordered.indexOf(b.item_key))
       .map((item) => {
         const label = item.item_key === "campaign_page" ? "Campaign page"

@@ -74,6 +74,16 @@ describe("isVisible", () => {
     expect(isVisible(field, { kind: true })).toBe(false);
   });
 
+  it("requires every condition for a field with dependent selections", () => {
+    const field: FieldDef = { ...base, showIf: [
+      { field: "kind", equals: ["opportunity_campaign"] },
+      { field: "route", equals: ["paid", "both"] },
+    ] };
+    expect(isVisible(field, { kind: "opportunity_campaign", route: "both" })).toBe(true);
+    expect(isVisible(field, { kind: "standalone_paid", route: "both" })).toBe(false);
+    expect(isVisible(field, { kind: "opportunity_campaign", route: "organic" })).toBe(false);
+  });
+
   it("treats a heading as visible unless a showIf hides it", () => {
     const heading: FieldDef = { name: "_personal", label: "Personal", kind: "heading" };
     expect(isVisible(heading, {})).toBe(true);

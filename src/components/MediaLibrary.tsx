@@ -5,6 +5,8 @@ import { EmptyState } from "./EmptyState";
 import { MediaCard, StatusBadge } from "./MediaCard";
 import { MediaDetailModal } from "./MediaDetailModal";
 import { ApprovalActions } from "./ApprovalActions";
+import { requestOrdinaryMediaReview } from "../lib/creativeReview";
+import { supabase } from "../lib/supabase";
 import { countFrames } from "../lib/frames";
 import { isMultiFrame } from "../lib/contentFormat";
 import { RegenerateAction } from "./RegenerateAction";
@@ -67,13 +69,16 @@ export function MediaLibrary({
   const { clientId } = useParams<{ clientId: string }>();
   const [sort, setSort] = useState<SortOptionId>(dateSortOptions[0].id);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
-  const urls = useSignedPreviewPaths("client-media", assets.map((asset) => asset.storage_path));
+  const urls = useSignedPreviewPaths("client-media", assets.map((asset) =>
+    asset.render_path ?? asset.storage_path));
   const [bodies, setBodies] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<MediaAsset | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [frameCounts, setFrameCounts] = useState<Map<string, number>>(new Map());
+  const [currentSignoffs, setCurrentSignoffs] = useState<Map<string, boolean>>(new Map());
+  const [requestingId, setRequestingId] = useState<string | null>(null);
 
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -90,10 +95,22 @@ export function MediaLibrary({
       ascending: sort === "oldest",
     });
     setAssets(rows);
+    const approvedCreative = rows.filter((row) => row.review_status === "approved"
+      && row.human_approved_at && (row.media_type === "image" || row.media_type === "text")
+      && ["single", "carousel", "story"].includes(row.content_format ?? "single")
+      && ((row.content_format ?? "single") === "single" || !row.render_path));
+    if (approvedCreative.length) {
+      const { data, error } = await supabase.from("ordinary_media_current_status_v6")
+        .select("asset_id,current_signoff").eq("client_id", clientId);
+      if (error) throw new Error(error.message);
+      setCurrentSignoffs(new Map((data ?? []).filter((row) => !!row.asset_id)
+        .map((row) => [row.asset_id!, row.current_signoff === true] as const)));
+    } else setCurrentSignoffs(new Map());
     // A text asset's file IS the content, so fetch it. Capped and
     // best-effort: one unreadable file must not blank the whole library.
     if (mediaType === "text") {
-      setBodies(await fetchTextBodies(rows, await signPaths("client-media", rows.map((row) => row.storage_path))));
+      setBodies(await fetchTextBodies(rows, await signPaths("client-media", rows.map((row) =>
+        row.render_path ?? row.storage_path))));
     }
     setFrameCounts(await countFrames(rows.map((r) => r.id)));
     setLoading(false);
@@ -103,6 +120,21 @@ export function MediaLibrary({
       setLoading(false);
     }
   }, [clientId, mediaType, contentFormat, sort]);
+
+  async function requestNewReview(asset: MediaAsset) {
+    if (!clientId) return;
+    setRequestingId(asset.id);
+    setActionError(null);
+    try {
+      await requestOrdinaryMediaReview(clientId, asset.id);
+      setNotice("Submitted the current creative for exact review.");
+      await refresh();
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setRequestingId(null);
+    }
+  }
 
   useEffect(() => {
     void refresh();
@@ -134,7 +166,7 @@ export function MediaLibrary({
             <MediaCard
               key={asset.id}
               mediaType={asset.media_type}
-              url={urls.get(asset.storage_path)}
+              url={urls.get(asset.render_path ?? asset.storage_path)}
               body={bodies.get(asset.id)}
               title={asset.title ?? "Untitled"}
               meta={frameMeta(asset, frameCounts.get(asset.id))}
@@ -157,9 +189,24 @@ export function MediaLibrary({
                   <ApprovalActions
                     assetId={asset.id}
                     title={asset.title ?? "Untitled"}
+                    clientId={clientId}
+                    exactReview={(asset.media_type === "image" || asset.media_type === "text")
+                      && ["single", "carousel", "story"].includes(asset.content_format ?? "single")
+                      && ((asset.content_format ?? "single") === "single" || !asset.render_path)}
                     onDone={() => void refresh()}
                     onError={setActionError}
+                    onNotice={setNotice}
                   />
+                ) : asset.review_status === "approved" && asset.human_approved_at
+                    && (asset.media_type === "image" || asset.media_type === "text")
+                    && ["single", "carousel", "story"].includes(asset.content_format ?? "single")
+                    && ((asset.content_format ?? "single") === "single" || !asset.render_path)
+                    && currentSignoffs.get(asset.id) === false ? (
+                  <button type="button" disabled={requestingId === asset.id}
+                    onClick={() => void requestNewReview(asset)}
+                    className="text-xs font-medium text-brand-strong hover:underline disabled:opacity-50">
+                    {requestingId === asset.id ? "Submitting…" : "Request new review"}
+                  </button>
                 ) : (
                   // Any decided asset can be built again. A rejected one is
                   // the obvious case; an approved one that is nearly right is
@@ -181,10 +228,11 @@ export function MediaLibrary({
 
       <MediaDetailModal
         asset={open}
-        url={open ? urls.get(open.storage_path) : undefined}
+        url={open ? urls.get(open.render_path ?? open.storage_path) : undefined}
         body={open ? bodies.get(open.id) : undefined}
         open={open !== null}
         onClose={() => setOpen(null)}
+        onChanged={() => void refresh()}
       />
     </div>
   );

@@ -214,6 +214,9 @@ if [[ "${AA_SCHEMA_PHASE2_SMOKES:-0}" == "1" ]]; then
   smoke_count=0
   for smoke_file in scripts/phase2-*-smoke.sql; do
     smoke_name="${smoke_file##*/}"
+    if [[ -n "${AA_SCHEMA_PHASE2_SMOKE:-}" && "$smoke_name" != "$AA_SCHEMA_PHASE2_SMOKE" ]]; then
+      continue
+    fi
     if psql_local -qAt -f "$smoke_file" >"$run_dir/$smoke_name.private.log" 2>&1; then
       smoke_count=$((smoke_count + 1))
     else
@@ -222,12 +225,16 @@ if [[ "${AA_SCHEMA_PHASE2_SMOKES:-0}" == "1" ]]; then
       exit 1
     fi
   done
+  if [[ -n "${AA_SCHEMA_PHASE2_SMOKE:-}" && "$smoke_count" -ne 1 ]]; then
+    echo "The selected Phase 2 smoke fixture was not found." >&2
+    exit 1
+  fi
   echo "$smoke_count Phase 2 rollback fixtures passed."
 fi
 
 if [[ "${AA_SCHEMA_PHASE3_SMOKES:-0}" == "1" ]]; then
   smoke_count=0
-  for smoke_file in scripts/phase3-*-smoke.sql; do
+  for smoke_file in scripts/phase3-*-smoke.sql scripts/manual-first-*-smoke.sql; do
     smoke_name="${smoke_file##*/}"
     if psql_local -qAt -f "$smoke_file" >"$run_dir/$smoke_name.private.log" 2>&1; then
       smoke_count=$((smoke_count + 1))
@@ -289,6 +296,9 @@ if [[ "${AA_SCHEMA_PHASE7_SMOKES:-0}" == "1" ]]; then
   smoke_count=0
   for smoke_file in scripts/phase7-*-smoke.sql; do
     smoke_name="${smoke_file##*/}"
+    if [[ -n "${AA_SCHEMA_PHASE7_ONLY:-}" && "$smoke_name" != *"$AA_SCHEMA_PHASE7_ONLY"* ]]; then
+      continue
+    fi
     if psql_local -qAt -f "$smoke_file" >"$run_dir/$smoke_name.private.log" 2>&1; then
       smoke_count=$((smoke_count + 1))
     else
@@ -297,6 +307,10 @@ if [[ "${AA_SCHEMA_PHASE7_SMOKES:-0}" == "1" ]]; then
       exit 1
     fi
   done
+  if [[ -n "${AA_SCHEMA_PHASE7_ONLY:-}" && "$smoke_count" -eq 0 ]]; then
+    echo "No Phase 7 fixture matched AA_SCHEMA_PHASE7_ONLY." >&2
+    exit 1
+  fi
   echo "$smoke_count Phase 7 rollback fixtures passed."
 fi
 

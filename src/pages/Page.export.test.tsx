@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
+import { useState } from "react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 
 const { downloadTabPdf, downloadModuleZip } = vi.hoisted(() => ({
@@ -29,13 +30,56 @@ vi.mock("./sites/SitesPanel", () => ({ SitesPanel: () => <p>Sites panel</p> }));
 vi.mock("./distribution/MetaProfilePanel", () => ({ MetaProfilePanel: ({ tab }: { tab: string }) => <p>Meta profile {tab}</p> }));
 vi.mock("./distribution/OrganicPanel", () => ({ OrganicPanel: () => <p>Organic board</p> }));
 vi.mock("./reporting/OrganicReportingPanel", () => ({ OrganicReportingPanel: () => <p>Organic reporting</p> }));
+vi.mock("./proof-distribution/ProofDistributionPanel", () => ({
+  ProofDistributionPanel: ({ tab }: { tab: string }) => {
+    const { clientId } = useParams();
+    const [initialClient] = useState(clientId);
+    return <p>Proof distribution {tab} for {initialClient}</p>;
+  },
+}));
 
 import { v6ModuleNodes } from "../config/navigation";
 import { Page } from "./Page";
 
 const intelligenceOs = v6ModuleNodes.find((node) => node.id === "intelligence-os")!;
+const proofDistribution = v6ModuleNodes.find((node) => node.id === "proof-distribution")!;
+
+function SwitchClient() {
+  const navigate = useNavigate();
+  return <button type="button" onClick={() => navigate("/clients/client-2/delivery/proof-distribution?tab=placements")}>Switch client</button>;
+}
 
 beforeEach(() => vi.clearAllMocks());
+
+it("opens the combined Distribution Log from an old Rights deep link", () => {
+  render(
+    <MemoryRouter initialEntries={["/clients/client-1/delivery/proof-distribution?tab=rights"]}>
+      <Routes>
+        <Route path="/clients/:clientId/delivery/proof-distribution"
+          element={<Page node={proofDistribution} />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole("tab", { name: "Distribution Log" }))
+    .toHaveAttribute("aria-selected", "true");
+  expect(screen.getByText("Proof distribution placements for client-1")).toBeInTheDocument();
+});
+
+it("remounts a Delivery panel when the route changes clients", async () => {
+  render(
+    <MemoryRouter initialEntries={["/clients/client-1/delivery/proof-distribution?tab=placements"]}>
+      <SwitchClient />
+      <Routes>
+        <Route path="/clients/:clientId/delivery/proof-distribution"
+          element={<Page node={proofDistribution} />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  expect(screen.getByText("Proof distribution placements for client-1")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Switch client" }));
+  expect(screen.getByText("Proof distribution placements for client-2")).toBeInTheDocument();
+  expect(screen.queryByText("Proof distribution placements for client-1")).not.toBeInTheDocument();
+});
 
 it("downloads whichever tab is open as a PDF", async () => {
   const user = userEvent.setup();

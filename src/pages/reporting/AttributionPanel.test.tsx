@@ -1,10 +1,11 @@
 import { createElement } from "react";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { rpc, useParams } = vi.hoisted(() => ({ rpc: vi.fn(), useParams: vi.fn() }));
 vi.mock("../../lib/supabase", () => ({ supabase: { rpc } }));
+vi.mock("./BusinessProfileCoverage", () => ({ BusinessProfileCoverage: () => null }));
 vi.mock("react-router-dom", () => ({
   useParams,
   // Link renders as an anchor so tests can still find navigation by role.
@@ -42,7 +43,7 @@ function show(f: Record<string, unknown> | null = funnel(), top: unknown[] = [co
   rpc.mockImplementation((name: string) =>
     Promise.resolve({ data: name === "acquisition_funnel" ? (f ? [f] : [])
       : name === "acquisition_coverage_v8" ? [c]
-        : name === "lead_journey_trace_v9" ? journeys : top, error: null }),
+        : name === "lead_journey_trace_v10" ? journeys : top, error: null }),
   );
   return render(<AttributionPanel />);
 }
@@ -71,6 +72,48 @@ describe("the chain", () => {
   });
 });
 
+describe("client boundary", () => {
+  function response(name: string, clientId: string) {
+    return { data: name === "acquisition_funnel" ? [funnel()]
+      : name === "acquisition_coverage_v8" ? [coverage()]
+        : name === "lead_journey_trace_v10" ? []
+          : [content({ hook: `Hook for ${clientId}` })], error: null };
+  }
+
+  it("clears the previous client's figures before the next read completes", async () => {
+    let releaseNext!: () => void;
+    const nextGate = new Promise<void>((resolve) => { releaseNext = resolve; });
+    rpc.mockImplementation((name: string, args: { p_client_id: string }) =>
+      args.p_client_id === "client-2"
+        ? nextGate.then(() => response(name, args.p_client_id))
+        : Promise.resolve(response(name, args.p_client_id)));
+    const view = render(<AttributionPanel />);
+    expect(await screen.findByText("Hook for client-1")).toBeInTheDocument();
+    useParams.mockReturnValue({ clientId: "client-2" });
+    view.rerender(<AttributionPanel />);
+    expect(screen.queryByText("Hook for client-1")).not.toBeInTheDocument();
+    expect(screen.getByText("Loading attribution…")).toBeInTheDocument();
+    await act(async () => { releaseNext(); });
+    expect(await screen.findByText("Hook for client-2")).toBeInTheDocument();
+  });
+
+  it("ignores an old client's response after the new client has loaded", async () => {
+    let releaseOld!: () => void;
+    const oldGate = new Promise<void>((resolve) => { releaseOld = resolve; });
+    rpc.mockImplementation((name: string, args: { p_client_id: string }) =>
+      args.p_client_id === "client-1"
+        ? oldGate.then(() => response(name, args.p_client_id))
+        : Promise.resolve(response(name, args.p_client_id)));
+    const view = render(<AttributionPanel />);
+    useParams.mockReturnValue({ clientId: "client-2" });
+    view.rerender(<AttributionPanel />);
+    expect(await screen.findByText("Hook for client-2")).toBeInTheDocument();
+    await act(async () => { releaseOld(); });
+    await waitFor(() => expect(screen.getByText("Hook for client-2")).toBeInTheDocument());
+    expect(screen.queryByText("Hook for client-1")).not.toBeInTheDocument();
+  });
+});
+
 describe("recorded lead journeys", () => {
   it("shows the exact capture route while keeping its causal meaning limited", async () => {
     show(funnel(), [content()], coverage(), [{
@@ -81,7 +124,7 @@ describe("recorded lead journeys", () => {
       asset_id: null, asset_title: null, page_id: null, page_title: null,
       sales_agent_id: null, sale_value: null, cash_collected: null,
       outcome_events: 0, route_package_ids: ["87654321-1111-4111-8111-111111111111"],
-      capture_submissions: 1, unknown_route_submissions: 0,
+      capture_submissions: 1, unknown_route_submissions: 0, archived_at: null,
     }]);
     expect(await screen.findByText(/route 87654321/)).toHaveAttribute("title", "87654321-1111-4111-8111-111111111111");
     expect(screen.getByText(/capture doors, not which route caused a sale/)).toBeInTheDocument();
@@ -97,6 +140,7 @@ describe("recorded lead journeys", () => {
       sales_agent_id: null, sale_value: 12000, cash_collected: 9000,
       outcome_events: 1,
       route_package_ids: [], capture_submissions: 0, unknown_route_submissions: 0,
+      archived_at: null,
     }]);
     const journeys = within((await screen.findByRole("heading", { name: "Recorded lead journeys" })).parentElement as HTMLElement);
     expect(journeys.getByText(/12345678/)).toBeInTheDocument();
@@ -104,6 +148,22 @@ describe("recorded lead journeys", () => {
     expect(journeys.getByText(/asset unknown/)).toBeInTheDocument();
     expect(journeys.getByText("cash · 1 outcome event")).toBeInTheDocument();
     expect(journeys.getByText("12,000 / 9,000")).toBeInTheDocument();
+  });
+
+  it("labels an archived lead snapshot separately from live funnel totals", async () => {
+    show(funnel(), [content()], coverage(), [{
+      lead_id: "12345678-1111-4111-8111-111111111111",
+      lead_created_at: "2026-11-15T12:00:00Z", lead_stage: "shown",
+      source_channel: "organic", campaign_id: null, campaign_name: null,
+      campaign_mode: null, opportunity_ids: [], offer_version_id: null,
+      asset_id: null, asset_title: null, page_id: null, page_title: null,
+      sales_agent_id: null, sale_value: null, cash_collected: null,
+      outcome_events: 0, route_package_ids: [], capture_submissions: 0,
+      unknown_route_submissions: 0, archived_at: "2026-11-16T12:00:00Z",
+    }]);
+    const journeys = within((await screen.findByRole("heading", { name: "Recorded lead journeys" })).parentElement as HTMLElement);
+    expect(journeys.getByText(/Archived \d/)).toBeInTheDocument();
+    expect(journeys.getByText(/excluded from the live funnel totals/)).toBeInTheDocument();
   });
 });
 
@@ -144,6 +204,16 @@ describe("ratios that are unknown rather than zero", () => {
     expect(within(cost).getByText("—")).toBeInTheDocument();
     const roas = screen.getByText("Return on spend").parentElement as HTMLElement;
     expect(within(roas).getByText("—")).toBeInTheDocument();
+  });
+
+  it("shows spend-only cost in its currency but holds return without lead cash currency", async () => {
+    show(funnel({ cost_per_lead: 1500, return_on_spend: 5 }), [content()],
+      coverage({ spend_rows: 1, spend_currencies: 1, spend_currency: "USD" }));
+    expect(await screen.findByText(/does not expose lead cash currency coverage/)).toBeInTheDocument();
+    expect(within(screen.getByText("Cost per lead").parentElement as HTMLElement).getByText("USD 1,500")).toBeInTheDocument();
+    expect(within(screen.getByText("Return on spend").parentElement as HTMLElement).getByText("—")).toBeInTheDocument();
+    expect(within(screen.getByText("Cash collected · currency not shown").parentElement as HTMLElement).getByText("45,000")).toBeInTheDocument();
+    expect(screen.queryByText("5×")).not.toBeInTheDocument();
   });
 
   it("shows a failed read as an error rather than zero cash", async () => {

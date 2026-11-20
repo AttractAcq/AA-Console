@@ -7,6 +7,7 @@ import { dayOrDash } from "../../lib/contentRecords";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
 import { PROFILE_FIELD_PATCH_HOLD } from "../../../agent-runtime/src/profiles/prewrite-gate.js";
+import { MetaAdsReadPanel } from "./MetaAdsReadPanel";
 
 // The view's historical health_detail and derived blocker can include a raw
 // provider OAuth error. Keep both out of the browser response until a SQL
@@ -28,6 +29,19 @@ type ProfileOutcome = Pick<Database["public"]["Views"]["meta_profile_execution_o
   "attempt_id" | "change_id" | "status" | "provider_ref" | "reconciliation_result" | "reconciled_at">;
 type ProfileJob = Pick<Database["public"]["Tables"]["agent_jobs"]["Row"],
   "id" | "agent_key" | "input_id" | "status">;
+
+function presenceReadbackLabel(post: Presence): string {
+  switch (post.provider_readback_state) {
+    case "uncertain": return "Provider outcome uncertain; inspect before retry";
+    case "verified": return "Verified on the exact provider account";
+    case "mismatch": return "Provider post or account mismatch; inspect";
+    case "unavailable": return "Provider read unavailable; presence unknown";
+    case "partial": return "Story frame acknowledgement incomplete";
+    case "no_provider_id": return "No provider ID; presence unknown";
+    case "missing": return "Provider read missing; presence unknown";
+    default: return "No publication recorded";
+  }
+}
 
 type Tab = "identities" | "profile" | "presence";
 
@@ -66,6 +80,12 @@ function recordedIdentityAlert(identity: Identity, now = Date.now()): string | n
  */
 export function MetaProfilePanel({ tab }: { tab: Tab }) {
   const { clientId } = useParams<{ clientId: string }>();
+  return <MetaProfilePanelForClient key={clientId ?? "no-client"} clientId={clientId} tab={tab} />;
+}
+
+function MetaProfilePanelForClient({ clientId, tab }: {
+  clientId: string | undefined; tab: Tab;
+}) {
   const [identities, setIdentities] = useState<Identity[]>([]);
   const [presence, setPresence] = useState<Presence[]>([]);
   const [changes, setChanges] = useState<ProfileChange[]>([]);
@@ -377,14 +397,13 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
       {tab === "presence" && (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            What is on the profiles, with the campaign and the proof behind each post. Content
-            Distribution owns publishing; this says what is present — and marks the posts carrying
-            placed proof, because those are the ones that would have to come down if permission
-            ended.
+            Recorded Meta post activity, with its campaign, proof and provider read. Content
+            Distribution owns publishing. A local published row is shown separately from
+            verified presence on the exact provider account.
           </p>
           <DataTable
-            columns={["Post", "Platform", "Campaign", "Proof", "When"]}
-            emptyLabel={loading ? "Loading…" : "Nothing has been published to a Meta profile"}
+            columns={["Recorded post", "Platform", "Campaign", "Proof", "Provider read", "When"]}
+            emptyLabel={loading ? "Loading…" : "No Meta post activity recorded"}
             rows={presence.map((post) => [
               <span key="p" className="text-xs">
                 {post.external_url ? (
@@ -394,18 +413,35 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
                 ) : (
                   (post.publication_status ?? "not published")
                 )}
+                <span className="block text-muted-foreground">
+                  Local state: {post.publication_status ?? "unknown"}
+                </span>
               </span>,
               <span key="l" className="capitalize">{post.platform}</span>,
               <span key="c" className="text-xs">{post.campaign_name ?? "no campaign"}</span>,
               <span key="r" className="text-xs">
                 {post.proof_title ?? "none"}
                 {post.carries_placed_proof && (
-                  <span className="block text-brand-strong">placed proof</span>
+                  <span className="block text-brand-strong">proof placement recorded</span>
+                )}
+              </span>,
+              <span key="read" className="text-xs">
+                {presenceReadbackLabel(post)}
+                {post.provider_readback_at && (
+                  <span className="block text-muted-foreground">Read {dayOrDash(post.provider_readback_at)}</span>
                 )}
               </span>,
               <span key="w">{dayOrDash(post.published_at ?? post.scheduled_at)}</span>,
             ])}
           />
+          <div className="space-y-2">
+            <h3 className="font-semibold">Paid Meta activity</h3>
+            <p className="text-sm text-muted-foreground">
+              The configured ad account's latest read, shared with Meta Ads Studio.
+              Unknown metrics remain unknown when the provider did not return a row.
+            </p>
+            <MetaAdsReadPanel clientId={clientId} readOnly />
+          </div>
         </div>
       )}
     </div>

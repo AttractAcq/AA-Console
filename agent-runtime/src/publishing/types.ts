@@ -34,6 +34,8 @@ export interface PublishRequest {
   readonly postId: string;
   readonly clientId: string;
   readonly platform: Platform;
+  /** Exact package hash that must still pass the final prewrite check. */
+  readonly reviewedArtifactHash?: string;
   /** The token, already read from the Vault. Adapters never touch the database. */
   readonly accessToken: string;
   /**
@@ -86,6 +88,8 @@ export class PublishError extends Error {
   constructor(
     message: string,
     readonly retryable: boolean = false,
+    /** A public write may have landed; inspect the provider before retry. */
+    readonly uncertain: boolean = false,
   ) {
     super(message);
     this.name = "PublishError";

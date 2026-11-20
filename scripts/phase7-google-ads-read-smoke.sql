@@ -19,13 +19,13 @@ declare cid uuid:='b2222222-2222-4222-8222-222222222222';
   integration_id uuid; credential_id uuid; request_id uuid; review_id uuid; job_id uuid;
   v_run_id uuid; refused boolean:=false;
   campaign_rows jsonb:='[{"id":"42","name":"Lead search","status":"ENABLED",
-    "channel":"SEARCH","impressions":"100","clicks":"8",
+    "channel":"SEARCH","metrics_observed":true,"impressions":"100","clicks":"8",
     "cost_micros":"1230000","conversions":"1.25"}]'::jsonb;
   ad_rows jsonb:='[{"resource_name":"customers/1234567890/adGroupAds/7~9",
     "campaign_id":"42","ad_group_id":"7","ad_id":"9","status":"ENABLED",
     "ad_type":"RESPONSIVE_SEARCH_AD","final_urls":["https://example.com"],
     "headlines":["A headline"],"descriptions":["A description"],
-    "impressions":"50","clicks":"4","cost_micros":"600000","conversions":"1"}]'::jsonb;
+    "metrics_observed":true,"impressions":"50","clicks":"4","cost_micros":"600000","conversions":"1"}]'::jsonb;
 begin
   integration_id:=public.admin_store_integration_credential(
     cid,'google_ads','Google Ads fixture','fixture-oauth-token','read');
@@ -85,16 +85,27 @@ begin
     '1234567890','USD',current_date-29,current_date,'req-d',campaign_rows,ad_rows) into v_run_id;
   if not exists(select 1 from public.google_ads_campaign_reads_v7 r
     where r.run_id=v_run_id and r.client_id=cid and r.external_campaign_id='42'
-      and cost_micros=1230000 and conversions=1.25) then
+      and cost_micros=1230000 and conversions=1.25 and metrics_observed) then
     raise exception 'Google read did not persist exact metrics'; end if;
   if not exists(select 1 from public.google_ads_ad_reads_v7 a
     where a.run_id=v_run_id and a.client_id=cid and a.external_ad_id='9'
-      and a.cost_micros=600000 and a.headlines='["A headline"]'::jsonb) then
+      and a.cost_micros=600000 and a.headlines='["A headline"]'::jsonb
+      and a.metrics_observed) then
     raise exception 'Google read did not persist ad creative and metrics'; end if;
   begin
     perform public.record_google_ads_full_read_v7(cid,integration_id,credential_id,job_id,
       '1234567890','USD',current_date-29,current_date,'req-d',campaign_rows,ad_rows);
   exception when unique_violation then refused:=true; end;
   if not refused then raise exception 'Duplicate job recorded a second Google read'; end if;
+  insert into public.agent_jobs(agent_key,client_id)
+    values('google_ads_read',cid) returning id into job_id;
+  select public.record_google_ads_full_read_v7(cid,integration_id,credential_id,job_id,
+    '1234567890','USD',current_date-29,current_date,'req-no-insights',
+    '[{"id":"43","name":"No insights","status":"PAUSED","channel":"SEARCH",
+      "impressions":"0","clicks":"0","cost_micros":"0","conversions":"0"}]'::jsonb,
+    '[]'::jsonb) into v_run_id;
+  if not exists(select 1 from public.google_ads_campaign_reads_v7 c
+    where c.run_id=v_run_id and c.external_campaign_id='43' and not c.metrics_observed) then
+    raise exception 'Google missing metrics row was presented as observed'; end if;
 end $checks$;
 rollback;

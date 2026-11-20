@@ -1,10 +1,9 @@
 // How an economics figure is presented, and when it must refuse to show a
 // number at all.
 //
-// Pure and separate from the panel so these rules can be tested and mutated
-// without rendering anything. They are display rules, not maths: the database
-// returns the mathematically correct value and this decides what a person
-// should be shown.
+// Pure and separate from the panel so these rules can be tested without
+// rendering anything. The database withholds money totals when positive lead
+// amounts have missing or mixed currencies.
 //
 // The distinction that matters: a spend of zero is a fact and shows as 0. A
 // ratio whose denominator is zero is unknown and shows as "—". And a ratio of
@@ -13,13 +12,13 @@
 // 0.00 reads as "this failed" when the truth is "nothing has landed yet".
 
 export type Economics = {
-  spend: number;
+  spend: number | null;
   leads: number;
   qualified_leads: number;
   appointments: number;
   customers: number;
-  revenue: number;
-  cash_collected: number;
+  revenue: number | null;
+  cash_collected: number | null;
   cpl: number | null;
   cpql: number | null;
   cpa: number | null;
@@ -66,7 +65,8 @@ export function showCost(value: number | null, currency: string | null, stage: s
  * revenue yet means the cohort has not matured. Saying which is the difference
  * between a reader believing the campaign failed and knowing it is early.
  */
-export function showRatio(value: number | null, spend: number, revenue: number): Shown {
+export function showRatio(value: number | null, spend: number | null, revenue: number): Shown {
+  if (spend === null) return { unavailable: "Spend currencies are mixed" };
   if (spend === 0) return { unavailable: "No spend recorded in this period" };
   if (revenue === 0) return { unavailable: "No revenue from this cohort yet" };
   if (value === null) return { unavailable: "Not calculable" };

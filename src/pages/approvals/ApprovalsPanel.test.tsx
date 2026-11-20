@@ -4,11 +4,13 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MediaAsset } from "../../lib/media";
 
-const { fetchClientAssets, signPaths, useParams } = vi.hoisted(() => ({
+const { fetchClientAssets, signPaths, useParams, requestOrdinaryMediaReview } = vi.hoisted(() => ({
   fetchClientAssets: vi.fn(),
   signPaths: vi.fn(),
   useParams: vi.fn(),
+  requestOrdinaryMediaReview: vi.fn(),
 }));
+vi.mock("../../lib/creativeReview", () => ({ requestOrdinaryMediaReview }));
 
 vi.mock("../../lib/media", async () => {
   const actual = await vi.importActual<typeof import("../../lib/media")>("../../lib/media");
@@ -75,6 +77,7 @@ beforeEach(() => {
   signPaths.mockImplementation(async (_bucket: string, paths: string[]) => {
     return new Map(paths.map((path) => [path, `https://signed/${path.split("/").pop()}`]));
   });
+  requestOrdinaryMediaReview.mockResolvedValue("review-1");
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
@@ -122,13 +125,30 @@ describe("ApprovalsPanel — text preview", () => {
 });
 
 describe("ApprovalsPanel — review controls stay intact", () => {
-  it("still offers Approve and Reject on a pending text asset", async () => {
+  it("offers exact review and rejection on a pending text asset", async () => {
     const user = userEvent.setup();
     render(<MemoryRouter><ApprovalsPanel /></MemoryRouter>);
     await user.click(await screen.findByRole("button", { name: "Text" }));
     await screen.findByText("Shade guide follow-up");
-    expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Request review" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
+  });
+
+  it("requests exact review for a rendered image and a carousel", async () => {
+    fetchClientAssets.mockImplementation(async (_clientId: string,
+      opts?: { mediaType?: string; reviewStatus?: string }) =>
+      opts?.reviewStatus === "pending" && opts?.mediaType === "image" ? [
+        textAsset({ id: "render-1", media_type: "image", title: "Rendered image",
+          content_format: "single", render_path: "client-1/render.png" }),
+        textAsset({ id: "carousel-1", media_type: "image", title: "Carousel",
+          content_format: "carousel" }),
+      ] : [],
+    );
+    render(<MemoryRouter><ApprovalsPanel /></MemoryRouter>);
+    await userEvent.click(await screen.findAllByRole("button", { name: "Request review" }).then((buttons) => buttons[0]));
+    expect(requestOrdinaryMediaReview).toHaveBeenCalledWith("client-1", "render-1");
+    await userEvent.click(screen.getAllByRole("button", { name: "Request review" })[1]);
+    expect(requestOrdinaryMediaReview).toHaveBeenCalledWith("client-1", "carousel-1");
   });
 
   it("links a finished reel back to its production history", async () => {

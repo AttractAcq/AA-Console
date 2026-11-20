@@ -6,6 +6,7 @@ const MAX_ROWS = 5000;
 type Row = Record<string, unknown>;
 export type MetaReadCredentials = { accountId: string; accessToken: string };
 export type MetaReadMetrics = {
+  metrics_observed: boolean;
   impressions: string; clicks: string; spend: string; actions: Array<{ action_type: string; value: string }>;
 };
 export type MetaCampaignRead = MetaReadMetrics & {
@@ -58,7 +59,8 @@ function actions(value: unknown): MetaReadMetrics["actions"] {
   });
 }
 function metrics(row: Row | undefined): MetaReadMetrics {
-  return { impressions: nonnegative(row?.impressions, "impressions"),
+  return { metrics_observed: row !== undefined,
+    impressions: nonnegative(row?.impressions, "impressions"),
     clicks: nonnegative(row?.clicks, "clicks"), spend: nonnegative(row?.spend, "spend", 2),
     actions: actions(row?.actions) };
 }

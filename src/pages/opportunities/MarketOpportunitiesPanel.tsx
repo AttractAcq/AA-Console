@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Search } from "lucide-react";
 
 import { Button } from "../../components/Button";
@@ -13,13 +13,15 @@ import { dayOrDash } from "../../lib/contentRecords";
 import {
   ATTRIBUTE_KINDS, AWARENESS_STAGES, CLASSIFICATION_HINT, CONFIDENCE_LEVELS,
   createCampaignFromOpportunity,
-  acceptScoreProposal, fetchOpenProposals, rejectProposal,
+  fetchOpportunityOfferVersions,
+  acceptScoreProposal, acceptStrategyProposal, fetchOpenProposals,
+  fetchEvaluationInputHash, fetchStrategyReviewHash, rejectProposal,
   requestEvaluation, requestStrategy,
-  fetchOpportunities, fetchOpportunityApprovalStates, fetchOpportunityActivationStates,
+  fetchOpportunities, fetchOpportunityOutputs, fetchOpportunityApprovalStates, fetchOpportunityActivationStates,
   fetchReadiness, fetchScoreFactors, requireProof, scoreOpportunity,
   fetchStageTemplates, setStageTemplate, requestOpportunityApproval, requestOpportunityActivation,
   setAttributes, setAwarenessStage, setConfidence, setFields, setStatus,
-  type Opportunity, type OpportunityConfidence, type OpportunityProposal,
+  type Opportunity, type OpportunityConfidence, type OpportunityOutputs, type OpportunityProposal,
   type Readiness, type ScoreFactor,
   type StageTemplateCandidate,
 } from "../../lib/opportunities";
@@ -31,7 +33,7 @@ import {
  * where those reasons are found, compared, worked up and approved — the layer
  * between knowing a market and running campaigns at it.
  *
- * Four views, and they are four questions rather than four screens:
+ * The overview and its selected record answer four questions:
  *
  *   Discover   what buying situations might be worth pursuing
  *   Evaluate   which of them are worth spending against
@@ -46,10 +48,15 @@ import {
 
 type View = "discover" | "evaluate" | "strategize" | "activate";
 
-export function MarketOpportunitiesPanel({ view }: { view: View }) {
+export function MarketOpportunitiesPanel({ view }: { view?: View }) {
   const { clientId } = useParams<{ clientId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedId = searchParams.get("opportunity");
+  const legacyStage = searchParams.get("tab") ?? searchParams.get("view");
+  const requestedStage = searchParams.get("stage") ?? legacyStage;
+  const detailStage: Exclude<View, "discover"> =
+    requestedStage === "strategize" || requestedStage === "activate" ? requestedStage : "evaluate";
+  const unified = view === undefined;
 
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [readiness, setReadiness] = useState<ReadonlyMap<string, Readiness>>(new Map());
@@ -57,6 +64,8 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
   const [activationStates, setActivationStates] = useState<ReadonlyMap<string, string>>(new Map());
   const [factors, setFactors] = useState<ScoreFactor[]>([]);
   const [proposals, setProposals] = useState<OpportunityProposal[]>([]);
+  const [outputs, setOutputs] = useState<ReadonlyMap<string, OpportunityOutputs>>(new Map());
+  const [outputsError, setOutputsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,12 +73,34 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
   const [discovering, setDiscovering] = useState(false);
   /** The opportunity a campaign is being created from, if any. */
   const [building, setBuilding] = useState<Opportunity | null>(null);
+  const [campaignOffers, setCampaignOffers] = useState<Array<{ id: string; label: string }>>([]);
+  const [campaignOffersError, setCampaignOffersError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!clientId || !building) return;
+    let cancelled = false;
+    setCampaignOffers([]);
+    setCampaignOffersError(null);
+    void fetchOpportunityOfferVersions(clientId, building.id).then((choices) => {
+      if (!cancelled) setCampaignOffers(choices);
+    }).catch((cause) => {
+      if (!cancelled) setCampaignOffersError(cause instanceof Error ? cause.message : "Offer versions could not be loaded.");
+    });
+    return () => { cancelled = true; };
+  }, [clientId, building]);
 
   const refresh = useCallback(async () => {
     if (!clientId) {
       setLoading(false);
       return;
     }
+    const outputsPromise = fetchOpportunityOutputs(clientId).then(
+      (value) => ({ value, error: null }),
+      (cause) => ({
+        value: new Map<string, OpportunityOutputs>(),
+        error: cause instanceof Error ? cause.message : "Linked work could not be loaded.",
+      }),
+    );
     try {
       const [list, approvals, activations, ready, scoring, open] = await Promise.all([
         fetchOpportunities(clientId), fetchOpportunityApprovalStates(clientId),
@@ -82,6 +113,9 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
       setReadiness(ready);
       setFactors(scoring);
       setProposals(open);
+      const linked = await outputsPromise;
+      setOutputs(linked.value);
+      setOutputsError(linked.error);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not load opportunities.");
@@ -104,6 +138,15 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
       const next = new URLSearchParams(current);
       if (id) next.set("opportunity", id);
       else next.delete("opportunity");
+      return next;
+    });
+  const showStage = (stage: Exclude<View, "discover">) =>
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("tab");
+      next.delete("view");
+      if (stage === "evaluate") next.delete("stage");
+      else next.set("stage", stage);
       return next;
     });
 
@@ -138,7 +181,7 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
       {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
-      {view === "discover" && (
+      {(unified || view === "discover") && (
         <DiscoverView
           clientId={clientId}
           opportunities={opportunities}
@@ -154,16 +197,89 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
           onBuild={setBuilding}
         />
       )}
-      {view !== "discover" && (
+      {!unified && view !== "discover" && (
         <OpportunityPicker
           opportunities={opportunities}
           selectedId={selectedId}
           onSelect={select}
         />
       )}
+      {unified && selected && (
+        <section aria-label={`${selected.name} details`} className="space-y-4 rounded-xl border border-border bg-card p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">{selected.name}</h2>
+              <p className="text-sm text-muted-foreground">{selected.micro_market} · {selected.status}</p>
+            </div>
+            <Button onClick={() => select(null)}>Close details</Button>
+          </div>
+          <div className="flex flex-wrap gap-2" aria-label="Opportunity stages">
+            {(["evaluate", "strategize", "activate"] as const).map((stage) => (
+              <button
+                key={stage}
+                type="button"
+                aria-current={detailStage === stage ? "step" : undefined}
+                onClick={() => showStage(stage)}
+                className={`rounded-lg border px-3 py-2 text-sm capitalize ${
+                  detailStage === stage ? "border-primary bg-primary/10 font-semibold" : "border-border"
+                }`}
+              >
+                {stage}
+              </button>
+            ))}
+          </div>
+          {clientId && (
+            <LinkedWork
+              clientId={clientId}
+              outputs={outputs.get(selected.id)}
+              error={outputsError}
+              loading={loading}
+            />
+          )}
+          {detailStage === "activate" && (
+            <ActivationDetail
+              opportunity={selected}
+              readiness={readiness.get(selected.id)}
+              approvalState={approvalStates.get(selected.id)}
+              activationState={activationStates.get(selected.id)}
+              clientId={clientId}
+              busy={busy === selected.id}
+              onSelect={select}
+              onAct={act}
+              onBuild={setBuilding}
+            />
+          )}
+          {detailStage === "evaluate" && (
+            <>
+              <ProposalsPanel
+                opportunityId={selected.id}
+                proposals={proposals.filter((proposal) => proposal.opportunity_id === selected.id && proposal.kind === "score")}
+                factors={factors}
+                busy={busy}
+                onAct={act}
+              />
+              <EvaluateView
+                opportunity={selected}
+                readiness={readiness.get(selected.id)}
+                factors={factors}
+                busy={busy === selected.id}
+                onAct={act}
+              />
+            </>
+          )}
+          {detailStage === "strategize" && (
+            <>
+              {proposals.filter((proposal) => proposal.opportunity_id === selected.id && proposal.kind === "strategy")
+                .map((proposal) => <StrategyProposalReview key={proposal.id} proposal={proposal} busy={busy === proposal.id} onAct={act} />)}
+              <StrategizeView opportunity={selected} busy={busy === selected.id} onAct={act} />
+            </>
+          )}
+        </section>
+      )}
       {view === "evaluate" && selected && (
         <ProposalsPanel
-          proposals={proposals.filter((proposal) => proposal.opportunity_id === selected.id)}
+          opportunityId={selected.id}
+          proposals={proposals.filter((proposal) => proposal.opportunity_id === selected.id && proposal.kind === "score")}
           factors={factors}
           busy={busy}
           onAct={act}
@@ -179,7 +295,11 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
         />
       )}
       {view === "strategize" && selected && (
-        <StrategizeView opportunity={selected} busy={busy === selected.id} onAct={act} />
+        <>
+          {proposals.filter((proposal) => proposal.opportunity_id === selected.id && proposal.kind === "strategy")
+            .map((proposal) => <StrategyProposalReview key={proposal.id} proposal={proposal} busy={busy === proposal.id} onAct={act} />)}
+          <StrategizeView opportunity={selected} busy={busy === selected.id} onAct={act} />
+        </>
       )}
       {view === "activate" && (
         <ActivateView
@@ -194,7 +314,7 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
           onBuild={setBuilding}
         />
       )}
-      {view !== "discover" && view !== "activate" && !selected && (
+      {!unified && view !== "discover" && view !== "activate" && !selected && (
         <p className="text-sm text-muted-foreground">Choose an opportunity above.</p>
       )}
 
@@ -234,17 +354,21 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
         onSaved={refresh}
       />
 
-      {/* Creating the campaign is where the opportunity work either reaches
-          the rest of the system or stops being used. The route is the one
-          question a person has to answer, because 203 makes it immutable:
-          the other route is a second campaign, not an edit. */}
+      {/* Creating the campaign is where the opportunity reaches production.
+          The chosen route is immutable; "both" creates linked paid and
+          organic route packages under one commercial campaign. */}
       <FormModal
         open={building !== null}
         onClose={() => setBuilding(null)}
         title={building ? `Create a campaign for ${building.name}` : "Create a campaign"}
         submitLabel="Create and plan"
-        intro="The campaign takes this opportunity's problem, outcome, trigger, positioning and objections as its brief, and binds the approved offer it is linked to. The route cannot be changed afterwards — a different route is a second campaign with its own lineage. Planning runs straight after, and costs what a plan costs."
+        intro="The campaign takes this opportunity's problem, outcome, trigger, positioning and objections as its brief. Select its signed secondary offer version and choose organic, paid or both routes; the choice is fixed after creation. Planning runs after creation."
         fields={[
+          {
+            name: "offer_version_id", label: "Approved secondary offer version", kind: "select", required: true,
+            options: campaignOffers.map((offer) => ({ value: offer.id, label: offer.label })),
+            hint: "Create and approve a secondary offer from this opportunity before planning a campaign.",
+          },
           {
             name: "acquisition_mode", label: "Route", kind: "select", required: true,
             options: [
@@ -271,8 +395,13 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
             hint: "Left blank, it takes the opportunity's name.",
           },
         ]}
+        extra={campaignOffersError ? <p role="alert">Offer versions unavailable: {campaignOffersError}</p>
+          : campaignOffers.length === 0 ? <p>No signed secondary offer version is linked to this opportunity yet.</p> : null}
         onSubmit={async (values) => {
           if (!building) throw new Error("No opportunity selected.");
+          if (campaignOffersError) throw new Error("Offer versions could not be loaded.");
+          if (!campaignOffers.some((offer) => offer.id === values.offer_version_id))
+            throw new Error("Choose a signed secondary offer version linked to this opportunity.");
           // Read the choice rather than collapsing anything that is not "paid"
           // into "organic". That collapse predates 'both' and would have
           // silently created an organic campaign for someone who asked for
@@ -287,6 +416,7 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
           }
           const campaign = await createCampaignFromOpportunity({
             opportunityId: building.id,
+            offerVersionId: values.offer_version_id as string,
             acquisitionMode: mode,
             paidPlatform: needsPlatform ? platform : null,
             name: typeof values.name === "string" ? values.name : null,
@@ -307,6 +437,65 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
         }}
       />
     </div>
+  );
+}
+
+function LinkedWork({
+  clientId, outputs, error, loading,
+}: {
+  clientId: string;
+  outputs: OpportunityOutputs | undefined;
+  error: string | null;
+  loading: boolean;
+}) {
+  return (
+    <section aria-label="Linked work" className="rounded-lg border border-border p-4">
+      <h3 className="font-semibold">Linked work</h3>
+      {error ? (
+        <p role="alert" className="mt-2 text-sm text-destructive">Links unavailable: {error}</p>
+      ) : loading ? (
+        <p className="mt-2 text-sm text-muted-foreground">Loading linked work…</p>
+      ) : !outputs || (outputs.offers.length === 0 && outputs.campaigns.length === 0) ? (
+        <p className="mt-2 text-sm text-muted-foreground">No linked offers or campaigns yet.</p>
+      ) : (
+        <div className="mt-2 grid gap-3 text-sm sm:grid-cols-2">
+          <div>
+            <h4 className="text-muted-foreground">Offers</h4>
+            {outputs.offers.length === 0 ? <p>None linked</p> : (
+              <ul className="space-y-1">
+                {outputs.offers.map((offer) => (
+                  <li key={offer.id}>
+                    <Link className="text-brand-strong underline" to={`/clients/${clientId}/delivery/offer-studio?offer=${offer.id}`}>
+                      {offer.name}
+                    </Link>
+                    <span className="ml-2 text-muted-foreground">{offer.kind}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h4 className="text-muted-foreground">Campaigns</h4>
+            {outputs.campaigns.length === 0 ? <p>None linked</p> : (
+              <ul className="space-y-1">
+                {outputs.campaigns.map((campaign) => (
+                  <li key={campaign.id}>
+                    {campaign.archived ? campaign.name : (
+                      <Link className="text-brand-strong underline" to={`/clients/${clientId}/delivery/campaign-factory/${campaign.id}`}>
+                        {campaign.name}
+                      </Link>
+                    )}
+                    <span className="ml-2 text-muted-foreground">
+                      {campaign.archived ? "archived" : campaign.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -367,13 +556,32 @@ function OpportunityPicker({
  * the click.
  */
 function ProposalsPanel({
-  proposals, factors, busy, onAct,
+  opportunityId, proposals, factors, busy, onAct,
 }: {
+  opportunityId: string;
   proposals: OpportunityProposal[];
   factors: ScoreFactor[];
   busy: string | null;
   onAct: (id: string, work: () => Promise<void>, said: string) => Promise<void>;
 }) {
+  const [checked, setChecked] = useState<{
+    opportunityId: string; signature: string; hash: string | null; error: string | null;
+  } | null>(null);
+  const scoreSignature = proposals.filter((p) => p.kind === "score")
+    .map((p) => `${p.id}:${(p.payload as { input_hash?: string })?.input_hash ?? ""}`).join("|");
+  const currentCheck = checked?.opportunityId === opportunityId && checked.signature === scoreSignature
+    ? checked : null;
+  useEffect(() => {
+    if (!scoreSignature) return;
+    let current = true;
+    void fetchEvaluationInputHash(opportunityId).then((hash) => {
+      if (current) setChecked({ opportunityId, signature: scoreSignature, hash, error: null });
+    }).catch((cause) => {
+      if (current) setChecked({ opportunityId, signature: scoreSignature, hash: null,
+        error: cause instanceof Error ? cause.message : "The current evaluation inputs could not be checked." });
+    });
+    return () => { current = false; };
+  }, [opportunityId, scoreSignature]);
   if (proposals.length === 0) return null;
   const labelFor = (factor: string) =>
     factors.find((f) => f.factor === factor)?.label ?? factor.replace(/_/g, " ");
@@ -385,7 +593,10 @@ function ProposalsPanel({
           factors?: Record<string, number>;
           reasoning?: Record<string, string>;
           fields?: Record<string, string>;
+          input_hash?: string;
         };
+        const currentScore = proposal.kind === "score" && typeof payload.input_hash === "string"
+          && currentCheck?.hash === payload.input_hash;
         const scored = Object.entries(payload.factors ?? {});
         const fields = Object.entries(payload.fields ?? {});
         return (
@@ -421,6 +632,20 @@ function ProposalsPanel({
               </dl>
             )}
 
+            {proposal.kind === "score" && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                {!payload.input_hash
+                  ? "This older proposal has no source snapshot. Request a new evaluation."
+                  : !currentCheck
+                    ? "Checking current evaluation inputs…"
+                    : currentCheck.error
+                      ? `Source check unavailable: ${currentCheck.error}`
+                      : currentScore
+                        ? "Evaluation inputs are current."
+                        : "Evaluation inputs changed. Request a new evaluation."}
+              </p>
+            )}
+
             {fields.length > 0 && (
               <dl className="mt-3 space-y-1 text-sm">
                 {fields.map(([field, value]) => (
@@ -435,7 +660,7 @@ function ProposalsPanel({
             <div className="mt-4 flex flex-wrap gap-2">
               {proposal.kind === "score" ? (
                 <Button
-                  disabled={busy === proposal.id}
+                  disabled={busy === proposal.id || !currentScore}
                   onClick={() =>
                     void onAct(
                       proposal.id,
@@ -600,6 +825,18 @@ function DiscoverView({
   onAct: (id: string, work: () => Promise<void>, said: string) => Promise<void>;
   onBuild: (opportunity: Opportunity) => void;
 }) {
+  const [query, setQuery] = useState("");
+  const [status, setStatusFilter] = useState("all");
+  const statuses = [...new Set(opportunities.map((opportunity) => opportunity.status))].sort();
+  const normalizedQuery = query.trim().toLowerCase();
+  const visible = opportunities.filter((opportunity) => {
+    if (status !== "all" && opportunity.status !== status) return false;
+    if (!normalizedQuery) return true;
+    return [
+      opportunity.name, opportunity.micro_market, opportunity.buying_situation,
+      opportunity.purchase_trigger, opportunity.status,
+    ].some((value) => value?.toLowerCase().includes(normalizedQuery));
+  });
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -613,13 +850,42 @@ function DiscoverView({
         </Button>
       </div>
 
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="min-w-64 flex-1 text-sm">
+          <span className="block text-muted-foreground">Search opportunities</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Name, micro-market or buying situation"
+            className="mt-1 w-full rounded-lg border border-border bg-background p-2"
+          />
+        </label>
+        <label className="text-sm">
+          <span className="block text-muted-foreground">Status</span>
+          <select
+            value={status}
+            onChange={(event) => setStatusFilter(event.target.value)}
+            className="mt-1 rounded-lg border border-border bg-background p-2"
+          >
+            <option value="all">All statuses</option>
+            {statuses.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
+        <p className="text-sm text-muted-foreground" role="status">
+          {visible.length} of {opportunities.length} opportunities
+        </p>
+      </div>
+
       <DataTable
         // Status is its own column rather than a subtitle under the name: the
         // notes ask that it be easy "to see what market opportunities are
         // active", and a caption under a button is not that.
         columns={["Opportunity", "Status", "Micro-market", "Trigger", "Confidence", "Proposed", "Found", "Actions"]}
-        emptyLabel={loading ? "Loading opportunities…" : "No opportunities yet — run a discovery pass"}
-        rows={opportunities.map((o) => [
+        emptyLabel={loading ? "Loading opportunities…"
+          : opportunities.length === 0 ? "No opportunities yet — run a discovery pass"
+            : "No opportunities match these filters"}
+        rows={visible.map((o) => [
           <button
             key="n"
             type="button"
@@ -812,6 +1078,99 @@ function EvaluateView({
         </div>
       </section>
     </div>
+  );
+}
+
+const STRATEGY_REVIEW_FIELDS = [
+  ["core_problem", "Problem"], ["desired_outcome", "Desired outcome"],
+  ["purchase_trigger", "Trigger"], ["positioning", "Positioning"],
+  ["conversion_action", "Conversion action"],
+] as const;
+
+function StrategyProposalReview({ proposal, busy, onAct }: {
+  proposal: OpportunityProposal;
+  busy: boolean;
+  onAct: (id: string, work: () => Promise<void>, said: string) => Promise<void>;
+}) {
+  const payload = (proposal.payload ?? {}) as {
+    fields?: Record<string, string>; review_hash?: string;
+  };
+  const [fields, setReviewFields] = useState<Record<string, string>>(() => ({
+    core_problem: payload.fields?.core_problem ?? "",
+    desired_outcome: payload.fields?.desired_outcome ?? "",
+    purchase_trigger: payload.fields?.purchase_trigger ?? "",
+    entry_awareness: payload.fields?.entry_awareness ?? "",
+    positioning: payload.fields?.positioning ?? "",
+    conversion_action: payload.fields?.conversion_action ?? "",
+  }));
+  const [note, setNote] = useState("");
+  const [checked, setChecked] = useState<{ hash: string | null; error: string | null } | null>(null);
+  useEffect(() => {
+    if (!payload.review_hash) return;
+    let live = true;
+    void fetchStrategyReviewHash(proposal.opportunity_id).then((hash) => {
+      if (live) setChecked({ hash, error: null });
+    }).catch((cause) => {
+      if (live) setChecked({ hash: null,
+        error: cause instanceof Error ? cause.message : "Current strategy sources could not be checked." });
+    });
+    return () => { live = false; };
+  }, [proposal.opportunity_id, payload.review_hash]);
+  const current = Boolean(payload.review_hash && checked?.hash === payload.review_hash);
+  const usable = STRATEGY_REVIEW_FIELDS.every(([key]) => fields[key]?.trim())
+    && AWARENESS_STAGES.some((stage) => stage.value === fields.entry_awareness);
+  return (
+    <section className="space-y-3 rounded-xl border border-brand-strong/40 bg-brand-subtle/20 p-5">
+      <div>
+        <h3 className="font-semibold">Review proposed strategy fields</h3>
+        <p className="text-sm text-muted-foreground">
+          The agent saved its lists and awareness messages. Review these six commercial fields before applying them.
+        </p>
+      </div>
+      <p className="text-sm">{proposal.rationale}</p>
+      <p className="text-xs text-muted-foreground">
+        {!payload.review_hash ? "This older proposal needs a new strategy run."
+          : !checked ? "Checking current strategy sources…"
+            : checked.error ? `Source check unavailable: ${checked.error}`
+              : current ? "Strategy sources are current."
+                : "Strategy sources changed. Request a new strategy run."}
+      </p>
+      <div className="grid gap-3 md:grid-cols-2">
+        {STRATEGY_REVIEW_FIELDS.map(([key, label]) => (
+          <label key={key} className="block text-sm">
+            <span>{label}</span>
+            <textarea rows={2} value={fields[key] ?? ""}
+              onChange={(event) => setReviewFields((old) => ({ ...old, [key]: event.target.value }))}
+              className="mt-1 w-full rounded-lg border border-border bg-background p-2" />
+          </label>
+        ))}
+        <label className="block text-sm">
+          <span>Entry awareness</span>
+          <select value={fields.entry_awareness ?? ""}
+            onChange={(event) => setReviewFields((old) => ({ ...old, entry_awareness: event.target.value }))}
+            className="mt-1 w-full rounded-lg border border-border bg-background p-2">
+            <option value="">Choose a stage</option>
+            {AWARENESS_STAGES.map((stage) => <option key={stage.value} value={stage.value}>{stage.label}</option>)}
+          </select>
+        </label>
+      </div>
+      <label className="block text-sm">
+        <span>Review note (optional)</span>
+        <textarea rows={2} value={note} onChange={(event) => setNote(event.target.value)}
+          className="mt-1 w-full rounded-lg border border-border bg-background p-2" />
+      </label>
+      <div className="flex flex-wrap gap-2">
+        <Button disabled={busy || !current || !usable}
+          onClick={() => void onAct(proposal.id,
+            () => acceptStrategyProposal(proposal.id, fields, note),
+            "Reviewed strategy fields applied.")}>Apply reviewed fields</Button>
+        <Button disabled={busy} onClick={() => {
+          const why = window.prompt("Why is this strategy not right?");
+          if (why?.trim()) void onAct(proposal.id,
+            () => rejectProposal(proposal.id, why.trim()), "Strategy proposal rejected.");
+        }}>Reject</Button>
+      </div>
+    </section>
   );
 }
 
@@ -1078,6 +1437,50 @@ function ActivateView({
               })}
             />,
           ];
+        })}
+      />
+    </div>
+  );
+}
+
+function ActivationDetail({
+  opportunity, readiness, approvalState, activationState, clientId, busy, onSelect, onAct, onBuild,
+}: {
+  opportunity: Opportunity;
+  readiness: Readiness | undefined;
+  approvalState: string | undefined;
+  activationState: string | undefined;
+  clientId: string | undefined;
+  busy: boolean;
+  onSelect: (id: string) => void;
+  onAct: (id: string, work: () => Promise<void>, said: string) => Promise<void>;
+  onBuild: (opportunity: Opportunity) => void;
+}) {
+  const blocker = readiness?.blocker
+    ?? (approvalState === "legacy" ? "Pre-Inbox approval needs exact review."
+      : approvalState === "stale" ? "The approved opportunity changed; request a new review."
+        : activationState === "legacy" ? "Pre-Inbox activation needs exact review."
+          : activationState === "stale" ? "Activation evidence changed; review it again."
+            : null);
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        Approval and activation are separate decisions. A current decision applies only to the reviewed state.
+      </p>
+      <dl className="grid gap-3 text-sm sm:grid-cols-3">
+        <div><dt className="text-muted-foreground">Score</dt><dd>{readiness?.score ?? "Not scored"}</dd></div>
+        <div><dt className="text-muted-foreground">Open proof gaps</dt><dd>{readiness?.open_proof_gaps ?? "Unknown"}</dd></div>
+        <div><dt className="text-muted-foreground">Readiness</dt>
+          <dd className={blocker ? "text-destructive" : "text-brand-strong"}>
+            {blocker ?? (approvalState === "current" ? "Approved for campaign planning" : "Ready to request review")}
+          </dd>
+        </div>
+      </dl>
+      <ActionMenu
+        name={opportunity.name}
+        busy={busy}
+        items={opportunityActions({
+          opportunity, readiness, approvalState, activationState, clientId, onSelect, onAct, onBuild,
         })}
       />
     </div>

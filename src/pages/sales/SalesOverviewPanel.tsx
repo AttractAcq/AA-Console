@@ -8,10 +8,17 @@ import type { FieldDef } from "../../components/forms/fields";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
+import { fetchArchivedReturnBatchPacket, type ArchivedReturnBatchPacket } from "../../lib/archivedReturnBatch";
+import { ArchivedReturnBatchModal } from "./ArchivedReturnBatchModal";
+import { ArchivedDmReturnsPanel } from "./ArchivedDmReturnsPanel";
 import { ArchiveAction } from "../../components/ArchiveAction";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 import { cn } from "../../lib/cn";
 import { liveStateOf, sinceLabel, STATE_TONE } from "./liveState";
+import {
+  fetchSalesAgentReturnPacket, resolveSalesAgentReturn,
+  type SalesAgentReturnPacket,
+} from "../../lib/salesAgentReturn";
 import {
   approvalConfirmBody,
   revokeConfirmBody,
@@ -65,6 +72,8 @@ type Conversation = {
   handed_over: boolean;
   outcome: string | null;
   lead_id: string | null;
+  archive_match_lead_id: string | null;
+  archive_match_snapshot: { contact_name?: string | null; contact_email?: string | null; contact_phone?: string | null } | null;
   started_at: string;
 };
 
@@ -89,6 +98,8 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
     null,
   );
   const [notice, setNotice] = useState<string | null>(null);
+  const [returnReview, setReturnReview] = useState<SalesAgentReturnPacket | null>(null);
+  const [batchReview, setBatchReview] = useState<ArchivedReturnBatchPacket | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -115,7 +126,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
       supabase
         .from("sales_agent_conversations")
         .select(
-          "id, sales_agent_id, contact_name, contact_email, contact_phone, qualified, handed_over, outcome, lead_id, started_at",
+          "id, sales_agent_id, contact_name, contact_email, contact_phone, qualified, handed_over, outcome, lead_id, archive_match_lead_id, archive_match_snapshot, started_at",
         )
         .eq("client_id", clientId)
         .order("started_at", { ascending: false }),
@@ -239,6 +250,8 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
     <div>
       {!campaignId && <AgentActivityBar inFlight={inFlight} failures={recentFailures} />}
 
+      {!campaignId && clientId && <ArchivedDmReturnsPanel key={clientId} clientId={clientId} />}
+
       <div className="mb-4 flex justify-end">
         <Button icon={Plus} onClick={() => setBuildOpen(true)}>
           Build Sales Agent
@@ -260,6 +273,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
           {visibleAgents.map((a) => {
             const mine = conversations.filter((c) => c.sales_agent_id === a.id);
             const captured = mine.filter((c) => c.lead_id).length;
+            const heldReturns = mine.filter((c) => c.archive_match_lead_id && !c.lead_id).length;
             const qualified = mine.filter((c) => c.qualified).length;
             const state = liveStateOf(a, builds[a.id]);
             const questions = a.qualification?.length ?? 0;
@@ -316,6 +330,9 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
                           : "No conversations yet"
                         : `Last conversation ${sinceLabel(mine[0]?.started_at ?? null)}`}
                     </p>
+                    {heldReturns > 0 && <p className="mt-1 text-xs text-foreground">
+                      {heldReturns} archived-contact return{heldReturns === 1 ? "" : "s"} awaiting identity review
+                    </p>}
 
                     <p className="mt-1 text-xs text-muted-foreground">
                       {questions} question{questions === 1 ? "" : "s"} ·{" "}
@@ -656,7 +673,9 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {c.qualified ? "Qualified" : "Not qualified"}
-                          {c.lead_id ? " · became a lead" : " · no lead"}
+                          {c.archive_match_lead_id && !c.lead_id
+                            ? " · archived contact — identity review needed"
+                            : c.lead_id ? " · became a lead" : " · no lead"}
                           {c.handed_over ? " · handed to a person" : ""}
                           {c.contact_email || c.contact_phone
                             ? ` · ${c.contact_email ?? c.contact_phone}`
@@ -664,6 +683,25 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
                         </p>
                         {c.outcome && (
                           <p className="mt-1 text-xs text-muted-foreground">{c.outcome}</p>
+                        )}
+                        {c.archive_match_lead_id && !c.lead_id && c.archive_match_snapshot && (
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            <p>Match-time contact: {c.archive_match_snapshot.contact_name ?? "Unnamed"}
+                              {c.archive_match_snapshot.contact_email || c.archive_match_snapshot.contact_phone
+                                ? ` · ${c.archive_match_snapshot.contact_email ?? c.archive_match_snapshot.contact_phone}`
+                                : ""}</p>
+                            <button type="button"
+                              className="mt-1 rounded font-medium text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              onClick={() => void (async () => {
+                                const batch = await fetchArchivedReturnBatchPacket(c.archive_match_lead_id!);
+                                setOpenId(null);
+                                if (batch.decision_state === "grouped_hold") setBatchReview(batch);
+                                else setReturnReview(await fetchSalesAgentReturnPacket(c.id));
+                              })().catch((cause: unknown) => setNotice(cause instanceof Error
+                                ? cause.message : "Could not load the identity review."))}>
+                              Review archived contact
+                            </button>
+                          </div>
                         )}
                       </li>
                     ))}
@@ -681,6 +719,55 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
           </div>
         </div>
       )}
+
+      <ArchivedReturnBatchModal packet={batchReview} onClose={() => setBatchReview(null)}
+        onSaved={() => {
+          setBatchReview(null);
+          setNotice("Grouped lead identity decision recorded.");
+          void refresh();
+        }} />
+
+      <FormModal
+        open={returnReview !== null}
+        onClose={() => setReturnReview(null)}
+        title="Review sales-agent return"
+        submitLabel="Record AAL2 decision"
+        intro={returnReview && <div className="space-y-2 text-sm">
+          <p>Matched contact: {returnReview.matched.contact_name ?? "Unnamed"} · {returnReview.matched.contact_email
+            ?? returnReview.matched.contact_phone ?? "no contact"}.</p>
+          <p>Archived record: {returnReview.archived_name ?? returnReview.archived_lead_id} · {returnReview.archived_email
+            ?? returnReview.archived_phone ?? "no contact"} · original source {returnReview.archived_source ?? "unknown"}.</p>
+          <p>Current conversation contact: {returnReview.current_name ?? "Unnamed"} · {returnReview.current_email
+            ?? returnReview.current_phone ?? "no contact"}. The conversation may have changed since the match.</p>
+          <p>Match-time outcome: {returnReview.matched.outcome ?? "unknown"}. A changed conversation or archived record makes this review stale.</p>
+          <p>Reopen keeps the historical lead identity. Start a separate lead keeps the archive and records a new identity. Both require current AAL2 and a reason.</p>
+        </div>}
+        fields={[
+          { name: "action", label: "Reviewed outcome", kind: "select", required: true,
+            options: [
+              { value: "recover", label: "Reopen archived lead" },
+              { value: "new_lead", label: "Start separate lead" },
+            ] },
+          { name: "reason", label: "Reason for this decision", kind: "textarea", required: true,
+            rows: 3, hint: "Explain why this is the same continuing relationship or a separate acquisition journey." },
+        ]}
+        onSubmit={async (values) => {
+          if (!returnReview) throw new Error("The review packet is unavailable.");
+          const action = String(values.action);
+          if (action !== "recover" && action !== "new_lead") throw new Error("Choose a reviewed outcome.");
+          await resolveSalesAgentReturn({
+            conversationId: returnReview.conversation_id,
+            action,
+            sourceHash: returnReview.source_hash,
+            reason: String(values.reason ?? ""),
+          });
+        }}
+        onSaved={() => {
+          setReturnReview(null);
+          setNotice("Reviewed sales-agent identity transition recorded.");
+          void refresh();
+        }}
+      />
 
       <ConfirmModal
         open={confirm !== null}

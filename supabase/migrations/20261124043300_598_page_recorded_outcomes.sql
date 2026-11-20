@@ -1,0 +1,50 @@
+-- First-party conversion evidence for landing and offer pages. The source
+-- page is the lead's recorded first source; it is not a page-view count or a
+-- claim that this page caused a later sale. Sale evidence is an explicit sale
+-- stage, positive recorded sale value, positive collected cash or a recorded
+-- sale/cash stage transition. Retain
+-- archived page rows.
+create function public.page_recorded_outcomes_v8(
+  p_client_id uuid,p_page_type text,p_days integer default 30)
+returns table(
+  page_id uuid,page_title text,archived_at timestamptz,
+  recorded_leads integer,consented_leads integer,recorded_sales integer,
+  recorded_cash numeric,latest_lead_at timestamptz
+)
+language plpgsql stable security definer
+set search_path=pg_catalog,public as $$
+declare v_days integer:=greatest(1,least(coalesce(p_days,30),3650));
+begin
+  if public.may_manage_client_leads(p_client_id) is not true then
+    raise exception 'Not permitted for this client.' using errcode='42501';
+  end if;
+  if p_page_type not in ('landing','offer') then
+    raise exception 'Unsupported page type.' using errcode='22023';
+  end if;
+  return query
+  select p.id,p.title,p.archived_at,
+    count(l.id)::integer,
+    count(l.id) filter(where l.consent_given_at is not null
+      and nullif(btrim(l.consent_wording),'') is not null)::integer,
+    count(l.id) filter(where l.stage in ('sale','cash')
+      or coalesce(l.sale_value,0)>0 or coalesce(l.cash_collected,0)>0
+      or exists (select 1 from public.lead_events sale_event
+        where sale_event.lead_id=l.id and sale_event.client_id=l.client_id
+          and sale_event.kind='stage_change'
+          and sale_event.to_stage in ('sale','cash')))::integer,
+    coalesce(sum(l.cash_collected),0)::numeric,max(l.created_at)
+  from public.client_pages p
+  left join public.client_leads l on l.client_id=p.client_id
+    and l.source_page_id=p.id and not coalesce(l.is_probe,false)
+    and l.created_at>=now()-make_interval(days=>v_days)
+  where p.client_id=p_client_id and p.page_type::text=p_page_type
+  group by p.id,p.title,p.archived_at
+  order by count(l.id) desc,p.title,p.id;
+end $$;
+revoke all on function public.page_recorded_outcomes_v8(uuid,text,integer)
+  from public,anon,authenticated;
+grant execute on function public.page_recorded_outcomes_v8(uuid,text,integer)
+  to authenticated,service_role;
+comment on function public.page_recorded_outcomes_v8(uuid,text,integer) is
+  'Recorded first-source page lead, consent, sale-evidence and cash associations for a bounded window. Excludes probes; never supplies page visits or causal attribution.';
+select public.lock_down_definer_functions();

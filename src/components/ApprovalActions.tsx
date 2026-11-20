@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
+import { requestOrdinaryMediaReview } from "../lib/creativeReview";
 import { Modal } from "./Modal";
 
 /**
@@ -19,11 +20,17 @@ export function ApprovalActions({
   title,
   onDone,
   onError,
+  onNotice,
+  clientId,
+  exactReview = false,
 }: {
   assetId: string;
   title: string;
   onDone: () => void;
   onError: (message: string) => void;
+  onNotice?: (message: string) => void;
+  clientId?: string;
+  exactReview?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [rejecting, setRejecting] = useState(false);
@@ -31,17 +38,25 @@ export function ApprovalActions({
 
   async function review(decision: "approved" | "rejected", why?: string) {
     setBusy(true);
-    const { error } = await supabase.rpc("review_media_asset", {
-      p_asset_id: assetId,
-      p_decision: decision,
-      p_reason: why?.trim() || undefined,
-    });
-    setBusy(false);
-    if (error) {
-      onError(error.message);
-      return;
+    try {
+      if (decision === "approved" && exactReview) {
+        if (!clientId) throw new Error("Choose a client before requesting review.");
+        await requestOrdinaryMediaReview(clientId, assetId);
+        onNotice?.("Submitted the current file for exact review in Approval Inbox.");
+      } else {
+        const { error } = await supabase.rpc("review_media_asset", {
+          p_asset_id: assetId,
+          p_decision: decision,
+          p_reason: why?.trim() || undefined,
+        });
+        if (error) throw error;
+      }
+      onDone();
+    } catch (error) {
+      onError(error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Review failed.");
+    } finally {
+      setBusy(false);
     }
-    onDone();
   }
 
   return (
@@ -52,7 +67,7 @@ export function ApprovalActions({
         onClick={() => void review("approved")}
         className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        Approve
+        {exactReview ? "Submit for review" : "Approve"}
       </button>
       <button
         type="button"

@@ -3,7 +3,8 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from, rpc, useParams, useNavigate, useAgentJobs, callRuntime, useSearchParams } = vi.hoisted(() => ({
+const { from, rpc, useParams, useNavigate, useAgentJobs, callRuntime, useSearchParams,
+  fetchCampaignOrigins, fetchOpportunities, fetchOpportunityApprovalStates, fetchReadiness, fetchOpportunityOfferVersions } = vi.hoisted(() => ({
   callRuntime: vi.fn(),
   from: vi.fn(),
   rpc: vi.fn(),
@@ -11,6 +12,15 @@ const { from, rpc, useParams, useNavigate, useAgentJobs, callRuntime, useSearchP
   useNavigate: vi.fn(() => vi.fn()),
   useSearchParams: vi.fn(() => [new URLSearchParams()]),
   useAgentJobs: vi.fn(),
+  fetchOpportunities: vi.fn(),
+  fetchCampaignOrigins: vi.fn(),
+  fetchOpportunityApprovalStates: vi.fn(),
+  fetchReadiness: vi.fn(),
+  fetchOpportunityOfferVersions: vi.fn(),
+}));
+vi.mock("../../lib/opportunities", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/opportunities")>()),
+  fetchCampaignOrigins, fetchOpportunities, fetchOpportunityApprovalStates, fetchReadiness, fetchOpportunityOfferVersions,
 }));
 vi.mock("../../lib/supabase", () => ({
   supabase: {
@@ -166,7 +176,23 @@ beforeEach(() => {
   useParams.mockReturnValue({ clientId: "client-1", campaignId: "camp-1" });
   useAgentJobs.mockReturnValue({ inFlight: [], recentFailures: [] });
   useSearchParams.mockReturnValue([new URLSearchParams()]);
+  fetchOpportunities.mockResolvedValue([{ id: "opp-1", name: "Approved niche", status: "approved" }]);
+  fetchOpportunityApprovalStates.mockResolvedValue(new Map([["opp-1", "current"]]));
+  fetchReadiness.mockResolvedValue(new Map([["opp-1", { blocker: null }]]));
+  fetchOpportunityOfferVersions.mockResolvedValue([{ id: "version-1", label: "Niche offer v1" }]);
+  fetchCampaignOrigins.mockResolvedValue(new Map([["camp-1", {
+    campaign_id: "camp-1", opportunity_id: "opp-1", opportunity_name: "Approved niche",
+    micro_market: "Winter", opportunity_status: "approved", confidence: "observed",
+    score: 80, classification: "high", open_proof_gaps: 0, opportunity_blocker: null,
+  }]]));
 });
+
+async function chooseCampaignSources() {
+  await screen.findByRole("option", { name: "Approved niche" });
+  await userEvent.selectOptions(screen.getByRole("combobox", { name: "Approved market opportunity" }), "opp-1");
+  await screen.findByRole("option", { name: "Niche offer v1" });
+  await userEvent.selectOptions(screen.getByRole("combobox", { name: "Signed secondary offer version" }), "version-1");
+}
 
 describe("the plan", () => {
   it("shows what the planner decided, not the raw brief", async () => {
@@ -190,6 +216,18 @@ describe("the plan", () => {
 });
 
 describe("campaign pages", () => {
+  it("closes the previous client's detail state when the route changes clients", async () => {
+    const view = show([planned()], READY);
+    await open();
+    await userEvent.click(screen.getByRole("button", { name: "Action buttons" }));
+    await userEvent.click(screen.getByRole("button", { name: "Launch" }));
+    expect(screen.getByRole("dialog", { name: "Confirm campaign action" })).toBeInTheDocument();
+
+    useParams.mockReturnValue({ clientId: "client-2", campaignId: "camp-1" });
+    view.rerender(<CampaignExecutionPanel />);
+    expect(screen.queryByRole("dialog", { name: "Confirm campaign action" })).not.toBeInTheDocument();
+  });
+
   it("shows the v2 campaign table and opens a campaign through its name", async () => {
     useParams.mockReturnValue({ clientId: "client-1" });
     show([planned(), planned({ id: "camp-2", name: "Spring whitening" })]);
@@ -214,7 +252,7 @@ describe("campaign pages", () => {
     expect(rpc).not.toHaveBeenCalledWith("launch_campaign", expect.anything());
   });
 
-  it("shows all v2 build tabs only for paid campaigns", async () => {
+  it("shows paid build tabs for paid campaigns", async () => {
     show([planned({ acquisition_mode: "paid", paid_platform: "meta" })], READY);
     expect(await screen.findByRole("heading", { name: "Winter full-arch push" })).toBeInTheDocument();
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Plan", "Content", "Landing Page", "Sales Agent", "Meta Ads", "Launch state"]);
@@ -227,10 +265,55 @@ describe("campaign pages", () => {
     expect(screen.getByRole("button", { name: "Record a hand build" })).toBeEnabled();
   });
 
+  it("shows both route packages and paid build sections for a combined campaign", async () => {
+    show([planned({ acquisition_mode: "both", paid_platform: "meta" })], READY);
+    expect(await screen.findByRole("heading", { name: "Winter full-arch push" })).toBeInTheDocument();
+    expect(screen.getByText("Legacy / unknown · Organic + Paid · Meta Ads")).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Plan", "Content", "Landing Page", "Sales Agent", "Meta Ads", "Launch state",
+    ]);
+    await userEvent.click(screen.getByRole("tab", { name: "Meta Ads" }));
+    expect(screen.getByRole("heading", { name: "Meta paid handoff" })).toBeInTheDocument();
+  });
+
+  it("labels a combined campaign correctly in the overview table", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
+    show([planned({ acquisition_mode: "both", paid_platform: "google" })], READY);
+    const row = (await screen.findByRole("link", { name: "Winter full-arch push" })).closest("tr");
+    expect(row).toHaveTextContent("Organic + Paid · Google Ads");
+    expect(row).toHaveTextContent("Legacy / unknown");
+  });
+
+  it("shows only selected modules and routes for a typed standalone organic campaign", async () => {
+    fetchCampaignOrigins.mockResolvedValue(new Map());
+    show([planned({ campaign_kind: "standalone_organic", acquisition_mode: "organic",
+      needs_landing_page: false, needs_sales_agent: false, needs_lead_magnet: true })]);
+    expect(await screen.findByRole("heading", { name: "Winter full-arch push" })).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Plan", "Organic", "Lead Magnet", "Launch",
+    ]);
+    expect(screen.getByText(/Standalone campaign. No market opportunity is required/)).toBeInTheDocument();
+  });
+
+  it("opens paid production and the exact operator export from a typed campaign", async () => {
+    fetchCampaignOrigins.mockResolvedValue(new Map());
+    show([planned({ campaign_kind: "standalone_paid", acquisition_mode: "paid",
+      paid_platform: "meta", needs_landing_page: false, needs_sales_agent: false,
+      needs_lead_magnet: false })]);
+    expect(await screen.findByRole("heading", { name: "Winter full-arch push" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Paid" }));
+    expect(screen.getByRole("region", { name: "Campaign production work" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Paid operator pack" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Launch" }));
+    expect(screen.getByRole("region", { name: "Campaign package readiness" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Launch paid operator pack" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Freeze operator bundle" })).toBeInTheDocument();
+  });
+
   it("shows route and artifact blockers while keeping a planned campaign's edit form to its name", async () => {
     show([planned({ acquisition_mode: "paid", paid_platform: "meta" })], NOT_READY);
     expect(await screen.findByRole("region", { name: "Readiness and blockers" })).toHaveTextContent("0 of 2 pieces ready");
-    expect(screen.getByText("Paid · Meta Ads")).toBeInTheDocument();
+    expect(screen.getByText("Legacy / unknown · Paid · Meta Ads")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Edit campaign" }));
     expect(screen.getByRole("textbox", { name: "Campaign name" })).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Objective" })).not.toBeInTheDocument();
@@ -258,36 +341,63 @@ describe("campaign pages", () => {
   it("regenerates a built plan as a linked revision instead of replacing its assets", async () => {
     const navigate = vi.fn();
     useNavigate.mockReturnValue(navigate);
-    show([planned({ acquisition_mode: "paid", paid_platform: "meta" })], READY);
-    const insert = vi.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "revision-1" }, error: null }) }) }));
-    const originalFrom = from.getMockImplementation()!;
-    from.mockImplementation((table: string) => table === "client_campaigns" ? { ...originalFrom(table), insert } : originalFrom(table));
+    fetchOpportunityOfferVersions.mockResolvedValue([{ id: "offer-v1", label: "Winter offer v1" }]);
+    show([planned({ acquisition_mode: "paid", paid_platform: "meta", offer_version_id: "offer-v1" })], READY);
+    rpc.mockImplementation((name: string) => name === "create_sourced_campaign_revision_v7"
+      ? Promise.resolve({ data: { id: "revision-1" }, error: null })
+      : Promise.resolve({ data: READY, error: null }));
     await screen.findByRole("heading", { name: "Winter full-arch push" });
     await userEvent.click(screen.getByRole("button", { name: "Regenerate plan" }));
-    expect(insert).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalledWith("create_sourced_campaign_revision_v7", expect.anything());
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
-      acquisition_mode: "paid", paid_platform: "meta", cloned_from_campaign_id: "camp-1",
-      brief: "Fill the January consult diary",
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_sourced_campaign_revision_v7", expect.objectContaining({
+      p_campaign_id: "camp-1", p_offer_version_id: "offer-v1", p_brief: "Fill the January consult diary",
     })));
-    expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", expect.objectContaining({ p_input_id: "revision-1" }));
+    expect(rpc).not.toHaveBeenCalledWith("enqueue_agent_job", expect.anything());
     expect(navigate).toHaveBeenCalledWith("/clients/client-1/delivery/campaign-factory/revision-1");
   });
 
   it("passes edited plan details to the planner of a new revision", async () => {
-    show([planned({ acquisition_mode: "paid", paid_platform: "meta" })], READY);
-    const insert = vi.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "revision-2" }, error: null }) }) }));
-    const originalFrom = from.getMockImplementation()!;
-    from.mockImplementation((table: string) => table === "client_campaigns" ? { ...originalFrom(table), insert } : originalFrom(table));
+    fetchOpportunityOfferVersions.mockResolvedValue([{ id: "offer-v1", label: "Winter offer v1" }]);
+    show([planned({ acquisition_mode: "paid", paid_platform: "meta", offer_version_id: "offer-v1" })], READY);
+    rpc.mockImplementation((name: string) => name === "create_sourced_campaign_revision_v7"
+      ? Promise.resolve({ data: { id: "revision-2" }, error: null })
+      : Promise.resolve({ data: READY, error: null }));
     await screen.findByRole("heading", { name: "Winter full-arch push" });
     await userEvent.click(screen.getByRole("button", { name: "Edit plan" }));
     const dialog = within(screen.getByRole("dialog", { name: "Edit and regenerate plan" }));
+    await waitFor(() => expect(fetchOpportunityOfferVersions).toHaveBeenCalledWith("client-1", "opp-1"));
+    expect(dialog.getByRole("option", { name: "Winter offer v1" })).toBeInTheDocument();
     await userEvent.clear(dialog.getByRole("textbox", { name: "Objective" }));
     await userEvent.type(dialog.getByRole("textbox", { name: "Objective" }), "Book 60 consultations");
     await userEvent.click(dialog.getByRole("button", { name: "Save and regenerate" }));
-    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
-      brief: expect.stringContaining("Objective: Book 60 consultations"),
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_sourced_campaign_revision_v7", expect.objectContaining({
+      p_brief: expect.stringContaining("Objective: Book 60 consultations"),
     })));
+  });
+
+  it("revises a standalone plan with changed producer choices and no invented opportunity", async () => {
+    const navigate = vi.fn();
+    useNavigate.mockReturnValue(navigate);
+    fetchCampaignOrigins.mockResolvedValue(new Map());
+    show([planned({ campaign_kind: "standalone_organic", acquisition_mode: "organic",
+      offer_version_id: null, needs_landing_page: false, needs_sales_agent: false,
+      needs_lead_magnet: false })], READY);
+    rpc.mockImplementation((name: string) => name === "create_typed_campaign_revision_v11"
+      ? Promise.resolve({ data: { id: "typed-revision-1" }, error: null })
+      : Promise.resolve({ data: READY, error: null }));
+    await screen.findByRole("heading", { name: "Winter full-arch push" });
+    await userEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Edit and regenerate plan" }));
+    await userEvent.click(dialog.getByRole("checkbox", { name: "Build landing page" }));
+    await userEvent.click(dialog.getByRole("button", { name: "Save and regenerate" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_typed_campaign_revision_v11",
+      expect.objectContaining({
+        p_campaign_id: "camp-1", p_offer_version_id: "",
+        p_needs_landing_page: true, p_needs_sales_agent: false,
+        p_needs_lead_magnet: false, p_idempotency_key: expect.any(String),
+      })));
+    expect(navigate).toHaveBeenCalledWith("/clients/client-1/delivery/campaign-factory/typed-revision-1");
   });
 
   it("clones a legacy campaign into an explicit route without reusing its activation", async () => {
@@ -418,6 +528,22 @@ describe("launching", () => {
 });
 
 describe("campaign visibility", () => {
+  it("labels an unlinked historical campaign without hiding its record", async () => {
+    fetchCampaignOrigins.mockResolvedValue(new Map());
+    show([planned()]);
+    await open();
+    expect(await screen.findByText(/No opportunity source is recorded/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Winter full-arch push" })).toBeInTheDocument();
+  });
+
+  it("marks a failed source read as unavailable rather than missing", async () => {
+    fetchCampaignOrigins.mockRejectedValue(new Error("source read denied"));
+    useParams.mockReturnValue({ clientId: "client-1" });
+    show([planned()]);
+    expect(await screen.findByText("Unavailable")).toBeInTheDocument();
+    expect(screen.queryByText("No link recorded")).not.toBeInTheDocument();
+  });
+
   it("renders all 15 planning campaigns for Attract Acquisition", async () => {
     useParams.mockReturnValue({ clientId: "e4b4b001-81f6-4997-8429-ff21f4ee1fbe" });
     show(Array.from({ length: 15 }, (_, i) => planned({ id: `camp-${i}`, name: `Planning ${i}` })));
@@ -576,15 +702,53 @@ describe("proposing a campaign", () => {
       "Fill the January consultation diary with full-arch patients, using the written plan assessment the offer strategy says nobody is using.",
   };
 
-  it("can plan a new campaign without generating content ideas", async () => {
+  it("creates a standalone organic campaign without an opportunity or unselected producers", async () => {
     useParams.mockReturnValue({ clientId: "client-1" });
-    const insert = vi.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "new-1" }, error: null }) }) }));
-    from.mockImplementation((table: string) => table === "client_content_pillars"
-      ? rows([])
-      : table === "client_campaigns" ? { ...rows([]), insert } : rows([]));
+    fetchOpportunityApprovalStates.mockResolvedValue(new Map());
+    from.mockImplementation(() => rows([]));
     rpc.mockResolvedValue({ data: [], error: null });
     render(<CampaignExecutionPanel />);
     await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Campaign type" }), "standalone_organic");
+    expect(screen.queryByRole("combobox", { name: "Approved market opportunity" })).not.toBeInTheDocument();
+    await userEvent.type(screen.getByRole("textbox", { name: "Campaign name" }), "Useful weekly advice");
+    await userEvent.type(screen.getByRole("textbox", { name: "What this campaign is for" }), "Help local homeowners");
+    await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_standalone_campaign_plan_v11",
+      expect.objectContaining({ p_campaign_kind: "standalone_organic", p_paid_platform: null,
+        p_offer_version_id: null, p_needs_landing_page: false,
+        p_needs_sales_agent: false, p_needs_lead_magnet: false })));
+    expect(rpc).not.toHaveBeenCalledWith("create_opportunity_campaign_plan_v11", expect.anything());
+  });
+
+  it("stores the paid destination and selected conversion modules for a standalone campaign", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
+    from.mockImplementation(() => rows([]));
+    rpc.mockResolvedValue({ data: [], error: null });
+    render(<CampaignExecutionPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Campaign type" }), "standalone_paid");
+    await userEvent.type(screen.getByRole("textbox", { name: "Campaign name" }), "Local paid launch");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Paid platform" }), "meta");
+    await userEvent.type(screen.getByRole("textbox", { name: "What this campaign is for" }), "Book local enquiries");
+    await userEvent.click(screen.getByRole("checkbox", { name: "Landing page" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Lead magnet" }));
+    await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_standalone_campaign_plan_v11",
+      expect.objectContaining({ p_campaign_kind: "standalone_paid", p_paid_platform: "meta",
+        p_needs_landing_page: true, p_needs_sales_agent: false,
+        p_needs_lead_magnet: true })));
+  });
+
+  it("can plan a new campaign without generating content ideas", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
+    from.mockImplementation((table: string) => table === "client_content_pillars"
+      ? rows([])
+      : rows([]));
+    rpc.mockResolvedValue({ data: [], error: null });
+    render(<CampaignExecutionPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await chooseCampaignSources();
     await userEvent.type(screen.getByLabelText(/Campaign name/i), "Editor hiring");
     await userEvent.selectOptions(screen.getByLabelText(/Campaign route/i), "organic");
     await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Plan the campaign first");
@@ -592,53 +756,82 @@ describe("proposing a campaign", () => {
     expect(toggle).toBeChecked();
     await userEvent.click(toggle);
     await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
-    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({ ideate_on_plan: false, acquisition_mode: "organic", paid_platform: null })));
-    expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", expect.objectContaining({ p_input_id: "new-1" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_opportunity_campaign_plan_v11", expect.objectContaining({
+      p_opportunity_id: "opp-1", p_offer_version_id: "version-1",
+      p_ideate_on_plan: false, p_acquisition_mode: "organic", p_pillar_ids: [],
+    })));
+    expect(rpc).not.toHaveBeenCalledWith("enqueue_agent_job", expect.anything());
   });
 
   it("passes the selected approved offer version to the planner campaign", async () => {
     useParams.mockReturnValue({ clientId: "client-1" });
-    const insert = vi.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "bound-1" }, error: null }) }) }));
-    from.mockImplementation((table: string) => {
-      if (table === "client_campaigns") return { ...rows([]), insert };
-      if (table === "service_offers") return rows([{ id: "service-1", service_name: "Boiler service" }]);
-      if (table === "service_offer_versions") return rows([{
-        id: "version-1", offer_id: "service-1", version: 2, promise: "An inspected boiler",
-      }]);
-      if (table === "service_offer_signoffs") return rows([{ offer_version_id: "version-1" }]);
-      return rows([]);
-    });
+    from.mockImplementation(() => rows([]));
     rpc.mockResolvedValue({ data: [], error: null });
     render(<CampaignExecutionPanel />);
     await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await chooseCampaignSources();
     await userEvent.type(screen.getByLabelText(/Campaign name/i), "Boiler acquisition");
     await userEvent.selectOptions(screen.getByLabelText(/Campaign route/i), "organic");
     await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Book inspections");
-    await userEvent.selectOptions(await screen.findByLabelText(/Approved service offer/i), "version-1");
     await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
-    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
-      offer_version_id: "version-1", acquisition_mode: "organic",
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_opportunity_campaign_plan_v11", expect.objectContaining({
+      p_offer_version_id: "version-1", p_acquisition_mode: "organic",
     })));
+  });
+
+  it("holds new campaign creation when no opportunity has current approval", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
+    fetchOpportunityApprovalStates.mockResolvedValue(new Map());
+    from.mockImplementation(() => rows([]));
+    rpc.mockResolvedValue({ data: [], error: null });
+    render(<CampaignExecutionPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await userEvent.type(screen.getByLabelText(/Campaign name/i), "Unapproved plan");
+    await userEvent.selectOptions(screen.getByLabelText(/Campaign route/i), "organic");
+    await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Do work too soon");
+    await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
+    expect(await screen.findByText(/Choose a currently approved and ready market opportunity/i))
+      .toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalledWith("create_opportunity_campaign_plan_v11", expect.anything());
   });
 
   it("stores a paid Google route without applying Meta's campaign template", async () => {
     useParams.mockReturnValue({ clientId: "client-1" });
-    const insert = vi.fn((_values: Record<string, unknown>) => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "new-google" }, error: null }) }) }));
     from.mockImplementation((table: string) => table === "client_content_pillars"
-      ? rows([]) : table === "client_campaigns" ? { ...rows([]), insert } : rows([]));
+      ? rows([]) : rows([]));
     rpc.mockResolvedValue({ data: [], error: null });
     render(<CampaignExecutionPanel />);
     await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await chooseCampaignSources();
     await userEvent.type(screen.getByLabelText(/Campaign name/i), "Search consults");
     await userEvent.selectOptions(screen.getByLabelText(/Campaign route/i), "paid");
     await userEvent.selectOptions(screen.getByLabelText(/Paid platform/i), "google");
     expect(screen.queryByLabelText(/Campaign template/i)).not.toBeInTheDocument();
     await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Book consultations from search");
     await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
-    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
-      acquisition_mode: "paid", paid_platform: "google",
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_opportunity_campaign_plan_v11", expect.objectContaining({
+      p_acquisition_mode: "paid", p_paid_platform: "google",
     })));
-    expect(insert.mock.calls[0]?.[0]).not.toHaveProperty("template");
+    expect(rpc.mock.calls.find(([name]) => name === "create_opportunity_campaign_plan_v11")?.[1])
+      .toHaveProperty("p_template", null);
+  });
+
+  it("creates a coordinated organic and Meta paid campaign with both route flags", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
+    from.mockImplementation(() => rows([]));
+    rpc.mockResolvedValue({ data: [], error: null });
+    render(<CampaignExecutionPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await chooseCampaignSources();
+    await userEvent.type(screen.getByLabelText(/Campaign name/i), "Combined launch");
+    await userEvent.selectOptions(screen.getByLabelText(/Campaign route/i), "both");
+    await userEvent.selectOptions(screen.getByLabelText(/Paid platform/i), "meta");
+    await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Coordinate paid and organic");
+    await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_opportunity_campaign_plan_v11", expect.objectContaining({
+      p_acquisition_mode: "both", p_paid_platform: "meta",
+    })));
+    expect(rpc).not.toHaveBeenCalledWith("enqueue_agent_job", expect.anything());
   });
 
   async function openProposer() {
@@ -723,34 +916,31 @@ describe("proposing a campaign", () => {
     expect(screen.queryByText(/Content pillars \(optional\)/i)).not.toBeInTheDocument();
   });
 
-  // Without this the campaign is created, the pillars silently are not, and
-  // the planner runs without them while the operator believes they were set.
-  it("refuses to queue the planner when the pillars cannot be attached", async () => {
+  // The sourced creator is one transaction: a rejected pillar rolls the
+  // campaign and planner queue back together.
+  it("shows a sourced-creation refusal when a selected pillar cannot be attached", async () => {
     useParams.mockReturnValue({ clientId: "client-1" });
-    const pillarInsert = vi.fn().mockResolvedValue({ error: { message: "pillar write failed" } });
     from.mockImplementation((table: string) => {
       if (table === "client_content_pillars") {
         return rows([{ id: "pil-1", name: "Honest proof", target_share: 100 }]);
       }
-      if (table === "campaign_content_pillars") return { insert: pillarInsert };
-      if (table === "client_campaigns") {
-        return {
-          ...rows([planned()]),
-          insert: () => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "new-1" }, error: null }) }) }),
-        };
-      }
       return rows([planned()]);
     });
+    rpc.mockImplementation((name: string) => name === "create_opportunity_campaign_plan_v11"
+      ? Promise.resolve({ data: null, error: { message: "pillar write failed" } })
+      : Promise.resolve({ data: [], error: null }));
 
     render(<CampaignExecutionPanel />);
     await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await chooseCampaignSources();
     await userEvent.type(await screen.findByLabelText(/Campaign name/i), "Winter push");
     await userEvent.selectOptions(screen.getByLabelText(/Campaign route/i), "organic");
     await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Fill the diary");
     await userEvent.click(screen.getByRole("checkbox", { name: /Honest proof/i }));
     await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
 
-    await waitFor(() => expect(pillarInsert).toHaveBeenCalled());
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_opportunity_campaign_plan_v11",
+      expect.objectContaining({ p_pillar_ids: ["pil-1"] })));
     expect(rpc).not.toHaveBeenCalledWith("enqueue_agent_job", expect.anything());
     expect(await screen.findByText(/pillar write failed/i)).toBeInTheDocument();
   });
@@ -1024,6 +1214,16 @@ describe("sweeping a plan into work", () => {
     plan_approved_at: "2026-11-05T09:00:00Z",
     plan_approved_fingerprint: "abc",
     ...over,
+  });
+
+  it("offers one Generate Assets action for an approved typed campaign", async () => {
+    show([approved({ campaign_kind: "standalone_organic", acquisition_mode: "organic",
+      needs_landing_page: false, needs_sales_agent: false, needs_lead_magnet: false })]);
+    await open();
+    await userEvent.click(await plan().findByRole("button", { name: "Generate Assets" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_campaign_sweep_v6",
+      { p_campaign_id: "camp-1" }));
+    expect(rpc).not.toHaveBeenCalledWith("create_workflow_run", expect.anything());
   });
 
   it("will not sweep an unreviewed plan, and says why", async () => {

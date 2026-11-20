@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CHAIN_STAGES, matchesSearch, stageLabel, stageReached } from "./contentChain";
+import { archiveMetricPresentation, CHAIN_STAGES, matchesSearch, publicationEvidence, stageLabel, stageReached } from "./contentChain";
+import type { ArchiveMetricCoverage } from "./contentChain";
 import type { ArchiveRow } from "./contentChain";
 
 const row = (over: Partial<ArchiveRow> = {}): ArchiveRow => ({
@@ -68,8 +69,50 @@ describe("stageLabel", () => {
   });
 
   it("counts multiple publications rather than saying published once", () => {
-    expect(stageLabel(row({ assets: 1, scheduled: 3, published: 1 }))).toBe("Published");
-    expect(stageLabel(row({ assets: 1, scheduled: 3, published: 3 }))).toBe("Published ×3");
+    expect(stageLabel(row({ assets: 1, scheduled: 3, published: 1 }))).toBe("Publication recorded");
+    expect(stageLabel(row({ assets: 1, scheduled: 3, published: 3 }))).toBe("Publication recorded ×3");
+  });
+});
+
+describe("publicationEvidence", () => {
+  it("does not present a recorded transition or external reference as provider read-back", () => {
+    expect(publicationEvidence({ published_at: null, external_id: null, external_url: null })).toBeNull();
+    expect(publicationEvidence({ published_at: "2026-11-18T00:00:00Z", external_id: null, external_url: null }))
+      .toContain("without an external reference");
+    expect(publicationEvidence({ published_at: "2026-11-18T00:00:00Z", external_id: "post-1", external_url: null }))
+      .toContain("provider read-back unverified");
+  });
+});
+
+const coverage = (over: Partial<ArchiveMetricCoverage> = {}): ArchiveMetricCoverage => ({
+  linked_posts: 2, metric_rows: 1, posts_with_metrics: 1, cumulative_rows: 0,
+  impression_rows: 1, reach_rows: 0, click_rows: 1, spend_rows: 1,
+  currency_count: 1, missing_currency_rows: 0, currency: "ZAR",
+  first_metric_date: "2026-11-17", last_metric_date: "2026-11-17",
+  last_fetched_at: "2026-11-18T00:00:00Z", ...over,
+});
+
+describe("archiveMetricPresentation", () => {
+  const totals = { impressions: 0, reach: 0, clicks: 4, spend: 12 };
+
+  it("distinguishes missing values from observed zero and labels partial coverage", () => {
+    const result = archiveMetricPresentation(totals, coverage());
+    expect(result.impressions).toContain("0 (recorded daily rows");
+    expect(result.reach).toBe("unknown (no ingested value)");
+    expect(result.spend).toContain("12 (recorded daily rows; coverage unverified) ZAR");
+    expect(result.metric_coverage).toContain("1/2 linked posts");
+    expect(archiveMetricPresentation(totals, coverage({ metric_rows: 0, impression_rows: 0,
+      click_rows: 0, spend_rows: 0 })).impressions).toBe("unknown (no ingested value)");
+  });
+
+  it("labels latest cumulative snapshots and holds incompatible spend currencies", () => {
+    expect(archiveMetricPresentation(totals, coverage({ cumulative_rows: 1 })).impressions)
+      .toContain("daily rows plus latest cumulative snapshot per source");
+    expect(archiveMetricPresentation(totals, coverage({ cumulative_rows: 1 })).spend)
+      .toContain("recorded daily rows");
+    expect(archiveMetricPresentation(totals, coverage({ currency_count: 2 })).spend)
+      .toBe("unknown (spend currency missing or mixed)");
+    expect(archiveMetricPresentation(totals, null).impressions).toBe("unknown");
   });
 });
 

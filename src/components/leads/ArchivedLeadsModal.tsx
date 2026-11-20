@@ -82,7 +82,7 @@ export function ArchivedLeadsModal({ open, rows, onClose, onRecovered }: {
           <tbody>{rows.filter((row) => (row.name ?? "").toLowerCase().includes(search.toLowerCase())).map((row) => <tr key={row.id} className="border-t border-border">
             <td className="px-2 py-2">{row.name ?? "Unnamed"}</td>
             <td className="px-2 py-2">{stageLabel(row.stage_at_archive)}</td>
-            <td className="px-2 py-2">{row.lead.opportunity_value == null ? "—" : `R${Number(row.lead.opportunity_value).toLocaleString()}`}</td>
+            <td className="px-2 py-2">{row.lead.opportunity_value == null ? "—" : `${typeof row.lead.opportunity_currency === "string" ? `${row.lead.opportunity_currency} ` : ""}${Number(row.lead.opportunity_value).toLocaleString()}${row.lead.opportunity_currency ? "" : " (currency unrecorded)"}`}</td>
             <td className="px-2 py-2">{new Date(row.archived_at).toLocaleDateString()}</td>
             <td className="px-2 py-2">{row.archived_by ? names[row.archived_by] ?? row.archived_by : "—"}</td>
             <td className="max-w-48 truncate px-2 py-2">{row.reason ?? "—"}</td>

@@ -44,6 +44,7 @@ it("sends a stable idempotency key and stores provider acceptance", async () => 
   const { sb, update } = db({
     id: "delivery",
     channel: "email",
+    sender_ref: "resend:Proof <proof@example.com>",
     recipient: "a@example.com",
     message: "Reviewed text",
     subject: "Evidence",
@@ -62,7 +63,7 @@ it("sends a stable idempotency key and stores provider acceptance", async () => 
   );
 });
 it("does not retry ambiguous provider failures", async () => {
-  const { sb, update } = db({ id: "delivery", channel: "email" });
+  const { sb, update } = db({ id: "delivery", channel: "email", sender_ref: "resend:Proof <proof@example.com>" });
   await dispatchProofDelivery(
     sb,
     config,
@@ -76,9 +77,11 @@ it("uses the snapshotted WhatsApp template and variables", async () => {
   vi.stubEnv("TWILIO_ACCOUNT_SID", "account");
   vi.stubEnv("TWILIO_AUTH_TOKEN", "secret");
   vi.stubEnv("TWILIO_WHATSAPP_FROM", "whatsapp:+1234567890");
+  vi.stubEnv("TWILIO_PROOF_WHATSAPP_CONTENT_SID", "HXapproved");
   const { sb } = db({
     id: "delivery",
     channel: "whatsapp",
+    sender_ref: "twilio:whatsapp:account:whatsapp:+1234567890",
     recipient: "+1234567890",
     template_sid: "HXapproved",
     template_variables: { "1": "Reviewed request" },
@@ -93,6 +96,15 @@ it("uses the snapshotted WhatsApp template and variables", async () => {
   expect(JSON.parse(body.get("ContentVariables")!)).toEqual({
     "1": "Reviewed request",
   });
+});
+it("refuses a changed sender before the provider call", async () => {
+  const { sb, update } = db({
+    id: "delivery", channel: "email", sender_ref: "resend:Other <other@example.com>",
+  });
+  const send = vi.fn();
+  await dispatchProofDelivery(sb, config, send);
+  expect(send).not.toHaveBeenCalled();
+  expect(update).toHaveBeenCalledWith(expect.objectContaining({ status: "failed" }));
 });
 it("rejects disguised executable attachments and empty files", () => {
   expect(

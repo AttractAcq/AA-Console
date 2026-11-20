@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,12 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * Offer Studio as one page.
  *
- * The notes ask for a table of every offer, click-through detail, and two
- * buttons: one for a main offer, one for a secondary one. Nothing in the schema
- * distinguished those two until migration 303, so the properties worth pinning
- * are that each button writes its own kind, and that the question the old Live
- * use tab existed to answer still gets answered -- on the offer it belongs to,
- * rather than in a list somebody has to go and look at.
+ * Offers is the read/review table. Build chooses a source before exposing
+ * manual or agent drafting. Source binding still happens in the database.
  */
 const { from, insert, rpc } = vi.hoisted(() => ({
   from: vi.fn(), insert: vi.fn(), rpc: vi.fn(),
@@ -24,7 +20,8 @@ import { OfferStudioPanel } from "./OfferStudioPanel";
 
 const offer = (over: Record<string, unknown> = {}) => ({
   id: "offer-1", client_id: "client-1", service_name: "Garage conversion",
-  kind: "main", created_at: "2026-10-01T00:00:00Z", ...over,
+  kind: "main", created_at: "2026-10-01T00:00:00Z",
+  archived_at: null, archived_by: null, ...over,
 });
 const version = (over: Record<string, unknown> = {}) => ({
   id: "ver-2", offer_id: "offer-1", client_id: "client-1", version: 2,
@@ -44,6 +41,8 @@ const drift = (over: Record<string, unknown> = {}) => ({
 function database(data: {
   offers?: unknown[]; versions?: unknown[]; signoffs?: unknown[]; drift?: unknown[]; jobs?: unknown[];
   opportunities?: unknown[]; approvals?: unknown[]; sources?: unknown[]; mainSources?: unknown[];
+  proofs?: unknown[];
+  failTable?: string;
 }) {
   const byTable: Record<string, unknown[]> = {
     service_offers: data.offers ?? [],
@@ -55,12 +54,13 @@ function database(data: {
     opportunity_approval_state_v6: data.approvals ?? [],
     secondary_offer_sources_v7: data.sources ?? [],
     main_offer_sources_v7: data.mainSources ?? [],
+    client_proof_assets: data.proofs ?? [],
   };
   // The panel chains select -> eq -> order for some tables and select -> eq for
   // others, so the chain is a thenable rather than having one terminal method:
   // awaiting it at any point yields the rows.
   from.mockImplementation((table: string) => {
-    const result = { data: byTable[table] ?? [], error: null };
+    const result = { data: byTable[table] ?? [], error: table === data.failTable ? { message: "Read denied" } : null };
     const chain: Record<string, unknown> = {};
     Object.assign(chain, {
       select: () => chain,
@@ -74,12 +74,24 @@ function database(data: {
   });
 }
 
-function show() {
+function show(view: "offers" | "build" = "offers", entry = "/") {
   return render(
-    <MemoryRouter initialEntries={["/"]}>
-      <OfferStudioPanel />
+    <MemoryRouter initialEntries={[entry]}>
+      <OfferStudioPanel view={view} />
     </MemoryRouter>,
   );
+}
+
+async function selectBaseline() {
+  await userEvent.click(await screen.findByRole("radio", { name: "Baseline service" }));
+}
+
+async function selectOpportunity() {
+  await userEvent.click(await screen.findByRole("radio", { name: "Approved opportunity" }));
+}
+
+async function nameService() {
+  await userEvent.type(screen.getByRole("textbox", { name: "Business service" }), "Garage conversion");
 }
 
 vi.mock("react-router-dom", async (importOriginal) => ({
@@ -92,47 +104,189 @@ beforeEach(() => {
   rpc.mockResolvedValue({ error: null });
 });
 
-describe("the two buttons the notes ask for", () => {
+describe("the source-first Build path", () => {
   it("creates a main offer as main", async () => {
     database({ offers: [] });
-    show();
-    await userEvent.click(await screen.findByRole("button", { name: "New main offer" }));
-    expect(rpc).toHaveBeenCalledWith("create_main_offer_v7", { p_client_id: "client-1" });
+    show("build");
+    await selectBaseline();
+    await userEvent.type(screen.getByRole("textbox", { name: "Business service" }), "Garage conversion");
+    await userEvent.click(screen.getByRole("button", { name: "Create manual draft" }));
+    expect(rpc).toHaveBeenCalledWith("create_named_main_offer_v9", {
+      p_client_id: "client-1", p_service_name: "Garage conversion",
+    });
     expect(insert).not.toHaveBeenCalled();
   });
 
   it("creates a secondary offer as secondary", async () => {
     database({ offers: [], opportunities: [{ id: "opp-1", name: "Winter garage gym", micro_market: "Unused garages" }],
       approvals: [{ opportunity_id: "opp-1", approval_current: true }] });
-    show();
-    await userEvent.click(await screen.findByRole("button", { name: "New secondary offer" }));
-    expect(rpc).toHaveBeenCalledWith("create_secondary_offer_v7", { p_opportunity_id: "opp-1" });
+    show("build");
+    await selectOpportunity();
+    await userEvent.type(screen.getByRole("textbox", { name: "Business service" }), "Garage conversion");
+    await userEvent.click(screen.getByRole("button", { name: "Create manual draft" }));
+    expect(rpc).toHaveBeenCalledWith("create_named_secondary_offer_v9", {
+      p_opportunity_id: "opp-1", p_service_name: "Garage conversion",
+    });
     expect(insert).not.toHaveBeenCalled();
   });
 
   it("holds secondary actions until an opportunity has current approval", async () => {
     database({ offers: [], opportunities: [{ id: "opp-1", name: "Winter garage gym", micro_market: "Unused garages" }],
       approvals: [{ opportunity_id: "opp-1", approval_current: false }] });
-    show();
-    expect(await screen.findByRole("button", { name: "New secondary offer" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Compile a secondary offer" })).toBeDisabled();
+    show("build");
+    await selectOpportunity();
+    await userEvent.type(screen.getByRole("textbox", { name: "Business service" }), "Garage conversion");
+    expect(screen.getByRole("button", { name: "Create manual draft" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Draft with agent" })).toBeDisabled();
   });
 
   it("says what to do when there is nothing yet, naming both kinds", async () => {
     database({ offers: [] });
     show();
-    expect(await screen.findByText(/Create a main offer for the business/)).toBeInTheDocument();
+    expect(await screen.findByText(/Open Build to make a baseline service/)).toBeInTheDocument();
+  });
+
+  it("opens a selected source-bound offer for an exact draft version", async () => {
+    database({ offers: [offer()] });
+    show("build", "/?tab=build&offer=offer-1");
+    expect(await screen.findByRole("heading", { name: "New offer version" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Service name" })).toHaveValue("Garage conversion");
+    await userEvent.type(screen.getByRole("textbox", { name: "Audience" }), "Homeowners");
+    await userEvent.type(screen.getByRole("textbox", { name: "Offer promise" }), "A usable garage gym");
+    await userEvent.type(screen.getByRole("textbox", { name: "Dream outcome" }), "A functional home gym");
+    await userEvent.type(screen.getByRole("textbox", { name: "How this offer strengthens the outcome" }), "Designed around the home");
+    await userEvent.type(screen.getByRole("textbox", { name: "Perceived likelihood of achievement" }), "A measured build plan");
+    await userEvent.type(screen.getByRole("textbox", { name: "Proof or mechanism that raises likelihood" }), "Site survey and plan");
+    await userEvent.type(screen.getByRole("textbox", { name: "Time delay" }), "Four weeks");
+    await userEvent.type(screen.getByRole("textbox", { name: "Steps that reduce delay, one per line" }), "Survey first");
+    await userEvent.type(screen.getByRole("textbox", { name: "Effort and sacrifice" }), "One planning call");
+    await userEvent.type(screen.getByRole("textbox", { name: "Steps that reduce effort, one per line" }), "We handle planning");
+    await userEvent.click(screen.getByRole("button", { name: "Save draft version" }));
+    expect(rpc).toHaveBeenCalledWith("create_service_offer_version_v9", expect.objectContaining({
+      p_offer_id: "offer-1", p_service_name: "Garage conversion",
+      p_audience: "Homeowners", p_promise: "A usable garage gym",
+      p_value_equation: expect.objectContaining({ dream_outcome: "A functional home gym",
+        delay_reduction_steps: ["Survey first"], effort_reduction_steps: ["We handle planning"] }),
+    }));
+  });
+
+  it("requires cleared matching proof for a general claim in a new offer version", async () => {
+    const proofId = "11111111-1111-4111-8111-111111111111";
+    database({ offers: [offer()], proofs: [{ id: proofId, title: "Garage handover",
+      claim: "Completed within the agreed period", evidence: "Signed handover note",
+      usage_rights: "approved", expires_on: null }] });
+    show("build", "/?tab=build&offer=offer-1");
+    await screen.findByRole("heading", { name: "New offer version" });
+    for (const name of ["Audience", "Offer promise", "Dream outcome",
+      "How this offer strengthens the outcome", "Perceived likelihood of achievement",
+      "Proof or mechanism that raises likelihood", "Time delay",
+      "Steps that reduce delay, one per line", "Effort and sacrifice",
+      "Steps that reduce effort, one per line"]) {
+      await userEvent.type(screen.getByRole("textbox", { name }), "Recorded plan");
+    }
+    await userEvent.click(screen.getByRole("button", { name: "Add claim" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Claim" }), "Unrelated claim");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Cleared proof" }), proofId);
+    await userEvent.click(screen.getByRole("button", { name: "Save draft version" }));
+    expect(await screen.findByText(/Each general claim needs a current cleared proof record/)).toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalledWith("create_service_offer_version_v9", expect.anything());
+    await userEvent.clear(screen.getByRole("textbox", { name: "Claim" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Claim" }), "Completed within the agreed period");
+    await userEvent.click(screen.getByRole("button", { name: "Save draft version" }));
+    expect(rpc).toHaveBeenCalledWith("create_service_offer_version_v9", expect.objectContaining({
+      p_claims: [{ kind: "general", text: "Completed within the agreed period", proof_asset_id: proofId }],
+    }));
+  });
+
+  it("keeps versions for another offer out of the selected Build editor", async () => {
+    database({
+      offers: [offer(), offer({ id: "offer-2", service_name: "Roof repair" })],
+      versions: [version(), version({ id: "ver-3", offer_id: "offer-2", promise: "A repaired roof" })],
+    });
+    show("build", "/?tab=build&offer=offer-1");
+    expect(await screen.findByRole("heading", { name: "Garage conversion versions" })).toBeInTheDocument();
+    expect(screen.getByText("Version 2 · Draft")).toBeInTheDocument();
+    expect(screen.queryByText("A repaired roof")).toBeNull();
+  });
+
+  it("shows the recorded evidence and flags a missing proof link during exact offer review", async () => {
+    const proofId = "11111111-1111-4111-8111-111111111111";
+    const missingId = "22222222-2222-4222-8222-222222222222";
+    database({ offers: [offer()], versions: [version({
+      promise: "A garage ready for training",
+      claims: [
+        { kind: "quantified", text: "Completed within the agreed period", proof_asset_id: proofId },
+        { kind: "general", text: "Completed within the agreed period", proof_asset_id: proofId },
+        { kind: "quantified", text: "A second unsupported result", proof_asset_id: missingId },
+      ],
+    })], proofs: [{ id: proofId, title: "Garage handover", claim: "Completed within the agreed period",
+      evidence: "Signed handover note", usage_rights: "approved", expires_on: null }] });
+    show("build", "/?tab=build&offer=offer-1");
+    await userEvent.click(await screen.findByText("Inclusions, limits and claims"));
+    expect(screen.getAllByText("Proof: Garage handover")).toHaveLength(2);
+    expect(screen.getAllByText("Evidence: Signed handover note")).toHaveLength(2);
+    expect(screen.getByText("The linked proof record is unavailable for this client.")).toBeInTheDocument();
+  });
+
+  it("lets a saved Versions link choose an existing offer", async () => {
+    database({ offers: [offer()] });
+    show("build", "/?tab=versions");
+    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Continue an existing offer" }), "offer-1");
+    expect(await screen.findByRole("heading", { name: "Garage conversion versions" })).toBeInTheDocument();
   });
 });
 
 describe("the table", () => {
-  it("shows each offer with its kind and latest version", async () => {
+  it("keeps archived offers out of active tables and offers restore", async () => {
+    database({ offers: [offer({ archived_at: "2026-11-19T12:00:00Z" })],
+      versions: [version({ promise: "Historical approved promise" })],
+      drift: [drift({ offer_version_id: "ver-2", version: 2, superseded: false })] });
+    show();
+    const archived = await screen.findByRole("region", { name: "Archived offers" });
+    expect(within(archived).getByText("Garage conversion")).toBeInTheDocument();
+    expect(within(archived).getByText("1 recorded live use remains")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Proposed offers" })).queryByText("Garage conversion")).toBeNull();
+    await userEvent.click(within(archived).getByRole("button", { name: "Show Garage conversion" }));
+    expect(screen.getByText(/Historical approved promise/)).toBeInTheDocument();
+    await userEvent.click(within(archived).getByRole("button", { name: "Restore" }));
+    expect(rpc).toHaveBeenCalledWith("set_service_offer_archived_v10", {
+      p_offer_id: "offer-1", p_archive: false,
+    });
+  });
+
+  it("offers deletion only for an empty draft and archives a versioned offer", async () => {
+    database({ offers: [offer(), offer({ id: "offer-2", service_name: "Roof repair" })],
+      versions: [version()] });
+    show();
+    const proposed = await screen.findByRole("region", { name: "Proposed offers" });
+    expect(within(proposed).getAllByRole("button", { name: "Delete empty draft" })).toHaveLength(1);
+    await userEvent.click(within(proposed).getByRole("button", { name: "Delete empty draft" }));
+    expect(rpc).toHaveBeenCalledWith("delete_empty_service_offer_v10", { p_offer_id: "offer-2" });
+    await waitFor(() => expect(within(screen.getByRole("region", { name: "Proposed offers" }))
+      .getAllByRole("button", { name: "Archive" })[0]).toBeEnabled());
+    await userEvent.click(within(screen.getByRole("region", { name: "Proposed offers" }))
+      .getAllByRole("button", { name: "Archive" })[0]);
+    expect(rpc).toHaveBeenCalledWith("set_service_offer_archived_v10", {
+      p_offer_id: "offer-1", p_archive: true,
+    });
+  });
+
+  it("shows a failed source read as unavailable with a retry", async () => {
+    database({ offers: [], failTable: "service_offers" });
+    show();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Offers are unavailable: Read denied");
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.queryByText(/No offers yet/)).toBeNull();
+  });
+
+  it("shows an unsigned latest version in Proposed offers", async () => {
     database({ offers: [offer()], versions: [version()] });
     show();
-    expect(await screen.findByText("Garage conversion")).toBeInTheDocument();
-    expect(screen.getByText("Main")).toBeInTheDocument();
-    // Not signed off, and it says so rather than leaving it blank.
-    expect(screen.getByText("v2, not signed off")).toBeInTheDocument();
+    const proposed = await screen.findByRole("region", { name: "Proposed offers" });
+    expect(within(proposed).getByText("Garage conversion")).toBeInTheDocument();
+    expect(within(proposed).getByText("Baseline service")).toBeInTheDocument();
+    expect(within(proposed).getByText("Proposed")).toBeInTheDocument();
+    expect(within(proposed).getByText("v2")).toBeInTheDocument();
   });
 
   it("reports a signed-off version as signed off", async () => {
@@ -142,13 +296,36 @@ describe("the table", () => {
       signoffs: [{ offer_version_id: "ver-2", client_id: "client-1" }],
     });
     show();
-    expect(await screen.findByText("v2, signed off")).toBeInTheDocument();
+    const approved = await screen.findByRole("region", { name: "Approved offers" });
+    expect(within(approved).getByText("Garage conversion")).toBeInTheDocument();
+    expect(within(approved).getByText("Signed off")).toBeInTheDocument();
+    expect(within(approved).getByText("v2")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Proposed offers" })).queryByText("Garage conversion")).toBeNull();
   });
 
-  it("distinguishes a secondary offer", async () => {
+  it("shows an unbound secondary offer as source unknown", async () => {
     database({ offers: [offer({ id: "offer-2", kind: "secondary", service_name: "Roofers" })] });
     show();
-    expect(await screen.findByText("Secondary")).toBeInTheDocument();
+    const proposed = await screen.findByRole("region", { name: "Proposed offers" });
+    expect(within(proposed).getByText("Roofers")).toBeInTheDocument();
+    expect(within(proposed).getByText("Source unknown")).toBeInTheDocument();
+  });
+
+  it("shows the linked opportunity, reviewer and revision action for a signed offer", async () => {
+    database({
+      offers: [offer({ kind: "secondary" })], versions: [version()],
+      signoffs: [{ offer_version_id: "ver-2", approved_by: "reviewer-1", client_id: "client-1" }],
+      sources: [{ offer_id: "offer-1", opportunity_id: "opp-1" }],
+      opportunities: [{ id: "opp-1", name: "Winter garage gym", micro_market: "Garages" }],
+      approvals: [{ opportunity_id: "opp-1", approval_current: true }],
+    });
+    show();
+    const approved = await screen.findByRole("region", { name: "Approved offers" });
+    expect(within(approved).getByText("Winter garage gym")).toBeInTheDocument();
+    expect(within(approved).getByText("reviewer-1")).toBeInTheDocument();
+    expect(within(approved).getByRole("link", { name: "Revise" })).toHaveAttribute(
+      "href", "/clients/client-1/delivery/offer-studio?tab=build&offer=offer-1",
+    );
   });
 });
 
@@ -188,11 +365,20 @@ describe("the question Live use existed to answer", () => {
 });
 
 describe("the detail", () => {
-  it("explains where a main offer is compiled from", async () => {
+  it("shows the reviewed Strategy snapshot bound to a new main offer", async () => {
+    database({ offers: [offer()], mainSources: [{ offer_id: "offer-1", strategy_hash: "a".repeat(64) }] });
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Show Garage conversion" }));
+    expect(screen.getByText(/bound to reviewed Offer Strategy/)).toBeInTheDocument();
+    expect(screen.getByText(/Source: reviewed Offer Strategy snapshot/)).toBeInTheDocument();
+  });
+
+  it("labels a historical main offer without a reviewed source", async () => {
     database({ offers: [offer()] });
     show();
     await userEvent.click(await screen.findByRole("button", { name: "Show Garage conversion" }));
-    expect(screen.getByText(/compiled from offer strategy/)).toBeInTheDocument();
+    expect(screen.getByText(/legacy main offer has no reviewed Offer Strategy snapshot/)).toBeInTheDocument();
+    expect(screen.getByText(/Source review is unverified/)).toBeInTheDocument();
   });
 
   it("explains where a secondary offer is compiled from", async () => {
@@ -215,7 +401,7 @@ describe("the detail", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Show Garage conversion" }));
     expect(screen.getByRole("link", { name: "Edit versions and claims" })).toHaveAttribute(
       "href",
-      "/clients/client-1/delivery/offer-studio?tab=versions&offer=offer-1",
+      "/clients/client-1/delivery/offer-studio?tab=build&offer=offer-1",
     );
   });
 });
@@ -224,8 +410,10 @@ describe("compiling an offer instead of writing one", () => {
   it("shows a completed compile and asks for draft review", async () => {
     database({ offers: [], jobs: [{ id: "job-1", status: "completed", terminal: true, error: null }] });
     rpc.mockResolvedValueOnce({ data: "job-1", error: null });
-    show();
-    await userEvent.click(await screen.findByRole("button", { name: "Compile a main offer" }));
+    show("build");
+    await selectBaseline();
+    await nameService();
+    await userEvent.click(screen.getByRole("button", { name: "Draft with agent" }));
     expect(await screen.findByRole("status")).toHaveTextContent(/Review the draft version/);
     expect(from).toHaveBeenCalledWith("agent_jobs");
   });
@@ -235,23 +423,28 @@ describe("compiling an offer instead of writing one", () => {
       opportunities: [{ id: "opp-1", name: "Winter garage gym", micro_market: "Unused garages" }],
       approvals: [{ opportunity_id: "opp-1", approval_current: true }] });
     rpc.mockResolvedValueOnce({ data: "job-2", error: null });
-    show();
-    await userEvent.click(await screen.findByRole("button", { name: "Compile a secondary offer" }));
+    show("build");
+    await selectOpportunity();
+    await nameService();
+    await userEvent.click(screen.getByRole("button", { name: "Draft with agent" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/Version writer refused the draft/);
   });
 
   it("asks the compiler for a main or a secondary offer", async () => {
     database({ offers: [], opportunities: [{ id: "opp-1", name: "Winter garage gym", micro_market: "Unused garages" }],
       approvals: [{ opportunity_id: "opp-1", approval_current: true }] });
-    show();
-    await userEvent.click(await screen.findByRole("button", { name: "Compile a main offer" }));
-    expect(rpc).toHaveBeenCalledWith("request_offer_compile_v6", {
-      p_client_id: "client-1", p_kind: "main", p_source: "strategy", p_opportunity_id: undefined,
+    show("build");
+    await selectBaseline();
+    await nameService();
+    await userEvent.click(screen.getByRole("button", { name: "Draft with agent" }));
+    expect(rpc).toHaveBeenCalledWith("request_named_offer_compile_v9", {
+      p_client_id: "client-1", p_kind: "main", p_opportunity_id: null, p_service_name: "Garage conversion",
     });
 
-    await userEvent.click(screen.getByRole("button", { name: "Compile a secondary offer" }));
-    expect(rpc).toHaveBeenCalledWith("request_offer_compile_v6", {
-      p_client_id: "client-1", p_kind: "secondary", p_source: "micro_niche", p_opportunity_id: "opp-1",
+    await selectOpportunity();
+    await userEvent.click(screen.getByRole("button", { name: "Draft with agent" }));
+    expect(rpc).toHaveBeenCalledWith("request_named_offer_compile_v9", {
+      p_client_id: "client-1", p_kind: "secondary", p_opportunity_id: "opp-1", p_service_name: "Garage conversion",
     });
   });
 
@@ -259,8 +452,10 @@ describe("compiling an offer instead of writing one", () => {
     // Compiling must not also insert an empty offer row. Two offers from one
     // click is the bug a shared busy flag invites.
     database({ offers: [] });
-    show();
-    await userEvent.click(await screen.findByRole("button", { name: "Compile a main offer" }));
+    show("build");
+    await selectBaseline();
+    await nameService();
+    await userEvent.click(screen.getByRole("button", { name: "Draft with agent" }));
     expect(insert).not.toHaveBeenCalled();
   });
 
@@ -271,8 +466,10 @@ describe("compiling an offer instead of writing one", () => {
     rpc.mockResolvedValue({
       error: { message: "This client has no offer strategy yet." },
     });
-    show();
-    await userEvent.click(await screen.findByRole("button", { name: "Compile a main offer" }));
+    show("build");
+    await selectBaseline();
+    await nameService();
+    await userEvent.click(screen.getByRole("button", { name: "Draft with agent" }));
     expect(await screen.findByRole("alert"))
       .toHaveTextContent("This client has no offer strategy yet.");
   });
@@ -280,8 +477,10 @@ describe("compiling an offer instead of writing one", () => {
   it("confirms what was queued when it works", async () => {
     database({ offers: [], opportunities: [{ id: "opp-1", name: "Winter garage gym", micro_market: "Unused garages" }],
       approvals: [{ opportunity_id: "opp-1", approval_current: true }] });
-    show();
-    await userEvent.click(await screen.findByRole("button", { name: "Compile a secondary offer" }));
+    show("build");
+    await selectOpportunity();
+    await nameService();
+    await userEvent.click(screen.getByRole("button", { name: "Draft with agent" }));
     expect(await screen.findByRole("status"))
       .toHaveTextContent(/drafting a secondary offer from the selected approved opportunity/);
   });

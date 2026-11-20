@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../config.js";
+import { proofSenderIdentity } from "./sender-identity.js";
 export async function dispatchProofDelivery(
   sb: SupabaseClient,
   config: RuntimeConfig,
@@ -16,6 +17,14 @@ export async function dispatchProofDelivery(
   if (sendReady !== true) {
     const { error: stopError } = await sb.from("proof_request_deliveries")
       .update({ status: "cancelled", error: "Current exact Inbox approval or capture link is unavailable.", lease_until: null })
+      .eq("id", row.id).eq("status", "sending")
+      .eq("attempt_request_id", row.attempt_request_id);
+    if (stopError) throw stopError;
+    return;
+  }
+  if (!row.sender_ref || row.sender_ref !== proofSenderIdentity(row.channel, config)) {
+    const { error: stopError } = await sb.from("proof_request_deliveries")
+      .update({ status: "failed", error: "The reviewed provider sender is unavailable or has changed. Review a new request before sending.", lease_until: null })
       .eq("id", row.id).eq("status", "sending")
       .eq("attempt_request_id", row.attempt_request_id);
     if (stopError) throw stopError;

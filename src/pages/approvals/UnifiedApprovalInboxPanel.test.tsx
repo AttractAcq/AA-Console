@@ -185,6 +185,65 @@ const readyGoogleOperator = {
   owning_path: "/clients/client-1/delivery/google-ads-studio",
 };
 
+const paidBundleId = "77777777-7777-4777-8777-777777777777";
+const paidBundleHash = "7".repeat(64);
+const organicPackageId = "88888888-8888-4888-8888-888888888888";
+const organicPackageHash = "8".repeat(64);
+const readyOrganicPublication = {
+  ...request, id: "organic-publication-inbox-1", source_system: "aa_console",
+  source_kind: "organic_publication", source_id: organicPackageId,
+  source_version: organicPackageHash, artifact_hash: organicPackageHash,
+  title: "Organic publication: instagram", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", destination: "organic:instagram",
+  account_ref: "ig-account-1", owner_role: "client_media_reviewer",
+  preview: { client_id: "client-1", scheduled_post_id: "post-1", slot_id: "slot-1",
+    platform: "instagram", account_ref: "ig-account-1",
+    scheduled_at: "2026-11-20T12:00:00Z", rights: { usage_rights: "client_owned" },
+    provider_copy: { caption: "Approved exact caption" },
+    media: [{ frozen_bucket: "publication-media", sha256: "a".repeat(64) }] },
+  scope: { client_id: "client-1", scheduled_post_id: "post-1", slot_id: "slot-1",
+    source_snapshot_hash: "b".repeat(64) },
+};
+const readyPaidOperator = {
+  ...request, id: "paid-operator-inbox-1", source_system: "aa_console",
+  source_kind: "paid_operator_bundle", source_id: paidBundleId,
+  source_version: paidBundleHash, artifact_hash: paidBundleHash,
+  title: "Google paid operator bundle v1", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z",
+  destination: "google_ads:manual_operator_handoff", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { source: { campaign_id: "campaign-1", package_id: packageId,
+    platform: "google", creative: [{ copy_id: googleBundleId }] },
+    operator: "Paid operator", budget_instruction: "Cap at 25 per day",
+    tracking_instruction: "Record external campaign ID",
+    research_task: "Research search terms, negatives and match types" },
+  scope: { client_id: "client-1", campaign_id: "campaign-1", package_id: packageId,
+    bundle_id: paidBundleId, platform: "google", snapshot_hash: paidBundleHash,
+    version: 1 },
+  owning_path: "/clients/client-1/delivery/google-ads-studio",
+};
+
+const googleCopyId = "99999999-9999-4999-8999-999999999999";
+const googleCopyHash = "9".repeat(64);
+const readyGoogleCopy = {
+  ...request, id: "google-copy-inbox-1", source_system: "aa_console",
+  source_kind: "google_search_copy", source_id: googleCopyId,
+  source_version: googleCopyHash, artifact_hash: googleCopyHash,
+  title: "Google search copy · piece 2", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z",
+  destination: "google_ads:manual_operator_handoff", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { campaign_id: "campaign-1", route_package_id: "route-1",
+    work_item_id: "work-1", copy_hash: googleCopyHash,
+    headlines: ["One", "Two", "Three"],
+    descriptions: ["First description", "Second description"],
+    rationale: "The copy follows the approved offer and intended buyer." },
+  scope: { client_id: "client-1", campaign_id: "campaign-1",
+    route_package_id: "route-1", work_item_id: "work-1",
+    copy_id: googleCopyId, copy_hash: googleCopyHash },
+  owning_path: "/clients/client-1/delivery/campaign-factory?campaign=campaign-1",
+};
+
 const publicAgentId = "55555555-5555-4555-8555-555555555555";
 const publicAgentToken = "66666666-6666-4666-8666-666666666666";
 const publicAgentHash = "1".repeat(64);
@@ -337,6 +396,7 @@ const readyProofDelivery = {
   preview: { client_id: "client-1", delivery_id: "delivery-1",
     request_token: proofDeliveryToken, config_id: "config-1", link_id: "link-1",
     channel: "email", recipient: "customer@example.invalid",
+    sender_ref: "resend:Proof <proof@example.invalid>",
     subject: "Evidence request", message: "Please send evidence",
     capture_url: "https://example.invalid/capture/private" },
   scope: { client_id: "client-1", delivery_id: "delivery-1",
@@ -720,7 +780,8 @@ const readyEngineSlot = {
     post_copy: [{ platform: "instagram", caption: "Exact caption" }],
     account_ref: "17890000000000000" } },
   scope: { client_id: "client-1", slot_id: engineSlotId, asset_id: mediaAssetId,
-    platform: "instagram", scheduled_at: engineTime, approval_entry_id: engineEntryId },
+    platform: "instagram", scheduled_at: engineTime, format: "single",
+    approval_entry_id: engineEntryId },
   owning_path: "/clients/client-1/delivery/approval-inbox?tab=engine",
 };
 
@@ -1100,6 +1161,47 @@ describe("unified approval inbox", () => {
     }));
   });
 
+  it("reviews the route-bound paid operator packet and its human instructions", async () => {
+    requests = [readyPaidOperator];
+    show();
+    const card = await screen.findByRole("article", { name: readyPaidOperator.title });
+    expect(within(card).getByText("Paid operator bundle decision")).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_paid_operator_bundle_v7", {
+      p_bundle_id: paidBundleId, p_request_id: readyPaidOperator.id, p_approved: true,
+    }));
+  });
+
+  it("reviews the frozen organic publication package through its exact decision RPC", async () => {
+    requests = [readyOrganicPublication];
+    show();
+    const card = await screen.findByRole("article", { name: readyOrganicPublication.title });
+    expect(within(card).getByText("Organic publication package decision")).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_organic_publication_v7", {
+      p_package_id: organicPackageId, p_request_id: readyOrganicPublication.id, p_approved: true,
+    }));
+  });
+
+  it("holds an organic package with missing media rights", async () => {
+    requests = [{ ...readyOrganicPublication,
+      preview: { ...readyOrganicPublication.preview, rights: { usage_rights: null } } }];
+    show();
+    const card = await screen.findByRole("article", { name: readyOrganicPublication.title });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).toBeNull();
+  });
+
+  it("reviews exact Google search copy through its paid-route decision RPC", async () => {
+    requests = [readyGoogleCopy];
+    show();
+    const card = await screen.findByRole("article", { name: readyGoogleCopy.title });
+    expect(within(card).getByText("Google search copy decision")).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_google_search_copy_v7", {
+      p_copy_id: googleCopyId, p_request_id: readyGoogleCopy.id, p_approved: true,
+    }));
+  });
+
   it("decides the frozen public sales-agent script through its owning AAL2 RPC", async () => {
     requests = [readyPublicAgent];
     show();
@@ -1190,11 +1292,21 @@ describe("unified approval inbox", () => {
     show();
     const card = await screen.findByRole("article", { name: readyProofDelivery.title });
     expect(within(card).getByText(/Please send evidence/)).toBeInTheDocument();
+    expect(within(card).getByText(/resend:Proof <proof@example.invalid>/)).toBeInTheDocument();
     await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_proof_delivery_inbox_v6", {
       p_review_id: proofDeliveryReviewId, p_request_id: readyProofDelivery.id,
       p_approved: true,
     }));
+  });
+
+  it("holds a proof request whose reviewed sender is missing", async () => {
+    requests = [{ ...readyProofDelivery, preview: {
+      ...readyProofDelivery.preview, sender_ref: undefined,
+    } }];
+    show();
+    const card = await screen.findByRole("article", { name: readyProofDelivery.title });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
   });
 
   it("routes an exact Meta profile proposal through its owning Inbox RPC", async () => {
@@ -1471,6 +1583,85 @@ describe("unified approval inbox", () => {
     }));
   });
 
+  it("downloads a generated single-file render rather than its source file", async () => {
+    requests = [{ ...readyOrdinaryMedia, preview: {
+      ...readyOrdinaryMedia.preview,
+      asset: { ...readyOrdinaryMedia.preview.asset, render_path: "client-1/render.png" },
+    } }];
+    show();
+    const card = await screen.findByRole("article", { name: readyOrdinaryMedia.title });
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify creative file" }));
+    await waitFor(() => expect(downloadVerifiedCreativeFile).toHaveBeenCalledWith(
+      "client-1/render.png", mediaFileHash,
+    ));
+  });
+
+  it("requires every ordered carousel frame to match before source approval", async () => {
+    const first = { frame_id: "frame-1", position: 1, caption: "Opening",
+      storage_path: "client-1/image.png", file_sha256: mediaFileHash,
+      file_bytes: 12, object_id: "storage-object-1", object_version: "v1",
+      object_updated_at: "2026-11-19T00:00:00Z" };
+    const second = { frame_id: "frame-2", position: 2, caption: "Close",
+      storage_path: "client-1/image-2.png", file_sha256: "a".repeat(64),
+      file_bytes: 15, object_id: "storage-object-2", object_version: null,
+      object_updated_at: "2026-11-19T00:00:00Z" };
+    requests = [{ ...readyOrdinaryMedia, preview: {
+      ...readyOrdinaryMedia.preview,
+      asset: { ...readyOrdinaryMedia.preview.asset, content_format: "carousel" },
+      frames: [first, second],
+    } }];
+    downloadVerifiedCreativeFile.mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("Second frame bytes changed"));
+    show();
+    const card = await screen.findByRole("article", { name: readyOrdinaryMedia.title });
+    const approve = within(card).getByRole("button", { name: "Approve exact version" });
+    expect(approve).toBeDisabled();
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify every frame" }));
+    expect(await within(card).findByRole("alert")).toHaveTextContent("Second frame bytes changed");
+    expect(approve).toBeDisabled();
+    expect(downloadVerifiedCreativeFile).toHaveBeenNthCalledWith(1, first.storage_path, first.file_sha256);
+    expect(downloadVerifiedCreativeFile).toHaveBeenNthCalledWith(2, second.storage_path, second.file_sha256);
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify every frame" }));
+    await waitFor(() => expect(approve).toBeEnabled());
+    await userEvent.click(approve);
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_ordinary_media_inbox_v6", {
+      p_review_id: mediaReviewId, p_request_id: readyOrdinaryMedia.id,
+    }));
+  });
+
+  it("holds a framed creative card when its ordered frame packet is incomplete", async () => {
+    requests = [{ ...readyOrdinaryMedia, preview: {
+      ...readyOrdinaryMedia.preview,
+      asset: { ...readyOrdinaryMedia.preview.asset, content_format: "story" },
+      frames: [{ frame_id: "frame-2", position: 2, storage_path: "client-1/image.png",
+        file_sha256: mediaFileHash, file_bytes: 12, object_id: "storage-object-1",
+        object_version: "v1", object_updated_at: "2026-11-19T00:00:00Z" }],
+    } }];
+    show();
+    const card = await screen.findByRole("article", { name: readyOrdinaryMedia.title });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+  });
+
+  it("accepts a complete one-frame story packet", async () => {
+    requests = [{ ...readyOrdinaryMedia, preview: {
+      ...readyOrdinaryMedia.preview,
+      asset: { ...readyOrdinaryMedia.preview.asset, content_format: "story" },
+      frames: [{ frame_id: "frame-1", position: 1, caption: "Story",
+        storage_path: "client-1/image.png", file_sha256: mediaFileHash,
+        file_bytes: 12, object_id: "storage-object-1", object_version: "v1",
+        object_updated_at: "2026-11-19T00:00:00Z" }],
+    } }];
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    show();
+    const card = await screen.findByRole("article", { name: readyOrdinaryMedia.title });
+    const approve = within(card).getByRole("button", { name: "Approve exact version" });
+    expect(approve).toBeDisabled();
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify every frame" }));
+    await waitFor(() => expect(approve).toBeEnabled());
+  });
+
   it("schedules an exact Engine slot only after the reviewer verifies its file", async () => {
     requests = [readyEngineSlot];
     show();
@@ -1485,6 +1676,89 @@ describe("unified approval inbox", () => {
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_engine_slot_inbox_v6", {
       p_slot_id: engineSlotId, p_request_id: readyEngineSlot.id, p_approved: true,
     }));
+  });
+
+  it("verifies the finished Engine render instead of its source file", async () => {
+    requests = [{ ...readyEngineSlot, preview: { exact_package: {
+      ...readyEngineSlot.preview.exact_package,
+      asset: { ...readyEngineSlot.preview.exact_package.asset,
+        render_path: "client-1/finished.png" },
+    } } }];
+    show();
+    const card = await screen.findByRole("article", { name: readyEngineSlot.title });
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify creative file" }));
+    await waitFor(() => expect(downloadVerifiedCreativeFile).toHaveBeenCalledWith(
+      "client-1/finished.png", mediaFileHash));
+  });
+
+  it("verifies every ordered Engine carousel frame before approval", async () => {
+    const frames = [
+      { frame_id: "engine-frame-1", position: 1, storage_path: "client-1/image.png",
+        file_sha256: mediaFileHash, file_bytes: 12, object_id: "storage-object-1",
+        object_version: "v1", object_updated_at: "2026-11-19T00:00:00Z" },
+      { frame_id: "engine-frame-2", position: 2, storage_path: "client-1/second.png",
+        file_sha256: "b".repeat(64), file_bytes: 16, object_id: "storage-object-2",
+        object_version: "v1", object_updated_at: "2026-11-19T00:00:00Z" },
+    ];
+    requests = [{ ...readyEngineSlot, scope: { ...readyEngineSlot.scope, format: "carousel" },
+      preview: { exact_package: { ...readyEngineSlot.preview.exact_package,
+        slot: { ...readyEngineSlot.preview.exact_package.slot, format: "carousel" },
+        asset: { ...readyEngineSlot.preview.exact_package.asset, content_format: "carousel" },
+        frames,
+      } } }];
+    show();
+    const card = await screen.findByRole("article", { name: readyEngineSlot.title });
+    const approve = within(card).getByRole("button", { name: "Approve exact version" });
+    expect(approve).toBeDisabled();
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify every frame" }));
+    await waitFor(() => expect(approve).toBeEnabled());
+    expect(downloadVerifiedCreativeFile).toHaveBeenNthCalledWith(1, frames[0].storage_path, frames[0].file_sha256);
+    expect(downloadVerifiedCreativeFile).toHaveBeenNthCalledWith(2, frames[1].storage_path, frames[1].file_sha256);
+  });
+
+  it("reviews a finished Engine reel only with exact video seats", async () => {
+    const seats = { owner_user_id: "video-owner", manager_user_id: "video-manager",
+      client_user_id: null, signoffs: [
+        { role: "owner", user_id: "video-owner", request_id: "owner-request",
+          content_hash: "a".repeat(64) },
+        { role: "manager", user_id: "video-manager", request_id: "manager-request",
+          content_hash: "b".repeat(64) },
+      ] };
+    const reel = { ...readyEngineSlot, scope: { ...readyEngineSlot.scope, format: "reel" },
+      preview: { exact_package: { ...readyEngineSlot.preview.exact_package,
+        slot: { ...readyEngineSlot.preview.exact_package.slot, format: "reel" },
+        asset: { ...readyEngineSlot.preview.exact_package.asset,
+          media_type: "video", content_format: "reel", edit_stage: "review_ready",
+          render_path: "client-1/finished-reel.mp4" },
+        video_seats: seats,
+      } } };
+    requests = [{ ...reel, preview: { exact_package: {
+      ...reel.preview.exact_package,
+      video_seats: { ...seats, signoffs: seats.signoffs.slice(0, 1) },
+    } } }];
+    const firstView = show();
+    let card = await screen.findByRole("article", { name: readyEngineSlot.title });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+    firstView.unmount();
+    requests = [{ ...reel, preview: { exact_package: {
+      ...reel.preview.exact_package,
+      video_seats: { ...seats, manager_user_id: "reassigned-manager" },
+    } } }];
+    const mismatchedView = show();
+    card = await screen.findByRole("article", { name: readyEngineSlot.title });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+    mismatchedView.unmount();
+    requests = [reel];
+    show();
+    card = await screen.findByRole("article", { name: readyEngineSlot.title });
+    const approve = within(card).getByRole("button", { name: "Approve exact version" });
+    expect(approve).toBeDisabled();
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify creative file" }));
+    await waitFor(() => expect(approve).toBeEnabled());
+    expect(downloadVerifiedCreativeFile).toHaveBeenCalledWith("client-1/finished-reel.mp4", mediaFileHash);
   });
 
   it("rejects an offer with a reason", async () => {
@@ -1742,6 +2016,29 @@ describe("unified approval inbox", () => {
     }));
     await waitFor(() => expect(screen.getByText("Decision history (1)")).toBeInTheDocument());
     expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+  });
+
+  it("routes a canonical archived-contact card to its source-owned AAL2 review", async () => {
+    requests = [{ ...request,
+      id: "archived-return-card", source_system: "aa_console",
+      source_kind: "archived_form_return", source_id: "form-return-1",
+      source_version: "c".repeat(64), artifact_hash: "c".repeat(64),
+      title: "Review returning form contact", source_state: "pending",
+      expires_at: "2030-01-01T00:00:00Z",
+      preview: { archived_lead_id: "archived-1", source_hash: "c".repeat(64) },
+      scope: { client_id: "client-1", effect: "lead_identity_resolution" },
+      destination: "internal:lead_identity", owner_role: "client_lead_reviewer",
+      owning_path: "/clients/client-1/delivery/sales-os?tab=capture",
+    }];
+    show();
+    const card = await screen.findByRole("article", { name: "Review returning form contact" });
+    expect(within(card).getByRole("link", { name: "View owning source" }))
+      .toHaveAttribute("href", "/clients/client-1/delivery/sales-os?tab=capture");
+    expect(within(card).queryByRole("button", { name: "Approve exact version" }))
+      .not.toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "Reject exact version" }))
+      .not.toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("uses the exact sales revoke source and requires a reason for rejection", async () => {

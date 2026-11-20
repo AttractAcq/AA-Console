@@ -135,7 +135,7 @@ begin
       then raise exception 'Route-free campaign endpoint was activated'; end if;
   perform public.advance_lead(v_lead_id,'shown');
   perform public.advance_lead(v_lead_id,'cash');
-  perform public.update_lead(v_lead_id,'{"sale_value":12000,"cash_collected":9000}'::jsonb);
+  perform public.update_lead(v_lead_id,'{"sale_value":12000,"sale_currency":"ZAR","cash_collected":9000,"cash_currency":"ZAR"}'::jsonb);
   perform public.set_client_archive_v8(cid,'client_campaigns',campaign_id,true);
   perform public.set_client_archive_v8(cid,'client_pages',page_id,true);
   select * into v from public.lead_journey_trace_v9(cid,30,50) j

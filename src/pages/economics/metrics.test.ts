@@ -45,6 +45,7 @@ describe("showRatio", () => {
   it("distinguishes no spend from no revenue, because they are different facts", () => {
     // One means the question is meaningless; the other means it is early.
     expect(reason(showRatio(null, 0, 0))).toBe("No spend recorded in this period");
+    expect(reason(showRatio(null, null, 0))).toBe("Spend currencies are mixed");
     expect(reason(showRatio(0, 8888, 0))).toBe("No revenue from this cohort yet");
   });
 

@@ -6,11 +6,15 @@ import { DataTable } from "../../components/DataTable";
 import { ActionMenu } from "../../components/ActionMenu";
 import { FormModal } from "../../components/forms/FormModal";
 import { dayOrDash } from "../../lib/contentRecords";
+import { fetchArchivedReturnBatchPacket, type ArchivedReturnBatchPacket } from "../../lib/archivedReturnBatch";
+import { ArchivedReturnBatchModal } from "./ArchivedReturnBatchModal";
 import { supabase } from "../../lib/supabase";
 import {
   CAPTURE_PURPOSES,
-  createEndpoint, fetchCapturedLeads, fetchEndpoints, fetchSubmissions, setEndpointEnabled,
-  type CapturedLead, type CaptureDue, type CaptureEndpoint, type LeadSubmission,
+  createEndpoint, fetchArchivedReturnPacket, fetchCapturedLeads, fetchEndpoints,
+  fetchSubmissions, resolveArchivedReturn, setEndpointEnabled,
+  type ArchivedReturnPacket, type CapturedLead, type CaptureDue,
+  type CaptureEndpoint, type LeadSubmission,
 } from "../../lib/leadCapture";
 
 /**
@@ -45,6 +49,8 @@ export function LeadCapturePanel() {
   const [error, setError] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
   const [issued, setIssued] = useState<string | null>(null);
+  const [returnReview, setReturnReview] = useState<ArchivedReturnPacket | null>(null);
+  const [batchReview, setBatchReview] = useState<ArchivedReturnBatchPacket | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -121,7 +127,7 @@ export function LeadCapturePanel() {
     return counts;
   }, [submissions]);
 
-  /** Submissions that did not create a lead: merged, or refused. */
+  /** Submissions still waiting for a reviewed lead transition, or refused. */
   const unpromoted = submissions.filter((s) => s.status !== "promoted");
 
   const open = endpoints.filter((e) => !due.get(e.id)?.blocker).length;
@@ -254,27 +260,96 @@ export function LeadCapturePanel() {
 
       {unpromoted.length > 0 && (
         <section className="space-y-2">
-          <h3 className="font-semibold">Came in without creating a lead</h3>
+          <h3 className="font-semibold">Submissions needing attention</h3>
           <p className="text-sm text-muted-foreground">
-            Kept deliberately. A submission that merged into an existing lead still happened, and
-            "did this person ever contact us" has to stay answerable.
+            A consented contact matching archived history waits here for a reviewed lead transition.
+            The original archive and this submission remain separate until that decision.
           </p>
           <DataTable
-            columns={["When", "Who", "What happened"]}
+            columns={["When", "Who", "What happened", "Action"]}
             emptyLabel="Nothing"
             rows={unpromoted.map((s) => [
               <span key="w">{dayOrDash(s.created_at)}</span>,
               <span key="n">{s.email ?? s.phone ?? "no contact given"}</span>,
               <span key="h" className="text-xs">
-                {s.status}
+                {s.status === "received" && s.archive_match_lead_id
+                  ? "Archived contact match — review required"
+                  : s.status}
                 {s.rejected_reason && (
                   <span className="block text-destructive">{s.rejected_reason}</span>
+                )}
+              </span>,
+              <span key="a">
+                {s.status === "received" && s.archive_match_lead_id && (
+                  <Button onClick={() => void act(s.id,
+                    async () => {
+                      const batch = await fetchArchivedReturnBatchPacket(s.archive_match_lead_id!);
+                      if (batch.decision_state === "grouped_hold") setBatchReview(batch);
+                      else setReturnReview(await fetchArchivedReturnPacket(s.id));
+                    },
+                    "Identity review loaded.")}>
+                    Review return
+                  </Button>
                 )}
               </span>,
             ])}
           />
         </section>
       )}
+
+      <ArchivedReturnBatchModal packet={batchReview} onClose={() => setBatchReview(null)}
+        onSaved={() => {
+          setBatchReview(null);
+          setNotice("Grouped lead identity decision recorded.");
+          void refresh();
+        }} />
+
+      <FormModal
+        open={returnReview !== null}
+        onClose={() => setReturnReview(null)}
+        title="Review returning contact"
+        submitLabel="Record AAL2 decision"
+        intro={returnReview && (
+          <div className="space-y-2 text-sm">
+            <p>Submitted by {returnReview.submitted_name ?? returnReview.submitted_email
+              ?? returnReview.submitted_phone ?? "unknown contact"} on {dayOrDash(returnReview.submitted_at)}.</p>
+            <p>Archived record: {returnReview.archived_name ?? returnReview.archived_lead_id},
+              {" "}{returnReview.archived_stage.replace(/_/g, " ")}, archived {dayOrDash(returnReview.archived_at)}.</p>
+            <p>Archived contact: {returnReview.archived_email ?? returnReview.archived_phone ?? "unknown"};
+              {" "}original source {returnReview.archived_source ?? "unknown"}.</p>
+            <p>Consent: {returnReview.consent_wording}</p>
+            <p>Captured source: {returnReview.source_snapshot?.source_channel
+              ?? returnReview.source_snapshot?.purpose ?? "unknown"}; route
+              {" "}{returnReview.route_package_id ?? "unknown"}; click {returnReview.click_id ?? "unknown"}.</p>
+            <p>Reopen keeps the existing lead identity. Start a separate lead preserves the archive and records a new identity. Both decisions require current AAL2 and a reason.</p>
+          </div>
+        )}
+        fields={[
+          { name: "action", label: "Reviewed outcome", kind: "select", required: true,
+            options: [
+              { value: "recover", label: "Reopen archived lead" },
+              { value: "new_lead", label: "Start separate lead" },
+            ] },
+          { name: "reason", label: "Reason for this decision", kind: "textarea", required: true,
+            rows: 3, hint: "Explain why this is the same continuing relationship or a separate acquisition journey." },
+        ]}
+        onSubmit={async (values) => {
+          if (!returnReview) throw new Error("The review packet is unavailable.");
+          const action = String(values.action);
+          if (action !== "recover" && action !== "new_lead") throw new Error("Choose a reviewed outcome.");
+          await resolveArchivedReturn({
+            submissionId: returnReview.submission_id,
+            action,
+            sourceHash: returnReview.source_hash,
+            reason: String(values.reason ?? ""),
+          });
+        }}
+        onSaved={() => {
+          setReturnReview(null);
+          setNotice("Reviewed lead transition recorded.");
+          void refresh();
+        }}
+      />
 
       <FormModal
         open={opening}

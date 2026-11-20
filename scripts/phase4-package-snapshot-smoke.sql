@@ -8,14 +8,60 @@ insert into public.profiles(id,role,email) values
 insert into public.clients(id,name,initials) values
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Snapshot fixture','SF');
 insert into public.client_campaigns(id,client_id,name,brief,acquisition_mode,runs_organic,runs_paid,
-  content_count,organic_content_count,paid_content_count,built_at)
+  content_count,organic_content_count,paid_content_count)
 values ('cccccccc-cccc-4ccc-8ccc-cccccccccccc',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Snapshot campaign','Fixture',
-  'organic',true,false,1,1,0,now());
+  'organic',true,false,1,1,0);
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
 select set_config('request.jwt.claims',
   '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+-- A reviewable package now requires the same signed opportunity and secondary
+-- offer lineage as a new commercial campaign. Keep this fixture on that path.
+do $source$
+declare o public.market_opportunities%rowtype;
+  offer public.service_offers%rowtype;
+  v public.service_offer_versions%rowtype;
+  claim_proof public.client_proof_assets%rowtype;
+  main_offer_id uuid; approval_id uuid; rights_request uuid; rights_id uuid;
+begin
+  insert into public.market_opportunities(client_id,name,micro_market,buying_situation,
+    core_problem,desired_outcome,idempotency_key,confidence)
+  values('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Snapshot buyer',
+    'Homeowners with unused garages','Preparing for winter fitness',
+    'Their garage cannot be used for training','A private gym at home',
+    'snapshot-opportunity','conversation') returning * into o;
+  update public.market_opportunities set status='validated' where id=o.id;
+  insert into public.service_offers(client_id,kind,service_name)
+    values(o.client_id,'main','Garage conversion') returning id into main_offer_id;
+  insert into public.opportunity_links(opportunity_id,client_id,role,offer_id)
+    values(o.id,o.client_id,'offer',main_offer_id);
+  insert into public.opportunity_scores(opportunity_id,client_id,factors,total,classification)
+    values(o.id,o.client_id,'{}'::jsonb,72,'test');
+  insert into public.opportunity_awareness_stages(opportunity_id,client_id,stage,mindset,message)
+    values(o.id,o.client_id,'problem_aware','Winter is coming','Convert the garage');
+  approval_id:=public.request_opportunity_approval_v6(o.id);
+  perform public.approve_opportunity_v6(o.id,approval_id);
+  offer:=public.create_secondary_offer_v7(o.id);
+  insert into public.client_proof_assets(client_id,media_type,title,body,source,claim,evidence)
+    values(o.client_id,'text','Snapshot claim proof','Completed on time',
+      'Customer interview','On time','Signed handover') returning * into claim_proof;
+  rights_request:=public.request_proof_rights_v6(claim_proof.id,'Signed quote release');
+  select id into rights_id from public.proof_rights_requests_v6
+    where canonical_request_id=rights_request;
+  perform public.approve_proof_rights_v6(rights_id,rights_request);
+  v:=public.create_service_offer_version_v6(o.client_id,'New secondary offer',
+    'Homeowners with unused garages','A garage ready for training',
+    array['Insulation'],array['Gym equipment'],null,null,null,
+    jsonb_build_array(jsonb_build_object('kind','quantified',
+      'text','Completed on time','proof_asset_id',claim_proof.id)),
+    'snapshot-offer-version',offer.id);
+  perform public.approve_service_offer_version_v6(v.id);
+  insert into public.opportunity_links(opportunity_id,client_id,role,campaign_id)
+    values(o.id,o.client_id,'campaign','cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+  update public.client_campaigns set offer_version_id=v.id,built_at=now()
+    where id='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+end $source$;
 select public.set_campaign_content_spec_v7('cccccccc-cccc-4ccc-8ccc-cccccccccccc',
   '[{"route":"organic","platform":"instagram","media_type":"image","content_format":"single"}]'::jsonb);
 select public.approve_campaign_plan_v6('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
@@ -27,6 +73,7 @@ declare cid uuid:='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
   client uuid:='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
   v_run_id uuid; route_id uuid; route_version integer; work_id uuid;
   asset_id uuid; asset_fingerprint text; plan_hash text; spec_hash text;
+  proof_id uuid; next_rights_request uuid; next_rights_id uuid;
   frozen public.campaign_preparation_packages_v7%rowtype;
   again public.campaign_preparation_packages_v7%rowtype;
   request_id uuid; refused boolean := false;
@@ -95,6 +142,21 @@ begin
   if not public.campaign_preparation_approved_v7(frozen.id)
     or (select status from public.approval_inbox_v6 where id=request_id)<>'approved' then
     raise exception 'AAL2 review did not approve the exact package'; end if;
+  if jsonb_array_length(coalesce(frozen.snapshot->'offer_proof_rights','[]'::jsonb))<>1 then
+    raise exception 'Frozen package omitted its quantified proof-rights decision'; end if;
+  select id into proof_id from public.client_proof_assets
+    where client_id=client and title='Snapshot claim proof';
+  update public.client_proof_assets set usage_rights='restricted' where id=proof_id;
+  if public.campaign_preparation_package_current_v7(frozen.id) then
+    raise exception 'Withdrawn proof rights kept package approval current'; end if;
+  next_rights_request:=public.request_proof_rights_v6(proof_id,'Signed quote release');
+  select id into next_rights_id from public.proof_rights_requests_v6
+    where canonical_request_id=next_rights_request;
+  perform public.approve_proof_rights_v6(next_rights_id,next_rights_request);
+  if next_rights_request=(frozen.snapshot->'offer_proof_rights'->0->>'rights_request_id')::uuid
+    or public.campaign_preparation_package_current_v7(frozen.id)
+    or public.campaign_preparation_approved_v7(frozen.id) then
+    raise exception 'New proof clearance revived the older package decision'; end if;
   update public.client_media_assets set storage_path='campaign-fixture/changed.png'
     where id=asset_id;
   if public.campaign_preparation_package_current_v7(frozen.id)

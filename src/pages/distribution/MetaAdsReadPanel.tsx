@@ -17,7 +17,16 @@ function actionLabels(value: unknown): string {
   }).join(" · ");
 }
 
-export function MetaAdsReadPanel({ clientId }: { clientId: string | undefined }) {
+export function MetaAdsReadPanel({ clientId, readOnly = false }: {
+  clientId: string | undefined; readOnly?: boolean;
+}) {
+  return <MetaAdsReadPanelForClient key={clientId ?? "no-client"}
+    clientId={clientId} readOnly={readOnly} />;
+}
+
+function MetaAdsReadPanelForClient({ clientId, readOnly }: {
+  clientId: string | undefined; readOnly: boolean;
+}) {
   const [run, setRun] = useState<Run | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [ads, setAds] = useState<Ad[]>([]);
@@ -82,7 +91,9 @@ export function MetaAdsReadPanel({ clientId }: { clientId: string | undefined })
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
     <div className="flex flex-wrap gap-2">
-      <Button disabled={busy || !clientId} onClick={() => void queue()}>Read Meta Ads account</Button>
+      {!readOnly && <Button disabled={busy || !clientId} onClick={() => void queue()}>
+        Read Meta Ads account
+      </Button>}
       <Button disabled={busy || !clientId} onClick={() => void refresh().catch((cause) => setError(String(cause)))}>Refresh view</Button>
     </div>
     {run ? <p className="text-xs text-muted-foreground">Account {run.account_id} · {run.currency} · {run.from_date} to {run.through_date} · fetched {new Date(run.fetched_at).toLocaleString()}</p>
@@ -103,10 +114,12 @@ export function MetaAdsReadPanel({ clientId }: { clientId: string | undefined })
         </button>)}
         {campaign && <dl className="grid gap-1 rounded border border-border p-3 text-sm">
           <div><dt>Status</dt><dd>{campaign.status} · effective {campaign.effective_status}</dd></div>
-          <div><dt>Impressions</dt><dd>{campaign.impressions}</dd></div>
-          <div><dt>Clicks</dt><dd>{campaign.clicks}</dd></div>
-          <div><dt>Spend in period</dt><dd>{Number(campaign.spend).toFixed(2)} {run.currency}</dd></div>
-          <div><dt>Actions by type</dt><dd>{actionLabels(campaign.actions)}</dd></div>
+          {campaign.metrics_observed ? <>
+            <div><dt>Impressions</dt><dd>{campaign.impressions}</dd></div>
+            <div><dt>Clicks</dt><dd>{campaign.clicks}</dd></div>
+            <div><dt>Spend in period</dt><dd>{Number(campaign.spend).toFixed(2)} {run.currency}</dd></div>
+            <div><dt>Actions by type</dt><dd>{actionLabels(campaign.actions)}</dd></div>
+          </> : <div><dt>Period metrics</dt><dd>Unknown — no provider metrics row returned.</dd></div>}
         </dl>}
       </div>
       <div className="space-y-1"><h4 className="font-medium">Ads ({ads.length})</h4>
@@ -120,10 +133,12 @@ export function MetaAdsReadPanel({ clientId }: { clientId: string | undefined })
           <div><dt>Campaign / ad set</dt><dd>{ad.external_campaign_id} / {ad.external_adset_id}</dd></div>
           <div><dt>Status</dt><dd>{ad.status} · effective {ad.effective_status}</dd></div>
           <div><dt>Creative</dt><dd>{ad.creative_name ?? "None returned"} {ad.creative_id ?? ""}</dd></div>
-          <div><dt>Impressions</dt><dd>{ad.impressions}</dd></div>
-          <div><dt>Clicks</dt><dd>{ad.clicks}</dd></div>
-          <div><dt>Spend in period</dt><dd>{Number(ad.spend).toFixed(2)} {run.currency}</dd></div>
-          <div><dt>Actions by type</dt><dd>{actionLabels(ad.actions)}</dd></div>
+          {ad.metrics_observed ? <>
+            <div><dt>Impressions</dt><dd>{ad.impressions}</dd></div>
+            <div><dt>Clicks</dt><dd>{ad.clicks}</dd></div>
+            <div><dt>Spend in period</dt><dd>{Number(ad.spend).toFixed(2)} {run.currency}</dd></div>
+            <div><dt>Actions by type</dt><dd>{actionLabels(ad.actions)}</dd></div>
+          </> : <div><dt>Period metrics</dt><dd>Unknown — no provider metrics row returned.</dd></div>}
         </dl>}
       </div>
     </div>}

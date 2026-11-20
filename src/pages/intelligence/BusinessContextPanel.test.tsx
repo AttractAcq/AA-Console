@@ -118,3 +118,29 @@ describe("drafting the business context", () => {
     expect(screen.getByLabelText(/What you know from talking to them/i)).toBeInTheDocument();
   });
 });
+
+describe("correcting a displayed business field", () => {
+  it("saves one panel field, reports success, and keeps the other fields out of the write", async () => {
+    const upsert = vi.fn().mockResolvedValue({ error: null });
+    const chain: Record<string, unknown> = {};
+    for (const method of ["select", "eq"]) chain[method] = () => chain;
+    chain.maybeSingle = () => Promise.resolve({ data: DRAFT, error: null });
+    chain.upsert = upsert;
+    from.mockReturnValue(chain);
+    render(<BusinessContextPanel />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Brand Voice" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Edit Brand Voice" }));
+    const field = screen.getByRole("textbox", { name: "Brand voice" });
+    expect(field).toHaveValue("Plain, unhurried.");
+    await userEvent.clear(field);
+    await userEvent.type(field, "Calm and precise.");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(upsert).toHaveBeenCalledWith({
+      client_id: "3f1c2b4e-5a6d-4e7f-8a9b-0c1d2e3f4a5b",
+      brand_voice: "Calm and precise.",
+    }, { onConflict: "client_id" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Saved Brand Voice.");
+  });
+});

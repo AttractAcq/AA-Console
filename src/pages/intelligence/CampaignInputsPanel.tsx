@@ -1,5 +1,5 @@
 import { CollapsiblePanel } from "../../components/CollapsiblePanel";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
@@ -7,26 +7,44 @@ import type { Database } from "../../types/database";
 type Snapshot = Database["public"]["Tables"]["campaign_intelligence_snapshots"]["Row"];
 type SourceRecord = { id: string; domain: string; title: string; body: string; updated_at: string };
 
+function campaignLabel(row: Snapshot): string {
+  if (row.acquisition_mode === "both") return `${row.paid_platform ?? "Paid"} + organic campaign`;
+  if (row.acquisition_mode === "paid") return `${row.paid_platform ?? "Paid"} campaign`;
+  if (row.acquisition_mode === "organic") return "Organic campaign";
+  return "Campaign route not recorded";
+}
+
 export function CampaignInputsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [rows, setRows] = useState<Snapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const load = useCallback(async (active: () => boolean) => {
+    if (!clientId) { setLoading(false); return; }
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: queryError } = await supabase.from("campaign_intelligence_snapshots")
+        .select("*").eq("client_id", clientId)
+        .order("captured_at", { ascending: false }).limit(50);
+      if (!active()) return;
+      if (queryError) throw queryError;
+      setRows(data ?? []);
+    } catch (cause) {
+      if (!active()) return;
+      setRows([]);
+      setError(cause && typeof cause === "object" && "message" in cause
+        ? String(cause.message) : "Snapshot read failed.");
+    }
+    setLoading(false);
+  }, [clientId]);
+
   useEffect(() => {
     let active = true;
-    if (!clientId) { setLoading(false); return; }
-    void supabase.from("campaign_intelligence_snapshots")
-      .select("*").eq("client_id", clientId)
-      .order("captured_at", { ascending: false }).limit(50)
-      .then(({ data, error: queryError }) => {
-        if (!active) return;
-        setRows(data ?? []);
-        setError(queryError?.message ?? null);
-        setLoading(false);
-      });
+    void load(() => active);
     return () => { active = false; };
-  }, [clientId]);
+  }, [load]);
 
   return <div className="space-y-5">
     <div>
@@ -36,17 +54,20 @@ export function CampaignInputsPanel() {
         A later edit to Intelligence OS does not silently change an existing plan.
       </p>
     </div>
-    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    {error && <div role="alert" className="text-sm text-destructive">
+      <p>Campaign input snapshots are unavailable: {error}</p>
+      <button type="button" className="mt-1 underline" onClick={() => void load(() => true)}>Retry</button>
+    </div>}
     {loading ? <p className="text-sm text-muted-foreground">Loading snapshots…</p>
-      : rows.length === 0 ? <p className="text-sm text-muted-foreground">No v6 campaign has captured an intelligence snapshot yet.</p>
+      : error ? null
+        : rows.length === 0 ? <p className="text-sm text-muted-foreground">No campaign has captured an intelligence snapshot yet.</p>
         : rows.map((row) => {
           const sources = Array.isArray(row.source_records)
             ? row.source_records as SourceRecord[] : [];
-          return <CollapsiblePanel key={`${clientId}:${row.id}`} title={`${row.acquisition_mode === "paid" ? `${row.paid_platform ?? "Paid"} campaign` : "Organic campaign"} · ${new Date(row.captured_at).toLocaleString()}`}>
+          return <CollapsiblePanel key={`${clientId}:${row.id}`} title={`${campaignLabel(row)} · ${new Date(row.captured_at).toLocaleString()}`}>
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <h3 className="font-semibold">{row.acquisition_mode === "paid"
-                  ? `${row.paid_platform ?? "Paid"} campaign` : "Organic campaign"}</h3>
+                <h3 className="font-semibold">{campaignLabel(row)}</h3>
                 <p className="mt-1 text-sm text-muted-foreground">Captured {new Date(row.captured_at).toLocaleString()} · {sources.length} source records</p>
               </div>
               <Link className="text-sm text-primary underline" to={`/clients/${clientId}/delivery/campaign-factory/${row.campaign_id}`}>

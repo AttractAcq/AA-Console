@@ -32,7 +32,7 @@ export const MODE_HINT: Record<string, string> = {
 export const PLACEMENT_STATUSES = [
   "drafted", "awaiting_approval", "approved", "queued", "placing",
   "awaiting_manual_placement", "bound", "placed", "verified",
-  "failed", "rejected", "retraction_required", "retracted",
+  "failed", "uncertain", "rejected", "retraction_required", "retracted",
 ] as const;
 export type PlacementStatus = (typeof PLACEMENT_STATUSES)[number];
 
@@ -117,6 +117,40 @@ export interface RetractionReceipt {
   reason: string;
   recorded_at: string;
   legacy_audit: boolean;
+}
+
+export interface ProofProviderRead {
+  id: string;
+  placement_id: string;
+  external_id: string;
+  payload_hash: string;
+  result: "live_exact_text" | "live_media_unverified" | "nonlive" |
+    "mismatch" | "not_found" | "unavailable";
+  provider_state: string | null;
+  provider_url: string | null;
+  checked_at: string;
+}
+
+export async function fetchProofProviderReads(clientId: string): Promise<Map<string, ProofProviderRead>> {
+  const { data, error } = await supabase.from("proof_placement_provider_read_latest_v8")
+    .select("id,placement_id,external_id,payload_hash,result,provider_state,provider_url,checked_at")
+    .eq("client_id", clientId);
+  if (error) throw new Error(error.message);
+  return new Map(((data ?? []) as ProofProviderRead[]).map((row) => [row.placement_id, row]));
+}
+
+export async function requestProofProviderRead(placementId: string): Promise<void> {
+  const { error } = await supabase.rpc("request_proof_placement_readback_v8", {
+    p_placement_id: placementId,
+  } as never);
+  if (error) throw new Error(error.message);
+}
+
+export async function resolveProofProviderRead(placementId: string, readId: string): Promise<void> {
+  const { error } = await supabase.rpc("resolve_proof_placement_readback_v8", {
+    p_placement_id: placementId, p_read_id: readId,
+  } as never);
+  if (error) throw new Error(error.message);
 }
 
 export interface PlacementDue {

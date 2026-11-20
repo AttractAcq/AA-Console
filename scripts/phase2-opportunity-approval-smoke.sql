@@ -10,6 +10,7 @@ insert into public.profiles(id,role,email) values
   ('cccccccc-cccc-4ccc-8ccc-cccccccccccc','client','opportunity-outsider@example.invalid');
 insert into public.clients(id,name,initials) values
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Opportunity fixture','OF');
+update public.agents set requires_upstream='{}' where agent_key='campaign_plan';
 select set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claims',
@@ -18,6 +19,8 @@ select set_config('request.jwt.claims',
 do $checks$
 declare o public.market_opportunities%rowtype;
   offer_id uuid;
+  secondary_offer public.service_offers%rowtype;
+  offer_version public.service_offer_versions%rowtype;
   request_id uuid;
   new_request uuid;
 begin
@@ -88,7 +91,13 @@ begin
   if (select status from public.approval_inbox_v6 where id = new_request) <> 'approved'
     or not public.opportunity_approval_current_v6(o.id) then
     raise exception 'Source and Inbox approval diverged'; end if;
-  perform public.create_campaign_from_opportunity_v6(o.id,'organic');
+  secondary_offer:=public.create_secondary_offer_v7(o.id);
+  offer_version:=public.create_service_offer_version_v6(o.client_id,
+    secondary_offer.service_name,'Homeowners with unused garages','A garage ready for training',
+    array['Insulation'],array['Gym equipment'],null,null,null,'[]'::jsonb,
+    'opportunity-approval-fixture-offer',secondary_offer.id);
+  perform public.approve_service_offer_version_v6(offer_version.id);
+  perform public.create_campaign_from_opportunity_v7(o.id,offer_version.id,'organic');
   if not public.opportunity_approval_current_v6(o.id) then
     raise exception 'A downstream campaign link invalidated its source approval'; end if;
   update public.opportunity_awareness_stages set message = 'Changed after approval'
@@ -97,7 +106,7 @@ begin
     or public.opportunity_approval_source_state_v6(new_request) <> 'superseded' then
     raise exception 'A changed approved opportunity remained campaign-ready'; end if;
   begin
-    perform public.create_campaign_from_opportunity_v6(o.id,'organic');
+    perform public.create_campaign_from_opportunity_v7(o.id,offer_version.id,'organic');
     raise exception 'Stale opportunity reused a campaign without a current decision';
   exception when check_violation then null; end;
   perform public.set_opportunity_status_v6(o.id,'paused','Recheck changed strategy');

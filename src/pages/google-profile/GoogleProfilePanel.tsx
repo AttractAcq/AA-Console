@@ -10,6 +10,9 @@ import { dayOrDash } from "../../lib/contentRecords";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
 import { PROFILE_FIELD_PATCH_HOLD } from "../../../agent-runtime/src/profiles/prewrite-gate.js";
+import { GoogleAdsReadPanel } from "../google-ads/GoogleAdsReadPanel";
+import { GoogleProfilePerformancePanel } from "./GoogleProfilePerformancePanel";
+import { fetchProofProviderReads, type ProofProviderRead } from "../../lib/proofDistribution";
 
 type Location = Database["public"]["Tables"]["client_google_locations"]["Row"];
 type ProfileDue = Database["public"]["Views"]["google_profile_due"]["Row"];
@@ -69,6 +72,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
   const [replyOutcomes, setReplyOutcomes] = useState<ReplyOutcome[]>([]);
   const [replyJobs, setReplyJobs] = useState<ReplyJob[]>([]);
   const [placements, setPlacements] = useState<Placement[]>([]);
+  const [providerReads, setProviderReads] = useState<ReadonlyMap<string, ProofProviderRead>>(new Map());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -90,7 +94,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
     }
     try {
       const [locs, board, proposed, profileCards, profileAttempts, profileQueued,
-        revs, reps, outcomes, jobs, place] = await Promise.all([
+        revs, reps, outcomes, jobs, place, providerReadRows] = await Promise.all([
         supabase
           .from("client_google_locations")
           .select("*")
@@ -127,6 +131,8 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           .eq("client_id", clientId)
           .eq("destination_key", "google_business_profile")
           .order("created_at", { ascending: false }),
+        tab === "posts" ? fetchProofProviderReads(clientId)
+          : Promise.resolve(new Map<string, ProofProviderRead>()),
       ]);
       for (const result of [locs, board, proposed, profileCards, profileAttempts,
         profileQueued, revs, reps, outcomes, jobs, place]) {
@@ -146,6 +152,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
       setReplyOutcomes(outcomes.data ?? []);
       setReplyJobs(jobs.data ?? []);
       setPlacements(place.data ?? []);
+      setProviderReads(providerReadRows);
       setError(null);
     } catch (cause) {
       if (isCurrent()) {
@@ -154,7 +161,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
     } finally {
       if (isCurrent()) setLoading(false);
     }
-  }, [clientId]);
+  }, [clientId, tab]);
 
   useEffect(() => {
     activeVisit.current = true;
@@ -568,9 +575,13 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
             a client gets the same testimonial twice.
           </p>
           <DataTable
-            columns={["Status", "External record", "Attempts", "When"]}
+            columns={["Status", "External record", "Provider observation", "Attempts", "When"]}
             emptyLabel={loading ? "Loading…" : "No proof has been placed on this profile"}
-            rows={placements.map((p) => [
+            rows={placements.map((p) => {
+              const read = providerReads.get(p.id);
+              const exact = read && read.external_id === p.external_id
+                && read.payload_hash === p.payload_hash;
+              return [
               <span key="s">{p.status.replace(/_/g, " ")}</span>,
               <span key="e" className="font-mono text-xs">
                 {p.external_url ? (
@@ -581,23 +592,38 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                   (p.external_id ?? "—")
                 )}
               </span>,
+              <span key="r" className="text-xs">
+                {!read ? "No provider GET recorded"
+                  : !exact ? "Provider GET is for an earlier ID or payload; current placement unverified"
+                    : `Provider GET: ${read.result.replace(/_/g, " ")} · ${dayOrDash(read.checked_at)}`}
+              </span>,
               <span key="a">{p.attempts}</span>,
               <span key="w">{dayOrDash(p.placed_at ?? p.created_at)}</span>,
-            ])}
+              ];
+            })}
           />
         </div>
       )}
 
       {tab === "metrics" && (
-        <div className="rounded-lg border border-border bg-card p-4">
-          <h3 className="font-semibold">Profile metrics</h3>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Views, searches and actions come from the Business Profile performance API, which
-            nothing in this runtime calls yet. Rather than show zeroes that look like data, this
-            says so: the ingest is the next slice, and it needs the same{" "}
-            <code className="text-xs">google_business</code> credential the rest of this page is
-            waiting on.
-          </p>
+        <div className="space-y-4">
+          <div className="rounded-lg border border-border bg-card p-4">
+            <h3 className="font-semibold">Business Profile metrics</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Daily impressions and actions come from a separate Business Profile performance read.
+              Missing dates and metrics remain unknown. This requires a verified location and a
+              current <code className="text-xs">google_business</code> credential.
+            </p>
+          </div>
+          <GoogleProfilePerformancePanel clientId={clientId} locations={locations} />
+          <div className="space-y-2">
+            <h3 className="font-semibold">Paid Google activity</h3>
+            <p className="text-sm text-muted-foreground">
+              This is the separate Google Ads customer's latest account read. It does not measure
+              Business Profile views or actions. Request a new account read in Google Ads Studio.
+            </p>
+            <GoogleAdsReadPanel clientId={clientId} readOnly />
+          </div>
         </div>
       )}
 

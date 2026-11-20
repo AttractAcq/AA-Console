@@ -148,13 +148,16 @@ export function verifySnapshot(snapshot, baseline, now = Date.now()) {
 function migrationInventory() {
   const names = readdirSync(join(sourceDir, 'migrations'))
     .filter(name => /^\d{14}_.+\.sql$/.test(name)).sort()
+  // This rehearsal is pinned to the released 551 boundary. Later candidate
+  // migrations may coexist in the repository, but must never enter its copy.
+  const reviewedNames = names.filter(name => name.slice(0, 14) <= reviewedHeadVersion)
   const canonical259 = names.find(name => name.startsWith('20261025233000_'))
   const canonical260 = names.find(name => name.startsWith('20261025235000_'))
   if (!canonical259 || !canonical260 ||
       !names.some(name => name.startsWith(`${boundaryVersion}_272_`)) ||
       !names.some(name => name.startsWith(`${finalBoundaryVersion}_279_`)) ||
-      names.length !== 568 ||
-      names.at(-1)?.slice(0, 14) !== reviewedHeadVersion ||
+      reviewedNames.length !== 568 ||
+      reviewedNames.at(-1)?.slice(0, 14) !== reviewedHeadVersion ||
       readFileSync(join(sourceDir, 'verification', 'released-migration-version.txt'), 'utf8').trim() !== reviewedHeadVersion) {
     fail('Source migration boundary changed; review and repin the workspace')
   }

@@ -98,6 +98,9 @@ export function validateEvaluation(
       // rubric, which makes the rest of the set untrustworthy too.
       return { error: `"${name || "(unnamed)"}" is not one of the scoring factors.` };
     }
+    if (name in factors) {
+      return { error: `${name} was scored twice; each factor needs one reviewed reason.` };
+    }
     if (badScore(row.score)) {
       return { error: `${name} came back as something other than a whole number from 0 to 100.` };
     }
@@ -151,6 +154,14 @@ export async function runOpportunityEvaluateJob(
     return { ok: false, retryable: false, failureMessage: "That opportunity belongs to another client." };
   }
 
+  const { data: inputHash, error: inputHashError } = await sb.rpc(
+    "opportunity_evaluation_input_hash_v7", { p_opportunity_id: job.input_id },
+  );
+  if (inputHashError) throw new Error(`Evaluation input snapshot failed: ${inputHashError.message}`);
+  if (typeof inputHash !== "string" || !/^[0-9a-f]{64}$/.test(inputHash)) {
+    return { ok: false, retryable: false, failureMessage: "Evaluation inputs could not be fingerprinted." };
+  }
+
   const { data: factorRows, error: factorError } = await sb
     .from("opportunity_score_factors")
     .select("factor, weight, label")
@@ -171,23 +182,25 @@ export async function runOpportunityEvaluateJob(
 
   // The evidence. Same records discovery reasons from, because a score that
   // cannot point at why is the thing a person is being asked to trust.
-  const { data: records } = await sb
+  const { data: records, error: recordsError } = await sb
     .from("client_agent_records")
     .select("domain, title, body")
     .eq("client_id", job.client_id)
     .in("domain", ["market", "icp", "association", "competitor", "money_model"])
     .order("created_at", { ascending: true })
     .limit(40);
+  if (recordsError) throw new Error(`Intelligence lookup failed: ${recordsError.message}`);
   const evidence = (records ?? []).map(
     (row) =>
       `(${String((row as { domain: string }).domain)}) ${String((row as { title?: string }).title ?? "")}\n${String((row as { body?: string }).body ?? "")}`,
   );
 
-  const { data: offers } = await sb
+  const { data: offers, error: offersError } = await sb
     .from("service_offers")
     .select("name, kind")
     .eq("client_id", job.client_id)
     .limit(10);
+  if (offersError) throw new Error(`Offer lookup failed: ${offersError.message}`);
   const offerLines = (offers ?? []).map(
     (o) => `${String((o as { name?: string }).name ?? "")} (${String((o as { kind?: string }).kind ?? "main")})`,
   ).filter((line) => line.trim().length > 1);
@@ -298,27 +311,25 @@ ${evidence.length > 0 ? `INTELLIGENCE RECORDS\n${evidence.join("\n\n")}` : "Ther
     return { ok: false, retryable: false, failureMessage: `${checked.error} Nothing was saved.`, usage };
   }
 
-  // An earlier open proposal for the same opportunity is superseded rather
-  // than left decidable. Two open score cards for one opportunity is a person
-  // choosing between drafts they have no way to tell apart.
-  const { error: supersedeError } = await sb
-    .from("opportunity_proposals")
-    .update({ resolution: "superseded", resolved_at: new Date().toISOString() })
-    .eq("opportunity_id", job.input_id)
-    .eq("kind", "score")
-    .eq("resolution", "open");
-  if (supersedeError) throw new Error(`Could not supersede the previous proposal: ${supersedeError.message}`);
+  const { data: currentHash, error: currentHashError } = await sb.rpc(
+    "opportunity_evaluation_input_hash_v7", { p_opportunity_id: job.input_id },
+  );
+  if (currentHashError) throw new Error(`Evaluation input recheck failed: ${currentHashError.message}`);
+  if (currentHash !== inputHash) {
+    return { ok: false, retryable: false,
+      failureMessage: "The opportunity or its sources changed during evaluation. Request a new run; nothing was saved.",
+      usage };
+  }
 
-  const { error: insertError } = await sb.from("opportunity_proposals").insert({
-    opportunity_id: job.input_id,
-    client_id: job.client_id,
-    kind: "score",
-    payload: { factors: checked.factors, reasoning: checked.reasoning },
-    rationale: checked.rationale,
-    proposed_by: agent.agent_key,
-    proposed_by_job_id: job.id,
+  const { error: saveError } = await sb.rpc("save_opportunity_score_proposal_v7", {
+    p_opportunity_id: job.input_id,
+    p_client_id: job.client_id,
+    p_job_id: job.id,
+    p_payload: { factors: checked.factors, reasoning: checked.reasoning, input_hash: inputHash },
+    p_rationale: checked.rationale,
+    p_proposed_by: agent.agent_key,
   });
-  if (insertError) throw new Error(`Could not save the proposal: ${insertError.message}`);
+  if (saveError) throw new Error(`Could not save the proposal: ${saveError.message}`);
 
   await appendEvent(
     sb,

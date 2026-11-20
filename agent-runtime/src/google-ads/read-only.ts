@@ -13,6 +13,7 @@ export interface GoogleCampaignRead {
   name: string;
   status: string;
   channel: string;
+  metrics_observed: boolean;
   impressions: string;
   clicks: string;
   cost_micros: string;
@@ -29,6 +30,7 @@ export interface GoogleAdRead {
   final_urls: string[];
   headlines: string[];
   descriptions: string[];
+  metrics_observed: boolean;
   impressions: string;
   clicks: string;
   cost_micros: string;
@@ -210,7 +212,7 @@ export async function readGoogleAdsAccount(
       throw new GoogleAdsReadError("Google Ads returned an incomplete campaign record.", false);
     }
     const metric = byId.get(id) ?? {};
-    return { id, name, status, channel,
+    return { id, name, status, channel, metrics_observed: byId.has(id),
       impressions: nonnegative(metric.impressions, "impressions"),
       clicks: nonnegative(metric.clicks, "clicks"),
       cost_micros: nonnegative(metric.costMicros, "cost"),
@@ -245,6 +247,7 @@ export async function readGoogleAdsAccount(
       ad_id:adId, status:groupAd.status, ad_type:ad.type,
       final_urls:urls(ad.finalUrls), headlines:textAssets(rsa?.headlines,"ad headlines"),
       descriptions:textAssets(rsa?.descriptions,"ad descriptions"),
+      metrics_observed:adMetricByName.has(name),
       impressions:nonnegative(metric.impressions,"ad impressions"),
       clicks:nonnegative(metric.clicks,"ad clicks"),
       cost_micros:nonnegative(metric.costMicros,"ad cost"),

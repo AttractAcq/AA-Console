@@ -106,6 +106,10 @@ beforeEach(async () => {
    repeat('a',64),'Cut their response time in half');
  insert into proof_artifact_signoffs values('${ARTIFACT}','${CLIENT}');`);
   await db.exec(await migration());
+  await db.exec(await readFile(new URL(
+    "../../supabase/migrations/20261124042800_593_proof_placement_uncertain_outcome.sql",
+    import.meta.url,
+  ), "utf8"));
   // Everything that makes a placement possible, so each test can switch off
   // exactly the one thing it is about.
   await db.exec(`
@@ -415,6 +419,46 @@ describe("rights ending", () => {
       "not edited",
     );
     await expect(db.exec("delete from proof_placement_events")).rejects.toThrow("not edited");
+  });
+});
+
+describe("an uncertain Business Profile effect", () => {
+  it("keeps a possible public post and its ID out of automatic retry", async () => {
+    const { id } = await approved("uncertain-post", "google_business_profile");
+    await db.exec("set test.role = 'service_role'");
+    await db.query("select * from claim_proof_placements(5)");
+    await db.exec("set test.role = 'authenticated'");
+    await expect(db.query("select record_proof_placement_uncertain_v8($1,$2)",
+      [id, "forged result"])).rejects.toThrow("Only the proof placer");
+    await db.exec("set test.role = 'service_role'");
+    await db.query("select record_proof_placement_uncertain_v8($1,$2,$3,$4)", [
+      id, "Provider acknowledged but local receipt failed.",
+      "accounts/123/locations/456/localPosts/7", null,
+    ]);
+    expect(await one<{ status: string; external_id: string; lease_until: string | null }>(
+      "select status,external_id,lease_until from proof_placements where id=$1", [id],
+    )).toMatchObject({ status: "uncertain",
+      external_id: "accounts/123/locations/456/localPosts/7", lease_until: null });
+    expect(await rows("select * from claim_proof_placements(5)")).toHaveLength(0);
+    await expect(db.query("select record_proof_placement_failure($1,$2,true)",
+      [id, "retry"])).rejects.toThrow("not being placed");
+    expect(await one<{ event: string }>(
+      "select event from proof_placement_events where placement_id=$1 order by occurred_at desc,id desc limit 1",
+      [id],
+    )).toMatchObject({ event: "uncertain" });
+  });
+
+  it("reaps an expired lease as uncertain, not a failed retriable post", async () => {
+    const { id } = await approved("stale-post", "google_business_profile");
+    await db.exec("set test.role = 'service_role'");
+    await db.query("select * from claim_proof_placements(5)");
+    await db.query("update proof_placements set lease_until=now()-interval '1 minute' where id=$1", [id]);
+    expect(await one<{ reap_stale_proof_placement_claims: number }>(
+      "select reap_stale_proof_placement_claims()",
+    )).toMatchObject({ reap_stale_proof_placement_claims: 1 });
+    expect(await one<{ status: string }>(
+      "select status from proof_placements where id=$1", [id],
+    )).toMatchObject({ status: "uncertain" });
   });
 });
 

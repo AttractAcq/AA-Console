@@ -14,9 +14,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   fetchCapturedLeads, fetchEndpoints, fetchSubmissions, createEndpoint, setEndpointEnabled,
+  fetchArchivedReturnPacket, resolveArchivedReturn, fetchArchivedReturnBatchPacket,
+  resolveArchivedReturnBatch,
 } = vi.hoisted(() => ({
   fetchCapturedLeads: vi.fn(), fetchEndpoints: vi.fn(), fetchSubmissions: vi.fn(),
   createEndpoint: vi.fn(), setEndpointEnabled: vi.fn(),
+  fetchArchivedReturnPacket: vi.fn(), resolveArchivedReturn: vi.fn(),
+  fetchArchivedReturnBatchPacket: vi.fn(),
+  resolveArchivedReturnBatch: vi.fn(),
+}));
+
+vi.mock("../../lib/archivedReturnBatch", () => ({
+  fetchArchivedReturnBatchPacket, resolveArchivedReturnBatch,
 }));
 
 vi.mock("../../lib/leadCapture", async () => {
@@ -24,6 +33,7 @@ vi.mock("../../lib/leadCapture", async () => {
   return {
     ...actual,
     fetchCapturedLeads, fetchEndpoints, fetchSubmissions, createEndpoint, setEndpointEnabled,
+    fetchArchivedReturnPacket, resolveArchivedReturn,
   };
 });
 vi.mock("../../lib/supabase", () => ({
@@ -87,6 +97,23 @@ beforeEach(() => {
   });
   fetchSubmissions.mockResolvedValue([submission()]);
   createEndpoint.mockResolvedValue({ endpointId: "end-2", token: "f".repeat(64) });
+  fetchArchivedReturnPacket.mockResolvedValue({
+    source_hash: "a".repeat(64), submission_id: "sub-1", archived_lead_id: "arch-1",
+    archived_name: "Jay Okafor", archived_stage: "shown",
+    archived_email: "jay@example.test", archived_phone: null, archived_source: "page_form",
+    archived_at: "2026-10-23T09:00:00Z", submitted_name: "Jay Okafor",
+    submitted_email: "jay@example.test", submitted_phone: null,
+    submitted_at: "2026-10-24T09:14:00Z", consent_wording: "I agree.",
+    source_snapshot: { purpose: "page_form", source_channel: "paid_search" },
+    route_package_id: "route-1", click_id: "click-1",
+  });
+  resolveArchivedReturn.mockResolvedValue("arch-1");
+  fetchArchivedReturnBatchPacket.mockResolvedValue({
+    archived_lead_id: "arch-1", archived_name: "Jay Okafor", source_hash: "b".repeat(64),
+    source_count: 1, dm_count: 0, decision_state: "single_source",
+    blocker: "One source is pending.", sources: [], dms: [],
+  });
+  resolveArchivedReturnBatch.mockResolvedValue("lead-new");
 });
 
 describe("who arrived", () => {
@@ -218,7 +245,7 @@ describe("what did not become a lead", () => {
     ]);
     render(<LeadCapturePanel />);
     expect(
-      await screen.findByText("Came in without creating a lead"),
+      await screen.findByText("Submissions needing attention"),
     ).toBeInTheDocument();
     expect(screen.getByText("No consent given.")).toBeInTheDocument();
   });
@@ -227,7 +254,79 @@ describe("what did not become a lead", () => {
     render(<LeadCapturePanel />);
     await screen.findByText("Jay Okafor");
     expect(
-      screen.queryByText("Came in without creating a lead"),
+      screen.queryByText("Submissions needing attention"),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows the exact archived-return packet and records the selected review", async () => {
+    const user = userEvent.setup();
+    fetchSubmissions.mockResolvedValue([submission({
+      status: "received", lead_id: null, archive_match_lead_id: "arch-1",
+    })]);
+    render(<LeadCapturePanel />);
+    await user.click(await screen.findByRole("button", { name: "Review return" }));
+    expect(await screen.findByText(/Captured source: paid_search/)).toBeInTheDocument();
+    expect(screen.getByText(/Consent: I agree/)).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText(/Reviewed outcome/), "recover");
+    await user.type(screen.getByLabelText(/Reason for this decision/),
+      "Same continuing customer relationship");
+    await user.click(screen.getByRole("button", { name: "Record AAL2 decision" }));
+    await waitFor(() => expect(resolveArchivedReturn).toHaveBeenCalledWith({
+      submissionId: "sub-1", action: "recover", sourceHash: "a".repeat(64),
+      reason: "Same continuing customer relationship",
+    }));
+  });
+
+  it("holds a form decision when another arrival shares the archived identity", async () => {
+    fetchSubmissions.mockResolvedValue([submission({
+      status: "received", lead_id: null, archive_match_lead_id: "arch-1",
+    })]);
+    fetchArchivedReturnBatchPacket.mockResolvedValue({
+      archived_lead_id: "arch-1", archived_name: "Jay Okafor", source_hash: "c".repeat(64),
+      source_count: 2, dm_count: 1, decision_state: "grouped_hold",
+      blocker: "All arrivals need one exact coordinated AAL2 identity decision.",
+      sources: [
+        { kind: "form", submission_id: "sub-1", submitted_name: "Jay Okafor" },
+        { kind: "sales_agent", conversation_id: "conv-2", current_name: "Jay returns" },
+      ],
+      dms: [{ conversation_id: "dm-3", platform: "instagram", last_inbound_at: null }],
+    });
+    render(<LeadCapturePanel />);
+    await userEvent.click(await screen.findByRole("button", { name: "Review return" }));
+    expect(await screen.findByRole("dialog", { name: "Related archived-contact arrivals" })).toBeInTheDocument();
+    expect(screen.getByText("Jay returns")).toBeInTheDocument();
+    expect(screen.getByText(/Held instagram DM/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Record AAL2 decision" })).not.toBeInTheDocument();
+    expect(fetchArchivedReturnPacket).not.toHaveBeenCalled();
+  });
+
+  it("reviews a grouped form and sales return through one decision", async () => {
+    fetchSubmissions.mockResolvedValue([submission({
+      status: "received", lead_id: null, archive_match_lead_id: "arch-1",
+    })]);
+    fetchArchivedReturnBatchPacket.mockResolvedValue({
+      archived_lead_id: "arch-1", archived_name: "Jay Okafor", source_hash: "d".repeat(64),
+      source_count: 2, dm_count: 0, decision_state: "grouped_hold",
+      blocker: "All arrivals need one exact coordinated AAL2 identity decision.",
+      sources: [
+        { kind: "form", submission_id: "sub-1", submitted_name: "Jay Okafor",
+          consent_wording: "I agree." },
+        { kind: "sales_agent", conversation_id: "conv-2", current_name: "Jay returns" },
+      ], dms: [],
+    });
+    const user = userEvent.setup();
+    render(<LeadCapturePanel />);
+    await user.click(await screen.findByRole("button", { name: "Review return" }));
+    expect(await screen.findByText(/Consent: I agree/)).toBeInTheDocument();
+    await user.selectOptions(screen.getByRole("combobox", { name: "Reviewed outcome" }), "new_lead");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Primary source for attribution" }), "form:sub-1");
+    await user.type(screen.getByRole("textbox", { name: "Reason for this decision" }),
+      "This is one new relationship");
+    await user.click(screen.getByRole("button", { name: "Record grouped AAL2 decision" }));
+    await waitFor(() => expect(resolveArchivedReturnBatch).toHaveBeenCalledWith({
+      archivedLeadId: "arch-1", action: "new_lead", sourceHash: "d".repeat(64),
+      reason: "This is one new relationship", primaryKind: "form", primaryId: "sub-1",
+    }));
+    expect(resolveArchivedReturn).not.toHaveBeenCalled();
   });
 });
