@@ -9,7 +9,9 @@ if (!irPath || !timingsPath) throw new Error("Usage: npm run render:ir -- <ir.js
 const ir = JSON.parse(await readFile(resolve(root, irPath), "utf8"));
 const timings = JSON.parse(await readFile(resolve(root, timingsPath), "utf8"));
 const aspects = requestedAspects.length ? requestedAspects : ir.aspects;
-if (!Array.isArray(ir.aspects) || aspects.some((aspect) => !ir.aspects.includes(aspect))) throw new Error("Requested aspect is absent from the IR");
+if (!Array.isArray(ir.aspects) || aspects.some((aspect) => !["16:9", "9:16", "1:1"].includes(aspect) || !ir.aspects.includes(aspect))) {
+  throw new Error("Requested aspect is invalid or absent from the IR");
+}
 const outDir = resolve(process.env.AA_VIDEO_OUT_DIR ?? resolve(root, "out"));
 await mkdir(outDir, { recursive: true });
 const tempDir = await mkdtemp(resolve(tmpdir(), "aa-video-ir-"));
