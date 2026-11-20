@@ -22,6 +22,7 @@ export function CampaignProductionOverview() {
   const [packages, setPackages] = useState<Map<string, RoutePackage>>(new Map());
   const [work, setWork] = useState<Map<string, Work>>(new Map());
   const [error, setError] = useState<string | null>(null);
+  const [loadedClientId, setLoadedClientId] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
 
   useEffect(() => {
@@ -33,16 +34,16 @@ export function CampaignProductionOverview() {
         .not("built_at", "is", null).is("archived_at", null)
         .order("created_at", { ascending: false }).limit(8);
       if (!active) return;
-      if (recent.error) { setError(recent.error.message); return; }
+      if (recent.error) { setError(recent.error.message); setLoadedClientId(clientId); return; }
       const campaigns = (recent.data ?? []) as Campaign[];
-      if (!campaigns.length) { setCampaigns([]); setDemand([]); setPackages(new Map()); setWork(new Map()); setError(null); return; }
+      if (!campaigns.length) { setCampaigns([]); setDemand([]); setPackages(new Map()); setWork(new Map()); setError(null); setLoadedClientId(clientId); return; }
       const ids = campaigns.map((campaign) => campaign.id);
       const routes = await supabase.from("campaign_route_packages_v6")
         .select("id, campaign_id, route, version")
         .eq("client_id", clientId).in("campaign_id", ids)
         .order("version", { ascending: false });
       if (!active) return;
-      if (routes.error) { setError(routes.error.message); return; }
+      if (routes.error) { setError(routes.error.message); setLoadedClientId(clientId); return; }
       const latest = new Map<string, RoutePackage>();
       for (const row of (routes.data ?? []) as RoutePackage[]) {
         const key = `${row.campaign_id}:${row.route}`;
@@ -51,7 +52,7 @@ export function CampaignProductionOverview() {
       const packageById = new Map([...latest.values()].map((row) => [row.id, row]));
       const packageIds = [...packageById.keys()];
       if (!packageIds.length) {
-        setCampaigns(campaigns); setDemand([]); setPackages(new Map()); setWork(new Map()); setError(null); return;
+        setCampaigns(campaigns); setDemand([]); setPackages(new Map()); setWork(new Map()); setError(null); setLoadedClientId(clientId); return;
       }
       const [counts, workResult] = await Promise.all([
         supabase.from("production_demand_counts_v8")
@@ -65,6 +66,7 @@ export function CampaignProductionOverview() {
       if (!active) return;
       if (counts.error || workResult.error) {
         setError(counts.error?.message ?? workResult.error?.message ?? "Campaign production is unavailable.");
+        setLoadedClientId(clientId);
         return;
       }
       setCampaigns(campaigns);
@@ -72,12 +74,16 @@ export function CampaignProductionOverview() {
       setPackages(packageById);
       setWork(new Map(((workResult.data ?? []) as Work[]).map((row) => [row.id, row])));
       setError(null);
+      setLoadedClientId(clientId);
     };
     void load();
     return () => { active = false; };
   }, [clientId, refreshToken]);
 
   if (!clientId) return null;
+  if (loadedClientId !== clientId) return <section className="mb-5 rounded-lg border border-border bg-card p-4"
+    aria-label="Campaign production requests"><h2 className="font-semibold">Campaign production requests</h2>
+    <p className="mt-2 text-xs text-muted-foreground">Loading campaign work…</p></section>;
   return <section className="mb-5 rounded-lg border border-border bg-card p-4" aria-label="Campaign production requests">
     <div className="flex items-center justify-between gap-2">
       <h2 className="font-semibold">Campaign production requests</h2>
@@ -88,7 +94,7 @@ export function CampaignProductionOverview() {
     {!error && !demand.length && <p className="mt-2 text-xs text-muted-foreground">
       {campaigns.length ? "No campaign assets have been requested yet. Generate Assets from an approved campaign plan." : "No planned campaigns for this client."}
     </p>}
-    {campaigns.filter((campaign) => demand.some((row) => row.campaign_id === campaign.id))
+    {!error && campaigns.filter((campaign) => demand.some((row) => row.campaign_id === campaign.id))
       .map((campaign) => <div key={campaign.id} className="mt-3">
         <h3 className="text-sm font-medium"><Link className="text-brand-strong underline" to={`/clients/${clientId}/delivery/campaign-factory/${campaign.id}`}>{campaign.name}</Link></h3>
         <ul className="mt-1 space-y-2 text-xs text-muted-foreground">

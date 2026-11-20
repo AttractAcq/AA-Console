@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { expect, it, vi } from "vitest";
 
 const { from, inFilter } = vi.hoisted(() => ({ from: vi.fn(), inFilter: vi.fn() }));
@@ -47,4 +47,35 @@ it("shows campaign requests and blockers from the shared production records", as
   const readsBeforeRefresh = from.mock.calls.length;
   fireEvent.click(screen.getByRole("button", { name: "Refresh campaign work" }));
   await waitFor(() => expect(from.mock.calls.length).toBeGreaterThan(readsBeforeRefresh));
+});
+
+it("hides the previous client's campaign work while another client loads", async () => {
+  let campaignReads = 0;
+  from.mockImplementation((table: string) => {
+    if (table === "client_campaigns") {
+      campaignReads++;
+      if (campaignReads > 1) {
+        const pending = { select: () => pending, eq: () => pending, not: () => pending,
+          is: () => pending, order: () => pending, limit: () => pending,
+          then: () => new Promise(() => {}) };
+        return pending;
+      }
+      return rows([{ id: "campaign-1", name: "Client One Campaign" }]);
+    }
+    if (table === "campaign_route_packages_v6")
+      return rows([{ id: "route-1", campaign_id: "campaign-1", route: "organic", version: 1 }]);
+    if (table === "production_demand_counts_v8")
+      return rows([{ demand_id: "work-1", campaign_id: "campaign-1", route_package_id: "route-1",
+        piece_key: "piece1", attempts: 0, produced: 0, rejected: 0, revised: 0,
+        workflow_accepted: 0, human_approved: 0 }]);
+    return rows([]);
+  });
+  render(<MemoryRouter initialEntries={["/clients/client-1"]}><Routes>
+    <Route path="/clients/:clientId" element={<><Link to="/clients/client-2">Switch client</Link>
+      <CampaignProductionOverview /></>} />
+  </Routes></MemoryRouter>);
+  expect(await screen.findByRole("link", { name: "Client One Campaign" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("link", { name: "Switch client" }));
+  expect(screen.queryByRole("link", { name: "Client One Campaign" })).not.toBeInTheDocument();
+  expect(screen.getByText("Loading campaign work…")).toBeInTheDocument();
 });
