@@ -24,6 +24,7 @@ import { loadIdentity, identityWriterBlock } from "../identity.js";
 import { loadUsableProof, renderProof, proofIdForRef } from "../proof.js";
 import { completeMissingFinalReelCaption, reelBriefProblem, reelCopyProblem, reelPlannerNote } from "./shots.js";
 import { loadBrandProfile } from "../creative_build/brand.js";
+import { loadCampaignBriefContext } from "./campaign-context.js";
 
 export async function runBriefJob(
   sb: SupabaseClient,
@@ -111,13 +112,15 @@ export async function runBriefJob(
 
   const { data: idea, error: ideaError } = await sb
     .from("client_ideas")
-    .select("id, title, body, media_type, content_territory, source_question, strategic_reason, content_format, target_platform")
+    .select("id, title, body, media_type, content_territory, source_question, strategic_reason, content_format, target_platform, campaign_id")
     .eq("id", ideaId)
     .maybeSingle();
   if (ideaError) throw new Error(`Failed to load idea: ${ideaError.message}`);
   if (!idea) {
     return { ok: false, retryable: false, failureMessage: "That idea no longer exists." };
   }
+  const campaignContext = await loadCampaignBriefContext(sb, job.client_id, idea.campaign_id);
+  if (campaignContext.blocker) return { ok: false, retryable: false, failureMessage: campaignContext.blocker };
 
   // Per-idea retrieval, not the whole corpus — same discipline as
   // ideation, and the reason the architecture calls this "progressive
@@ -210,6 +213,7 @@ Core idea: ${idea.body ?? ""}
 ${idea.source_question ? `Answers this buyer question: ${idea.source_question}` : ""}
 ${idea.strategic_reason ? `Why it matters: ${idea.strategic_reason}` : ""}
 ${idea.content_territory ? `Content territory: ${idea.content_territory}` : ""}
+${campaignContext.text ? `\n${campaignContext.text}\n` : ""}
 ${contentFormat === "reel"
     ? reelPlannerNote()
     : `Format: ${idea.media_type}${idea.content_format && idea.content_format !== "single" ? ` — produced as a ${idea.content_format}, which is an ordered set of frames rather than one picture` : ""}`}

@@ -963,13 +963,13 @@ function CampaignExecutionPanelContent() {
               {c.built_at && (
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4">
                   <div>
-                    <p className="text-sm font-medium">Sweep into work</p>
+                    <p className="text-sm font-medium">{c.campaign_kind ? "Generate selected assets" : "Sweep into work"}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {c.plan_approved_at === null
-                        ? "Approve the plan first. A sweep is the moment a plan becomes work, so it refuses an unreviewed one."
+                        ? "Approve the plan first. Generation uses the reviewed routes, formats and counts."
                         : sweeping.has(c.id)
                           ? "A sweep of this campaign is queued. One at a time, so two sweeps cannot compose the same steps twice."
-                          : `Prepares ${c.content_count} ${c.content_count === 1 ? "piece" : "pieces"} of planned content${c.needs_landing_page ? ", a page" : ""}${c.needs_sales_agent ? ", a sales agent" : ""}${c.needs_lead_magnet ? ", and a lead magnet PDF" : ""}. Each output stops for review before public use.`}
+                          : `Prepares ${c.content_count} ${c.content_count === 1 ? "piece" : "pieces"} of planned content${c.campaign_kind && contentSpec ? ` (${contentSpec.map((piece) => `${piece.route} ${piece.platform} ${piece.media_type} ${piece.content_format}`).join("; ")})` : ""}${c.needs_landing_page ? ", a page" : ""}${c.needs_sales_agent ? ", a sales agent" : ""}${c.needs_lead_magnet ? ", and a lead magnet PDF" : ""}. Each output stops for review before public use.`}
                     </p>
                   </div>
                   <button
@@ -978,7 +978,7 @@ function CampaignExecutionPanelContent() {
                     disabled={busy || c.plan_approved_at === null || sweeping.has(c.id)}
                     onClick={() => void sweep(c)}
                   >
-                    {sweeping.has(c.id) ? "Sweeping…" : "Sweep into work"}
+                    {sweeping.has(c.id) ? "Sweeping…" : c.campaign_kind ? "Generate Assets" : "Sweep into work"}
                   </button>
                 </div>
               )}

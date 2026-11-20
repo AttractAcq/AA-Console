@@ -1216,6 +1216,16 @@ describe("sweeping a plan into work", () => {
     ...over,
   });
 
+  it("offers one Generate Assets action for an approved typed campaign", async () => {
+    show([approved({ campaign_kind: "standalone_organic", acquisition_mode: "organic",
+      needs_landing_page: false, needs_sales_agent: false, needs_lead_magnet: false })]);
+    await open();
+    await userEvent.click(await plan().findByRole("button", { name: "Generate Assets" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_campaign_sweep_v6",
+      { p_campaign_id: "camp-1" }));
+    expect(rpc).not.toHaveBeenCalledWith("create_workflow_run", expect.anything());
+  });
+
   it("will not sweep an unreviewed plan, and says why", async () => {
     // A sweep is the moment a plan becomes work, so 309's gate is exactly what
     // it has to respect. The button says so rather than letting a person press
