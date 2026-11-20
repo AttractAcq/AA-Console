@@ -29644,6 +29644,92 @@ export type Database = {
           },
         ]
       }
+      video_project_render_attempts_v1: {
+        Row: {
+          aspect: string
+          bucket_name: string | null
+          claimed_at: string
+          client_id: string
+          error_code: string | null
+          finished_at: string | null
+          function_name: string | null
+          id: string
+          ir_version: number
+          job_id: string
+          out_name: string | null
+          project_id: string
+          region: string | null
+          render_id: string | null
+          started_at: string | null
+          state: string
+        }
+        Insert: {
+          aspect: string
+          bucket_name?: string | null
+          claimed_at?: string
+          client_id: string
+          error_code?: string | null
+          finished_at?: string | null
+          function_name?: string | null
+          id?: string
+          ir_version: number
+          job_id: string
+          out_name?: string | null
+          project_id: string
+          region?: string | null
+          render_id?: string | null
+          started_at?: string | null
+          state?: string
+        }
+        Update: {
+          aspect?: string
+          bucket_name?: string | null
+          claimed_at?: string
+          client_id?: string
+          error_code?: string | null
+          finished_at?: string | null
+          function_name?: string | null
+          id?: string
+          ir_version?: number
+          job_id?: string
+          out_name?: string | null
+          project_id?: string
+          region?: string | null
+          render_id?: string | null
+          started_at?: string | null
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_project_render_attempts_v1_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_render_attempts_v1_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_project_render_attempts_v1_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_project_render_attempts_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
       video_projects: {
         Row: {
           aspects: string[]
@@ -40939,6 +41025,15 @@ export type Database = {
         Args: { p_issued_at: string; p_nonce_hash: string }
         Returns: boolean
       }
+      claim_video_project_render_v1: {
+        Args: {
+          p_aspect: string
+          p_ir_version: number
+          p_job_id: string
+          p_project_id: string
+        }
+        Returns: Json
+      }
       client_authority_assignment_hash_v6: {
         Args: {
           q: Database["public"]["Tables"]["client_authority_assignment_reviews_v6"]["Row"]
@@ -44334,6 +44429,10 @@ export type Database = {
         Args: { p_reservation_id: string }
         Returns: boolean
       }
+      mark_video_project_render_uncertain_v1: {
+        Args: { p_attempt_id: string; p_code: string; p_job_id: string }
+        Returns: boolean
+      }
       master_ai_describe_table: {
         Args: { p_table: string }
         Returns: {
@@ -46480,6 +46579,18 @@ export type Database = {
           p_usd: number
         }
         Returns: string
+      }
+      record_video_project_lambda_handle_v1: {
+        Args: {
+          p_attempt_id: string
+          p_bucket_name: string
+          p_function_name: string
+          p_job_id: string
+          p_out_name: string
+          p_region: string
+          p_render_id: string
+        }
+        Returns: boolean
       }
       record_video_project_music_cost_v1: {
         Args: {
