@@ -29495,6 +29495,8 @@ export type Database = {
         Row: {
           aspects: string[]
           audience: string | null
+          brief_id: string | null
+          campaign_id: string | null
           client_id: string
           cost_usd: number
           created_at: string
@@ -29506,7 +29508,10 @@ export type Database = {
           ir_version: number
           music_path: string | null
           music_prompt: string | null
+          request_hash: string | null
+          request_key: string | null
           research: Json | null
+          route_package_id: string | null
           script: Json | null
           stage: string
           stage_error: string | null
@@ -29517,6 +29522,8 @@ export type Database = {
         Insert: {
           aspects?: string[]
           audience?: string | null
+          brief_id?: string | null
+          campaign_id?: string | null
           client_id: string
           cost_usd?: number
           created_at?: string
@@ -29528,7 +29535,10 @@ export type Database = {
           ir_version?: number
           music_path?: string | null
           music_prompt?: string | null
+          request_hash?: string | null
+          request_key?: string | null
           research?: Json | null
+          route_package_id?: string | null
           script?: Json | null
           stage?: string
           stage_error?: string | null
@@ -29539,6 +29549,8 @@ export type Database = {
         Update: {
           aspects?: string[]
           audience?: string | null
+          brief_id?: string | null
+          campaign_id?: string | null
           client_id?: string
           cost_usd?: number
           created_at?: string
@@ -29550,7 +29562,10 @@ export type Database = {
           ir_version?: number
           music_path?: string | null
           music_prompt?: string | null
+          request_hash?: string | null
+          request_key?: string | null
           research?: Json | null
+          route_package_id?: string | null
           script?: Json | null
           stage?: string
           stage_error?: string | null
@@ -29559,6 +29574,69 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "video_projects_brief_client_fk"
+            columns: ["brief_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_briefs"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_projects_brief_client_fk"
+            columns: ["brief_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive"
+            referencedColumns: ["brief_id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_projects_campaign_client_fk"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_projects_campaign_client_fk"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_projects_campaign_client_fk"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_projects_campaign_client_fk"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_projects_campaign_client_fk"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_projects_campaign_client_fk"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_projects_campaign_client_fk"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
           {
             foreignKeyName: "video_projects_client_id_fkey"
             columns: ["client_id"]
@@ -29586,6 +29664,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_projects_route_client_fk"
+            columns: ["route_package_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_route_packages_v6"
+            referencedColumns: ["id", "campaign_id", "client_id"]
           },
         ]
       }
@@ -42206,6 +42291,53 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "client_campaigns"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_video_project_draft_v1: {
+        Args: {
+          p_aspects?: string[]
+          p_audience?: string
+          p_brief_id?: string
+          p_campaign_id?: string
+          p_client_id: string
+          p_idea: string
+          p_request_key?: string
+          p_route_package_id?: string
+          p_target_length_sec?: number
+          p_tone?: string
+        }
+        Returns: {
+          aspects: string[]
+          audience: string | null
+          brief_id: string | null
+          campaign_id: string | null
+          client_id: string
+          cost_usd: number
+          created_at: string
+          created_by: string | null
+          critic_reports: Json
+          id: string
+          idea: string
+          ir: Json | null
+          ir_version: number
+          music_path: string | null
+          music_prompt: string | null
+          request_hash: string | null
+          request_key: string | null
+          research: Json | null
+          route_package_id: string | null
+          script: Json | null
+          stage: string
+          stage_error: string | null
+          target_length_sec: number
+          tone: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "video_projects"
           isOneToOne: true
           isSetofReturn: false
         }
