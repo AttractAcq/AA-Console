@@ -1,5 +1,4 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { ChevronRight, Trash2 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
@@ -14,6 +13,7 @@ import { formatLabel } from "../../lib/contentFormat";
 import { cn } from "../../lib/cn";
 import { RegenerateAction } from "../../components/RegenerateAction";
 import { requestOrdinaryMediaReview } from "../../lib/creativeReview";
+import { CodeVideoProjectsPanel } from "../motion/CodeVideoProjectsPanel";
 
 type Idea = Database["public"]["Tables"]["client_ideas"]["Row"];
 type Brief = Database["public"]["Tables"]["client_briefs"]["Row"];
@@ -68,6 +68,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
   // pattern CampaignExecutionPanel uses for campaign cards.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [openAssetActions, setOpenAssetActions] = useState<string | null>(null);
+  const [openVideoBriefId, setOpenVideoBriefId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -406,19 +407,25 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
 
           {ideaBriefs.map((brief) => {
             const briefAssets = assetsByBrief.get(brief.id) ?? [];
+            const videoWorkspaceAvailable = Boolean(route && brief.media_type === "video"
+              && brief.source_idea_id
+              && ["approved", "in_production", "complete"].includes(brief.status));
             return <div key={brief.id} className="ml-3 space-y-2 border-l border-border pl-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs text-muted-foreground">Brief</span>
                 <button type="button" className="text-sm text-brand-strong hover:underline" onClick={() => setViewing(brief)}>{brief.title}</button>
                 <span className="text-xs text-muted-foreground">{brief.status.replace(/_/g, " ")}</span>
                 {(brief.status === "draft" || brief.status === "approved") && <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => setBuilding(brief)}>Approve &amp; Build</button>}
-                {route && brief.media_type === "video" && brief.status === "approved"
-                  && brief.source_idea_id && <Link className="text-xs text-brand-strong underline"
-                    to={`/clients/${clientId}/delivery/content-production-factory?${new URLSearchParams({
-                      tab: "generation", videoBrief: brief.id,
-                      videoCampaign: campaignId, videoRoute: route,
-                    })}`}>Start code video for {route} route</Link>}
+                {videoWorkspaceAvailable && <button type="button" className={buttonClass}
+                    aria-expanded={openVideoBriefId === brief.id}
+                    onClick={() => setOpenVideoBriefId((current) => current === brief.id ? null : brief.id)}>
+                    {openVideoBriefId === brief.id ? "Hide code video"
+                      : `${brief.status === "approved" ? "Start" : "Open"} code video for ${route} route`}
+                  </button>}
               </div>
+              {videoWorkspaceAvailable && route && openVideoBriefId === brief.id
+                && <CodeVideoProjectsPanel key={`${campaignId}:${brief.id}`}
+                  campaignBinding={{ briefId: brief.id, campaignId, route }} />}
               {briefAssets.length === 0 && brief.status === "in_production" && <p className="text-xs text-muted-foreground">Asset being produced — it appears here when it is done.</p>}
               {briefAssets.map((asset) => assetRow(asset))}
             </div>;

@@ -20,9 +20,10 @@ function checks(value: Json | undefined): Check[] {
     && typeof item.reason === "string");
 }
 
-export function CodeVideoRenderCandidatesPanel({ clientId, titles }: {
+export function CodeVideoRenderCandidatesPanel({ clientId, titles, projectIds }: {
   clientId: string | undefined;
   titles: ReadonlyMap<string, string>;
+  projectIds?: readonly string[];
 }) {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -30,13 +31,15 @@ export function CodeVideoRenderCandidatesPanel({ clientId, titles }: {
   const urls = useSignedPreviewPaths("client-media", candidates.map((row) => row.storage_path));
 
   useEffect(() => {
-    if (!clientId) { setCandidates([]); setLoading(false); return; }
+    if (!clientId || projectIds?.length === 0) { setCandidates([]); setLoading(false); return; }
     let active = true;
     setLoading(true);
     void (async () => {
-      const { data, error: queryError } = await supabase
+      const query = supabase
         .from("video_project_render_candidates_v1")
-        .select("*").eq("client_id", clientId)
+        .select("*").eq("client_id", clientId);
+      const { data, error: queryError } = await (projectIds
+        ? query.in("project_id", [...projectIds]) : query)
         .order("created_at", { ascending: false }).limit(50);
       if (!active) return;
       setCandidates(data ?? []);
@@ -44,7 +47,7 @@ export function CodeVideoRenderCandidatesPanel({ clientId, titles }: {
       setLoading(false);
     })();
     return () => { active = false; };
-  }, [clientId]);
+  }, [clientId, projectIds]);
 
   return <section aria-label="Code-video render candidates" className="space-y-2">
     <h3 className="text-xs font-semibold">Render candidates</h3>

@@ -6,6 +6,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 const { rpc, records } = vi.hoisted(() => ({
   rpc: vi.fn(),
   records: { projects: [] as Record<string, unknown>[],
+    scopedProjectIds: [] as string[],
     sources: [{ record_id: "source-1", title: "Reviewed offer", domain: "offer_strategy",
       observed_on: "2026-11-20", review_state: "supported" }],
     brief: null as Record<string, unknown> | null,
@@ -17,9 +18,13 @@ vi.mock("../../lib/supabase", () => ({ supabase: {
   rpc,
   from: (table: string) => {
     let agentKey = "video_script";
+    let projectIds: string[] | null = null;
     const query = { select: () => query,
       eq: (column: string, value: string) => {
         if (column === "agent_key") agentKey = value;
+        return query;
+      }, in: (column: string, values: string[]) => {
+        if (column === "id") projectIds = values;
         return query;
       }, order: () => query,
       limit: () => query,
@@ -30,7 +35,11 @@ vi.mock("../../lib/supabase", () => ({ supabase: {
             : table === "campaign_route_packages_v6" ? records.routePackage : null,
         error: null }),
       then: (resolve: (value: unknown) => unknown) => Promise.resolve({
-        data: table === "video_project_status_v1" ? records.projects : records.sources,
+        data: table === "video_project_status_v1"
+          ? (projectIds ? records.projects.filter((project) => projectIds!.includes(String(project.id)))
+            : records.projects)
+          : table === "video_projects" ? records.scopedProjectIds.map((id) => ({ id }))
+            : records.sources,
         error: null,
       }).then(resolve),
     };
@@ -48,6 +57,7 @@ vi.mock("./CodeVideoAttachmentsPanel", () => ({
 import { CodeVideoProjectsPanel } from "./CodeVideoProjectsPanel";
 
 beforeEach(() => { rpc.mockReset(); records.projects = [];
+  records.scopedProjectIds = [];
   records.paused = true; records.audioPaused = true;
   records.brief = null; records.idea = null; records.routePackage = null; });
 
@@ -158,6 +168,34 @@ it("binds an approved campaign brief to the current route package", async () => 
   expect(rpc).toHaveBeenCalledWith("create_video_project_draft_v1",
     expect.objectContaining({ p_brief_id: "brief-1",
       p_campaign_id: "campaign-1", p_route_package_id: "route-2" }));
+});
+
+it("keeps the inline campaign workspace on its brief and its own projects", async () => {
+  records.brief = { id: "brief-1", title: "Campaign explainer",
+    body: "Show the reviewed offer", media_type: "video",
+    status: "approved", source_idea_id: "idea-1" };
+  records.idea = { id: "idea-1", campaign_id: "campaign-1" };
+  records.routePackage = { id: "route-2", version: 2 };
+  records.scopedProjectIds = ["project-own"];
+  records.projects = [
+    { id: "project-own", idea: "Own approved brief", stage: "draft", ir_version: 0 },
+    { id: "project-other", idea: "Another campaign video", stage: "draft", ir_version: 0 },
+  ];
+  rpc.mockResolvedValue({ data: { id: "project-own", stage: "draft" }, error: null });
+
+  render(<MemoryRouter><CodeVideoProjectsPanel campaignBinding={{
+    briefId: "brief-1", campaignId: "campaign-1", route: "organic",
+  }} /></MemoryRouter>);
+
+  expect(await screen.findByText("Own approved brief")).toBeInTheDocument();
+  expect(screen.queryByText("Another campaign video")).not.toBeInTheDocument();
+  expect(screen.getByText(/Source brief: Campaign explainer · organic route v2/))
+    .toBeInTheDocument();
+  await userEvent.type(screen.getByRole("textbox", { name: "Video audience" }), "Local buyers");
+  await userEvent.click(screen.getByRole("button", { name: "Save code-video draft" }));
+  expect(rpc).toHaveBeenCalledWith("create_video_project_draft_v1",
+    expect.objectContaining({ p_brief_id: "brief-1", p_campaign_id: "campaign-1",
+      p_route_package_id: "route-2" }));
 });
 
 it("holds a campaign video whose brief belongs to another campaign", async () => {
