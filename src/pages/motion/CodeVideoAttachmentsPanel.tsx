@@ -13,6 +13,9 @@ type Asset = { id: string; title: string | null; review_status: string;
 type Thumbnail = { id: string; project_id: string; ir_version: number;
   first_candidate_id: string; state: string; storage_path: string | null;
   file_sha256: string | null; file_bytes: number | null };
+type Candidate = { id: string; project_id: string; ir_version: number;
+  aspect: string; verdict: string; probe_result: string;
+  storage_path: string; file_sha256: string };
 
 export function CodeVideoAttachmentsPanel({ clientId, titles }: {
   clientId: string | undefined;
@@ -21,6 +24,7 @@ export function CodeVideoAttachmentsPanel({ clientId, titles }: {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [assets, setAssets] = useState<ReadonlyMap<string, Asset>>(new Map());
   const [thumbnails, setThumbnails] = useState<ReadonlyMap<string, Thumbnail>>(new Map());
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -28,11 +32,13 @@ export function CodeVideoAttachmentsPanel({ clientId, titles }: {
   const urls = useSignedPreviewPaths("client-media", [
     ...[...assets.values()].map((asset) => asset.render_path ?? asset.storage_path),
     ...[...thumbnails.values()].map((thumbnail) => thumbnail.storage_path),
+    ...candidates.map((candidate) => candidate.storage_path),
   ]);
 
   const refresh = useCallback(async () => {
     const epoch = ++requestEpoch.current;
     if (!clientId) { setAttachments([]); setAssets(new Map()); setThumbnails(new Map());
+      setCandidates([]);
       setLoading(false); return; }
     setLoading(true);
     const attached = await supabase.from("video_project_attachments_v1")
@@ -45,12 +51,13 @@ export function CodeVideoAttachmentsPanel({ clientId, titles }: {
     }
     const rows = (attached.data ?? []) as Attachment[];
     if (rows.length === 0) {
-      setAttachments([]); setAssets(new Map()); setThumbnails(new Map()); setError(null);
+      setAttachments([]); setAssets(new Map()); setThumbnails(new Map());
+      setCandidates([]); setError(null);
       setLoading(false); return;
     }
     const thumbnailIds = rows.flatMap((row) => row.thumbnail_attempt_id
       ? [row.thumbnail_attempt_id] : []);
-    const [assetResult, thumbnailResult] = await Promise.all([
+    const [assetResult, thumbnailResult, candidateResult] = await Promise.all([
       supabase.from("client_media_assets")
         .select("id,title,review_status,human_approved_at,storage_path,render_path")
         .eq("client_id", clientId).in("id", rows.map((row) => row.asset_id)),
@@ -58,10 +65,19 @@ export function CodeVideoAttachmentsPanel({ clientId, titles }: {
         .select("id,project_id,ir_version,first_candidate_id,state,storage_path,file_sha256,file_bytes")
         .eq("client_id", clientId).in("id", thumbnailIds)
         : Promise.resolve({ data: [], error: null }),
+      supabase.from("video_project_render_candidates_v1")
+        .select("id,project_id,ir_version,aspect,verdict,probe_result,storage_path,file_sha256")
+        .eq("client_id", clientId)
+        .eq("verdict", "accepted")
+        .eq("probe_result", "pass")
+        .or(rows.map((row) => `and(project_id.eq.${row.project_id},ir_version.eq.${row.ir_version})`)
+          .join(","))
+        .limit(90),
     ]);
     if (epoch !== requestEpoch.current) return;
-    if (assetResult.error || thumbnailResult.error) {
+    if (assetResult.error || thumbnailResult.error || candidateResult.error) {
       setError(assetResult.error?.message ?? thumbnailResult.error?.message
+        ?? candidateResult.error?.message
         ?? "Could not load exact video attachment evidence.");
       setLoading(false); return;
     }
@@ -70,6 +86,7 @@ export function CodeVideoAttachmentsPanel({ clientId, titles }: {
       [asset.id, asset])));
     setThumbnails(new Map(((thumbnailResult.data ?? []) as Thumbnail[])
       .map((thumbnail) => [thumbnail.id, thumbnail])));
+    setCandidates((candidateResult.data ?? []) as Candidate[]);
     setError(null); setLoading(false);
   }, [clientId]);
   useEffect(() => {
@@ -86,12 +103,11 @@ export function CodeVideoAttachmentsPanel({ clientId, titles }: {
     void refresh();
   }
 
-  async function downloadVideo(asset: Asset) {
+  async function downloadVideo(path: string, title: string, aspect?: string) {
     setError(null);
-    const path = asset.render_path ?? asset.storage_path;
-    const filename = `${(asset.title ?? "reviewed-video")
+    const filename = `${title
       .replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").slice(0, 80)
-      || "reviewed-video"}.mp4`;
+      || "reviewed-video"}${aspect ? `-${aspect.replace(":", "x")}` : ""}.mp4`;
     try {
       const signed = await supabase.storage.from("client-media")
         .createSignedUrl(path,300,{ download: filename });
@@ -128,6 +144,11 @@ export function CodeVideoAttachmentsPanel({ clientId, titles }: {
         && thumbnail.first_candidate_id === attachment.first_candidate_id
         ? thumbnail.storage_path : null;
       const thumbnailUrl = thumbnailPath ? urls.get(thumbnailPath) : null;
+      const aspectFiles = candidates.filter((candidate) =>
+        candidate.project_id === attachment.project_id
+        && candidate.ir_version === attachment.ir_version
+        && candidate.verdict === "accepted"
+        && candidate.probe_result === "pass");
       return <article key={attachment.id} className="space-y-2 rounded-md border border-border p-3 text-xs">
         <h4 className="font-medium">{titles.get(attachment.project_id)
           ?? asset?.title ?? "Video project"} · IR v{attachment.ir_version}</h4>
@@ -144,8 +165,26 @@ export function CodeVideoAttachmentsPanel({ clientId, titles }: {
               : <p className="text-muted-foreground">{attachment.thumbnail_attempt_id
                 ? "Private thumbnail preview unavailable."
                 : "Historical attachment has no filed thumbnail receipt."}</p>}
-            {url && <button type="button" onClick={() => void downloadVideo(asset)}
+            {url && <button type="button" onClick={() => void downloadVideo(
+              asset.render_path ?? asset.storage_path, asset.title ?? "reviewed-video")}
               className="text-brand-strong underline">Download MP4</button>}
+            {aspectFiles.length > 0 && <div className="space-y-1" aria-label="Requested video aspect files">
+              <p className="font-medium">Requested aspect files</p>
+              <p className="text-muted-foreground">Each file passed its media probe and creative review. The human asset decision above applies to the first aspect; inspect derivatives before external use.</p>
+              {aspectFiles.map((candidate) => <div key={candidate.id} className="flex flex-wrap items-center gap-2">
+                <span>{candidate.aspect} · {candidate.id === attachment.first_candidate_id
+                  ? "first aspect" : "derivative"}</span>
+                {urls.get(candidate.storage_path)
+                  ? <button type="button" onClick={() => void downloadVideo(
+                    candidate.storage_path, asset.title ?? "video", candidate.aspect)}
+                    className="text-brand-strong underline">Download {candidate.aspect} MP4</button>
+                  : <span className="text-muted-foreground">Private file unavailable</span>}
+                <details><summary className="cursor-pointer">Receipt</summary>
+                  <p>Candidate: {candidate.id}</p>
+                  <p className="break-all">SHA-256: {candidate.file_sha256}</p>
+                </details>
+              </div>)}
+            </div>}
             {!asset.human_approved_at && asset.review_status !== "rejected" && url
               && clientId && <VideoApprovalRoute clientId={clientId} assetId={asset.id}
                 onFinalApprove={() => finish(asset.id)} />}
