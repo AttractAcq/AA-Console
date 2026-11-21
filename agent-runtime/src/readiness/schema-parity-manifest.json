@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "642d1f8c930eae5d431250e337617181ee9919350c3e665d45d9bf292b11df9e",
-  "generatedTypesSha256": "c0614d594a373ca678c7ee14eeab4b85690b1fa72ab880b94d276670f0ac797b",
-  "generatedSchemaBodySha256": "751480a0f77d7bce9b7f1e224c1e0043497c8ab09cebc418e4bb9f89805c5543",
+  "migrationSourceDigest": "83ccbf276893dd60f719b6c90bf8c45fcdd7a4b860cc40a783c6587425d5eb1d",
+  "generatedTypesSha256": "928129adca964b6aa1e05acfcbc1aa814e609a665056d84221d7e4eaacafd98e",
+  "generatedSchemaBodySha256": "a25e382a701cea99217a2778e3da0bb609b16aa759446db4d553716cb4256573",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4980,6 +4980,13 @@
       "filename": "20261124060900_694_mcp_create_video_project.sql",
       "sha256": "ae48f4208c6c7259dbf062692facdc00cc482f02d6d6430dfe8c586b2048f74c",
       "trimmedMd5": "1d01cd6853640f14bb03878e4f257061"
+    },
+    {
+      "version": "20261124061000",
+      "name": "695_daily_video_source_settings",
+      "filename": "20261124061000_695_daily_video_source_settings.sql",
+      "sha256": "24648e35b009b5af716e8d0dd69eae54e5cac4db4d05f3d19a44dd774846b286",
+      "trimmedMd5": "d5f80fd5ab104a3a292459d3adb648cf"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

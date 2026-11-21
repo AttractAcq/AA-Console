@@ -7536,6 +7536,72 @@ export type Database = {
           },
         ]
       }
+      client_daily_video_sources_v1: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          configured_at: string
+          model_record_ids: string[]
+          review_snapshot: Json
+          route_package_id: string
+          source_digest: string
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          configured_at?: string
+          model_record_ids: string[]
+          review_snapshot: Json
+          route_package_id: string
+          source_digest: string
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          configured_at?: string
+          model_record_ids?: string[]
+          review_snapshot?: Json
+          route_package_id?: string
+          source_digest?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_daily_video_sources_v1_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_daily_video_sources_v1_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_daily_video_sources_v1_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_daily_video_sources_v1_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_daily_video_sources_v1_route_package_id_campaign_id_fkey"
+            columns: ["route_package_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_route_packages_v6"
+            referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+        ]
+      }
       client_engine_budgets: {
         Row: {
           cap_usd: number
@@ -42376,6 +42442,14 @@ export type Database = {
         }
         Returns: string
       }
+      configure_daily_video_sources_v1: {
+        Args: {
+          p_client_id: string
+          p_record_ids: string[]
+          p_route_package_id: string
+        }
+        Returns: Json
+      }
       content_asset_outcomes_v10: {
         Args: { p_asset_id: string; p_client_id: string }
         Returns: {
@@ -44001,6 +44075,10 @@ export type Database = {
           shortfall: number
           target: number
         }[]
+      }
+      daily_video_sources_current_v1: {
+        Args: { p_client_id: string }
+        Returns: boolean
       }
       decide_campaign_action_approval_v6: {
         Args: { p_decision: string; p_reason?: string; p_request_id: string }
