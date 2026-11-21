@@ -27,26 +27,33 @@ digest into downstream source checks, so a changed brief or review holds
 later workers. The deployed v5 planner does not create v6 runs, so this start
 path is not automatically invoked yet.
 
+Migration 697 adds a service-only planner for new `v6.daily.code_video.1`
+runs. It freezes the current route, source digest and plan fingerprint, creates
+the four daily roles, and gives each video role a `video_script` project step
+instead of the old footage build/edit chain. The generic workflow reconciler
+skips these code-video steps so it cannot queue a script job against a brief
+ID or treat script completion as a final MP4. Image steps and all existing v5
+runs keep their current logic. The dedicated project reconciler is still
+required before this planned graph can finish.
+
 ## Required execution contract
 
-1. Add a new workflow version for newly planned daily packages. Keep all v5
-   rows and their graph readable and executable; never rewrite their steps.
-2. Before sealing a new run, require the current organic route, accepted
-   campaign plan, supported model sources and approved brief policy. Freeze
-   their IDs, review hashes and plan fingerprint in the run snapshot.
-3. For each video role, stop after accepted ideation and briefing. Call the
+1. Keep all v5 rows and their graph readable and executable; never rewrite
+   their steps. The new planner is service-only and must be selected by an
+   explicit daily setting or operator request before activation.
+2. After accepted ideation and briefing, call the
    daily service start from the reconciler, without impersonating an MCP bot
    or manager. A paused worker must leave the item visibly held and no
    partial project.
-4. Reconcile the project as a long-running item. Completion of its script job
+3. Reconcile the project as a long-running item. Completion of its script job
    is not completion of the video. Bind a final asset only after every
    requested aspect has an accepted candidate, stored bytes pass read-back,
    and `video_project_attachments_v1` records the exact version. Preserve
    brief, campaign, organic route and daily item lineage on the asset.
-5. Internal QA must verify project/asset/Storage identity and source currency
+4. Internal QA must verify project/asset/Storage identity and source currency
    before accepting the daily final step. Human asset approval remains a
    separate exact-version decision; scheduling and publication remain gated.
-6. A stale route, changed model review, paused worker, retry, failed render,
+5. A stale route, changed model review, paused worker, retry, failed render,
    duplicate attachment or cutoff must produce a clear held/failed state
    without another external effect or fabricated ready asset.
 

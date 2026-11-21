@@ -183,6 +183,35 @@ begin
     '{"result":"pass","checks":["fixture_brief"]}'::jsonb);
 end $fixture$;
 
+do $planner_checks$
+declare planned public.daily_packages%rowtype;
+  replay public.daily_packages%rowtype;
+  reel_step public.workflow_steps%rowtype;
+  story_step public.workflow_steps%rowtype;
+begin
+  planned:=public.plan_daily_code_video_package_v1(
+    'e2222222-2222-4222-8222-222222222222',date '2099-01-03');
+  replay:=public.plan_daily_code_video_package_v1(
+    'e2222222-2222-4222-8222-222222222222',date '2099-01-03');
+  select s.* into reel_step from public.daily_package_items i
+    join public.workflow_steps s on s.id=i.final_step_id
+    where i.package_id=planned.id and i.role='reel';
+  select s.* into story_step from public.daily_package_items i
+    join public.workflow_steps s on s.id=i.final_step_id
+    where i.package_id=planned.id and i.role='story';
+  if replay.id is distinct from planned.id
+    or (select count(*) from public.daily_package_items
+      where package_id=planned.id)<>4
+    or reel_step.agent_key is distinct from 'video_script'
+    or reel_step.input_table is distinct from 'video_projects'
+    or story_step.agent_key is distinct from 'creative_build'
+    or exists(select 1 from public.workflow_steps s
+      where s.run_id=planned.run_id
+        and s.agent_key in ('video_build','video_edit')) then
+    raise exception 'New daily planner did not create an idempotent code-video graph';
+  end if;
+end $planner_checks$;
+
 do $start_checks$
 declare item_id uuid; result jsonb; replay jsonb;
   project public.video_projects%rowtype;
@@ -192,6 +221,12 @@ begin
     join public.daily_packages p on p.id=i.package_id
     where p.client_id='e2222222-2222-4222-8222-222222222222'
       and p.package_day=date '2099-01-02' and i.role='reel';
+  perform public.reconcile_workflow_runs(100);
+  if exists(select 1 from public.workflow_steps s
+    join public.daily_package_items i on i.final_step_id=s.id
+    where i.id=item_id and (s.status<>'pending' or s.job_id is not null)) then
+    raise exception 'Generic v5 reconciler took the v6 code-video step';
+  end if;
   update public.client_daily_package_settings set enabled=false
     where client_id='e2222222-2222-4222-8222-222222222222';
   begin

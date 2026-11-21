@@ -46848,6 +46848,25 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      plan_daily_code_video_package_v1: {
+        Args: { p_client_id: string; p_day: string }
+        Returns: {
+          client_id: string
+          created_at: string
+          cutoff_at: string
+          id: string
+          package_day: string
+          platform: Database["public"]["Enums"]["post_platform"]
+          run_id: string
+          story_media_type: Database["public"]["Enums"]["media_type"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "daily_packages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       plan_daily_package: {
         Args: { p_client_id: string; p_day: string }
         Returns: {
