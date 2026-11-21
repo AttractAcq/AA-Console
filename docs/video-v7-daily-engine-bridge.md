@@ -69,6 +69,12 @@ production off remains immediate for a human admin. The Dashboard shows the
 latest internal daily run without inventing an external receipt. An enabled
 production switch still does not approve any asset or authorize publication.
 
+Migration 701 closes a direct API path around the campaign brief requirement.
+A campaign-bound video may remain a draft while its brief is selected, but
+cannot enter production without one. The existing brief lineage trigger still
+checks that a supplied brief came from the bound campaign's idea. Historical
+attached assets remain readable; no existing project is rewritten.
+
 ## Required execution contract
 
 1. Keep all v5 rows and their graph readable and executable; never rewrite

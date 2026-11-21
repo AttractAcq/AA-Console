@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "1bb2d71bdf2d20b33814c716a949d9076903bcf397b41ab508ce02057ce03c98",
+  "migrationSourceDigest": "80845487c213b40ae5500cc1ca3540fe7f14c3ebae9ad9b5b9be5799ca08b0c4",
   "generatedTypesSha256": "804ccdcd1f0471ea202b100543f3e9e0972cc3223abb164d88a0addb97fca35c",
   "generatedSchemaBodySha256": "da5ae45f47fc6a88a2855c466db4a51a60c3557e1094db133a73cb0e9c897a5a",
   "localMigrations": [
@@ -5022,6 +5022,13 @@
       "filename": "20261124061500_700_daily_package_activation_review.sql",
       "sha256": "7046e93fcbaf80585e4925483d4b575503539c31ace3ba659c1049f0ba79b74d",
       "trimmedMd5": "be216f7f6ce6e6be4d7dd94f62ce7179"
+    },
+    {
+      "version": "20261124061600",
+      "name": "701_video_campaign_brief_start_guard",
+      "filename": "20261124061600_701_video_campaign_brief_start_guard.sql",
+      "sha256": "155ecef5d3c6fdee4fe8cf8d5030acc1a9901d46b8bc97e6a36f93ee9e1398c3",
+      "trimmedMd5": "07b68d8b02649dd008cd47a3cb7730e6"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
