@@ -70,6 +70,9 @@ function fixture() {
   const config = {
     supabaseUrl: "https://project-abc.supabase.co", supabaseServiceRoleKey: "private-service-key",
     anthropicApiKey: "private-anthropic-key", openaiApiKey: "private-openai-key",
+    elevenLabsApiKey: "private-elevenlabs-key", elevenLabsVoiceId: "private-voice-id",
+    remotionAwsRegion: "eu-west-1", remotionFunctionName: "private-function-name",
+    remotionServeUrl: "https://private-renderer.example.invalid/site",
     githubAppPrivateKey: "private-github-key", githubAppId: "id", githubInstallationId: "installation",
     enabled: true, workflowEnabled: false, publishEnabled: false, proofPublishEnabled: false,
     campaignActionsEnabled: false, leadMagnetDeliveryEnabled: false, outboundMessagingEnabled: false,
@@ -92,6 +95,11 @@ describe("B001 system inventory", () => {
     expect(snapshot.runtime.sha).toBe(SHA);
     expect(snapshot.runtime.heartbeats.value?.[0]).toMatchObject({ isLive: false, enabled: true, sha: SHA });
     expect(snapshot.runtime.credentialPresence).toMatchObject({ anthropic: true, openai: true });
+    expect(snapshot.runtime.videoProviderConfiguration).toMatchObject({
+      elevenLabsKeyPresent: true, narratorVoiceSelected: true,
+      remotionRegionPresent: true, remotionFunctionPresent: true,
+      remotionSitePresent: true,
+    });
     expect(snapshot.runtime.actionHolds.profileFieldPatch).toMatchObject({
       state: "held",
       reason: expect.stringMatching(/exact-version AAL2 Approval Inbox decision/),
@@ -134,6 +142,7 @@ describe("B001 system inventory", () => {
     expect(snapshot.evidenceCoverage.externalEffects.state).toBe("unknown");
     const exported = JSON.stringify(snapshot);
     for (const forbidden of ["private-service-key", "private-anthropic-key", "private-openai-key",
+      "private-elevenlabs-key", "private-voice-id", "private-function-name", "private-renderer.example.invalid",
       "private-github-key", "vault-secret-123", "accidentally-a-secret",
       "possibly-private-account-ref", "private-token-hash"])
       expect(exported).not.toContain(forbidden);

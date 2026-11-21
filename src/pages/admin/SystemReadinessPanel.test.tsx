@@ -13,6 +13,9 @@ it("shows unknown deployment and external proof as unknown, even with a reachabl
     environment: { name: "production", railwayEnvironmentId: null, supabaseProjectRef: "project" },
     runtime: { sha: null, switches: { workers: true, publishing: false },
       credentialPresence: { anthropic: true },
+      videoProviderConfiguration: { elevenLabsKeyPresent: true, narratorVoiceSelected: true,
+        remotionRegionPresent: true, remotionFunctionPresent: false,
+        remotionSitePresent: false, musicRequested: false },
       heartbeats: { state: "unknown", checkedAt: "2026-10-29T12:00:00Z", value: null,
         reason: "No runtime heartbeat has been recorded." } },
     gateway: { state: "unknown", checkedAt: "2026-10-29T12:00:00Z", value: null,
@@ -29,6 +32,8 @@ it("shows unknown deployment and external proof as unknown, even with a reachabl
   expect(screen.getByText(/Schema catalog could not be read/)).toBeInTheDocument();
   expect(screen.getByText(/Provider receipts, read-back, actual spend/)).toBeInTheDocument();
   expect(screen.getByText(/has not supplied machine-readable evidence coverage/)).toBeInTheDocument();
+  expect(screen.getByText("Video provider configuration")).toBeInTheDocument();
+  expect(screen.getByText(/does not verify a licence, account access, provider render or stored output/)).toBeInTheDocument();
   expect(screen.queryByText("Runtime healthy")).not.toBeInTheDocument();
   expect(readRuntime).toHaveBeenCalledWith("/admin/system-readiness");
 });

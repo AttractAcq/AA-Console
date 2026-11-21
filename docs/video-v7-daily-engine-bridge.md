@@ -45,6 +45,11 @@ passes the existing daily role/campaign/pillar validation trigger. A failed
 or stale project retains a visible blocker; a completed script job alone
 cannot finish the step.
 
+Admin System Readiness reports whether the runtime has ElevenLabs narrator
+and Remotion target configuration. It reveals no credential values and does
+not imply account validity, licensing, a successful render, Storage delivery
+or asset approval.
+
 Migration 699 adds a service-only setup action for a client with no daily
 package settings. It accepts a built campaign, active content pillar, Meta
 destination, story type and local approval cutoff. The resulting row is always
