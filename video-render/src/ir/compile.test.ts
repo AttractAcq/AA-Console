@@ -8,6 +8,23 @@ const fixture = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../fixt
 const timings = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../fixtures/timings/gold-v2.json"), "utf8"));
 
 describe("video IR", () => {
+  it("compiles the two additional gold topics with matching timing evidence", () => {
+    for (const id of ["gold-02", "gold-03"]) {
+      const ir = JSON.parse(readFileSync(resolve(import.meta.dirname,
+        `../../fixtures/ir/${id}.json`), "utf8"));
+      const sceneTimings = JSON.parse(readFileSync(resolve(import.meta.dirname,
+        `../../fixtures/timings/${id}.json`), "utf8"));
+      expect(validateIR(ir).ok).toBe(true);
+      const timeline = compile(ir, sceneTimings);
+      expect(timeline.scenes).toHaveLength(5);
+      expect(timeline.totalFrames).toBeGreaterThan(700);
+      expect(timeline.totalFrames).toBeLessThan(750);
+      expect(compile(ir, sceneTimings).totalFrames).toBe(timeline.totalFrames);
+      expect(timeline.scenes.map((scene) => scene.id))
+        .toEqual(sceneTimings.scenes.map((scene: { id: string }) => scene.id));
+    }
+  });
+
   it("accepts a hand-written nine-scene plan and compiles a serializable two-minute timeline", () => {
     expect(validateIR(fixture).ok).toBe(true);
     const timeline = compile(fixture, timings);

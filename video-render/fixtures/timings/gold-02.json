@@ -1,0 +1,9 @@
+{
+  "scenes": [
+    { "id": "s01", "audioSrc": null, "durationSec": 5, "words": [] },
+    { "id": "s02", "audioSrc": null, "durationSec": 5, "words": [] },
+    { "id": "s03", "audioSrc": null, "durationSec": 5, "words": [] },
+    { "id": "s04", "audioSrc": null, "durationSec": 5, "words": [] },
+    { "id": "s05", "audioSrc": null, "durationSec": 5, "words": [] }
+  ]
+}
