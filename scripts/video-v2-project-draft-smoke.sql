@@ -213,4 +213,43 @@ begin
     raise exception 'Client role created another client draft';
   exception when insufficient_privilege then null; end;
 end $denied$;
+
+reset role;
+insert into public.mcp_bot_clients(bot_id,client_id) values
+  ('bot_production','f8888888-8888-4888-8888-888888888888'),
+  ('bot_chief_of_staff','f8888888-8888-4888-8888-888888888888'),
+  ('bot_marketing','f8888888-8888-4888-8888-888888888888');
+set local role service_role;
+select set_config('request.jwt.claim.role','service_role',true);
+do $bot_status$
+declare video_id uuid;
+  status jsonb;
+begin
+  select id into video_id from public.video_projects
+    where request_key='linked-brief-route';
+  status := public.mcp_video_project_status_v1(
+    'bot_production','f8888888-8888-4888-8888-888888888888',video_id);
+  if status->>'stage'<>'draft' or (status->>'scenes')::integer<>0
+    or status->>'asset_id' is not null
+    or status ? 'source_snapshot' then
+    raise exception 'Production bot status overstated or exposed source data'; end if;
+  status := public.mcp_video_project_status_v1(
+    'bot_chief_of_staff','f8888888-8888-4888-8888-888888888888',video_id);
+  if status->>'project_id'<>video_id::text then
+    raise exception 'Chief of Staff status was unavailable'; end if;
+  begin
+    perform public.mcp_video_project_status_v1(
+      'bot_marketing','f8888888-8888-4888-8888-888888888888',video_id);
+    raise exception 'Marketing bot read protected video status';
+  exception when sqlstate 'P0001' then
+    if SQLERRM<>'bot_forbidden' then raise; end if;
+  end;
+  begin
+    perform public.mcp_video_project_status_v1(
+      'bot_production','f9999999-9999-4999-8999-999999999999',video_id);
+    raise exception 'Production bot read another client video status';
+  exception when sqlstate 'P0001' then
+    if SQLERRM<>'client_forbidden' then raise; end if;
+  end;
+end $bot_status$;
 rollback;

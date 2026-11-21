@@ -85,6 +85,11 @@ const ROUTES: Record<
       })
       .refine((v) => Boolean(v.idea_id || v.brief_id || v.asset_id)),
   },
+  "content.video_project_status": {
+    path: "/internal/mcp/content/video-project-status",
+    kind: "read",
+    input: z.object({ client_id: uuid, project_id: uuid }).strict(),
+  },
   "content.request_revision": {
     path: "/internal/mcp/content/request-revision",
     kind: "write",
@@ -350,6 +355,7 @@ const codes = new Set([
   "incident_not_found",
   "task_not_found",
   "campaign_not_found",
+  "video_project_not_found",
   "invalid_assignee",
   "task_completed",
   "client_not_found",
@@ -483,6 +489,8 @@ function aaBody(
     if (input.asset_id) body.asset_id = input.asset_id;
     return body;
   }
+  if (tool === "content.video_project_status")
+    return { client_id: input.client_id, project_id: input.project_id };
   if (tool === "content.request_revision") {
     const body: Record<string, unknown> = {
       client_id: input.client_id,
@@ -683,6 +691,25 @@ export class AAApiAdapter implements Adapter {
         scoped.data.client_id !== input.client_id
       )
         return fail("malformed_response", response.status);
+      if (tool.name === "content.video_project_status") {
+        const status = z.object({
+          client_id: uuid, project_id: uuid, stage: z.string(),
+          ir_version: z.number().int().nonnegative(),
+          scenes: z.number().int().nonnegative(),
+          audio_scenes: z.number().int().nonnegative(),
+          render_candidates: z.number().int().nonnegative(),
+          accepted_candidates: z.number().int().nonnegative(),
+          critic_loops: z.number().int().nonnegative(),
+          cost_usd_estimate: z.number().nonnegative(),
+          asset_id: uuid.nullable(),
+          asset_review_status: z.enum(["pending", "approved", "rejected"]).nullable(),
+          human_approved_at: z.string().nullable(),
+          stage_error: z.string().nullable(),
+        }).strict().safeParse(raw);
+        if (!status.success || status.data.project_id !== input.project_id)
+          return fail("malformed_response", response.status);
+        return { status: "completed", capability: tool.name, data: status.data };
+      }
       if (tool.domain === "admin") {
         const event = z
           .object({

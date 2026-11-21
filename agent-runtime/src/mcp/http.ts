@@ -18,6 +18,7 @@ export const MCP_ERRORS: Record<string, [number, string]> = {
   incident_not_found: [404, "Incident unavailable for this client."],
   task_not_found: [404, 'Task not found.'],
   campaign_not_found: [404, 'Campaign not found.'],
+  video_project_not_found: [404, 'Video project unavailable for this client.'],
   task_completed: [409, 'Task is already complete.'],
   invalid_assignee: [400, 'Use an active AA bot or member label.'],
   client_not_found: [404, 'Client not found.'],

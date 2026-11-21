@@ -144,6 +144,18 @@ const ROUTES: Record<string, Route> = {
       };
     },
   },
+  '/internal/mcp/content/video-project-status': {
+    rpc: 'mcp_video_project_status_v1',
+    kind: 'read',
+    parse: (body) => {
+      const client_id = uuid(body, 'client_id');
+      const project_id = uuid(body, 'project_id');
+      if (!client_id || !project_id
+          || keysOf(body) !== 'client_id,project_id') return undefined;
+      return { p_bot_id: null, p_client_id: client_id,
+        p_project_id: project_id };
+    },
+  },
   '/internal/mcp/content/request-revision': {
     rpc: 'mcp_request_revision',
     kind: 'write',

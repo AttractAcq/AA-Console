@@ -46299,6 +46299,10 @@ export type Database = {
         }
         Returns: Json
       }
+      mcp_video_project_status_v1: {
+        Args: { p_bot_id: string; p_client_id: string; p_project_id: string }
+        Returns: Json
+      }
       mcp_workflow_task: {
         Args: {
           p_action: string

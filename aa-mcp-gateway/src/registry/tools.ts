@@ -6,7 +6,7 @@ const domains: Record<string, string> = {
     "list_clients get_client get_status get_plan get_blockers get_next_action create_task get_client_health",
   campaign: "list get create update get_status request_approval plan provision launch get_readiness",
   content:
-    "list_ideas generate_ideas get_idea select_idea generate_brief get_brief assign_production get_production_status create_upload_url submit_asset request_revision request_approval approve_asset create_repurpose_plan queue_distribution record_publication get_performance",
+    "list_ideas generate_ideas get_idea select_idea generate_brief get_brief assign_production get_production_status video_project_status create_upload_url submit_asset request_revision request_approval approve_asset create_repurpose_plan queue_distribution record_publication get_performance",
   conversion:
     "list_pages get_page create_page generate_structure generate_copy request_approval get_performance audit_page revise_page revert_page",
   sales_agents:
@@ -136,7 +136,8 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
   ([domain, actions]) =>
     actions.split(" ").map((action) => {
       const name = `${domain}.${action}`;
-      const read = /^(get|list|search)/.test(action);
+      const read = /^(get|list|search)/.test(action)
+        || name === "content.video_project_status";
       const approval =
         [
           // Sec Phase 9b/10: content.approve_asset and content.queue_distribution
@@ -227,6 +228,11 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         delete fields.limit;
         fields.idea_id = id.optional();
         fields.brief_id = id.optional();
+      }
+      if (name === "content.video_project_status") {
+        delete fields.limit;
+        delete fields.asset_id;
+        fields.project_id = id;
       }
       if (name === "content.request_revision") {
         fields.summary = text;
@@ -730,6 +736,7 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         "content.get_brief",
         "content.request_revision",
         "content.get_production_status",
+        "content.video_project_status",
         "content.create_repurpose_plan",
         "content.request_approval",
         // Sec Phase 9b: bot_production only, enforced by allowed() below, not

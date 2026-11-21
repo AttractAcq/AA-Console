@@ -7,6 +7,7 @@ export const chiefOfStaff = {
     "workflow.*",
     "attribution.*",
     "content.create_upload_url",
+    "content.video_project_status",
   ],
   forbidden: [
     "economics",

@@ -315,6 +315,7 @@ test("HTTP dual-read match, mismatch 401, and reviewer path stay on REVIEWER_CRE
       "content.get_brief",
       "content.get_idea",
       "content.get_production_status",
+      "content.video_project_status",
       "content.list_ideas",
       "content.request_approval",
       "content.request_revision",

@@ -55,6 +55,7 @@ test("Phase 5 tools are real and generate_brief stays accepted", async (t) => {
     "content.get_brief",
     "content.request_revision",
     "content.get_production_status",
+    "content.video_project_status",
     "content.create_repurpose_plan",
     "content.request_approval",
     "content.select_idea",
@@ -272,6 +273,7 @@ test("gateway denies other-client and unauthorized bots before AA for every real
     "content.request_revision",
     "content.select_idea",
     "content.submit_asset",
+    "content.video_project_status",
   ]);
   // Phase 10's two real content tools are bot_distribution only (hard gate,
   // see permissions.ts); exercised for bot_production here would hit that
@@ -290,6 +292,7 @@ test("gateway denies other-client and unauthorized bots before AA for every real
     },
     "content.get_brief": { client_id: other, idea_id: idea },
     "content.get_production_status": { client_id: other, idea_id: idea },
+    "content.video_project_status": { client_id: other, project_id: idea },
     "content.request_revision": {
       client_id: other,
       brief_id: brief,
