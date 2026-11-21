@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { from, rpc, update, filters, build } = vi.hoisted(() => ({
@@ -48,12 +49,14 @@ const asset = { id: "asset-1", brief_id: "brief-1", title: "Finished piece", rev
 
 let ideas: unknown[] = [idea];
 let links: unknown[] = [{ brief_id: "brief-1", asset_id: null }];
+let briefRows: unknown[] = [brief];
 let reviewStatus = "pending";
 
 beforeEach(() => {
   vi.clearAllMocks();
   ideas = [idea];
   links = [{ brief_id: "brief-1", asset_id: null }];
+  briefRows = [brief];
   reviewStatus = "pending";
   update.mockReturnValue(undefined);
   rpc.mockResolvedValue({ error: null });
@@ -71,7 +74,7 @@ beforeEach(() => {
           : table === "campaign_artifacts"
             ? links
             : table === "client_briefs"
-              ? [brief]
+              ? briefRows
               : [{ ...asset, review_status: reviewStatus }],
       }).then(resolve),
     };
@@ -80,7 +83,7 @@ beforeEach(() => {
 });
 
 function show(over: Partial<Parameters<typeof CampaignContentPanel>[0]> = {}) {
-  return render(<CampaignContentPanel
+  return render(<MemoryRouter><CampaignContentPanel
     clientId="client-1"
     campaignId="campaign-1"
     contentCount={2}
@@ -88,8 +91,15 @@ function show(over: Partial<Parameters<typeof CampaignContentPanel>[0]> = {}) {
     contentIdeasGeneratedAt="2026-09-13T08:01:00Z"
     onChanged={vi.fn()}
     {...over}
-  />);
+  /></MemoryRouter>);
 }
+
+it("routes an approved video brief from its campaign route into code video", async () => {
+  briefRows = [{ ...brief, media_type: "video", status: "approved" }];
+  show({ route: "organic", routePositions: [1] });
+  expect(await screen.findByRole("link", { name: "Start code video for organic route" }))
+    .toHaveAttribute("href", "/clients/client-1/delivery/content-production-factory?tab=generation&videoBrief=brief-1&videoCampaign=campaign-1&videoRoute=organic");
+});
 
 it("loads campaign-specific ideas and the production linked to their briefs", async () => {
   show();

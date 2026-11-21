@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { ChevronRight, Trash2 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
@@ -28,7 +29,7 @@ function hasAdCopy(asset: CampaignAsset): boolean {
   return [asset.ad_primary_text, asset.ad_headline, asset.ad_link_url, asset.ad_cta].some((v) => (v ?? "").trim() !== "");
 }
 
-export function CampaignContentPanel({ clientId, campaignId, contentCount, builtAt, contentIdeasGeneratedAt, template = null, mirrorsTemplate = null, onChanged, refreshToken, layout = "v1", routePositions }: {
+export function CampaignContentPanel({ clientId, campaignId, contentCount, builtAt, contentIdeasGeneratedAt, template = null, mirrorsTemplate = null, onChanged, refreshToken, layout = "v1", routePositions, route }: {
   clientId: string;
   campaignId: string;
   /** The campaign template, which decides which Meta buttons an ad may carry. */
@@ -42,6 +43,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
   layout?: "v1" | "v2";
   /** One-based positions from the reviewed route-specific content specification. */
   routePositions?: number[];
+  route?: "paid" | "organic";
 }) {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [briefs, setBriefs] = useState<Brief[]>([]);
@@ -410,6 +412,12 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
                 <button type="button" className="text-sm text-brand-strong hover:underline" onClick={() => setViewing(brief)}>{brief.title}</button>
                 <span className="text-xs text-muted-foreground">{brief.status.replace(/_/g, " ")}</span>
                 {(brief.status === "draft" || brief.status === "approved") && <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => setBuilding(brief)}>Approve &amp; Build</button>}
+                {route && brief.media_type === "video" && brief.status === "approved"
+                  && brief.source_idea_id && <Link className="text-xs text-brand-strong underline"
+                    to={`/clients/${clientId}/delivery/content-production-factory?${new URLSearchParams({
+                      tab: "generation", videoBrief: brief.id,
+                      videoCampaign: campaignId, videoRoute: route,
+                    })}`}>Start code video for {route} route</Link>}
               </div>
               {briefAssets.length === 0 && brief.status === "in_production" && <p className="text-xs text-muted-foreground">Asset being produced — it appears here when it is done.</p>}
               {briefAssets.map((asset) => assetRow(asset))}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { CodeVideoRenderCandidatesPanel } from "./CodeVideoRenderCandidatesPanel";
 import { CodeVideoAttachmentsPanel } from "./CodeVideoAttachmentsPanel";
@@ -10,9 +10,20 @@ type Project = { id: string; idea: string; audience: string | null;
   source_snapshot: unknown; created_at: string };
 type Source = { record_id: string; title: string; domain: string;
   observed_on: string | null; review_state: string };
+type BriefBinding = { briefId: string; title: string;
+  campaignId: string | null; routePackageId: string | null;
+  route: string | null; routeVersion: number | null };
 
 export function CodeVideoProjectsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
+  const [params] = useSearchParams();
+  const requestedBriefId = params.get("videoBrief");
+  const requestedCampaignId = params.get("videoCampaign");
+  const requestedRoute = params.get("videoRoute");
+  const bindingRequested = Boolean(requestedBriefId || requestedCampaignId || requestedRoute);
+  const [binding, setBinding] = useState<BriefBinding | null>(null);
+  const [bindingLoading, setBindingLoading] = useState(false);
+  const [bindingError, setBindingError] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
   const [agentPaused, setAgentPaused] = useState(true);
@@ -30,6 +41,61 @@ export function CodeVideoProjectsPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!clientId || !requestedBriefId) {
+      setBinding(null);
+      setBindingError(requestedCampaignId || requestedRoute
+        ? "A campaign video must name its approved brief." : null);
+      setBindingLoading(false); return;
+    }
+    let active = true;
+    setBinding(null); setBindingError(null); setBindingLoading(true);
+    void (async () => {
+      const brief = await supabase.from("client_briefs")
+        .select("id,title,body,media_type,status,source_idea_id")
+        .eq("client_id", clientId).eq("id", requestedBriefId).maybeSingle();
+      if (!active) return;
+      if (brief.error || !brief.data || brief.data.media_type !== "video"
+        || !["approved", "in_production", "complete"].includes(brief.data.status)) {
+        setBindingError("This video brief is unavailable or is not approved.");
+        setBindingLoading(false); return;
+      }
+      let routePackageId: string | null = null;
+      let routeVersion: number | null = null;
+      if (requestedCampaignId || requestedRoute) {
+        if (!requestedCampaignId || !["paid", "organic"].includes(requestedRoute ?? "")
+          || !brief.data.source_idea_id) {
+          setBindingError("Choose an approved campaign brief and route together.");
+          setBindingLoading(false); return;
+        }
+        const [idea, routePackage] = await Promise.all([
+          supabase.from("client_ideas").select("id,campaign_id")
+            .eq("client_id", clientId).eq("id", brief.data.source_idea_id)
+            .maybeSingle(),
+          supabase.from("campaign_route_packages_v6")
+            .select("id,version").eq("client_id", clientId)
+            .eq("campaign_id", requestedCampaignId).eq("route", requestedRoute!)
+            .order("version", { ascending: false }).limit(1).maybeSingle(),
+        ]);
+        if (!active) return;
+        if (idea.error || idea.data?.campaign_id !== requestedCampaignId
+          || routePackage.error || !routePackage.data) {
+          setBindingError("The brief and current campaign route could not be matched.");
+          setBindingLoading(false); return;
+        }
+        routePackageId = routePackage.data.id;
+        routeVersion = routePackage.data.version;
+      }
+      setBinding({ briefId: brief.data.id, title: brief.data.title,
+        campaignId: requestedCampaignId, routePackageId,
+        route: requestedRoute, routeVersion });
+      setIdea([brief.data.title, brief.data.body].filter(Boolean).join(" — ").slice(0, 4000));
+      setRequestKey(crypto.randomUUID());
+      setBindingLoading(false);
+    })();
+    return () => { active = false; };
+  }, [clientId, requestedBriefId, requestedCampaignId, requestedRoute]);
 
   const refresh = useCallback(async () => {
     if (!clientId) return;
@@ -59,11 +125,14 @@ export function CodeVideoProjectsPanel() {
   useEffect(() => { void refresh(); }, [refresh]);
 
   async function createDraft() {
-    if (!clientId) return;
+    if (!clientId || (bindingRequested && !binding)) return;
     setBusy(true); setError(null); setNotice(null);
     const result = await supabase.rpc("create_video_project_draft_v1", {
       p_client_id: clientId, p_idea: idea.trim(), p_audience: audience.trim(),
       p_tone: tone, p_target_length_sec: seconds, p_aspects: aspects,
+      p_brief_id: binding?.briefId ?? undefined,
+      p_campaign_id: binding?.campaignId ?? undefined,
+      p_route_package_id: binding?.routePackageId ?? undefined,
       p_request_key: requestKey,
     });
     setBusy(false);
@@ -92,6 +161,10 @@ export function CodeVideoProjectsPanel() {
   return <section aria-label="Code-rendered video projects" className="space-y-4 rounded-lg border border-border p-4">
     <div><h2 className="text-sm font-semibold">Code-rendered video projects</h2>
       <p className="text-xs text-muted-foreground">Save a draft, choose reviewed business sources, then start a sourced storyboard. Rendering and publication require later review.</p></div>
+    {bindingLoading && <p className="text-xs text-muted-foreground">Checking video brief and campaign route…</p>}
+    {bindingError && <p role="alert" className="text-xs text-destructive">{bindingError}</p>}
+    {binding && <p className="text-xs">Source brief: {binding.title}
+      {binding.route && ` · ${binding.route} route v${binding.routeVersion}`}</p>}
     <div className="grid gap-3 sm:grid-cols-2">
       <label className="text-xs sm:col-span-2">Video idea
         <textarea aria-label="Video idea" value={idea} onChange={(event) => setIdea(event.target.value)}
@@ -119,7 +192,8 @@ export function CodeVideoProjectsPanel() {
         <p className="text-muted-foreground">Choose at least one. The first aspect supplies the human-review asset.</p>
       </fieldset>
     </div>
-    <button type="button" disabled={busy || aspects.length === 0
+    <button type="button" disabled={busy || Boolean(bindingRequested && !binding)
+      || aspects.length === 0
       || idea.trim().length < 15 || !audience.trim()
       || seconds < 30 || seconds > 900 || !Number.isInteger(seconds)}
       onClick={() => void createDraft()}

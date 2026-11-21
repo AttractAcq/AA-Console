@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { briefStatus } = vi.hoisted(() => ({ briefStatus: { value: "in_production" } }));
 
 vi.mock("../../lib/useAgentJobs", () => ({ useAgentJobs: () => ({ inFlight: [], recentFailures: [] }) }));
 vi.mock("../../lib/supabase", () => ({
@@ -9,7 +11,7 @@ vi.mock("../../lib/supabase", () => ({
       const data = table === "client_briefs" ? [{
         id: "brief-1", title: "Founder video", body: "Record the founder", media_type: "video",
         content_format: "single", target_platform: "instagram", brief_ref: "BR-1",
-        status: "in_production", source_idea_id: "idea-1", created_at: "2026-10-10",
+        status: briefStatus.value, source_idea_id: "idea-1", created_at: "2026-10-10",
       }] : table === "job_assignments" ? [{
         id: "assignment-1", brief_id: "brief-1", stage: "delivered", asset_id: "asset-1",
         team_members: { name: "Taylor" },
@@ -32,6 +34,7 @@ vi.mock("react-router-dom", async (original) => ({
 import { BriefsPanel } from "./BriefsPanel";
 
 describe("BriefsPanel human Create handoff", () => {
+  beforeEach(() => { briefStatus.value = "in_production"; });
   it("shows the delivered assignment and missing email without hiding the work", async () => {
     render(<MemoryRouter initialEntries={["/?tab=briefs&brief=brief-1"]}><BriefsPanel /></MemoryRouter>);
     expect(await screen.findByText(/Taylor: delivered/)).toBeInTheDocument();
@@ -44,5 +47,14 @@ describe("BriefsPanel human Create handoff", () => {
     render(<MemoryRouter initialEntries={["/?brief=brief-1"]}><BriefsPanel stage="create" /></MemoryRouter>);
     expect(await screen.findByText(/Taylor: delivered/)).toBeInTheDocument();
     expect(screen.getByLabelText("Content production stages")).toHaveTextContent("Create");
+  });
+  it("offers an approved video brief as a sourced code-video entry", async () => {
+    briefStatus.value = "approved";
+    render(<MemoryRouter><BriefsPanel /></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: "Video" }));
+    expect(await screen.findByText("Founder video")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Actions for / }));
+    expect(screen.getByRole("menuitem", { name: "Start code video from brief" }))
+      .toBeInTheDocument();
   });
 });

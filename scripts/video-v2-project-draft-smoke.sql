@@ -47,6 +47,21 @@ select 'fccccccc-cccc-4ccc-8ccc-cccccccccccc',c.client_id,c.id,
   'organic',1,public.campaign_plan_fingerprint(c)
 from public.client_campaigns c
 where c.id='fbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+insert into public.client_ideas(id,client_id,campaign_id,campaign_position,
+  title,source,status)
+values ('f1212121-1212-4121-8121-121212121212',
+  'f8888888-8888-4888-8888-888888888888',
+  'fbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',1,
+  'Campaign video idea','manual','draft');
+insert into public.client_briefs(id,client_id,source_idea_id,title,
+  media_type,status)
+values ('f1313131-1313-4131-8131-131313131313',
+  'f8888888-8888-4888-8888-888888888888',
+  'f1212121-1212-4121-8121-121212121212',
+  'Matching campaign video brief','video','approved'),
+  ('f1414141-1414-4141-8141-141414141414',
+  'f8888888-8888-4888-8888-888888888888',
+  null,'Unrelated video brief','video','approved');
 
 select set_config('request.jwt.claim.sub',
   'f6666666-6666-4666-8666-666666666666',true);
@@ -55,6 +70,7 @@ do $checks$
 declare first_project public.video_projects%rowtype;
   replay public.video_projects%rowtype;
   route_project public.video_projects%rowtype;
+  linked_project public.video_projects%rowtype;
 begin
   first_project := public.create_video_project_draft_v1(
     'f8888888-8888-4888-8888-888888888888',
@@ -104,6 +120,22 @@ begin
   if route_project.campaign_id is null
     or route_project.route_package_id is null then
     raise exception 'Campaign route was not snapshotted'; end if;
+  linked_project := public.create_video_project_draft_v1(
+    first_project.client_id, first_project.idea,
+    'Local service buyers','confident',120,array['16:9'],
+    'f1313131-1313-4131-8131-131313131313',
+    route_project.campaign_id,route_project.route_package_id,'linked-brief-route');
+  if linked_project.brief_id is null or linked_project.campaign_id is null then
+    raise exception 'Matched video brief and campaign route did not bind'; end if;
+  begin
+    perform public.create_video_project_draft_v1(
+      first_project.client_id, first_project.idea,
+      'Local service buyers','confident',120,array['16:9'],
+      'f1414141-1414-4141-8141-141414141414',
+      route_project.campaign_id,route_project.route_package_id,
+      'unrelated-brief-route');
+    raise exception 'Unrelated video brief was bound to a campaign route';
+  exception when check_violation then null; end;
   insert into public.campaign_route_packages_v6(id,client_id,campaign_id,
     route,version,plan_fingerprint)
   select 'fddddddd-dddd-4ddd-8ddd-dddddddddddd',c.client_id,c.id,

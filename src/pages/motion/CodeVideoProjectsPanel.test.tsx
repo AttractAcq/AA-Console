@@ -8,6 +8,9 @@ const { rpc, records } = vi.hoisted(() => ({
   records: { projects: [] as Record<string, unknown>[],
     sources: [{ record_id: "source-1", title: "Reviewed offer", domain: "offer_strategy",
       observed_on: "2026-11-20", review_state: "supported" }],
+    brief: null as Record<string, unknown> | null,
+    idea: null as Record<string, unknown> | null,
+    routePackage: null as Record<string, unknown> | null,
     paused: true, audioPaused: true },
 }));
 vi.mock("../../lib/supabase", () => ({ supabase: {
@@ -22,7 +25,9 @@ vi.mock("../../lib/supabase", () => ({ supabase: {
       limit: () => query,
       maybeSingle: async () => ({ data: table === "agents"
         ? { paused: agentKey === "video_audio" ? records.audioPaused : records.paused }
-        : null,
+        : table === "client_briefs" ? records.brief
+          : table === "client_ideas" ? records.idea
+            : table === "campaign_route_packages_v6" ? records.routePackage : null,
         error: null }),
       then: (resolve: (value: unknown) => unknown) => Promise.resolve({
         data: table === "video_projects" ? records.projects : records.sources,
@@ -43,7 +48,8 @@ vi.mock("./CodeVideoAttachmentsPanel", () => ({
 import { CodeVideoProjectsPanel } from "./CodeVideoProjectsPanel";
 
 beforeEach(() => { rpc.mockReset(); records.projects = [];
-  records.paused = true; records.audioPaused = true; });
+  records.paused = true; records.audioPaused = true;
+  records.brief = null; records.idea = null; records.routePackage = null; });
 
 it("saves a manual draft and keeps storyboard start held while the agent is paused", async () => {
   rpc.mockResolvedValue({ data: { id: "project-1", stage: "draft", ir_version: 0 }, error: null });
@@ -91,4 +97,55 @@ it("saves the operator's exact ordered set of requested aspects", async () => {
   await user.click(screen.getByRole("button", { name: "Save code-video draft" }));
   expect(rpc).toHaveBeenCalledWith("create_video_project_draft_v1",
     expect.objectContaining({ p_aspects: ["16:9", "9:16"] }));
+});
+
+it("binds an approved campaign brief to the current route package", async () => {
+  records.brief = { id: "brief-1", title: "Campaign explainer",
+    body: "Show the reviewed offer", media_type: "video",
+    status: "approved", source_idea_id: "idea-1" };
+  records.idea = { id: "idea-1", campaign_id: "campaign-1",
+    archived_at: null };
+  records.routePackage = { id: "route-2", version: 2 };
+  rpc.mockResolvedValue({ data: { id: "project-4", stage: "draft", ir_version: 0 },
+    error: null });
+  const user = userEvent.setup();
+  render(<MemoryRouter initialEntries={[
+    "/?videoBrief=brief-1&videoCampaign=campaign-1&videoRoute=organic",
+  ]}><CodeVideoProjectsPanel /></MemoryRouter>);
+  expect(await screen.findByText(/Source brief: Campaign explainer · organic route v2/))
+    .toBeInTheDocument();
+  expect(screen.getByRole("textbox", { name: "Video idea" }))
+    .toHaveValue("Campaign explainer — Show the reviewed offer");
+  await user.type(screen.getByRole("textbox", { name: "Video audience" }),
+    "Local buyers");
+  await user.click(screen.getByRole("button", { name: "Save code-video draft" }));
+  expect(rpc).toHaveBeenCalledWith("create_video_project_draft_v1",
+    expect.objectContaining({ p_brief_id: "brief-1",
+      p_campaign_id: "campaign-1", p_route_package_id: "route-2" }));
+});
+
+it("holds a campaign video whose brief belongs to another campaign", async () => {
+  records.brief = { id: "brief-1", title: "Campaign explainer",
+    body: null, media_type: "video", status: "approved",
+    source_idea_id: "idea-1" };
+  records.idea = { id: "idea-1", campaign_id: "other-campaign",
+    archived_at: null };
+  records.routePackage = { id: "route-2", version: 2 };
+  render(<MemoryRouter initialEntries={[
+    "/?videoBrief=brief-1&videoCampaign=campaign-1&videoRoute=organic",
+  ]}><CodeVideoProjectsPanel /></MemoryRouter>);
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "The brief and current campaign route could not be matched.");
+  expect(screen.getByRole("button", { name: "Save code-video draft" }))
+    .toBeDisabled();
+});
+
+it("does not silently create a manual video from an incomplete campaign link", async () => {
+  render(<MemoryRouter initialEntries={[
+    "/?videoCampaign=campaign-1&videoRoute=paid",
+  ]}><CodeVideoProjectsPanel /></MemoryRouter>);
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "A campaign video must name its approved brief.");
+  expect(screen.getByRole("button", { name: "Save code-video draft" }))
+    .toBeDisabled();
 });

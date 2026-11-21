@@ -15,6 +15,7 @@ vi.mock("../lib/moduleExport", () => ({ downloadTabPdf, downloadModuleZip }));
 vi.mock("./intelligence/BusinessContextPanel", () => ({ BusinessContextPanel: () => <p>Business context panel</p> }));
 vi.mock("./intelligence/MarketPanel", () => ({ MarketPanel: () => <p>Market panel</p> }));
 vi.mock("./ideation/GenerationPanel", () => ({ GenerationPanel: ({ showJourney = true }: { showJourney?: boolean }) => <p>Ideation panel · journey {String(showJourney)}</p> }));
+vi.mock("./motion/CodeVideoProjectsPanel", () => ({ CodeVideoProjectsPanel: () => <p>Code video projects</p> }));
 vi.mock("./campaigns/CampaignExecutionPanel", () => ({ CampaignExecutionPanel: () => <p>Campaign table</p> }));
 
 // The workspace has its own test; here it stands for "Assets opened".
@@ -155,6 +156,7 @@ it("gives Content Production five tabs and no stage bar", async () => {
     <Routes><Route path="/clients/:clientId/delivery/content-production-factory" element={<Page node={content} />} /></Routes>
   </MemoryRouter>);
   expect(screen.getByText("Ideation panel · journey false")).toBeInTheDocument();
+  expect(screen.getByText("Code video projects")).toBeInTheDocument();
   expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
     "Ideation", "Briefs", "Create", "Edit / Repurpose", "Assets",
   ]);

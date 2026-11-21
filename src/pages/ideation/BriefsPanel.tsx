@@ -248,6 +248,10 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
                     ? [{ label: "View delivery", onSelect: () => navigate(deliveryHref()) }]
                     : []
                 : [{ label: "Approve & build", onSelect: () => setBuilding(b) }]),
+              ...(b.media_type === "video" && b.status === "approved"
+                ? [{ label: "Start code video from brief",
+                  onSelect: () => navigate(`/clients/${clientId}/delivery/content-production-factory?tab=generation&videoBrief=${b.id}`) }]
+                : []),
               { label: "View brief", onSelect: () => setViewing(b) },
               { label: "Archive", busyLabel: "Archiving…", onSelect: () => void archiveBrief(b) },
               { label: "Delete", destructive: true, busyLabel: "Deleting…", onSelect: () => void deleteBrief(b) },
