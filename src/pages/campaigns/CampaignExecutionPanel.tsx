@@ -30,6 +30,7 @@ import { CampaignSweepWork } from "./CampaignSweepWork";
 import { CampaignConversionWork } from "./CampaignConversionWork";
 import { CampaignPackageReadiness } from "./CampaignPackageReadiness";
 import { PaidOperatorBundles } from "../distribution/PaidOperatorBundles";
+import { LeadMagnetStudioPanel } from "../lead-magnet/LeadMagnetStudioPanel";
 
 type ContentSpecPiece = { route: string; platform: string; media_type: string; content_format: string };
 type PlannedIdea = { id: string; campaign_position: number | null; title: string; body: string | null };
@@ -1025,8 +1026,9 @@ function CampaignExecutionPanelContent() {
             {c.campaign_kind && v2Tab === "lead-magnet" && c.needs_lead_magnet && clientId && <>
               <CampaignConversionWork clientId={clientId} campaignId={c.id}
                 needsPage={false} needsAgent={false} needsMagnet visibleModule="magnet" />
-              <Link className="mt-3 inline-block text-sm text-brand-strong underline"
-                to={`/clients/${clientId}/delivery/lead-magnet-studio`}>Open Lead Magnet Studio</Link>
+              <section className="py-4" aria-label="Campaign lead magnet studio">
+                <LeadMagnetStudioPanel key={c.id} campaignId={c.id} />
+              </section>
             </>}
             {paid && c.paid_platform === "meta" && (v2Tab === "meta-ads" || v2Tab === "paid") && clientId && <section className="py-4"><div className="rounded-lg border border-border bg-card p-4 text-sm"><h3 className="font-semibold">Meta paid handoff</h3><p className="mt-2 text-xs text-muted-foreground">{packageState.manifest ? `Current package v${packageState.manifest.version}. ` : "A planned package is required. "}{packageState.approvals.filter((approval) => approval.action_key === "meta_ad_build").map((approval) => `Meta ad build approval: ${approval.status}. `).join("") || "No Meta build approval is recorded for this package. "}Prepare the build sheet and approved creative for the human paid operator here. Export is not ad activation.</p><Link className="mt-2 inline-block text-xs text-brand-strong underline" to={`/clients/${clientId}/delivery/approval-inbox?tab=campaign-actions`}>Open Approval Inbox</Link>{c.meta_campaign_id && <p className="mt-2 text-xs">Meta campaign {c.meta_campaign_id}{c.meta_ad_set_id ? ` · ad set ${c.meta_ad_set_id}` : " · ad set pending"}{c.meta_built_at ? ` · recorded ${new Date(c.meta_built_at).toLocaleString()}` : ""}</p>}</div><div className="mt-3 flex justify-end"><Button onClick={() => setMetaToolsOpenFor((open) => open === c.id ? null : c.id)}>Build functionality</Button></div>{metaToolsOpen && <MetaBuildSection clientId={clientId} campaign={c} building={inFlight.some((job) => job.agent_key === "meta_build" && job.input_id === c.id)} onChanged={() => { void refresh(); void packageState.refresh(); }} externalActionsAvailable={false} handBuildAvailable showSheetInline />}</section>}
           </div>;

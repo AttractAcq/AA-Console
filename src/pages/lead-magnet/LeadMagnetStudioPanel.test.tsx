@@ -123,6 +123,24 @@ beforeEach(() => {
   fetchSubmissions.mockResolvedValue([]);
 });
 
+describe("campaign magnet work", () => {
+  it("shows only the campaign's source magnet and keeps new versions scoped to it", async () => {
+    const otherMagnet = { ...magnet, id: "mag-2", name: "Unrelated campaign guide", campaign_id: "camp-2" };
+    fetchMagnets.mockResolvedValue([magnet, otherMagnet]);
+
+    render(<LeadMagnetStudioPanel campaignId="camp-1" />);
+
+    expect(await screen.findByText(magnet.name)).toBeInTheDocument();
+    expect(screen.queryByText(otherMagnet.name)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "New magnet" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: `Actions for ${magnet.name}` }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "New version" }));
+    expect(screen.getByRole("option", { name: magnet.name })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: otherMagnet.name })).not.toBeInTheDocument();
+  });
+});
+
 describe("which version is live", () => {
   it("names the approved version rather than saying only approved", async () => {
     fetchVersions.mockResolvedValue([version(), version({ id: "ver-2", version: 2 })]);
