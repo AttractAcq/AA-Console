@@ -132,8 +132,11 @@ function PaidOperatorBundlesForClient({ clientId, platform, campaignId }: {
           supabase.rpc("paid_operator_bundle_current_v7", { p_bundle_id: row.id }),
           supabase.rpc("paid_operator_bundle_approved_v7", { p_bundle_id: row.id }),
         ]);
-        return [row.id, !source.error && source.data === true,
-          !decision.error && decision.data === true] as const;
+        if (source.error || decision.error) {
+          throw new Error(`Exact review status is unavailable for bundle ${row.id}: ${
+            source.error?.message ?? decision.error?.message}`);
+        }
+        return [row.id, source.data === true, decision.data === true] as const;
       }));
       setCampaigns(campaigns);
       setPackages([...latest.values()]);
@@ -148,11 +151,35 @@ function PaidOperatorBundlesForClient({ clientId, platform, campaignId }: {
         .filter((row) => row.bundle_id !== null).map((row) => [row.bundle_id!, row])));
       setError(null);
     } catch (cause) {
+      // A failed refresh must not leave a previously approved bundle actionable.
+      setCampaigns([]);
+      setPackages([]);
+      setPackageId("");
+      setBundles([]);
+      setEvents([]);
+      setCurrent({});
+      setApproved({});
+      setMatches({});
+      setMetaAccountMatches({});
       setError(cause instanceof Error ? cause.message : "Could not load operator bundles.");
     }
   }, [clientId, platform, campaignId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  const assertReady = async (bundle: Bundle) => {
+    const [source, decision] = await Promise.all([
+      supabase.rpc("paid_operator_bundle_current_v7", { p_bundle_id: bundle.id }),
+      supabase.rpc("paid_operator_bundle_approved_v7", { p_bundle_id: bundle.id }),
+    ]);
+    if (source.error || decision.error || source.data !== true || decision.data !== true) {
+      setCurrent((state) => ({ ...state, [bundle.id]: false }));
+      setApproved((state) => ({ ...state, [bundle.id]: false }));
+      throw new Error(source.error || decision.error
+        ? "Exact bundle review could not be checked. Refresh before downloading or reporting a handoff."
+        : "The bundle or its approval changed. Review the current version before downloading or reporting a handoff.");
+    }
+  };
 
   const create = async () => {
     if (!packageId || busy) return;
@@ -188,6 +215,7 @@ function PaidOperatorBundlesForClient({ clientId, platform, campaignId }: {
       ? window.prompt("External ad ID, if known")?.trim() : undefined;
     setBusy(true); setError(null); setNotice(null);
     try {
+      await assertReady(bundle);
       const result = await supabase.rpc("record_paid_operator_event_v7", {
         p_bundle_id: bundle.id, p_event: kind, p_reference: reference,
         p_external_campaign_id: campaignId || undefined, p_external_ad_id: adId || undefined,
@@ -202,6 +230,7 @@ function PaidOperatorBundlesForClient({ clientId, platform, campaignId }: {
   };
 
   const downloadExactJson = async (bundle: Bundle) => {
+    await assertReady(bundle);
     const result = await supabase.rpc("paid_operator_bundle_export_v7", {
       p_bundle_id: bundle.id,
     });
@@ -225,6 +254,7 @@ function PaidOperatorBundlesForClient({ clientId, platform, campaignId }: {
     if (busy) return;
     setBusy(true); setError(null); setNotice(null);
     try {
+      await assertReady(bundle);
       const files = creativeFiles(bundle);
       const creative = sourceOf(bundle).creative;
       if (platform === "meta" && !completeMetaCreative(creative, files))
@@ -292,16 +322,17 @@ function PaidOperatorBundlesForClient({ clientId, platform, campaignId }: {
       onClick={() => void create()} className="rounded bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50">
       Freeze operator bundle
     </button>
-    {bundles.length === 0 && <p className="text-xs text-muted-foreground">No {platform} operator bundles recorded.</p>}
+    {!error && bundles.length === 0 && <p className="text-xs text-muted-foreground">No {platform} operator bundles recorded.</p>}
     {bundles.map((bundle) => {
       const source = sourceOf(bundle);
+      const ready = current[bundle.id] === true && approved[bundle.id] === true;
       const trail = events.filter((event) => event.bundle_id === bundle.id);
       const metric = matches[bundle.id];
       const metaAccount = metaAccountMatches[bundle.id];
       return <article key={bundle.id} className="rounded border border-border p-3 text-xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="font-medium">{String(source.campaign_name ?? "Campaign")} · v{bundle.version} · {current[bundle.id] ? approved[bundle.id] ? "approved and current" : "not approved" : "stale or unverified"}</p>
-          <button type="button" className="underline disabled:opacity-50" disabled={busy || !approved[bundle.id]}
+          <button type="button" className="underline disabled:opacity-50" disabled={busy || !ready}
             onClick={() => void downloadExactJson(bundle).catch((cause: unknown) => setError(
               cause instanceof Error ? cause.message : "Could not verify operator packet bytes."))}>
             Download exact JSON
@@ -312,16 +343,17 @@ function PaidOperatorBundlesForClient({ clientId, platform, campaignId }: {
           <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded bg-muted p-2">{JSON.stringify(bundle.snapshot, null, 2)}</pre>
         </details>
         <div className="mt-2 flex flex-wrap gap-3">{creativeFiles(bundle).map((file) =>
-          <button key={`${file.asset_id}:${file.frame_id ?? "single"}`} type="button" className="underline" onClick={() => {
-            void downloadCreative(file).catch((cause: unknown) => setError(
+          <button key={`${file.asset_id}:${file.frame_id ?? "single"}`} type="button"
+            className="underline disabled:opacity-50" disabled={busy || !ready} onClick={() => {
+            void assertReady(bundle).then(() => downloadCreative(file)).catch((cause: unknown) => setError(
               cause instanceof Error ? cause.message : "Could not verify creative bytes."));
           }}>Download verified {file.title || file.asset_id.slice(0, 8)}{file.position ? ` · frame ${file.position}` : ""}</button>)}</div>
         <div className="mt-2 flex flex-wrap gap-3">
-          <button type="button" className="underline disabled:opacity-50" disabled={busy || !approved[bundle.id]}
+          <button type="button" className="underline disabled:opacity-50" disabled={busy || !ready}
             onClick={() => void verifyDownload(bundle)}>{platform === "google" ? "Download and verify Google packet" : "Download and verify all files"}</button>
-          <button type="button" className="underline disabled:opacity-50" disabled={busy || !approved[bundle.id] || !trail.some((event) => event.event === "verified_download")}
+          <button type="button" className="underline disabled:opacity-50" disabled={busy || !ready || !trail.some((event) => event.event === "verified_download")}
             onClick={() => void record(bundle, "handoff_reported")}>Report handoff</button>
-          <button type="button" className="underline disabled:opacity-50" disabled={busy || !approved[bundle.id] || !trail.some((event) => event.event === "handoff_reported")}
+          <button type="button" className="underline disabled:opacity-50" disabled={busy || !ready || !trail.some((event) => event.event === "handoff_reported")}
             onClick={() => void record(bundle, "external_ids_reported")}>Report external IDs</button>
         </div>
         {trail.map((event) => <p key={event.id} className="mt-1 text-muted-foreground">
