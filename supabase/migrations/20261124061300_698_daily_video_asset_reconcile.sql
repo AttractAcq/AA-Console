@@ -207,12 +207,17 @@ begin
     if package.cutoff_at<=now() or run.deadline_at<=now()
       or attachment.id is null or candidate.id is null or asset.id is null
       or attachment.client_id is distinct from run.client_id
+      or attachment.project_id is distinct from project.id
+      or attachment.ir_version is distinct from project.ir_version
       or candidate.project_id is distinct from project.id
       or candidate.client_id is distinct from run.client_id
       or candidate.ir_version is distinct from project.ir_version
+      or candidate.aspect is distinct from project.aspects[1]
+      or candidate.aspect is distinct from '9:16'
       or asset.brief_id is distinct from project.brief_id
       or asset.media_type is distinct from 'video'
       or asset.content_format is distinct from item.content_format
+      or asset.edit_stage is distinct from 'review_ready'
       or asset.render_path is distinct from candidate.storage_path
       or asset.delivery_bytes_sha256 is distinct from candidate.file_sha256
       or candidate_count is distinct from cardinality(project.aspects)
