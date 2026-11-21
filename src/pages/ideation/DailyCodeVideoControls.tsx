@@ -118,10 +118,11 @@ export function DailyCodeVideoControls({ clientId, onPlanned }: {
         </label>)}
         {!sources.length && <p>No supported model sections are available.</p>}
       </fieldset>
-      <button type="button" disabled={busy || !routeId || sourceIds.length < 1 || sourceIds.length > 12}
+      <button type="button" disabled={busy || settings.enabled || !routeId || sourceIds.length < 1 || sourceIds.length > 12}
         onClick={() => void configure()} className="rounded-md border border-border px-3 py-2 text-xs disabled:opacity-50">
         Save daily video sources
       </button>
+      {settings.enabled && <p className="text-xs text-muted-foreground">Switch daily production off on the Dashboard before changing its approved route or model sources.</p>}
       <label className="block text-xs">Package day
         <input aria-label="Daily video package day" type="date" value={packageDay}
           onChange={(event) => setPackageDay(event.target.value)}

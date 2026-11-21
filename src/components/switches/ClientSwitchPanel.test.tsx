@@ -15,6 +15,8 @@ const state = {
   settings: null as Record<string, unknown> | null,
   controls: { enabled: false } as { enabled: boolean } | null,
   booking: null as { enabled: boolean } | null,
+  dailyPackage: null as { enabled: boolean } | null,
+  dailySourcesCurrent: false,
   error: null as string | null,
   runtime: null as Record<string, unknown> | null,
   activity: null as Record<string, unknown> | null,
@@ -38,6 +40,8 @@ function result(table: string) {
       return { data: state.settings, error: null };
     case "engine_controls":
       return { data: state.controls, error: null };
+    case "client_daily_package_settings":
+      return { data: state.dailyPackage, error: null };
     default:
       return { data: state.booking, error: null };
   }
@@ -58,11 +62,14 @@ beforeEach(() => {
   state.settings = { ...SETTINGS };
   state.controls = { enabled: false };
   state.booking = null;
+  state.dailyPackage = null;
+  state.dailySourcesCurrent = false;
   state.error = null;
   state.runtime = null;
   state.activity = null;
   rpc.mockImplementation((name: string) => Promise.resolve(
     name === "client_runtime_controls_v6" ? { data: state.runtime, error: null }
+      : name === "daily_video_sources_current_v1" ? { data: state.dailySourcesCurrent, error: null }
       : name === "client_control_activity_v6" ? { data: state.activity, error: null }
         : { error: null },
   ));
@@ -71,11 +78,36 @@ beforeEach(() => {
 describe("every switch in one place", () => {
   it("counts how many are on, so the heading answers the question first", async () => {
     // The system-wide switch is deliberately on and deliberately not
-    // counted: nine, not ten, and the two are this client's own.
+    // counted: ten, not eleven, and the two are this client's own.
     state.controls = { enabled: true };
     state.settings = { ...SETTINGS, enabled: true, auto_approve_ideas: true };
     render(<ClientSwitchPanel clientId="c1" />);
-    expect(await screen.findByText(/Switches — 2 of 9 on/)).toBeInTheDocument();
+    expect(await screen.findByText(/Switches — 2 of 10 on/)).toBeInTheDocument();
+  });
+
+  it("requests an exact daily activation review only after current sources and worker are observed", async () => {
+    state.dailyPackage = { enabled: false };
+    state.dailySourcesCurrent = true;
+    state.runtime = { state: "observed", workerEnabled: true, controls: {} };
+    render(<ClientSwitchPanel clientId="c1" />);
+    await userEvent.click(await screen.findByLabelText("Switch on Produce a daily content package"));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_client_switch_activation_v6", {
+      p_client_id: "c1", p_switch_key: "daily_package",
+    }));
+  });
+
+  it("shows daily production as an internal run without a provider receipt", async () => {
+    state.dailyPackage = { enabled: true };
+    state.dailySourcesCurrent = true;
+    state.runtime = { state: "observed", workerEnabled: true, controls: {} };
+    state.activity = { daily_package: {
+      lastRun: { at: "2026-11-21T08:00:00Z", status: "awaiting_human_approval", sourceId: "package-1" },
+      lastExternalReceipt: null,
+    } };
+    render(<ClientSwitchPanel clientId="c1" />);
+    expect(await screen.findByText("Produce a daily content package")).toBeInTheDocument();
+    expect(screen.getByText(/Last run: .*awaiting_human_approval/)).toBeInTheDocument();
+    expect(screen.getAllByText("Last external receipt: not applicable").length).toBeGreaterThan(0);
   });
 
   it("lists each switch with what is true while it is off", async () => {

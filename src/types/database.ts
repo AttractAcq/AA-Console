@@ -49764,6 +49764,25 @@ export type Database = {
         Args: { p_archived?: boolean; p_id: string; p_record: string }
         Returns: undefined
       }
+      set_daily_package_enabled_v1: {
+        Args: { p_client_id: string; p_enabled: boolean }
+        Returns: {
+          approval_cutoff: string
+          campaign_id: string
+          client_id: string
+          enabled: boolean
+          pillar_id: string
+          platform: Database["public"]["Enums"]["post_platform"]
+          story_media_type: Database["public"]["Enums"]["media_type"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_daily_package_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_engine_enabled: {
         Args: { p_client_id: string; p_enabled: boolean }
         Returns: {

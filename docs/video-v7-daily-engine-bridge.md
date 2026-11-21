@@ -51,7 +51,18 @@ destination, story type and local approval cutoff. The resulting row is always
 disabled, and the function refuses to retarget an enabled row. The Dashboard
 exposes these inputs through an AAL2, client-scoped runtime route. Setup never
 activates the daily switch, creates a package or publishes content. Activation
-still needs its own approval-governed Dashboard control.
+uses the separate approval-governed Dashboard switch below.
+
+Migration 700 adds that control through the existing client switch approval
+class. The Dashboard requests an exact AAL2 Inbox decision; its preview binds
+the disabled daily settings, organic route, reviewed model-source snapshot and
+legacy Engine state. An SQL guard refuses a direct enable, the decision
+rechecks current sources, and changes to live settings or video sources require
+switching daily production off first. A second guard prevents the legacy
+client Engine from being turned on while the daily switch is on. Turning daily
+production off remains immediate for a human admin. The Dashboard shows the
+latest internal daily run without inventing an external receipt. An enabled
+production switch still does not approve any asset or authorize publication.
 
 ## Required execution contract
 
@@ -91,9 +102,8 @@ save the current organic route and 1–12 supported model sources, then
 explicitly request one v6 day. The browser offers those controls only when
 the client already has daily package settings; the route still rechecks
 client authority and the service-only SQL checks source currency and cutoff.
-A real provider-run attachment, signed-in use, and approval-governed Dashboard
-activation remain unverified. The disabled Dashboard setup path is now
-implemented and awaits deployed, signed-in verification.
+A real provider-run attachment and signed-in use remain unverified. The
+Dashboard setup and reviewed activation paths await deployed verification.
 Then inspect the signed-in client page and run one scoped preparation case before calling the bridge
 operational. Keep outbound switches off until separate approval and provider
 receipt gates pass.

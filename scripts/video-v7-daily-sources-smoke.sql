@@ -89,18 +89,11 @@ begin
     from public.client_daily_package_settings
     where client_id='e2222222-2222-4222-8222-222222222222') then
     raise exception 'Daily setup enabled internal production'; end if;
-  update public.client_daily_package_settings set enabled=true
-    where client_id='e2222222-2222-4222-8222-222222222222';
   begin
-    perform public.configure_daily_package_settings_v1(
-      'e2222222-2222-4222-8222-222222222222',
-      'e6666666-6666-4666-8666-666666666666',
-      'e8888888-8888-4888-8888-888888888888',
-      'instagram','image',time '10:00');
-    raise exception 'Live daily setup was retargeted';
-  exception when check_violation then null; end;
-  update public.client_daily_package_settings set enabled=false
-    where client_id='e2222222-2222-4222-8222-222222222222';
+    update public.client_daily_package_settings set enabled=true
+      where client_id='e2222222-2222-4222-8222-222222222222';
+    raise exception 'Direct service-role update enabled daily production';
+  exception when insufficient_privilege then null; end;
   begin
     perform public.configure_daily_video_sources_v1(
       'e2222222-2222-4222-8222-222222222222',
@@ -144,6 +137,65 @@ begin
   end if;
 end $checks$;
 
+-- The reviewed route was superseded in the previous check. Save its current
+-- replacement before an exact AAL2 activation; direct writes stay denied.
+select public.configure_daily_video_sources_v1(
+  'e2222222-2222-4222-8222-222222222222',
+  'e9999999-9999-4999-8999-999999999999',
+  array['e4444444-4444-4444-8444-444444444444']::uuid[]);
+reset role;
+select set_config('request.jwt.claim.role','authenticated',true);
+do $activation$
+declare rid uuid; qid uuid;
+begin
+  rid:=public.request_client_switch_activation_v6(
+    'e2222222-2222-4222-8222-222222222222','daily_package');
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+  perform public.configure_daily_video_sources_v1(
+    'e2222222-2222-4222-8222-222222222222',
+    'e9999999-9999-4999-8999-999999999999',
+    array['e4444444-4444-4444-8444-444444444444']::uuid[]);
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"e1111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',true);
+  if public.client_switch_activation_source_state_v6(rid)<>'superseded' then
+    raise exception 'Changed daily source did not invalidate its pending review'; end if;
+  rid:=public.request_client_switch_activation_v6(
+    'e2222222-2222-4222-8222-222222222222','daily_package');
+  select id into qid from public.client_switch_activation_reviews_v6
+    where canonical_request_id=rid;
+  if qid is null or public.client_switch_activation_source_state_v6(rid)<>'pending' then
+    raise exception 'Daily activation review was not current'; end if;
+  perform set_config('request.jwt.claims',
+    '{"sub":"e1111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal1"}',true);
+  begin
+    perform public.decide_client_switch_activation_v6(qid,rid,true,null);
+    raise exception 'AAL1 approved daily production';
+  exception when insufficient_privilege then null; end;
+  perform set_config('request.jwt.claims',
+    '{"sub":"e1111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',true);
+  perform public.decide_client_switch_activation_v6(qid,rid,true,null);
+  if public.client_switch_activation_source_state_v6(rid)<>'source_decided' then
+    raise exception 'Approved daily activation did not retain its decision receipt'; end if;
+  if not (select enabled from public.client_daily_package_settings
+    where client_id='e2222222-2222-4222-8222-222222222222') then
+    raise exception 'AAL2 daily activation did not enable the switch'; end if;
+  begin
+    update public.client_daily_package_settings set approval_cutoff=time '10:00'
+      where client_id='e2222222-2222-4222-8222-222222222222';
+    raise exception 'Enabled daily setup changed without switching off';
+  exception when insufficient_privilege then null; end;
+  begin
+    update public.client_daily_video_sources_v1
+      set source_digest=repeat('f',64)
+      where client_id='e2222222-2222-4222-8222-222222222222';
+    raise exception 'Enabled daily video sources changed without switching off';
+  exception when insufficient_privilege then null; end;
+end $activation$;
+set local role service_role;
+select set_config('request.jwt.claim.role','service_role',true);
+
 -- Construct one sealed new-version daily run with an accepted video brief.
 -- The older v5 planner is deliberately not invoked or modified.
 do $fixture$
@@ -155,16 +207,10 @@ declare configured public.client_daily_video_sources_v1%rowtype;
   video_step public.workflow_steps%rowtype;
   package public.daily_packages%rowtype;
 begin
-  perform public.configure_daily_video_sources_v1(
-    'e2222222-2222-4222-8222-222222222222',
-    'e9999999-9999-4999-8999-999999999999',
-    array['e4444444-4444-4444-8444-444444444444']::uuid[]);
   select * into configured from public.client_daily_video_sources_v1
     where client_id='e2222222-2222-4222-8222-222222222222';
   select * into route from public.campaign_route_packages_v6
     where id=configured.route_package_id;
-  update public.client_daily_package_settings set enabled=true
-    where client_id=configured.client_id;
   run:=public.create_workflow_run(configured.client_id,
     'daily_content_package','v6.daily.code_video.1','2099-01-02',
     jsonb_build_object('video_route_package_id',route.id,
@@ -295,14 +341,6 @@ begin
     where i.id=item_id and (s.status<>'pending' or s.job_id is not null)) then
     raise exception 'Generic v5 reconciler took the v6 code-video step';
   end if;
-  update public.client_daily_package_settings set enabled=false
-    where client_id='e2222222-2222-4222-8222-222222222222';
-  begin
-    perform public.start_daily_video_project_v1(item_id);
-    raise exception 'Disabled daily Engine started a video project';
-  exception when check_violation then null; end;
-  update public.client_daily_package_settings set enabled=true
-    where client_id='e2222222-2222-4222-8222-222222222222';
   begin
     perform public.start_daily_video_project_v1(item_id);
     raise exception 'Paused video script worker started daily project';
@@ -462,4 +500,17 @@ begin
     where step_id=step.id)<>1 then
     raise exception 'Daily video reconciliation duplicated a final asset'; end if;
 end $terminal_accept$;
+reset role;
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claims',
+  '{"sub":"e1111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',true);
+do $activity$
+declare activity jsonb;
+begin
+  activity:=public.client_control_activity_v6(
+    'e2222222-2222-4222-8222-222222222222');
+  if activity->'daily_package'->'lastRun'->>'sourceId' is null
+    or activity->'daily_package'->'lastExternalReceipt'<>'null'::jsonb then
+    raise exception 'Dashboard daily activity confused internal production with external receipt'; end if;
+end $activity$;
 rollback;
