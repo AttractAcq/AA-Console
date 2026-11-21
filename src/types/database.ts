@@ -42458,6 +42458,17 @@ export type Database = {
         }
         Returns: string
       }
+      configure_daily_package_settings_v1: {
+        Args: {
+          p_approval_cutoff: string
+          p_campaign_id: string
+          p_client_id: string
+          p_pillar_id: string
+          p_platform: Database["public"]["Enums"]["post_platform"]
+          p_story_media_type: Database["public"]["Enums"]["media_type"]
+        }
+        Returns: Json
+      }
       configure_daily_video_sources_v1: {
         Args: {
           p_client_id: string

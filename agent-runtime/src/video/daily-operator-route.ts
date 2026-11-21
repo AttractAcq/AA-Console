@@ -61,6 +61,32 @@ export async function handleDailyVideoOperator(
       { ok: false, error: error instanceof AuthError ? error.message : "Operator access could not be verified." });
     return;
   }
+  if (body.action === "setup") {
+    const campaignId = body.campaignId;
+    const pillarId = body.pillarId;
+    const platform = body.platform;
+    const storyMediaType = body.storyMediaType;
+    const cutoff = body.approvalCutoff;
+    if (typeof campaignId !== "string" || !UUID.test(campaignId)
+      || typeof pillarId !== "string" || !UUID.test(pillarId)
+      || !["facebook", "instagram"].includes(String(platform))
+      || !["image", "video"].includes(String(storyMediaType))
+      || typeof cutoff !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(cutoff)) {
+      reply(res, 400, { ok: false, error: "Choose a built campaign, active pillar, Meta destination, story format and cutoff." });
+      return;
+    }
+    try {
+      const { data, error } = await sb.rpc("configure_daily_package_settings_v1", {
+        p_client_id: clientId, p_campaign_id: campaignId,
+        p_pillar_id: pillarId, p_platform: platform as "facebook" | "instagram",
+        p_story_media_type: storyMediaType as "image" | "video",
+        p_approval_cutoff: cutoff,
+      });
+      if (error) { reply(res, 409, { ok: false, error: error.message }); return; }
+      reply(res, 200, { ok: true, settings: data });
+    } catch { reply(res, 503, { ok: false, error: "Daily package setup is unavailable." }); }
+    return;
+  }
   if (body.action === "configure") {
     const routeId = body.routePackageId;
     const ids = body.modelRecordIds;

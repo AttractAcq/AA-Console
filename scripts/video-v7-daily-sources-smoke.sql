@@ -73,6 +73,35 @@ do $checks$
 declare result jsonb; configured public.client_daily_video_sources_v1%rowtype;
 begin
   begin
+    perform public.configure_daily_package_settings_v1(
+      'e3333333-3333-4333-8333-333333333333',
+      'e6666666-6666-4666-8666-666666666666',
+      'e8888888-8888-4888-8888-888888888888',
+      'instagram','image',time '09:00');
+    raise exception 'Cross-client daily setup was accepted';
+  exception when check_violation then null; end;
+  result:=public.configure_daily_package_settings_v1(
+    'e2222222-2222-4222-8222-222222222222',
+    'e6666666-6666-4666-8666-666666666666',
+    'e8888888-8888-4888-8888-888888888888',
+    'instagram','image',time '09:00');
+  if result->>'enabled'<>'false' or (select enabled
+    from public.client_daily_package_settings
+    where client_id='e2222222-2222-4222-8222-222222222222') then
+    raise exception 'Daily setup enabled internal production'; end if;
+  update public.client_daily_package_settings set enabled=true
+    where client_id='e2222222-2222-4222-8222-222222222222';
+  begin
+    perform public.configure_daily_package_settings_v1(
+      'e2222222-2222-4222-8222-222222222222',
+      'e6666666-6666-4666-8666-666666666666',
+      'e8888888-8888-4888-8888-888888888888',
+      'instagram','image',time '10:00');
+    raise exception 'Live daily setup was retargeted';
+  exception when check_violation then null; end;
+  update public.client_daily_package_settings set enabled=false
+    where client_id='e2222222-2222-4222-8222-222222222222';
+  begin
     perform public.configure_daily_video_sources_v1(
       'e2222222-2222-4222-8222-222222222222',
       'e7777777-7777-4777-8777-777777777777',

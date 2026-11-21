@@ -45,6 +45,14 @@ passes the existing daily role/campaign/pillar validation trigger. A failed
 or stale project retains a visible blocker; a completed script job alone
 cannot finish the step.
 
+Migration 699 adds a service-only setup action for a client with no daily
+package settings. It accepts a built campaign, active content pillar, Meta
+destination, story type and local approval cutoff. The resulting row is always
+disabled, and the function refuses to retarget an enabled row. The Dashboard
+exposes these inputs through an AAL2, client-scoped runtime route. Setup never
+activates the daily switch, creates a package or publishes content. Activation
+still needs its own approval-governed Dashboard control.
+
 ## Required execution contract
 
 1. Keep all v5 rows and their graph readable and executable; never rewrite
@@ -83,8 +91,9 @@ save the current organic route and 1–12 supported model sources, then
 explicitly request one v6 day. The browser offers those controls only when
 the client already has daily package settings; the route still rechecks
 client authority and the service-only SQL checks source currency and cutoff.
-A real provider-run attachment, signed-in use, and a Dashboard setup path
-for clients without daily package settings remain unverified.
+A real provider-run attachment, signed-in use, and approval-governed Dashboard
+activation remain unverified. The disabled Dashboard setup path is now
+implemented and awaits deployed, signed-in verification.
 Then inspect the signed-in client page and run one scoped preparation case before calling the bridge
 operational. Keep outbound switches off until separate approval and provider
 receipt gates pass.

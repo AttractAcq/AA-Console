@@ -10,6 +10,8 @@ const ROUTE = "33333333-3333-4333-8333-333333333333";
 const SOURCE = "44444444-4444-4444-8444-444444444444";
 const PACKAGE = "55555555-5555-4555-8555-555555555555";
 const RUN = "66666666-6666-4666-8666-666666666666";
+const CAMPAIGN = "77777777-7777-4777-8777-777777777777";
+const PILLAR = "88888888-8888-4888-8888-888888888888";
 
 function request(body: Record<string, unknown>): IncomingMessage {
   const req = Readable.from([JSON.stringify({ clientId: CLIENT, ...body })]) as IncomingMessage;
@@ -86,6 +88,20 @@ describe("daily code-video operator route", () => {
       body: { ok: true, packageId: PACKAGE, runId: RUN } });
     expect(rpc).toHaveBeenCalledWith("plan_daily_code_video_package_v1", {
       p_client_id: CLIENT, p_day: "2099-01-02",
+    });
+  });
+
+  it("saves disabled daily setup without an activation argument", async () => {
+    const { sb, rpc } = service();
+    const { res, result } = response();
+    await handleDailyVideoOperator(request({ action: "setup", campaignId: CAMPAIGN,
+      pillarId: PILLAR, platform: "instagram", storyMediaType: "image",
+      approvalCutoff: "09:00" }), res, sb);
+    expect(result().status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("configure_daily_package_settings_v1", {
+      p_client_id: CLIENT, p_campaign_id: CAMPAIGN, p_pillar_id: PILLAR,
+      p_platform: "instagram", p_story_media_type: "image",
+      p_approval_cutoff: "09:00",
     });
   });
 

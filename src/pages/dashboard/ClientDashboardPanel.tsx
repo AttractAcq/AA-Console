@@ -12,6 +12,7 @@ import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { totalSpend, unresolvedFailures } from "../../lib/jobHistory";
 import { ClientOperationalBrief } from "./ClientOperationalBrief";
+import { DailyPackageSetupPanel } from "./DailyPackageSetupPanel";
 
 type JobRow = {
   id: string;
@@ -115,6 +116,7 @@ export function ClientDashboardPanel() {
         failedRuns={historyError ? null : failed.length}
         activeRuns={!liveLoaded || liveError ? null : active.length} />}
       {clientId && <ClientSwitchPanel clientId={clientId} />}
+      {clientId && <DailyPackageSetupPanel clientId={clientId} />}
 
       <Panel title="Agent spend"><p className="text-2xl font-semibold text-card-foreground">
         {historyError ? "Unknown" : `$${spend.toFixed(2)}`}

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "ba31c8ee94f0da5121eb942c26006d5815c9538fbca3733de16e15613ce611b5",
-  "generatedTypesSha256": "039fdd04ab3f29d2c87493fb5aad5d3dc599a145accf043c433386f16f600891",
-  "generatedSchemaBodySha256": "6d33b4aa58fa84f77581b47ef7ed9c279a0601a7974ed1e348b773ef6b7318cc",
+  "migrationSourceDigest": "07b57bea899397c2b80f637dda546ea4927fac71590d4ee57dd35b88090d203c",
+  "generatedTypesSha256": "b98c99d0d5d1855d648bd5267c5baefae23d38490b87a6fceae1cf72ae99ab70",
+  "generatedSchemaBodySha256": "867b124c0fc821c50f0650a5d5eecac9cb5c32ff080aae85bb02a49d1482454e",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -5008,6 +5008,13 @@
       "filename": "20261124061300_698_daily_video_asset_reconcile.sql",
       "sha256": "5004420ee0d5728be7fc0f75ad9eb6150dde4874541878e76aa6b3237675be60",
       "trimmedMd5": "588969d21193cf8bb4d244f5e7211e1f"
+    },
+    {
+      "version": "20261124061400",
+      "name": "699_daily_package_safe_setup",
+      "filename": "20261124061400_699_daily_package_safe_setup.sql",
+      "sha256": "b5374f235d5ec64f635edbf6f280c5936d2d7820100c63a8e7de9d8060e9090e",
+      "trimmedMd5": "9372e60b4c95f325e262ad42bba642c8"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
