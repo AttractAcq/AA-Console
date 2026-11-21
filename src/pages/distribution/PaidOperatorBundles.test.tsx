@@ -105,12 +105,34 @@ it("requires a Google keyword research task in the exact operator packet", async
 it("keeps a stale bundle from reporting a handoff", async () => {
   rows.paid_operator_bundles_v7 = [{ id: "bundle-1", client_id: "client-1",
     campaign_id: "campaign-1", package_id: "package-1", platform: "meta", version: 1,
-    snapshot_hash: "a".repeat(64), snapshot: { source: { campaign_name: "Local offer" } },
+    snapshot_hash: "a".repeat(64), snapshot: { source: { campaign_name: "Local offer",
+      creative: [{ asset_id: "asset-1", storage_path: "client/one.png",
+        file_sha256: "a".repeat(64) }] } },
     created_at: "2026-11-16T00:00:00Z", created_by: "user-1" }];
-  rpc.mockResolvedValue({ data: false, error: null });
+  rpc.mockImplementation((name: string) => Promise.resolve({
+    data: name === "paid_operator_bundle_approved_v7", error: null,
+  }));
   render(<PaidOperatorBundles clientId="client-1" platform="meta" />);
   expect(await screen.findByText(/Local offer · v1 · stale or unverified/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Download exact JSON" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Download verified asset-1" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Download and verify all files" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Report handoff" })).toBeDisabled();
+});
+
+it("reports an unavailable exact review read instead of calling the bundle unapproved", async () => {
+  rows.paid_operator_bundles_v7 = [{ id: "bundle-1", client_id: "client-1",
+    campaign_id: "campaign-1", package_id: "package-1", platform: "meta", version: 1,
+    snapshot_hash: "a".repeat(64), snapshot: { source: { campaign_name: "Local offer" } },
+    created_at: "2026-11-16T00:00:00Z", created_by: "user-1" }];
+  rpc.mockImplementation((name: string) => Promise.resolve(name === "paid_operator_bundle_approved_v7"
+    ? { data: null, error: { message: "permission denied" } }
+    : { data: true, error: null }));
+  render(<PaidOperatorBundles clientId="client-1" platform="meta" />);
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Exact review status is unavailable for bundle bundle-1: permission denied");
+  expect(screen.queryByText(/not approved/)).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Download exact JSON" })).not.toBeInTheDocument();
 });
 
 it("requires a reported verified download before the handoff button is usable", async () => {
@@ -173,7 +195,9 @@ it("shows the reviewed Google copy packet without requiring a media file", async
 it("holds exact packet download and handoff until the bundle review is approved", async () => {
   rows.paid_operator_bundles_v7 = [{ id: "bundle-1", client_id: "client-1",
     campaign_id: "campaign-1", package_id: "package-1", platform: "meta", version: 1,
-    snapshot_hash: "a".repeat(64), snapshot: { source: { campaign_name: "Local offer" } },
+    snapshot_hash: "a".repeat(64), snapshot: { source: { campaign_name: "Local offer",
+      creative: [{ asset_id: "asset-1", storage_path: "client/one.png",
+        file_sha256: "a".repeat(64) }] } },
     created_at: "2026-11-16T00:00:00Z", created_by: "user-1" }];
   rpc.mockImplementation((name: string) => Promise.resolve({
     data: name === "paid_operator_bundle_approved_v7" ? false : true, error: null,
@@ -181,6 +205,7 @@ it("holds exact packet download and handoff until the bundle review is approved"
   render(<PaidOperatorBundles clientId="client-1" platform="meta" />);
   expect(await screen.findByText(/Local offer · v1 · not approved/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Download exact JSON" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Download verified asset-1" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Download and verify all files" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Report handoff" })).toBeDisabled();
 });
