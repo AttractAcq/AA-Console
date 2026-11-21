@@ -75,8 +75,11 @@ fixture verifies that a mismatched render Storage receipt holds the step,
 then an exact attached MP4 binds one daily asset and produces one internal-QA
 artifact without duplication. It bypasses pre-render, cost and thumbnail
 insert triggers only inside the rollback transaction; those stages have their
-own V5 render fixture. A real provider-run attachment and coexistence with
-an in-flight v5 daily package remain unverified. Then inspect the signed-in client
-page and run one scoped preparation case before calling the bridge
+own V5 render fixture. A separate rollback case proves an in-flight v5
+package keeps its 14-step edit graph and queues an idea job beside a v6
+package. The daily production overview now displays graph type, run state
+and step blockers. A real provider-run attachment and operator controls for
+choosing route/model sources and requesting a v6 day remain unverified.
+Then inspect the signed-in client page and run one scoped preparation case before calling the bridge
 operational. Keep outbound switches off until separate approval and provider
 receipt gates pass.

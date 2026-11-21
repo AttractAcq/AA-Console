@@ -212,6 +212,45 @@ begin
   end if;
 end $planner_checks$;
 
+-- A legacy in-flight day retains its original graph and still queues work
+-- beside a new v6 day. Neither planner rewrites the other's sealed run.
+do $legacy_coexistence$
+declare legacy public.daily_packages%rowtype;
+  legacy_run public.workflow_runs%rowtype;
+  final_step public.workflow_steps%rowtype;
+  idea_step public.workflow_steps%rowtype;
+  v6_video_step public.workflow_steps%rowtype;
+begin
+  legacy:=public.plan_daily_package(
+    'e2222222-2222-4222-8222-222222222222',date '2099-01-04');
+  select * into legacy_run from public.workflow_runs where id=legacy.run_id;
+  select s.* into final_step from public.daily_package_items i
+    join public.workflow_steps s on s.id=i.final_step_id
+    where i.package_id=legacy.id and i.role='reel';
+  if legacy_run.workflow_version is distinct from 'v5.daily.1'
+    or final_step.agent_key is distinct from 'video_edit'
+    or (select count(*) from public.workflow_steps
+      where run_id=legacy_run.id)<>14 then
+    raise exception 'Legacy daily graph was rewritten by v6 planner'; end if;
+  -- This rollback client has no full Intelligence record. Isolate graph
+  -- routing by satisfying the legacy ideation worker's external prerequisite.
+  update public.agents set paused=false,requires_upstream='{}'::text[]
+    where agent_key='ideation';
+  perform public.reconcile_workflow_runs(100);
+  select * into idea_step from public.workflow_steps
+    where run_id=legacy_run.id and step_key='reel_idea';
+  select s.* into v6_video_step from public.workflow_steps s
+    join public.daily_package_items i on i.final_step_id=s.id
+    join public.daily_packages p on p.id=i.package_id
+    where p.package_day=date '2099-01-03' and i.role='reel';
+  if idea_step.status is distinct from 'queued' or idea_step.job_id is null
+    or v6_video_step.status is distinct from 'pending'
+    or v6_video_step.job_id is not null then
+    raise exception 'Legacy/v6 crossed graphs: legacy %, job %, blocker %; v6 %, job %',
+      idea_step.status,idea_step.job_id,idea_step.blocker,
+      v6_video_step.status,v6_video_step.job_id; end if;
+end $legacy_coexistence$;
+
 do $start_checks$
 declare item_id uuid; result jsonb; replay jsonb;
   project public.video_projects%rowtype;
