@@ -17,8 +17,10 @@ H.264 MP4. The copies for Alex's review are in
 | `Proof-with-permission-9x16.mp4` | 1080×1920 | 24.6 s | `af2ef03bbaa1c9a2fd90d8d02ea8677fb1dcdf438cb9a8dcb91ed1e668dc00ec` |
 
 `ffprobe` confirmed each codec, dimensions, frame rate and duration. `ffmpeg`
-decoded each whole file without an error. A frame from each was inspected for
-obvious clipping; that sample does not prove every frame is visually correct.
+decoded each whole file without an error. Contact sheets sample every scene of
+all three videos and are copied beside the MP4s for review. Inspection of
+those samples found no obvious text clipping. The contact sheets are sampled
+frames; they do not prove all animation frames or transitions are correct.
 
 These fixtures use `audioSrc: null` and empty word timings. **They are silent
 local visual preflights**, not finished narrated videos, model-written outputs,
