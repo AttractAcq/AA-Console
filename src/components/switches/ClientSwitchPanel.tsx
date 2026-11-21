@@ -48,6 +48,8 @@ type SwitchState = {
   settings: EngineSettings | null;
   engineRunning: boolean;
   bookingEnabled: boolean | null;
+  dailyPackageEnabled: boolean | null;
+  dailySourcesCurrent: boolean | null;
   runtime: RuntimeControls | null;
   activity: Record<string, ControlActivity> | null;
 };
@@ -82,6 +84,7 @@ const REVIEWED_SWITCHES = new Set([
   "engine", "auto_approve_ideas", "auto_approve_briefs", "publishing",
   "proof_publishing", "campaign_actions", "outbound_messaging",
   "lead_magnet_delivery", "booking",
+  "daily_package",
 ]);
 
 function sourcePath(clientId: string, key: string): string {
@@ -91,10 +94,19 @@ function sourcePath(clientId: string, key: string): string {
   if (key === "proof_publishing") return `${base}proof-distribution`;
   if (key === "campaign_actions") return `${base}approval-inbox?tab=campaign-actions`;
   if (key === "lead_magnet_delivery") return `${base}lead-magnet-studio`;
+  if (key === "daily_package") return `${base}content-production-factory`;
   return `${base}sales-os`;
 }
 
 function dependency(state: SwitchState, key: string): string | null {
+  if (key === "daily_package") {
+    if (state.settings?.enabled) return "Switch the legacy content engine off before starting daily production.";
+    if (state.dailySourcesCurrent !== true) return state.dailySourcesCurrent === false
+      ? "Choose a current organic route and reviewed model sources in Content Production."
+      : "Daily route and model-source status has not been verified.";
+    if (state.runtime?.state !== "observed" || state.runtime.workerEnabled !== true)
+      return "Agent runtime worker is off or unverified.";
+  }
   if (key === "engine" && !state.engineRunning) return "System-wide content engine is off.";
   if (key === "engine" && (!state.runtime || !("budgetCap" in state.runtime))) return "Current month spend cap has not been verified.";
   if (key === "engine" && state.runtime?.budgetCap == null) return "No spend cap is set for this month.";
@@ -237,6 +249,15 @@ const SWITCHES: SwitchRow[] = [
     value: (s) => s.bookingEnabled,
     write: (next) => ({ fn: "set_client_booking_enabled_v6", args: { p_enabled: next } }),
   },
+  {
+    key: "daily_package",
+    label: "Produce a daily content package",
+    on: "A four-asset package can run through internal production and wait for exact human review.",
+    off: "No recurring daily package starts for this client.",
+    caveat: "Needs a built campaign, active pillar, current organic route and reviewed model sources. Publication stays separately gated.",
+    value: (s) => s.dailyPackageEnabled,
+    write: (next) => ({ fn: "set_daily_package_enabled_v1", args: { p_enabled: next } }),
+  },
 ];
 
 export function ClientSwitchPanel({ clientId }: { clientId: string }) {
@@ -244,6 +265,8 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
     settings: null,
     engineRunning: false,
     bookingEnabled: null,
+    dailyPackageEnabled: null,
+    dailySourcesCurrent: null,
     runtime: null,
     activity: null,
   });
@@ -253,14 +276,16 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const [settings, controls, booking, runtime, activity] = await Promise.all([
+    const [settings, controls, booking, dailyPackage, dailySources, runtime, activity] = await Promise.all([
       supabase.from("client_engine_settings").select("*").eq("client_id", clientId).maybeSingle(),
       supabase.from("engine_controls").select("enabled").maybeSingle(),
       supabase.from("client_booking_settings").select("enabled").eq("client_id", clientId).maybeSingle(),
+      supabase.from("client_daily_package_settings").select("enabled").eq("client_id", clientId).maybeSingle(),
+      supabase.rpc("daily_video_sources_current_v1" as never, { p_client_id: clientId } as never),
       supabase.rpc("client_runtime_controls_v6" as never, { p_client_id: clientId } as never),
       supabase.rpc("client_control_activity_v6" as never, { p_client_id: clientId } as never),
     ]);
-    const failed = settings.error ?? controls.error ?? booking.error ?? activity.error;
+    const failed = settings.error ?? controls.error ?? booking.error ?? dailyPackage.error ?? activity.error;
     setError(failed?.message ?? null);
     setState({
       settings: (settings.data as EngineSettings) ?? null,
@@ -268,6 +293,8 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
       // null, not false: a client with no booking rules yet is a different
       // state from one whose booking is switched off.
       bookingEnabled: (booking.data as { enabled?: boolean } | null)?.enabled ?? null,
+      dailyPackageEnabled: (dailyPackage.data as { enabled?: boolean } | null)?.enabled ?? null,
+      dailySourcesCurrent: dailySources.error ? null : dailySources.data === true,
       runtime: runtime.error ? { state: "unknown", reason: runtime.error.message } : (runtime.data as RuntimeControls | null),
       activity: activity.error ? null : (activity.data as Record<string, ControlActivity> | null) ?? null,
     });
@@ -383,7 +410,8 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
                 {!row.readOnly && (
                 <button
                   type="button"
-                  disabled={busy !== null || unset || heldOn}
+                  disabled={busy !== null || unset || heldOn ||
+                    (row.key === "daily_package" && !value && blocker !== null)}
                   onClick={() => void flip(row, !value)}
                   aria-label={`${value ? "Switch off" : "Switch on"} ${row.label}`}
                   className={`rounded-md px-3 py-1.5 text-sm disabled:opacity-50 ${

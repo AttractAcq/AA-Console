@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { ProductionAttemptComparison } from "../../components/ProductionAttemptComparison";
+import { DailyCodeVideoControls } from "./DailyCodeVideoControls";
 
 type Package = { id: string; run_id: string; package_day: string; platform: string };
+type Run = { id: string; workflow_version: string; status: string; blocker: string | null };
+type StepBlocker = { id: string; run_id: string; step_key: string; blocker: string | null };
 type Count = {
   demand_id: string; run_id: string; piece_key: string; destination: string | null;
   media_type: string | null; content_format: string | null;
@@ -15,8 +18,11 @@ type Count = {
 export function DailyProductionOverview() {
   const { clientId } = useParams<{ clientId: string }>();
   const [packages, setPackages] = useState<Package[]>([]);
+  const [runs, setRuns] = useState<Run[]>([]);
+  const [stepBlockers, setStepBlockers] = useState<StepBlocker[]>([]);
   const [counts, setCounts] = useState<Count[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!clientId) return;
@@ -28,30 +34,53 @@ export function DailyProductionOverview() {
       if (!active) return;
       if (recent.error) { setError(recent.error.message); return; }
       const rows = (recent.data ?? []) as Package[];
-      if (!rows.length) { setPackages([]); setCounts([]); setError(null); return; }
-      const result = await supabase.from("production_demand_counts_v8")
-        .select("demand_id, run_id, piece_key, destination, media_type, content_format, attempts, produced, rejected, revised, workflow_accepted, human_approved")
-        .eq("client_id", clientId).eq("demand_kind", "daily")
-        .in("run_id", rows.map((row) => row.run_id));
+      if (!rows.length) { setPackages([]); setRuns([]); setStepBlockers([]); setCounts([]); setError(null); return; }
+      const [result, runResult, stepResult] = await Promise.all([
+        supabase.from("production_demand_counts_v8")
+          .select("demand_id, run_id, piece_key, destination, media_type, content_format, attempts, produced, rejected, revised, workflow_accepted, human_approved")
+          .eq("client_id", clientId).eq("demand_kind", "daily")
+          .in("run_id", rows.map((row) => row.run_id)),
+        supabase.from("workflow_runs")
+          .select("id, workflow_version, status, blocker")
+          .eq("client_id", clientId)
+          .in("id", rows.map((row) => row.run_id)),
+        supabase.from("workflow_steps")
+          .select("id, run_id, step_key, blocker")
+          .in("run_id", rows.map((row) => row.run_id)),
+      ]);
       if (!active) return;
-      if (result.error) { setError(result.error.message); return; }
+      if (result.error || runResult.error || stepResult.error) {
+        setError(result.error?.message ?? runResult.error?.message
+          ?? stepResult.error?.message ?? "Daily workflow state is unavailable.");
+        return;
+      }
       setPackages(rows);
+      setRuns((runResult.data ?? []) as Run[]);
+      setStepBlockers((stepResult.data ?? []) as StepBlocker[]);
       setCounts((result.data ?? []) as Count[]);
       setError(null);
     };
     void load();
     return () => { active = false; };
-  }, [clientId]);
+  }, [clientId, refreshKey]);
 
   if (!clientId) return null;
 
-  return <section className="mb-5 rounded-lg border border-border bg-card p-4" aria-label="Daily production requests">
+  return <><DailyCodeVideoControls clientId={clientId}
+    onPlanned={() => setRefreshKey((value) => value + 1)} />
+  <section className="mb-5 rounded-lg border border-border bg-card p-4" aria-label="Daily production requests">
     <h2 className="font-semibold">Daily production requests</h2>
     {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
     {!error && !packages.length && <p className="mt-2 text-xs text-muted-foreground">No daily packages have been requested for this client.</p>}
-    {packages.length > 0 && <div className="mt-3 space-y-3">{packages.map((pkg) =>
-      <div key={pkg.id}>
-        <h3 className="text-sm font-medium">{pkg.package_day} · {pkg.platform}</h3>
+    {packages.length > 0 && <div className="mt-3 space-y-3">{packages.map((pkg) => {
+      const run = runs.find((row) => row.id === pkg.run_id);
+      return <div key={pkg.id}>
+        <h3 className="text-sm font-medium">{pkg.package_day} · {pkg.platform} · {run?.workflow_version === "v6.daily.code_video.1" ? "Code video" : run?.workflow_version === "v5.daily.1" ? "Legacy daily" : run?.workflow_version ?? "Workflow unknown"}</h3>
+        <p className="mt-1 text-xs text-muted-foreground">Workflow: {run?.status ?? "unknown"}{run?.blocker ? ` · Held: ${run.blocker}` : ""}</p>
+        {stepBlockers.filter((step) => step.run_id === pkg.run_id && step.blocker)
+          .map((step) => <p key={step.id} className="mt-1 text-xs text-destructive">
+            {step.step_key.replaceAll("_", " ")}: {step.blocker}
+          </p>)}
         <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
           {counts.filter((row) => row.run_id === pkg.run_id).map((row) =>
             <li key={row.demand_id}>
@@ -61,7 +90,7 @@ export function DailyProductionOverview() {
                 demandId={row.demand_id} count={row.attempts} />
             </li>)}
         </ul>
-      </div>)}
+      </div>;})}
     </div>}
-  </section>;
+  </section></>;
 }

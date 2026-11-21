@@ -7536,6 +7536,72 @@ export type Database = {
           },
         ]
       }
+      client_daily_video_sources_v1: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          configured_at: string
+          model_record_ids: string[]
+          review_snapshot: Json
+          route_package_id: string
+          source_digest: string
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          configured_at?: string
+          model_record_ids: string[]
+          review_snapshot: Json
+          route_package_id: string
+          source_digest: string
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          configured_at?: string
+          model_record_ids?: string[]
+          review_snapshot?: Json
+          route_package_id?: string
+          source_digest?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_daily_video_sources_v1_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_daily_video_sources_v1_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_daily_video_sources_v1_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_daily_video_sources_v1_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_daily_video_sources_v1_route_package_id_campaign_id_fkey"
+            columns: ["route_package_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_route_packages_v6"
+            referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+        ]
+      }
       client_engine_budgets: {
         Row: {
           cap_usd: number
@@ -30510,6 +30576,9 @@ export type Database = {
           created_at: string
           created_by: string | null
           critic_reports: Json
+          daily_brief_body_sha256: string | null
+          daily_item_id: string | null
+          daily_source_digest: string | null
           id: string
           idea: string
           ir: Json | null
@@ -30546,6 +30615,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           critic_reports?: Json
+          daily_brief_body_sha256?: string | null
+          daily_item_id?: string | null
+          daily_source_digest?: string | null
           id?: string
           idea: string
           ir?: Json | null
@@ -30582,6 +30654,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           critic_reports?: Json
+          daily_brief_body_sha256?: string | null
+          daily_item_id?: string | null
+          daily_source_digest?: string | null
           id?: string
           idea?: string
           ir?: Json | null
@@ -30696,6 +30771,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_projects_daily_item_id_fkey"
+            columns: ["daily_item_id"]
+            isOneToOne: true
+            referencedRelation: "daily_package_items"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_projects_job_id_fkey"
@@ -42376,6 +42458,25 @@ export type Database = {
         }
         Returns: string
       }
+      configure_daily_package_settings_v1: {
+        Args: {
+          p_approval_cutoff: string
+          p_campaign_id: string
+          p_client_id: string
+          p_pillar_id: string
+          p_platform: Database["public"]["Enums"]["post_platform"]
+          p_story_media_type: Database["public"]["Enums"]["media_type"]
+        }
+        Returns: Json
+      }
+      configure_daily_video_sources_v1: {
+        Args: {
+          p_client_id: string
+          p_record_ids: string[]
+          p_route_package_id: string
+        }
+        Returns: Json
+      }
       content_asset_outcomes_v10: {
         Args: { p_asset_id: string; p_client_id: string }
         Returns: {
@@ -43877,6 +43978,9 @@ export type Database = {
           created_at: string
           created_by: string | null
           critic_reports: Json
+          daily_brief_body_sha256: string | null
+          daily_item_id: string | null
+          daily_source_digest: string | null
           id: string
           idea: string
           ir: Json | null
@@ -44001,6 +44105,10 @@ export type Database = {
           shortfall: number
           target: number
         }[]
+      }
+      daily_video_sources_current_v1: {
+        Args: { p_client_id: string }
+        Returns: boolean
       }
       decide_campaign_action_approval_v6: {
         Args: { p_decision: string; p_reason?: string; p_request_id: string }
@@ -46751,6 +46859,25 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      plan_daily_code_video_package_v1: {
+        Args: { p_client_id: string; p_day: string }
+        Returns: {
+          client_id: string
+          created_at: string
+          cutoff_at: string
+          id: string
+          package_day: string
+          platform: Database["public"]["Enums"]["post_platform"]
+          run_id: string
+          story_media_type: Database["public"]["Enums"]["media_type"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "daily_packages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       plan_daily_package: {
         Args: { p_client_id: string; p_day: string }
         Returns: {
@@ -47014,6 +47141,14 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      reconcile_daily_code_video_steps_v1: {
+        Args: { p_limit?: number }
+        Returns: {
+          assets_accepted: number
+          projects_started: number
+          steps_held: number
+        }[]
       }
       reconcile_unmerged_production_release_merge_lease_v6: {
         Args: {
@@ -49629,6 +49764,25 @@ export type Database = {
         Args: { p_archived?: boolean; p_id: string; p_record: string }
         Returns: undefined
       }
+      set_daily_package_enabled_v1: {
+        Args: { p_client_id: string; p_enabled: boolean }
+        Returns: {
+          approval_cutoff: string
+          campaign_id: string
+          client_id: string
+          enabled: boolean
+          pillar_id: string
+          platform: Database["public"]["Enums"]["post_platform"]
+          story_media_type: Database["public"]["Enums"]["media_type"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_daily_package_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_engine_enabled: {
         Args: { p_client_id: string; p_enabled: boolean }
         Returns: {
@@ -50090,6 +50244,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      start_daily_video_project_v1: {
+        Args: { p_item_id: string }
+        Returns: Json
       }
       start_google_build_v6: {
         Args: { p_execution_id: string }

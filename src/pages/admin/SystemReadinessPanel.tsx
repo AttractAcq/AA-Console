@@ -55,6 +55,14 @@ type Snapshot = {
       genericCampaignActionClaim?: { state: "held" | "ready" | "unknown"; reason: string };
     };
     credentialPresence: Record<string, boolean>;
+    videoProviderConfiguration?: {
+      elevenLabsKeyPresent: boolean;
+      narratorVoiceSelected: boolean;
+      remotionRegionPresent: boolean;
+      remotionFunctionPresent: boolean;
+      remotionSitePresent: boolean;
+      musicRequested: boolean;
+    };
     heartbeats: Observation<{
       workerId: string; sha: string | null; reportedVersion: string | null;
       reportedAt: string; isLive: boolean; enabled: boolean | null;
@@ -235,6 +243,20 @@ export function SystemReadinessPanel() {
             <p className="text-xs text-muted-foreground">Presence only; no credential value is returned.</p>
             <dl className="mt-2 space-y-1 text-sm">{Object.entries(snapshot.runtime.credentialPresence).map(([key, value]) =>
               <div key={key} className="flex justify-between gap-3"><dt>{key}</dt><dd>{value ? "Present" : "Missing"}</dd></div>)}</dl>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <h3 className="font-medium">Video provider configuration</h3>
+            <p className="text-xs text-muted-foreground">Presence only. This does not verify a licence, account access, provider render or stored output.</p>
+            {snapshot.runtime.videoProviderConfiguration ?
+              <dl className="mt-2 space-y-1 text-sm">{Object.entries({
+                "ElevenLabs key": snapshot.runtime.videoProviderConfiguration.elevenLabsKeyPresent,
+                "Narrator voice": snapshot.runtime.videoProviderConfiguration.narratorVoiceSelected,
+                "Remotion region": snapshot.runtime.videoProviderConfiguration.remotionRegionPresent,
+                "Remotion function": snapshot.runtime.videoProviderConfiguration.remotionFunctionPresent,
+                "Remotion site": snapshot.runtime.videoProviderConfiguration.remotionSitePresent,
+                "Music requested": snapshot.runtime.videoProviderConfiguration.musicRequested,
+              }).map(([key, value]) => <div key={key} className="flex justify-between gap-3"><dt>{key}</dt><dd>{value ? "Present" : "Missing or off"}</dd></div>)}</dl>
+              : <p className="mt-2 text-sm text-muted-foreground">Unknown until this runtime reports video configuration.</p>}
           </div>
         </div>
         <div className="rounded-lg border border-border bg-card p-4 text-sm">

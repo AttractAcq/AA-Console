@@ -29,6 +29,7 @@ export function CodeVideoAttachmentsPanel({ clientId, titles, projectIds }: {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
   const requestEpoch = useRef(0);
   const urls = useSignedPreviewPaths("client-media", [
     ...[...assets.values()].map((asset) => asset.render_path ?? asset.storage_path),
@@ -105,26 +106,42 @@ export function CodeVideoAttachmentsPanel({ clientId, titles, projectIds }: {
     void refresh();
   }
 
-  async function downloadVideo(path: string, title: string, aspect?: string) {
-    setError(null);
+  async function downloadVideo(candidate: Candidate, title: string,
+    includeAspect = false) {
+    setError(null); setNotice(null);
     const filename = `${title
       .replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").slice(0, 80)
-      || "reviewed-video"}${aspect ? `-${aspect.replace(":", "x")}` : ""}.mp4`;
+      || "reviewed-video"}${includeAspect
+      ? `-${candidate.aspect.replace(":", "x")}` : ""}.mp4`;
+    setDownloading(candidate.id);
     try {
       const signed = await supabase.storage.from("client-media")
-        .createSignedUrl(path,300,{ download: filename });
+        .createSignedUrl(candidate.storage_path,300);
       if (signed.error || !signed.data?.signedUrl) {
-        setError("Could not prepare the private MP4 download."); return;
+        throw new Error("Could not prepare the private MP4 download.");
       }
+      const response = await fetch(signed.data.signedUrl);
+      if (!response.ok) throw new Error("Could not retrieve the private MP4.");
+      const bytes = await response.arrayBuffer();
+      const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)))
+        .map((byte) => byte.toString(16).padStart(2, "0")).join("");
+      if (hash !== candidate.file_sha256.toLowerCase()) {
+        throw new Error("The downloaded MP4 does not match its filed SHA-256 receipt.");
+      }
+      const blobUrl = URL.createObjectURL(new Blob([bytes], { type: "video/mp4" }));
       const link = document.createElement("a");
-      link.href = signed.data.signedUrl;
+      link.href = blobUrl;
+      link.download = filename;
       link.rel = "noopener";
       document.body.appendChild(link);
       link.click();
       link.remove();
-    } catch {
-      setError("Could not prepare the private MP4 download."); return;
-    }
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+      setNotice(`Verified ${filename} against the filed SHA-256 receipt.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message
+        : "Could not verify the private MP4 download.");
+    } finally { setDownloading(null); }
   }
 
   return <section aria-label="Code-video attached assets" className="space-y-2">
@@ -151,6 +168,9 @@ export function CodeVideoAttachmentsPanel({ clientId, titles, projectIds }: {
         && candidate.ir_version === attachment.ir_version
         && candidate.verdict === "accepted"
         && candidate.probe_result === "pass");
+      const firstCandidate = asset && aspectFiles.find((candidate) =>
+        candidate.id === attachment.first_candidate_id
+        && candidate.storage_path === (asset.render_path ?? asset.storage_path));
       return <article key={attachment.id} className="space-y-2 rounded-md border border-border p-3 text-xs">
         <h4 className="font-medium">{titles.get(attachment.project_id)
           ?? asset?.title ?? "Video project"} · IR v{attachment.ir_version}</h4>
@@ -167,9 +187,15 @@ export function CodeVideoAttachmentsPanel({ clientId, titles, projectIds }: {
               : <p className="text-muted-foreground">{attachment.thumbnail_attempt_id
                 ? "Private thumbnail preview unavailable."
                 : "Historical attachment has no filed thumbnail receipt."}</p>}
-            {url && <button type="button" onClick={() => void downloadVideo(
-              asset.render_path ?? asset.storage_path, asset.title ?? "reviewed-video")}
-              className="text-brand-strong underline">Download MP4</button>}
+            {url && firstCandidate && <button type="button"
+              disabled={downloading !== null}
+              onClick={() => void downloadVideo(firstCandidate,
+                asset.title ?? "reviewed-video")}
+              className="text-brand-strong underline disabled:opacity-50">
+              {downloading === firstCandidate.id ? "Verifying MP4…" : "Download verified MP4"}</button>}
+            {!firstCandidate && <p role="alert" className="text-destructive">
+              First-aspect candidate receipt is unavailable or does not match the asset path;
+              download and approval are held.</p>}
             {aspectFiles.length > 0 && <div className="space-y-1" aria-label="Requested video aspect files">
               <p className="font-medium">Requested aspect files</p>
               <p className="text-muted-foreground">Each file passed its media probe and creative review. The human asset decision above applies to the first aspect; inspect derivatives before external use.</p>
@@ -177,9 +203,11 @@ export function CodeVideoAttachmentsPanel({ clientId, titles, projectIds }: {
                 <span>{candidate.aspect} · {candidate.id === attachment.first_candidate_id
                   ? "first aspect" : "derivative"}</span>
                 {urls.get(candidate.storage_path)
-                  ? <button type="button" onClick={() => void downloadVideo(
-                    candidate.storage_path, asset.title ?? "video", candidate.aspect)}
-                    className="text-brand-strong underline">Download {candidate.aspect} MP4</button>
+                  ? <button type="button" disabled={downloading !== null}
+                    onClick={() => void downloadVideo(candidate, asset.title ?? "video", true)}
+                    className="text-brand-strong underline disabled:opacity-50">
+                    {downloading === candidate.id ? "Verifying MP4…"
+                      : `Download verified ${candidate.aspect} MP4`}</button>
                   : <span className="text-muted-foreground">Private file unavailable</span>}
                 <details><summary className="cursor-pointer">Receipt</summary>
                   <p>Candidate: {candidate.id}</p>
@@ -188,6 +216,7 @@ export function CodeVideoAttachmentsPanel({ clientId, titles, projectIds }: {
               </div>)}
             </div>}
             {!asset.human_approved_at && asset.review_status !== "rejected" && url
+              && firstCandidate
               && clientId && <VideoApprovalRoute clientId={clientId} assetId={asset.id}
                 onFinalApprove={() => finish(asset.id)} />}
             <Link className="text-brand-strong underline"

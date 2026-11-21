@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "642d1f8c930eae5d431250e337617181ee9919350c3e665d45d9bf292b11df9e",
-  "generatedTypesSha256": "c0614d594a373ca678c7ee14eeab4b85690b1fa72ab880b94d276670f0ac797b",
-  "generatedSchemaBodySha256": "751480a0f77d7bce9b7f1e224c1e0043497c8ab09cebc418e4bb9f89805c5543",
+  "migrationSourceDigest": "80845487c213b40ae5500cc1ca3540fe7f14c3ebae9ad9b5b9be5799ca08b0c4",
+  "generatedTypesSha256": "804ccdcd1f0471ea202b100543f3e9e0972cc3223abb164d88a0addb97fca35c",
+  "generatedSchemaBodySha256": "da5ae45f47fc6a88a2855c466db4a51a60c3557e1094db133a73cb0e9c897a5a",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4980,6 +4980,55 @@
       "filename": "20261124060900_694_mcp_create_video_project.sql",
       "sha256": "ae48f4208c6c7259dbf062692facdc00cc482f02d6d6430dfe8c586b2048f74c",
       "trimmedMd5": "1d01cd6853640f14bb03878e4f257061"
+    },
+    {
+      "version": "20261124061000",
+      "name": "695_daily_video_source_settings",
+      "filename": "20261124061000_695_daily_video_source_settings.sql",
+      "sha256": "24648e35b009b5af716e8d0dd69eae54e5cac4db4d05f3d19a44dd774846b286",
+      "trimmedMd5": "d5f80fd5ab104a3a292459d3adb648cf"
+    },
+    {
+      "version": "20261124061100",
+      "name": "696_daily_video_project_start",
+      "filename": "20261124061100_696_daily_video_project_start.sql",
+      "sha256": "bce8f388d05a027702deabb700880ac5dd8873341141227ae3d05c34eff853aa",
+      "trimmedMd5": "eefde438c96d30fbc7e17f013a442973"
+    },
+    {
+      "version": "20261124061200",
+      "name": "697_daily_code_video_planner",
+      "filename": "20261124061200_697_daily_code_video_planner.sql",
+      "sha256": "17ec3239a687401ff658b84ec935a8038c599888aa95236c79a2124d363ac5e6",
+      "trimmedMd5": "4ad8195b2eb4e92eb3ef292d94edbe5c"
+    },
+    {
+      "version": "20261124061300",
+      "name": "698_daily_video_asset_reconcile",
+      "filename": "20261124061300_698_daily_video_asset_reconcile.sql",
+      "sha256": "5004420ee0d5728be7fc0f75ad9eb6150dde4874541878e76aa6b3237675be60",
+      "trimmedMd5": "588969d21193cf8bb4d244f5e7211e1f"
+    },
+    {
+      "version": "20261124061400",
+      "name": "699_daily_package_safe_setup",
+      "filename": "20261124061400_699_daily_package_safe_setup.sql",
+      "sha256": "b5374f235d5ec64f635edbf6f280c5936d2d7820100c63a8e7de9d8060e9090e",
+      "trimmedMd5": "9372e60b4c95f325e262ad42bba642c8"
+    },
+    {
+      "version": "20261124061500",
+      "name": "700_daily_package_activation_review",
+      "filename": "20261124061500_700_daily_package_activation_review.sql",
+      "sha256": "7046e93fcbaf80585e4925483d4b575503539c31ace3ba659c1049f0ba79b74d",
+      "trimmedMd5": "be216f7f6ce6e6be4d7dd94f62ce7179"
+    },
+    {
+      "version": "20261124061600",
+      "name": "701_video_campaign_brief_start_guard",
+      "filename": "20261124061600_701_video_campaign_brief_start_guard.sql",
+      "sha256": "155ecef5d3c6fdee4fe8cf8d5030acc1a9901d46b8bc97e6a36f93ee9e1398c3",
+      "trimmedMd5": "07b68d8b02649dd008cd47a3cb7730e6"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

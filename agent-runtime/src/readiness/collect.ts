@@ -111,6 +111,14 @@ export type SystemReadinessSnapshot = {
       genericCampaignActionClaim: { state: "held" | "ready" | "unknown"; reason: string };
     };
     credentialPresence: Record<string, boolean>;
+    videoProviderConfiguration: {
+      elevenLabsKeyPresent: boolean;
+      narratorVoiceSelected: boolean;
+      remotionRegionPresent: boolean;
+      remotionFunctionPresent: boolean;
+      remotionSitePresent: boolean;
+      musicRequested: boolean;
+    };
     heartbeats: Observation<Heartbeat[]>;
   };
   gateway: Observation<{
@@ -530,6 +538,14 @@ export async function collectSystemReadiness(
         mcpService: Boolean(config.mcpServiceSecret),
         metaWebhook: Boolean(config.metaAppSecret && config.metaWebhookVerifyToken),
         resend: Boolean(config.resendApiKey),
+      },
+      videoProviderConfiguration: {
+        elevenLabsKeyPresent: Boolean(config.elevenLabsApiKey),
+        narratorVoiceSelected: Boolean(config.elevenLabsVoiceId),
+        remotionRegionPresent: Boolean(config.remotionAwsRegion),
+        remotionFunctionPresent: Boolean(config.remotionFunctionName),
+        remotionSitePresent: Boolean(config.remotionServeUrl),
+        musicRequested: config.elevenLabsMusicEnabled === true,
       },
       heartbeats: heartbeatResult,
     },

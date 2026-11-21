@@ -120,6 +120,13 @@ begin
   if route_project.campaign_id is null
     or route_project.route_package_id is null then
     raise exception 'Campaign route was not snapshotted'; end if;
+  begin
+    update public.video_projects set stage='queued'
+      where id=route_project.id;
+    raise exception 'Campaign video without a brief entered production';
+  exception when check_violation then null; end;
+  if (select stage from public.video_projects where id=route_project.id)<>'draft' then
+    raise exception 'Rejected campaign video transition changed the draft'; end if;
   linked_project := public.create_video_project_draft_v1(
     first_project.client_id, first_project.idea,
     'Local service buyers','confident',120,array['16:9'],

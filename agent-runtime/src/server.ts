@@ -1,5 +1,6 @@
 import { handlePublicProof } from "./proof-capture/public-route.js";
 import { handleProofCaptureAdmin } from "./proof-capture/admin-route.js";
+import { handleDailyVideoOperator } from "./video/daily-operator-route.js";
 import { handleCampaignActionRequest } from "./campaigns/actions/request-route.js";
 import { handleLeadMagnetAttestation } from "./lead-magnets/attest-route.js";
 import { handleProofMediaRightsRequest } from "./proof-rights/request-media-route.js";
@@ -273,6 +274,10 @@ function dispatchRequest(req: http.IncomingMessage, res: http.ServerResponse): v
 
   if (req.url === "/admin/proof-capture") {
     void handleProofCaptureAdmin(req, res, sb, config);
+    return;
+  }
+  if (req.url === "/admin/video/daily") {
+    void handleDailyVideoOperator(req, res, sb);
     return;
   }
 
