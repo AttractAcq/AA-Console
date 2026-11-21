@@ -12,7 +12,8 @@
     "build": "tsc -p tsconfig.build.json && mkdir -p dist/video && cp src/video/catalogue.md dist/video/catalogue.md",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval:video": "tsx src/eval/video.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
