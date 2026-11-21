@@ -173,6 +173,9 @@ begin
     or status_row.scene_count <> 0 or status_row.audio_scene_count <> 0
     or status_row.candidate_count <> 0
     or status_row.accepted_candidate_count <> 0
+    or status_row.scheduled_post_count <> 0
+    or status_row.recorded_external_post_count <> 0
+    or status_row.unconfirmed_published_row_count <> 0
     or status_row.asset_id is not null
     or status_row.asset_review_status is not null then
     raise exception 'Video status inflated an unproduced draft'; end if;
@@ -230,6 +233,8 @@ begin
   status := public.mcp_video_project_status_v1(
     'bot_production','f8888888-8888-4888-8888-888888888888',video_id);
   if status->>'stage'<>'draft' or (status->>'scenes')::integer<>0
+    or (status->>'scheduled_posts')::integer<>0
+    or (status->>'recorded_external_posts')::integer<>0
     or status->>'asset_id' is not null
     or status ? 'source_snapshot' then
     raise exception 'Production bot status overstated or exposed source data'; end if;

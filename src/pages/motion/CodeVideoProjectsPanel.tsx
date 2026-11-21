@@ -11,7 +11,10 @@ type Project = { id: string; idea: string; audience: string | null;
   scene_count: number; audio_scene_count: number; candidate_count: number;
   accepted_candidate_count: number; critic_loop_count: number;
   asset_id: string | null; asset_review_status: string | null;
-  human_approved_at: string | null };
+  human_approved_at: string | null; scheduled_post_count: number;
+  recorded_external_post_count: number;
+  last_recorded_external_post_at: string | null;
+  unconfirmed_published_row_count: number };
 type Source = { record_id: string; title: string; domain: string;
   observed_on: string | null; review_state: string };
 type BriefBinding = { briefId: string; title: string;
@@ -105,7 +108,7 @@ export function CodeVideoProjectsPanel() {
     if (!clientId) return;
     const [projectResult, sourceResult, agentResult, audioAgentResult] = await Promise.all([
       supabase.from("video_project_status_v1")
-        .select("id,idea,audience,stage,stage_error,ir_version,source_snapshot,created_at,cost_usd,scene_count,audio_scene_count,candidate_count,accepted_candidate_count,critic_loop_count,asset_id,asset_review_status,human_approved_at")
+        .select("id,idea,audience,stage,stage_error,ir_version,source_snapshot,created_at,cost_usd,scene_count,audio_scene_count,candidate_count,accepted_candidate_count,critic_loop_count,asset_id,asset_review_status,human_approved_at,scheduled_post_count,recorded_external_post_count,last_recorded_external_post_at,unconfirmed_published_row_count")
         .eq("client_id", clientId).order("created_at", { ascending: false }).limit(30),
       supabase.from("model_section_review_state_v7")
         .select("record_id,title,domain,observed_on,review_state")
@@ -235,6 +238,12 @@ export function CodeVideoProjectsPanel() {
             · {project.critic_loop_count} critic loops · estimated cost ${Number(project.cost_usd ?? 0).toFixed(4)}</p>
           {project.asset_id && <p className="text-muted-foreground">Attached asset: {project.asset_review_status ?? "review unknown"}
             {project.human_approved_at ? ` · human approved ${project.human_approved_at}` : " · human approval pending"}</p>}
+          {project.asset_id && <p className="text-muted-foreground">Distribution: {project.scheduled_post_count} scheduled or publishing
+            · {project.recorded_external_post_count} recorded external posts
+            {project.last_recorded_external_post_at ? ` · latest ${project.last_recorded_external_post_at}` : ""}
+            {project.unconfirmed_published_row_count > 0
+              ? ` · ${project.unconfirmed_published_row_count} published rows lack an external reference` : ""}
+            . Provider read-back is a separate check.</p>}
         </div>
         <div className="flex shrink-0 gap-3">
           {project.stage === "draft" && <button type="button" onClick={() => { setActiveDraft(project.id); setSelected([]); setNote(""); }}

@@ -705,6 +705,10 @@ export class AAApiAdapter implements Adapter {
           asset_review_status: z.enum(["pending", "approved", "rejected"]).nullable(),
           human_approved_at: z.string().nullable(),
           stage_error: z.string().nullable(),
+          scheduled_posts: z.number().int().nonnegative(),
+          recorded_external_posts: z.number().int().nonnegative(),
+          last_recorded_external_post_at: z.string().nullable(),
+          unconfirmed_published_rows: z.number().int().nonnegative(),
         }).strict().safeParse(raw);
         if (!status.success || status.data.project_id !== input.project_id)
           return fail("malformed_response", response.status);

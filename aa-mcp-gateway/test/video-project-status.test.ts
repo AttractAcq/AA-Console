@@ -35,7 +35,9 @@ test("video status adapter binds exact project and refuses mismatched response",
       stage: "draft", stage_error: null, ir_version: 0,
       cost_usd_estimate: 0, scenes: 0, audio_scenes: 0,
       render_candidates: 0, accepted_candidates: 0, critic_loops: 0,
-      asset_id: null, asset_review_status: null, human_approved_at: null }));
+      asset_id: null, asset_review_status: null, human_approved_at: null,
+      scheduled_posts: 0, recorded_external_posts: 0,
+      last_recorded_external_post_at: null, unconfirmed_published_rows: 0 }));
   });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "8ccffdc313c9a64bb066cf4063364cb302ca3b20e37385852665e43208a7488f",
-  "generatedTypesSha256": "edd9c1d453a152e8ce4a75fec076e5358b5f871e07480b1c8f9588fbf6e3037b",
-  "generatedSchemaBodySha256": "d89b6299255205304d499db5a65b990470860dc78de64797fcfcfe30b35ea318",
+  "migrationSourceDigest": "df0178e5e4fbac52fed8fd3e7030852a7e9ab9bdce6f633a1a17d7411c648cdc",
+  "generatedTypesSha256": "f3f12123957a9ad9880f6c52367fa9cbc9d77785bec1417def23b23bd524dccd",
+  "generatedSchemaBodySha256": "7118ed23097515bc3b89484198536b20506d9a43ec5bd4660ffbfacde50a5d37",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4966,6 +4966,13 @@
       "filename": "20261124060700_692_mcp_video_project_status.sql",
       "sha256": "039ad52c0dd76a6bb38f75600b676a5c222fee4549c9c9c3bd5135f3c92c1873",
       "trimmedMd5": "4bc58c2623e8b5f0aafd48c218c9954b"
+    },
+    {
+      "version": "20261124060800",
+      "name": "693_video_project_distribution_status",
+      "filename": "20261124060800_693_video_project_distribution_status.sql",
+      "sha256": "1875503203880bc77e4c3c6b1a85fb32f8b39051d69fe72b5d9b6eff98cc9c39",
+      "trimmedMd5": "6cae2b6a5ed77cad8e8a0a44592f4262"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

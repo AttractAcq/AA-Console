@@ -106,6 +106,22 @@ it("distinguishes an attached candidate from human asset approval", async () => 
     .toBeInTheDocument();
 });
 
+it("separates scheduled posts, recorded external references and missing receipts", async () => {
+  records.projects = [{ id: "project-distribution", idea: "Explain the reviewed offer to buyers.",
+    audience: "Local buyers", stage: "attached", stage_error: null, ir_version: 2,
+    source_snapshot: [], created_at: "2026-11-20", scene_count: 3,
+    audio_scene_count: 3, candidate_count: 1, accepted_candidate_count: 1,
+    critic_loop_count: 1, asset_id: "asset-distribution", asset_review_status: "approved",
+    human_approved_at: "2026-11-21T02:00:00Z", scheduled_post_count: 2,
+    recorded_external_post_count: 1, last_recorded_external_post_at: "2026-11-21T03:00:00Z",
+    unconfirmed_published_row_count: 1 }];
+  render(<MemoryRouter><CodeVideoProjectsPanel /></MemoryRouter>);
+  expect(await screen.findByText(/Distribution: 2 scheduled or publishing/)).toHaveTextContent(
+    "1 recorded external posts");
+  expect(screen.getByText(/1 published rows lack an external reference/)).toHaveTextContent(
+    "Provider read-back is a separate check");
+});
+
 it("saves the operator's exact ordered set of requested aspects", async () => {
   rpc.mockResolvedValue({ data: { id: "project-3", stage: "draft", ir_version: 0 }, error: null });
   const user = userEvent.setup();

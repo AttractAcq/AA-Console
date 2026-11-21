@@ -40064,10 +40064,14 @@ export type Database = {
           id: string | null
           idea: string | null
           ir_version: number | null
+          last_recorded_external_post_at: string | null
+          recorded_external_post_count: number | null
           scene_count: number | null
+          scheduled_post_count: number | null
           source_snapshot: Json | null
           stage: string | null
           stage_error: string | null
+          unconfirmed_published_row_count: number | null
           updated_at: string | null
         }
         Relationships: [
