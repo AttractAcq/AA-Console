@@ -410,7 +410,8 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
                 {!row.readOnly && (
                 <button
                   type="button"
-                  disabled={busy !== null || unset || heldOn}
+                  disabled={busy !== null || unset || heldOn ||
+                    (row.key === "daily_package" && !value && blocker !== null)}
                   onClick={() => void flip(row, !value)}
                   aria-label={`${value ? "Switch off" : "Switch on"} ${row.label}`}
                   className={`rounded-md px-3 py-1.5 text-sm disabled:opacity-50 ${

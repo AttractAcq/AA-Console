@@ -96,6 +96,16 @@ describe("every switch in one place", () => {
     }));
   });
 
+  it("holds a daily activation request while its reviewed sources are stale", async () => {
+    state.dailyPackage = { enabled: false };
+    state.dailySourcesCurrent = false;
+    state.runtime = { state: "observed", workerEnabled: true, controls: {} };
+    render(<ClientSwitchPanel clientId="c1" />);
+    expect(await screen.findByLabelText("Switch on Produce a daily content package")).toBeDisabled();
+    expect(screen.getByText(/Choose a current organic route and reviewed model sources/)).toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalledWith("request_client_switch_activation_v6", expect.anything());
+  });
+
   it("shows daily production as an internal run without a provider receipt", async () => {
     state.dailyPackage = { enabled: true };
     state.dailySourcesCurrent = true;
