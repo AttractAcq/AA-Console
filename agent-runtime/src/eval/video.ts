@@ -2,9 +2,11 @@
 // This is not the rendered-video/vision-critic acceptance gate.
 import Anthropic from "@anthropic-ai/sdk";
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { estimateCostUsd } from "../usage/cost.js";
+import { replaceJsonReport, reserveJsonReport, runEvaluationBatch,
+  selectCaseRange, type BatchState } from "./video-report.js";
 import { reviewVideoStoryboard, VIDEO_REVIEW_SYSTEM,
   VideoReviewValidationError } from "../video/review.js";
 import { writeVideoStoryboard, VideoStoryboardValidationError,
@@ -125,52 +127,75 @@ async function main(): Promise<void> {
       fixtureSha256: digest(fixture), catalogueSha256: digest(catalogue) }) + "\n");
     return;
   }
+  const start = option("--start") === undefined ? 1 : Number(option("--start"));
   const limit = Number(option("--limit"));
+  const selected = selectCaseRange(cases, start, limit);
+  if (process.argv.includes("--plan")) {
+    process.stdout.write(JSON.stringify({ startCase: start,
+      selectedCaseIds: selected.map((test) => test.id),
+      fixtureSha256: digest(fixture), catalogueSha256: digest(catalogue),
+      note: "Read-only selection; no model call was made." }) + "\n");
+    return;
+  }
   const maxUsd = Number(option("--max-usd"));
   const out = option("--out");
   const model = process.env.VIDEO_SCRIPT_MODEL?.trim();
   const key = process.env.ANTHROPIC_API_KEY_VIDEO_SCRIPT?.trim()
     || process.env.ANTHROPIC_API_KEY?.trim();
-  if (!Number.isInteger(limit) || limit < 1 || limit > 20
-    || !Number.isFinite(maxUsd) || maxUsd <= 0 || maxUsd > 100
+  if (!Number.isFinite(maxUsd) || maxUsd <= 0 || maxUsd > 100
     || !out || !model || !key) {
-    throw new Error("Run with --limit 1..20 --max-usd 0..100 --out <new JSON path>, VIDEO_SCRIPT_MODEL and an Anthropic key. No model call was made.");
+    throw new Error("Run with --start 1..20 --limit within the remaining cases --max-usd 0..100 --out <new JSON path>, VIDEO_SCRIPT_MODEL and an Anthropic key. No model call was made.");
   }
+  const createdAt = new Date().toISOString();
+  const reportFor = (state: BatchState<Result>) => {
+    const results = state.results;
+    const estimatedCostUsd = results.reduce((total, result) =>
+      total + result.estimatedCostUsd, 0);
+    const qualityGatePassed = state.status === "complete"
+      && results.length === selected.length
+      && results.every((result) => result.writerValid
+        && result.reviewerAccepted === true && result.error === null);
+    return {
+      kind: "video_script_review_evaluation_v1",
+      createdAt, model, startCase: start,
+      selectedCases: selected.length,
+      selectedCaseIds: selected.map((test) => test.id),
+      fixtureSha256: digest(fixture), catalogueSha256: digest(catalogue),
+      runStatus: state.status, activeCaseId: state.activeCaseId,
+      completedCases: results.length, maxEstimatedUsd: maxUsd,
+      estimatedCostUsd: Math.round(estimatedCostUsd * 1e6) / 1e6,
+      costCoverage: state.activeCaseId
+        ? "inflight_provider_billing_unknown"
+        : results.some((result) => result.error === "provider_or_runtime_error")
+          ? "incomplete_provider_billing_unknown"
+          : "model_usage_estimate_not_provider_invoice",
+      writerValidateRate: results.length
+        ? results.filter((result) => result.writerValid).length / results.length : null,
+      reviewerAcceptRate: results.length
+        ? results.filter((result) => result.reviewerAccepted).length / results.length : null,
+      qualityGatePassed,
+      // Audio, render, vision critic and human assessment require separate evidence.
+      visionCriticOutcomes: null, goldRenders: [], humanReview: null,
+      results,
+    };
+  };
+  const outputPath = resolve(out);
+  await reserveJsonReport(outputPath, reportFor({ results: [],
+    activeCaseId: null, status: "running" }));
   const client = new Anthropic({ apiKey: key, maxRetries: 1, timeout: 180_000 });
   const writer = completion(client, model);
   const reviewer = completion(client, model, VIDEO_REVIEW_SYSTEM);
-  const results: Result[] = [];
-  let estimatedCostUsd = 0;
-  for (const test of cases.slice(0, limit)) {
-    if (estimatedCostUsd >= maxUsd) break;
-    const result = await evaluate(test, catalogue, writer, reviewer);
-    results.push(result);
-    estimatedCostUsd += result.estimatedCostUsd;
-  }
-  const report = {
-    kind: "video_script_review_evaluation_v1",
-    createdAt: new Date().toISOString(), model,
-    fixtureSha256: digest(fixture), catalogueSha256: digest(catalogue),
-    selectedCases: limit, completedCases: results.length,
-    estimatedCostUsd: Math.round(estimatedCostUsd * 1e6) / 1e6,
-    costCoverage: results.some((result) => result.error === "provider_or_runtime_error")
-      ? "incomplete_provider_billing_unknown" : "model_usage_estimate_not_provider_invoice",
-    writerValidateRate: results.length
-      ? results.filter((result) => result.writerValid).length / results.length : null,
-    reviewerAcceptRate: results.length
-      ? results.filter((result) => result.reviewerAccepted).length / results.length : null,
-    // Audio, render, vision critic and human assessment require separate evidence.
-    visionCriticOutcomes: null, goldRenders: [], humanReview: null,
-    results,
-  };
-  await writeFile(resolve(out),
-    JSON.stringify(report, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+  const state = await runEvaluationBatch(selected, maxUsd,
+    (test) => evaluate(test, catalogue, writer, reviewer),
+    (current) => replaceJsonReport(outputPath, reportFor(current)));
+  const report = reportFor(state);
   process.stdout.write(JSON.stringify({ completedCases: report.completedCases,
     writerValidateRate: report.writerValidateRate,
     reviewerAcceptRate: report.reviewerAcceptRate,
     estimatedCostUsd: report.estimatedCostUsd,
-    costCoverage: report.costCoverage }) + "\n");
-  if (results.length !== limit || results.some((result) => result.error)) process.exitCode = 1;
+    costCoverage: report.costCoverage, runStatus: report.runStatus,
+    qualityGatePassed: report.qualityGatePassed }) + "\n");
+  if (!report.qualityGatePassed) process.exitCode = 1;
 }
 
 main().catch((error: unknown) => {
