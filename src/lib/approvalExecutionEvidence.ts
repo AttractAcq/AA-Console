@@ -56,7 +56,8 @@ export async function loadApprovalExecutionEvidence(
           ? await supabase.from("lead_magnet_approval_execution_evidence_v6")
             .select("request_id,client_id,source_kind,state,detail,external_ref")
             .in("request_id", ids)
-          : await supabase.from("proof_approval_execution_evidence_v6")
+          : await supabase.rpc("list_proof_approval_execution_evidence_v6",
+            { p_client_id: clientId })
             .select("request_id,client_id,source_kind,state,detail,external_ref")
             .in("request_id", ids);
         if (error) throw error;

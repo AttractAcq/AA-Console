@@ -20,6 +20,14 @@ do $$ begin
       'public.list_meta_profile_execution_overview_v6(uuid)', 'EXECUTE')
     or not has_function_privilege('authenticated',
       'public.list_google_reply_execution_overview_v6(uuid)', 'EXECUTE')
+    or not has_function_privilege('authenticated',
+      'public.list_campaign_budget_readback_overview_v6(uuid)', 'EXECUTE')
+    or not has_function_privilege('authenticated',
+      'public.list_campaign_page_readback_overview_v6(uuid)', 'EXECUTE')
+    or not has_function_privilege('authenticated',
+      'public.list_proof_approval_execution_evidence_v6(uuid)', 'EXECUTE')
+    or not has_function_privilege('authenticated',
+      'public.list_gateway_tool_execution_overview_v6(text[])', 'EXECUTE')
     or has_function_privilege('anon',
       'public.list_google_reply_execution_overview_v6(uuid)', 'EXECUTE')
     or has_table_privilege('authenticated',
@@ -27,7 +35,13 @@ do $$ begin
     or has_table_privilege('authenticated',
       'public.meta_profile_execution_attempts_v6', 'SELECT')
     or has_table_privilege('authenticated',
-      'public.google_profile_execution_attempts_v6', 'SELECT') then
+      'public.google_profile_execution_attempts_v6', 'SELECT')
+    or has_table_privilege('authenticated',
+      'public.campaign_budget_readbacks_v6', 'SELECT')
+    or has_table_privilege('authenticated',
+      'public.campaign_page_readbacks_v6', 'SELECT')
+    or has_table_privilege('authenticated',
+      'public.proof_delivery_reviews_v6', 'SELECT') then
     raise exception 'Profile execution read ACLs are incorrect';
   end if;
 end $$;
@@ -43,6 +57,12 @@ do $$ declare denied boolean; begin
     or (select count(*) from public.list_meta_profile_execution_overview_v6(
        'b9999999-9999-4999-8999-999999999981')) <> 0
     or (select count(*) from public.list_google_reply_execution_overview_v6(
+       'b9999999-9999-4999-8999-999999999981')) <> 0
+    or (select count(*) from public.list_campaign_budget_readback_overview_v6(
+       'b9999999-9999-4999-8999-999999999981')) <> 0
+    or (select count(*) from public.list_campaign_page_readback_overview_v6(
+       'b9999999-9999-4999-8999-999999999981')) <> 0
+    or (select count(*) from public.list_proof_approval_execution_evidence_v6(
        'b9999999-9999-4999-8999-999999999981')) <> 0 then
     raise exception 'Client-scoped execution read failed';
   end if;
@@ -59,6 +79,22 @@ do $$ declare denied boolean; begin
   exception when insufficient_privilege then denied:=true; end;
   if not denied then raise exception 'Direct Meta overview unexpectedly readable'; end if;
   denied:=false;
+  begin perform count(*) from public.campaign_budget_readback_overview_v6;
+  exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'Direct budget overview unexpectedly readable'; end if;
+  denied:=false;
+  begin perform count(*) from public.campaign_page_readback_overview_v6;
+  exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'Direct page overview unexpectedly readable'; end if;
+  denied:=false;
+  begin perform count(*) from public.gateway_tool_execution_overview_v6;
+  exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'Direct gateway overview unexpectedly readable'; end if;
+  denied:=false;
+  begin perform count(*) from public.proof_approval_execution_evidence_v6;
+  exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'Direct proof overview unexpectedly readable'; end if;
+  denied:=false;
   begin perform count(*) from public.list_google_profile_execution_overview_v6(
     'b9999999-9999-4999-8999-999999999982');
   exception when insufficient_privilege then denied:=true; end;
@@ -74,6 +110,26 @@ do $$ declare denied boolean; begin
   exception when insufficient_privilege then denied:=true; end;
   if not denied then raise exception 'Other-client reply read succeeded'; end if;
   denied:=false;
+  begin perform count(*) from public.list_campaign_budget_readback_overview_v6(
+    'b9999999-9999-4999-8999-999999999982');
+  exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'Other-client budget read succeeded'; end if;
+  denied:=false;
+  begin perform count(*) from public.list_campaign_page_readback_overview_v6(
+    'b9999999-9999-4999-8999-999999999982');
+  exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'Other-client page read succeeded'; end if;
+  denied:=false;
+  begin perform count(*) from public.list_proof_approval_execution_evidence_v6(
+    'b9999999-9999-4999-8999-999999999982');
+  exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'Other-client proof read succeeded'; end if;
+  denied:=false;
+  begin perform count(*) from public.list_gateway_tool_execution_overview_v6(
+    array['00000000-0000-0000-0000-000000000001']);
+  exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'Client gateway read succeeded'; end if;
+  denied:=false;
   begin perform count(*) from public.list_google_reply_execution_overview_v6(null);
   exception when insufficient_privilege then denied:=true; end;
   if not denied then raise exception 'Null client scope succeeded'; end if;
@@ -86,7 +142,15 @@ do $$ begin
     or (select count(*) from public.list_meta_profile_execution_overview_v6(
        'b9999999-9999-4999-8999-999999999982')) <> 0
     or (select count(*) from public.list_google_reply_execution_overview_v6(
-       'b9999999-9999-4999-8999-999999999982')) <> 0 then
+       'b9999999-9999-4999-8999-999999999982')) <> 0
+    or (select count(*) from public.list_campaign_budget_readback_overview_v6(
+       'b9999999-9999-4999-8999-999999999982')) <> 0
+    or (select count(*) from public.list_campaign_page_readback_overview_v6(
+       'b9999999-9999-4999-8999-999999999982')) <> 0
+    or (select count(*) from public.list_proof_approval_execution_evidence_v6(
+       'b9999999-9999-4999-8999-999999999982')) <> 0
+    or (select count(*) from public.list_gateway_tool_execution_overview_v6(
+       array['00000000-0000-0000-0000-000000000001'])) <> 0 then
     raise exception 'Admin scoped execution read failed';
   end if;
 end $$;

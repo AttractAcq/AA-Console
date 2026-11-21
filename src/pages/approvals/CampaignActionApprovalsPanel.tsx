@@ -134,13 +134,13 @@ export function CampaignActionApprovalsPanel() {
           supabase.from("campaign_action_attempts_v6" as never)
             .select("execution_id,attempt_number,status,started_at,finished_at,external_id,external_url,error,legacy_inferred")
             .in("execution_id", executionIds).order("attempt_number", { ascending: true }),
-          supabase.from("campaign_budget_readback_overview_v6")
+          supabase.rpc("list_campaign_budget_readback_overview_v6", { p_client_id: clientId })
             .select("execution_id,result,observed_currency,observed_daily_budget_minor,checked_at,account_id")
             .in("execution_id", executionIds).order("checked_at", { ascending: false }),
           supabase.from("agent_jobs").select("input_id,status")
             .eq("agent_key", "campaign_budget_reconciler").in("input_id", executionIds)
             .order("created_at", { ascending: false }),
-          supabase.from("campaign_page_readback_overview_v6")
+          supabase.rpc("list_campaign_page_readback_overview_v6", { p_client_id: clientId })
             .select("execution_id,result,checked_ref,observed_sha256,checked_at,repository_owner,repository_name,site_path")
             .in("execution_id", executionIds).order("checked_at", { ascending: false }),
           supabase.from("agent_jobs").select("input_id,status")

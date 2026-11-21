@@ -87,7 +87,7 @@ it("reads profile receipts per client and preserves another client's result on f
 });
 
 it("keeps proof placement and delivery outcomes tied to their own exact requests", async () => {
-  rows.set("proof_approval_execution_evidence_v6", { data: [
+  rows.set("list_proof_approval_execution_evidence_v6", { data: [
     { request_id: "placement-card", client_id: "client-a", source_kind: "proof_placement",
       state: "retraction_required", detail: "Proof must be removed.", external_ref: "page-1" },
     { request_id: "delivery-card", client_id: "client-a", source_kind: "proof_delivery",

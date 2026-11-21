@@ -1713,10 +1713,11 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
       const gatewayIds = rows.filter((row) => row.source_kind === "gateway_tool"
         && row.source_id !== null).map((row) => row.source_id as string);
       const outcomeMap: Record<string, GatewayOutcome> = {};
-      if (gatewayIds.length > 0) {
-        const gatewayResult = await supabase.from("gateway_tool_execution_overview_v6")
+      if (gatewayIds.length > 0 && !manager) {
+        const gatewayResult = await supabase.rpc("list_gateway_tool_execution_overview_v6",
+          { p_approval_ids: gatewayIds })
           .select("approval_id,execution_status,claimed_at,finished_at,result_hash,sites_invocation_id,sites_invoked_at")
-          .in("approval_id", gatewayIds).order("approval_id");
+          .order("approval_id");
         if (gatewayResult.error) throw gatewayResult.error;
         for (const outcome of gatewayResult.data ?? []) {
           if (outcome.approval_id && gatewayIds.includes(outcome.approval_id))

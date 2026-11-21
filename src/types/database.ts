@@ -45570,6 +45570,47 @@ export type Database = {
           unread_inbound: number
         }[]
       }
+      list_campaign_budget_readback_overview_v6: {
+        Args: { p_client_id: string }
+        Returns: {
+          account_id: string | null
+          ad_set_external_id: string | null
+          checked_at: string | null
+          client_id: string | null
+          execution_id: string | null
+          id: string | null
+          observed_currency: string | null
+          observed_daily_budget_minor: number | null
+          result: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "campaign_budget_readback_overview_v6"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      list_campaign_page_readback_overview_v6: {
+        Args: { p_client_id: string }
+        Returns: {
+          checked_at: string | null
+          checked_ref: string | null
+          client_id: string | null
+          execution_id: string | null
+          id: string | null
+          observed_sha256: string | null
+          repository_name: string | null
+          repository_owner: string | null
+          result: string | null
+          site_path: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "campaign_page_readback_overview_v6"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       list_client_external_outcomes_v6: {
         Args: { p_client_id?: string }
         Returns: {
@@ -45594,6 +45635,26 @@ export type Database = {
           id: string
           name: string
         }[]
+      }
+      list_gateway_tool_execution_overview_v6: {
+        Args: { p_approval_ids: string[] }
+        Returns: {
+          approval_id: string | null
+          canonical_request_id: string | null
+          claimed_at: string | null
+          client_id: string | null
+          execution_status: string | null
+          finished_at: string | null
+          result_hash: string | null
+          sites_invocation_id: string | null
+          sites_invoked_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "gateway_tool_execution_overview_v6"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       list_google_profile_execution_overview_v6: {
         Args: { p_client_id: string }
@@ -45669,6 +45730,23 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "meta_profile_execution_overview_v6"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      list_proof_approval_execution_evidence_v6: {
+        Args: { p_client_id: string }
+        Returns: {
+          client_id: string | null
+          detail: string | null
+          external_ref: string | null
+          request_id: string | null
+          source_kind: string | null
+          state: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "proof_approval_execution_evidence_v6"
           isOneToOne: false
           isSetofReturn: true
         }
