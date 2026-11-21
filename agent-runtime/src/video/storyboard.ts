@@ -46,7 +46,7 @@ function sourceDigest(sources: VideoSource[]): string {
   return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
 }
 
-function validateRequest(request: VideoStoryboardRequest): void {
+export function validateVideoStoryboardRequest(request: VideoStoryboardRequest): void {
   if (request.idea.trim().length < 15 || request.idea.length > 4000
     || !request.audience.trim() || request.audience.length > 200
     || request.targetLengthSec < 30 || request.targetLengthSec > 900
@@ -141,7 +141,7 @@ function prompt(request: VideoStoryboardRequest, correction?: string): string {
 
 export async function writeVideoStoryboard(request: VideoStoryboardRequest,
   complete: VideoCompletion): Promise<VideoStoryboard> {
-  validateRequest(request);
+  validateVideoStoryboardRequest(request);
   const usage = { inputTokens: 0, outputTokens: 0, costUsd: 0 };
   let correction: string | undefined;
   for (let attempt = 1; attempt <= 2; attempt++) {

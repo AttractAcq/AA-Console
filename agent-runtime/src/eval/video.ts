@@ -8,7 +8,8 @@ import { estimateCostUsd } from "../usage/cost.js";
 import { reviewVideoStoryboard, VIDEO_REVIEW_SYSTEM,
   VideoReviewValidationError } from "../video/review.js";
 import { writeVideoStoryboard, VideoStoryboardValidationError,
-  type VideoCompletion, type VideoSource, type VideoStoryboardRequest } from "../video/storyboard.js";
+  validateVideoStoryboardRequest, type VideoCompletion, type VideoSource,
+  type VideoStoryboardRequest } from "../video/storyboard.js";
 
 type Case = Omit<VideoStoryboardRequest, "catalogue"> & { id: string };
 type Result = {
@@ -118,6 +119,7 @@ async function main(): Promise<void> {
   const fixture = await readFile(fixtureUrl, "utf8");
   const catalogue = await readFile(catalogueUrl, "utf8");
   const cases = manifest(JSON.parse(fixture));
+  for (const test of cases) validateVideoStoryboardRequest({ ...test, catalogue });
   if (process.argv.includes("--check")) {
     process.stdout.write(JSON.stringify({ cases: cases.length,
       fixtureSha256: digest(fixture), catalogueSha256: digest(catalogue) }) + "\n");
