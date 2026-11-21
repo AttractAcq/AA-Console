@@ -16,13 +16,19 @@ vi.mock("../../lib/supabase", () => ({ supabase: {
   rpc,
   storage: { from: () => ({ createSignedUrl: signDownload }) },
   from: (table: string) => {
+    let projectIds: string[] | null = null;
     const result = () => ({ data: table === "client_media_assets"
       ? records.assets : table === "video_project_thumbnail_attempts_v1"
         ? records.thumbnails : table === "video_project_render_candidates_v1"
-          ? records.candidates : records.attachments, error: null });
+          ? records.candidates : projectIds
+            ? records.attachments.filter((row) => projectIds!.includes(String(row.project_id)))
+            : records.attachments, error: null });
     const query = { select: () => query, eq: () => query,
       order: () => query, or: () => query, limit: async () => result(),
-      in: () => query, then: (resolve: (value: ReturnType<typeof result>) => void) =>
+      in: (column: string, values: string[]) => {
+        if (column === "project_id") projectIds = values;
+        return query;
+      }, then: (resolve: (value: ReturnType<typeof result>) => void) =>
         Promise.resolve(result()).then(resolve) };
     return query;
   },
@@ -58,6 +64,22 @@ function mockDownload(bytes: Uint8Array) {
   vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:verified-video");
   vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
 }
+
+it("keeps inline attached videos within the selected campaign projects", async () => {
+  records.attachments = [
+    { id: "own-attachment", project_id: "project-1", ir_version: 1,
+      first_candidate_id: "candidate-1", asset_id: "asset-1", attached_at: "2026-11-20" },
+    { id: "other-attachment", project_id: "project-2", ir_version: 1,
+      first_candidate_id: "candidate-2", asset_id: "asset-2", attached_at: "2026-11-20" },
+  ];
+  records.assets = [{ id: "asset-1", title: "Own asset", review_status: "pending",
+    human_approved_at: null, storage_path: "own.mp4", render_path: "own.mp4" }];
+  render(<MemoryRouter><CodeVideoAttachmentsPanel clientId="client-1"
+    projectIds={["project-1"]} titles={new Map([["project-1", "Own video"]])} /></MemoryRouter>);
+  expect(await screen.findByText(/Own video · IR v1/)).toBeInTheDocument();
+  expect(screen.queryByText(/other-attachment/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Video project · IR v1/)).not.toBeInTheDocument();
+});
 
 it("shows an attached video as pending until the human approval route finishes", async () => {
   records.attachments = [{ id: "attachment-1", project_id: "project-1",

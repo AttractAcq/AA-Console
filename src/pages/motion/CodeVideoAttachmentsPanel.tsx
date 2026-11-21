@@ -17,9 +17,10 @@ type Candidate = { id: string; project_id: string; ir_version: number;
   aspect: string; verdict: string; probe_result: string;
   storage_path: string; file_sha256: string };
 
-export function CodeVideoAttachmentsPanel({ clientId, titles }: {
+export function CodeVideoAttachmentsPanel({ clientId, titles, projectIds }: {
   clientId: string | undefined;
   titles: ReadonlyMap<string, string>;
+  projectIds?: readonly string[];
 }) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [assets, setAssets] = useState<ReadonlyMap<string, Asset>>(new Map());
@@ -38,13 +39,14 @@ export function CodeVideoAttachmentsPanel({ clientId, titles }: {
 
   const refresh = useCallback(async () => {
     const epoch = ++requestEpoch.current;
-    if (!clientId) { setAttachments([]); setAssets(new Map()); setThumbnails(new Map());
+    if (!clientId || projectIds?.length === 0) { setAttachments([]); setAssets(new Map()); setThumbnails(new Map());
       setCandidates([]);
       setLoading(false); return; }
     setLoading(true);
-    const attached = await supabase.from("video_project_attachments_v1")
+    const query = supabase.from("video_project_attachments_v1")
       .select("id,project_id,ir_version,first_candidate_id,thumbnail_attempt_id,asset_id,attached_at")
-      .eq("client_id", clientId)
+      .eq("client_id", clientId);
+    const attached = await (projectIds ? query.in("project_id", [...projectIds]) : query)
       .order("attached_at", { ascending: false }).limit(30);
     if (epoch !== requestEpoch.current) return;
     if (attached.error) {
@@ -89,7 +91,7 @@ export function CodeVideoAttachmentsPanel({ clientId, titles }: {
       .map((thumbnail) => [thumbnail.id, thumbnail])));
     setCandidates((candidateResult.data ?? []) as Candidate[]);
     setError(null); setLoading(false);
-  }, [clientId]);
+  }, [clientId, projectIds]);
   useEffect(() => {
     void refresh();
     return () => { requestEpoch.current += 1; };

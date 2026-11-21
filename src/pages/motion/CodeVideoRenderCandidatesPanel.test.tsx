@@ -7,8 +7,15 @@ const { rows, preview } = vi.hoisted(() => ({
 }));
 vi.mock("../../lib/supabase", () => ({ supabase: {
   from: () => {
+    let projectIds: string[] | null = null;
     const query = { select: () => query, eq: () => query, order: () => query,
-      limit: async () => ({ data: rows.value, error: null }) };
+      in: (column: string, values: string[]) => {
+        if (column === "project_id") projectIds = values;
+        return query;
+      },
+      limit: async () => ({ data: projectIds
+        ? rows.value.filter((row) => projectIds!.includes(String(row.project_id)))
+        : rows.value, error: null }) };
     return query;
   },
 } }));
@@ -19,6 +26,21 @@ vi.mock("../../lib/useSignedPreviewPaths", () => ({
 import { CodeVideoRenderCandidatesPanel } from "./CodeVideoRenderCandidatesPanel";
 
 beforeEach(() => { rows.value = []; preview.value = new Map(); });
+
+it("keeps inline render candidates within the selected campaign projects", async () => {
+  rows.value = [
+    { id: "own", project_id: "project-1", aspect: "16:9", ir_version: 1,
+      probe_result: "pass", verdict: "accepted", file_bytes: 1000000,
+      storage_path: "own.mp4", file_sha256: "a".repeat(64), created_at: "2026-11-20" },
+    { id: "other", project_id: "project-2", aspect: "9:16", ir_version: 1,
+      probe_result: "pass", verdict: "accepted", file_bytes: 1000000,
+      storage_path: "other.mp4", file_sha256: "b".repeat(64), created_at: "2026-11-20" },
+  ];
+  render(<CodeVideoRenderCandidatesPanel clientId="client-1"
+    projectIds={["project-1"]} titles={new Map([["project-1", "Own video"]])} />);
+  expect(await screen.findByText(/Own video · 16:9/)).toBeInTheDocument();
+  expect(screen.queryByText(/9:16 · IR/)).not.toBeInTheDocument();
+});
 
 it("distinguishes a passed media probe from creative and human approval", async () => {
   rows.value = [{ id: "candidate-1", project_id: "project-1", aspect: "16:9",

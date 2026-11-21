@@ -2,12 +2,13 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from, rpc, update, filters, build } = vi.hoisted(() => ({
+const { from, rpc, update, filters, build, videoWorkspace } = vi.hoisted(() => ({
   from: vi.fn(),
   rpc: vi.fn(),
   update: vi.fn(),
   filters: vi.fn(),
   build: vi.fn(),
+  videoWorkspace: vi.fn(),
 }));
 
 vi.mock("../../lib/supabase", () => ({
@@ -22,6 +23,13 @@ vi.mock("../../lib/media", () => ({ signPaths: async () => new Map() }));
 vi.mock("../../components/briefs/ApproveAndBuildModal", () => ({ ApproveAndBuildModal: (props: unknown) => { build(props); return null; } }));
 vi.mock("../../components/briefs/BriefDetailModal", () => ({ BriefDetailModal: () => null }));
 vi.mock("../../components/MediaDetailModal", () => ({ MediaDetailModal: () => null }));
+vi.mock("../motion/CodeVideoProjectsPanel", () => ({
+  CodeVideoProjectsPanel: (props: { campaignBinding: {
+    briefId: string; campaignId: string; route: string } }) => {
+    videoWorkspace(props);
+    return <section aria-label="Campaign code video workspace" />;
+  },
+}));
 
 import { CampaignContentPanel } from "./CampaignContentPanel";
 
@@ -94,11 +102,26 @@ function show(over: Partial<Parameters<typeof CampaignContentPanel>[0]> = {}) {
   /></MemoryRouter>);
 }
 
-it("routes an approved video brief from its campaign route into code video", async () => {
+it("opens the owning code-video workspace inside the selected campaign route", async () => {
   briefRows = [{ ...brief, media_type: "video", status: "approved" }];
   show({ route: "organic", routePositions: [1] });
-  expect(await screen.findByRole("link", { name: "Start code video for organic route" }))
-    .toHaveAttribute("href", "/clients/client-1/delivery/content-production-factory?tab=generation&videoBrief=brief-1&videoCampaign=campaign-1&videoRoute=organic");
+  const start = await screen.findByRole("button", { name: "Start code video for organic route" });
+  fireEvent.click(start);
+  expect(screen.getByRole("region", { name: "Campaign code video workspace" })).toBeInTheDocument();
+  expect(videoWorkspace).toHaveBeenCalledWith({ campaignBinding: {
+    briefId: "brief-1", campaignId: "campaign-1", route: "organic",
+  } });
+});
+
+it("keeps a produced campaign video inspectable after its brief advances", async () => {
+  briefRows = [{ ...brief, media_type: "video", status: "in_production" }];
+  show({ route: "paid", routePositions: [1] });
+  fireEvent.click(await screen.findByRole("button", { name: "Open code video for paid route" }));
+  expect(screen.getByRole("region", { name: "Campaign code video workspace" }))
+    .toBeInTheDocument();
+  expect(videoWorkspace).toHaveBeenCalledWith({ campaignBinding: {
+    briefId: "brief-1", campaignId: "campaign-1", route: "paid",
+  } });
 });
 
 it("loads campaign-specific ideas and the production linked to their briefs", async () => {
