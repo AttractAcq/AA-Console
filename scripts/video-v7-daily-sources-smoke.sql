@@ -280,4 +280,118 @@ begin
   if public.video_project_source_current_v1(project.id) then
     raise exception 'Changed daily brief remained current'; end if;
 end $start_checks$;
+
+-- Synthesize only the terminal provider state to isolate the daily handoff.
+-- The separate V5 render fixture exercises real pre-render, cost, probe,
+-- creative and thumbnail gates; these trigger bypasses are rollback-only and are
+-- re-enabled before the reconciler is called.
+reset role;
+alter table public.video_project_render_attempts_v1
+  disable trigger video_project_prerender_render_gate_v1;
+alter table public.video_project_render_candidates_v1
+  disable trigger video_project_render_candidate_cost_gate_v1;
+alter table public.video_project_attachments_v1
+  disable trigger video_attachment_thumbnail_guard_v1;
+do $terminal_fixture$
+declare project public.video_projects%rowtype;
+  object_row storage.objects%rowtype;
+  candidate_id uuid; asset_id uuid; attempt_id uuid;
+  media_path text;
+begin
+  update public.client_briefs set body=
+    'Explain the assessed service to local buyers with one clear process and a documented handoff.'
+    where id='ebbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  select * into project from public.video_projects
+    where brief_id='ebbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  if project.id is null or not public.video_project_source_current_v1(project.id) then
+    raise exception 'Terminal fixture lost the current daily project'; end if;
+  update public.video_projects set stage='attached',ir_version=1
+    where id=project.id;
+  insert into public.video_project_render_attempts_v1
+    (project_id,client_id,ir_version,aspect,job_id,state,region,function_name,
+      render_id,bucket_name,out_name,started_at)
+  values(project.id,project.client_id,1,'9:16',project.job_id,'started',
+    'eu-central-1','rollback-fixture','terminal-receipt','rollback-fixture',
+    'daily-fixture.mp4',now()) returning id into attempt_id;
+  media_path:=project.client_id::text||'/video/projects/'||project.id::text||
+    '/ir-v1/candidates/'||attempt_id::text||'-9x16-'||repeat('c',64)||'.mp4';
+  insert into storage.objects(bucket_id,name,version)
+  values('client-media',media_path,'v1') returning * into object_row;
+  insert into public.video_project_render_candidates_v1
+    (attempt_id,project_id,client_id,ir_version,aspect,storage_path,
+      file_sha256,file_bytes,object_id,object_version,object_updated_at,
+      media_probe,probe_result,verdict,reviewed_at)
+  values(attempt_id,project.id,project.client_id,1,'9:16',media_path,
+    repeat('c',64),2048,object_row.id,object_row.version,
+    object_row.updated_at,
+    '{"result":"pass","width":1080,"height":1920,"duration_sec":60}'::jsonb,
+    'pass','accepted',now()) returning id into candidate_id;
+  insert into public.client_media_assets
+    (client_id,brief_id,media_type,content_format,title,storage_path,
+      render_path,edit_stage)
+  values(project.client_id,project.brief_id,'video','reel',
+    'Daily terminal fixture',media_path,media_path,'review_ready')
+  returning id into asset_id;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform public.attest_creative_storage_bytes_v6(asset_id,media_path,
+    repeat('c',64),2048,object_row.id,object_row.version,object_row.updated_at);
+  insert into public.video_project_attachments_v1
+    (project_id,client_id,ir_version,first_candidate_id,asset_id)
+  values(project.id,project.client_id,1,candidate_id,asset_id);
+  update public.video_project_render_candidates_v1
+    set object_version='stale-v2' where id=candidate_id;
+end $terminal_fixture$;
+alter table public.video_project_render_attempts_v1
+  enable trigger video_project_prerender_render_gate_v1;
+alter table public.video_project_render_candidates_v1
+  enable trigger video_project_render_candidate_cost_gate_v1;
+alter table public.video_project_attachments_v1
+  enable trigger video_attachment_thumbnail_guard_v1;
+set local role service_role;
+select set_config('request.jwt.claim.role','service_role',true);
+do $terminal_checks$
+declare step public.workflow_steps%rowtype;
+  result record;
+begin
+  select s.* into step from public.workflow_steps s
+    join public.daily_package_items i on i.final_step_id=s.id
+    join public.daily_packages p on p.id=i.package_id
+    where p.package_day=date '2099-01-02' and i.role='reel';
+  select * into result from public.reconcile_daily_code_video_steps_v1(20);
+  if result.assets_accepted<>0 or result.steps_held<1
+    or exists(select 1 from public.workflow_artifacts where step_id=step.id) then
+    raise exception 'Stale render object receipt completed daily video'; end if;
+end $terminal_checks$;
+reset role;
+update public.video_project_render_candidates_v1 set object_version='v1'
+  where project_id=(select id from public.video_projects
+    where brief_id='ebbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+set local role service_role;
+select set_config('request.jwt.claim.role','service_role',true);
+do $terminal_accept$
+declare step public.workflow_steps%rowtype;
+  v_asset_id uuid; result record;
+begin
+  select s.* into step from public.workflow_steps s
+    join public.daily_package_items i on i.final_step_id=s.id
+    join public.daily_packages p on p.id=i.package_id
+    where p.package_day=date '2099-01-02' and i.role='reel';
+  select a.asset_id into v_asset_id from public.video_project_attachments_v1 a
+    where a.project_id=step.resolved_input_id;
+  select * into result from public.reconcile_daily_code_video_steps_v1(20);
+  select * into step from public.workflow_steps where id=step.id;
+  if result.assets_accepted<>1 or step.status<>'completed'
+    or not exists(select 1 from public.workflow_artifacts a
+      where a.step_id=step.id and a.record_id=v_asset_id
+        and a.artifact_kind='asset')
+    or not exists(select 1 from public.daily_package_items i
+      where i.final_step_id=step.id and i.asset_id=v_asset_id)
+    or (select status from public.workflow_runs where id=step.run_id)
+      is distinct from 'awaiting_human_approval' then
+    raise exception 'Exact attached MP4 did not complete daily internal QA'; end if;
+  select * into result from public.reconcile_daily_code_video_steps_v1(20);
+  if result.assets_accepted<>0 or (select count(*) from public.workflow_artifacts
+    where step_id=step.id)<>1 then
+    raise exception 'Daily video reconciliation duplicated a final asset'; end if;
+end $terminal_accept$;
 rollback;

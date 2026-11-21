@@ -70,9 +70,13 @@ cannot finish the step.
 
 The rollback fixture verifies one current brief creates one project, pause
 and stale-source paths leave no project, retries do not duplicate jobs, and
-script completion produces no final artifact. The full attached-MP4 positive
-path, a stale Storage negative case, and coexistence with an in-flight v5
-package still need a dedicated fixture. Then inspect the signed-in client
+script completion produces no final artifact. A synthetic terminal-state
+fixture verifies that a mismatched render Storage receipt holds the step,
+then an exact attached MP4 binds one daily asset and produces one internal-QA
+artifact without duplication. It bypasses pre-render, cost and thumbnail
+insert triggers only inside the rollback transaction; those stages have their
+own V5 render fixture. A real provider-run attachment and coexistence with
+an in-flight v5 daily package remain unverified. Then inspect the signed-in client
 page and run one scoped preparation case before calling the bridge
 operational. Keep outbound switches off until separate approval and provider
 receipt gates pass.
