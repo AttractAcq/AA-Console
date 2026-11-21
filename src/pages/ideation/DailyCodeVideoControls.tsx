@@ -67,6 +67,10 @@ export function DailyCodeVideoControls({ clientId, onPlanned }: {
 
   const toggleSource = (id: string) => setSourceIds((current) =>
     current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  const savedSelection = configured !== null
+    && routeId === configured.route_package_id
+    && sourceIds.length === configured.model_record_ids.length
+    && sourceIds.every((id) => configured.model_record_ids.includes(id));
 
   async function configure() {
     setBusy(true); setError(null); setNotice(null);
@@ -123,11 +127,12 @@ export function DailyCodeVideoControls({ clientId, onPlanned }: {
           onChange={(event) => setPackageDay(event.target.value)}
           className="mt-1 block rounded-md border border-input bg-background px-3 py-2 text-sm" />
       </label>
-      <button type="button" disabled={busy || !settings.enabled || !configured || !packageDay}
+      <button type="button" disabled={busy || !settings.enabled || !savedSelection || !packageDay}
         onClick={() => void plan()} className="rounded-md border border-border px-3 py-2 text-xs disabled:opacity-50">
         Request code-video day
       </button>
       {!settings.enabled && <p className="text-xs text-muted-foreground">The client daily package switch is off. It must be enabled before a request can run.</p>}
+      {settings.enabled && !savedSelection && <p className="text-xs text-muted-foreground">Save the selected route and sources before requesting a day.</p>}
     </div>}
   </section>;
 }

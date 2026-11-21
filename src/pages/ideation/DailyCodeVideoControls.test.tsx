@@ -39,13 +39,15 @@ it("lets an operator save reviewed sources and explicitly request one code-video
   render(<DailyCodeVideoControls clientId="client-1" onPlanned={onPlanned} />);
   fireEvent.change(await screen.findByLabelText("Daily video organic route"), { target: { value: ROUTE } });
   fireEvent.click(screen.getByText(/Reviewed service/));
+  fireEvent.change(screen.getByLabelText("Daily video package day"),
+    { target: { value: "2099-01-02" } });
+  expect(screen.getByRole("button", { name: "Request code-video day" })).toBeDisabled();
   fireEvent.click(screen.getByRole("button", { name: "Save daily video sources" }));
   await waitFor(() => expect(callRuntime).toHaveBeenCalledWith("/admin/video/daily", {
     action: "configure", clientId: "client-1", routePackageId: ROUTE,
     modelRecordIds: [SOURCE],
   }));
-  fireEvent.change(screen.getByLabelText("Daily video package day"),
-    { target: { value: "2099-01-02" } });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Request code-video day" })).toBeEnabled());
   fireEvent.click(screen.getByRole("button", { name: "Request code-video day" }));
   await waitFor(() => expect(callRuntime).toHaveBeenCalledWith("/admin/video/daily", {
     action: "plan", clientId: "client-1", packageDay: "2099-01-02",
