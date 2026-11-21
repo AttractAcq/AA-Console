@@ -50,7 +50,8 @@ An incomplete, interrupted, changed-source or failed-review batch produces a
 summary with explicit blockers and a nonzero exit. `scriptReviewGatePassed`
 applies only to script and independent-review evaluation. Its cost is a model
 usage estimate, `providerInvoiceReconciled` remains false, and
-`videoAcceptance` remains `not_assessed` until audio, render, vision critic and
+`providerCallsVerified` remains false because local JSON is not a provider
+receipt. `videoAcceptance` remains `not_assessed` until audio, render, vision critic and
 human review have separate evidence. Reconcile an in-flight case's outcome and
 billing before deciding whether to run it again.
 

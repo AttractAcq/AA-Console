@@ -40,6 +40,7 @@ describe("video evaluation report summary", () => {
       missingCaseIds: [], estimatedCostUsd: 4,
       writerValidateRate: 1, reviewerAcceptRate: 1,
       scriptReviewGatePassed: true, providerInvoiceReconciled: false,
+      providerCallsVerified: false,
       videoAcceptance: "not_assessed", blockers: [] });
     expect(summary.reportSha256).toEqual(["a".repeat(64), "b".repeat(64)]);
   });
