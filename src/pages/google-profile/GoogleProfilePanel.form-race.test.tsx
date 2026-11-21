@@ -40,7 +40,11 @@ beforeEach(() => {
     return chain;
   });
   insert.mockResolvedValue({ error: null });
-  rpc.mockResolvedValue({ error: null });
+  rpc.mockImplementation((name: string) =>
+    name === "list_google_profile_execution_overview_v6"
+      || name === "list_google_reply_execution_overview_v6"
+      ? { select: async () => ({ data: [], error: null }) }
+      : Promise.resolve({ error: null }));
 });
 
 it("does not close a new Connect draft when a cancelled save finishes", async () => {
@@ -71,7 +75,12 @@ it("does not close a new Connect draft when a cancelled save finishes", async ()
 
 it("does not close a new Reply draft when a cancelled reply save finishes", async () => {
   const firstSave = deferredSave();
-  rpc.mockReturnValueOnce(firstSave.promise);
+  rpc.mockImplementation((name: string) =>
+    name === "list_google_profile_execution_overview_v6"
+      || name === "list_google_reply_execution_overview_v6"
+      ? { select: async () => ({ data: [], error: null }) }
+      : name === "draft_google_review_reply_v6"
+        ? firstSave.promise : Promise.resolve({ error: null }));
   render(<GoogleProfilePanel tab="reviews" />);
   await userEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
   await userEvent.click(screen.getByRole("menuitem", { name: "Draft a reply" }));
@@ -93,5 +102,5 @@ it("does not close a new Reply draft when a cancelled reply save finishes", asyn
   await act(async () => { firstSave.resolve({ error: null }); await firstSave.promise; });
   expect(screen.getByRole("dialog", { name: "Reply to Reviewer A" })).toBeInTheDocument();
   expect(within(nextForm).getByRole("textbox", { name: "Reply" })).toHaveValue("Second reply");
-  expect(rpc).toHaveBeenCalledTimes(1);
+  expect(rpc).toHaveBeenCalledTimes(3);
 });

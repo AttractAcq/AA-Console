@@ -45595,6 +45595,84 @@ export type Database = {
           name: string
         }[]
       }
+      list_google_profile_execution_overview_v6: {
+        Args: { p_client_id: string }
+        Returns: {
+          approval_request_id: string | null
+          attempt_id: string | null
+          change_id: string | null
+          client_id: string | null
+          field: string | null
+          finished_at: string | null
+          location_ref: string | null
+          observed_value: string | null
+          outcome_note: string | null
+          provider_ref: string | null
+          reconciled_at: string | null
+          reconciliation_result: string | null
+          reserved_at: string | null
+          started_at: string | null
+          status: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "google_profile_execution_overview_v6"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      list_google_reply_execution_overview_v6: {
+        Args: { p_client_id: string }
+        Returns: {
+          approval_request_id: string | null
+          attempt_id: string | null
+          client_id: string | null
+          finished_at: string | null
+          observed_body_hash: string | null
+          outcome_note: string | null
+          provider_state: string | null
+          provider_update_time: string | null
+          reconciled_at: string | null
+          reconciled_provider_state: string | null
+          reconciliation_result: string | null
+          reply_id: string | null
+          reserved_at: string | null
+          started_at: string | null
+          status: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "google_reply_execution_overview_v6"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      list_meta_profile_execution_overview_v6: {
+        Args: { p_client_id: string }
+        Returns: {
+          approval_request_id: string | null
+          attempt_id: string | null
+          change_id: string | null
+          client_id: string | null
+          field: string | null
+          finished_at: string | null
+          observed_value: string | null
+          outcome_note: string | null
+          page_id: string | null
+          provider_ref: string | null
+          reconciled_at: string | null
+          reconciliation_result: string | null
+          reserved_at: string | null
+          started_at: string | null
+          status: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "meta_profile_execution_overview_v6"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       lock_down_definer_functions: { Args: never; Returns: number }
       main_offer_source_current_v7: {
         Args: { p_offer_id: string }

@@ -61,7 +61,6 @@ function database(options: { identities?: unknown[]; changes?: unknown[]; presen
       if (table === "meta_identity_health") return options.identities ?? [identity()];
       if (table === "meta_profile_changes") return options.changes ?? [];
       if (table === "approval_inbox_v6") return options.profileCards ?? [];
-      if (table === "meta_profile_execution_overview_v6") return options.profileOutcomes ?? [];
       if (table === "agent_jobs") return options.profileJobs ?? [];
       return options.presence ?? [];
     };
@@ -83,7 +82,12 @@ function database(options: { identities?: unknown[]; changes?: unknown[]; presen
     });
     return chain;
   });
-  rpc.mockResolvedValue({ data: null, error: null });
+  rpc.mockImplementation((name: string) => name === "list_meta_profile_execution_overview_v6"
+    ? { select: async (columns: string) => {
+      select(name, columns);
+      return { data: options.profileOutcomes ?? [], error: null };
+    } }
+    : Promise.resolve({ data: null, error: null }));
 }
 
 beforeEach(() => {
@@ -223,7 +227,7 @@ describe("proposed changes", () => {
     render(<MetaProfilePanel tab="profile" />);
     expect(await screen.findByText("Provider outcome uncertain; request a read-only Page check."))
       .toBeInTheDocument();
-    expect(select).toHaveBeenCalledWith("meta_profile_execution_overview_v6",
+    expect(select).toHaveBeenCalledWith("list_meta_profile_execution_overview_v6",
       "attempt_id,change_id,status,provider_ref,reconciliation_result,reconciled_at");
     expect(document.body.textContent).not.toContain(marker);
     await userEvent.click(screen.getByRole("button", { name: "Check Page read-only" }));
@@ -278,7 +282,8 @@ describe("proposed changes", () => {
     expect(screen.getByText(/Request review of the/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
-    expect(rpc).not.toHaveBeenCalled();
+    expect(rpc.mock.calls.every(([name]) => name === "list_meta_profile_execution_overview_v6"))
+      .toBe(true);
   });
 
   it("requests an exact Inbox review for a draft proposal", async () => {

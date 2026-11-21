@@ -106,9 +106,8 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           .eq("client_id", clientId).order("created_at", { ascending: false }).limit(100),
         supabase.from("approval_inbox_v6").select("id,status")
           .eq("client_id", clientId).eq("source_kind", "google_profile_change"),
-        supabase.from("google_profile_execution_overview_v6")
-          .select("attempt_id,change_id,status,provider_ref,reconciliation_result,reconciled_at")
-          .eq("client_id", clientId),
+        supabase.rpc("list_google_profile_execution_overview_v6", { p_client_id: clientId })
+          .select("attempt_id,change_id,status,provider_ref,reconciliation_result,reconciled_at"),
         supabase.from("agent_jobs").select("id,agent_key,input_id,status")
           .eq("client_id", clientId)
           .in("agent_key", ["google_profile_field_writer", "google_profile_field_reconciler"]),
@@ -119,9 +118,8 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           .order("reviewed_at", { ascending: false })
           .limit(100),
         supabase.from("google_review_replies").select("*").eq("client_id", clientId),
-        supabase.from("google_reply_execution_overview_v6")
-          .select("attempt_id,reply_id,status,provider_state,reconciliation_result,reconciled_at,reconciled_provider_state")
-          .eq("client_id", clientId),
+        supabase.rpc("list_google_reply_execution_overview_v6", { p_client_id: clientId })
+          .select("attempt_id,reply_id,status,provider_state,reconciliation_result,reconciled_at,reconciled_provider_state"),
         supabase.from("agent_jobs").select("id,agent_key,input_id,status")
           .eq("client_id", clientId)
           .in("agent_key", ["google_reply_sender", "google_reply_reconciler"]),

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "80845487c213b40ae5500cc1ca3540fe7f14c3ebae9ad9b5b9be5799ca08b0c4",
-  "generatedTypesSha256": "804ccdcd1f0471ea202b100543f3e9e0972cc3223abb164d88a0addb97fca35c",
-  "generatedSchemaBodySha256": "da5ae45f47fc6a88a2855c466db4a51a60c3557e1094db133a73cb0e9c897a5a",
+  "migrationSourceDigest": "dedaa26cebe878ed06a3f2d52876988a02c43528d31e5548342536224c0a2ed9",
+  "generatedTypesSha256": "aa4e9c348fcaa01bc27ef3c759a033c5e8d3047e701862e580aea06d2fb92ee2",
+  "generatedSchemaBodySha256": "653bf7b8555c1cdb45a40d46ef6780ac6515d7f1abd6f0d3e8ce8b7083d0571b",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -5029,6 +5029,13 @@
       "filename": "20261124061600_701_video_campaign_brief_start_guard.sql",
       "sha256": "155ecef5d3c6fdee4fe8cf8d5030acc1a9901d46b8bc97e6a36f93ee9e1398c3",
       "trimmedMd5": "07b68d8b02649dd008cd47a3cb7730e6"
+    },
+    {
+      "version": "20261124061700",
+      "name": "702_scoped_profile_execution_reads",
+      "filename": "20261124061700_702_scoped_profile_execution_reads.sql",
+      "sha256": "5e361ba14b5dabb58e6c9c0b7392f00cadea1495a4cf4bc93a610706fe03ac35",
+      "trimmedMd5": "bb442f435139b2c442b8f313f1ffaf45"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

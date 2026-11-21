@@ -119,9 +119,8 @@ function MetaProfilePanelForClient({ clientId, tab }: {
           .order("created_at", { ascending: false }),
         supabase.from("approval_inbox_v6").select("id,status")
           .eq("client_id", clientId).eq("source_kind", "meta_profile_change"),
-        supabase.from("meta_profile_execution_overview_v6")
-          .select("attempt_id,change_id,status,provider_ref,reconciliation_result,reconciled_at")
-          .eq("client_id", clientId),
+        supabase.rpc("list_meta_profile_execution_overview_v6", { p_client_id: clientId })
+          .select("attempt_id,change_id,status,provider_ref,reconciliation_result,reconciled_at"),
         supabase.from("agent_jobs").select("id,agent_key,input_id,status")
           .eq("client_id", clientId)
           .in("agent_key", ["meta_profile_field_writer", "meta_profile_field_reconciler"]),
