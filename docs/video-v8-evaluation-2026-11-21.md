@@ -7,7 +7,8 @@ operator-only idea without external facts. These records are evaluation data,
 not publishable client evidence.
 
 `npm run eval:video -- --check` validates the fixture count and prints its
-SHA-256 and the component-catalogue SHA-256. It makes no model call.
+SHA-256, the component-catalogue SHA-256 and a conservative fingerprint of the
+storyboard/review source files that form the paid prompts. It makes no model call.
 
 `npm run eval:video -- --plan --start 11 --limit 10` prints the selected case
 IDs and the same hashes without a model call. `--start` is one-based and
@@ -42,7 +43,8 @@ npm run eval:video:summary -- --out /private/tmp/aa-video-eval-summary.json \
 ```
 
 The summary reads the current 20-case manifest and component catalogue, then
-checks each report's hashes, model, case order, result count, duplicates,
+checks each report's fixture, catalogue and prompt-source hashes, model, case
+order, result count, duplicates,
 active case, estimated cost, writer/reviewer outcomes and accepted IR/citation
 integrity. It records each input
 file's SHA-256 and writes a new owner-only JSON file; it never calls a model.
@@ -54,6 +56,10 @@ usage estimate, `providerInvoiceReconciled` remains false, and
 receipt. `videoAcceptance` remains `not_assessed` until audio, render, vision critic and
 human review have separate evidence. Reconcile an in-flight case's outcome and
 billing before deciding whether to run it again.
+
+Reports from before the prompt-source fingerprint was added are held by the
+summary. A changed storyboard or reviewer implementation requires a new paid
+evaluation batch to support current-source claims.
 
 The `--max-usd` value is an **estimated stop threshold checked between cases**,
 not a hard provider spend cap. A case can pass the threshold and a provider

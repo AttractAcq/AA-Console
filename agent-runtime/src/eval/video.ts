@@ -7,6 +7,7 @@ import { resolve } from "node:path";
 import { estimateCostUsd } from "../usage/cost.js";
 import { replaceJsonReport, reserveJsonReport, runEvaluationBatch,
   selectCaseRange, type BatchState } from "./video-report.js";
+import { videoScriptSourceSha256 } from "./video-source.js";
 import { reviewVideoStoryboard, VIDEO_REVIEW_SYSTEM,
   VideoReviewValidationError } from "../video/review.js";
 import { writeVideoStoryboard, VideoStoryboardValidationError,
@@ -120,11 +121,13 @@ async function evaluate(test: Case, catalogue: string,
 async function main(): Promise<void> {
   const fixture = await readFile(fixtureUrl, "utf8");
   const catalogue = await readFile(catalogueUrl, "utf8");
+  const scriptSourceSha256 = await videoScriptSourceSha256();
   const cases = manifest(JSON.parse(fixture));
   for (const test of cases) validateVideoStoryboardRequest({ ...test, catalogue });
   if (process.argv.includes("--check")) {
     process.stdout.write(JSON.stringify({ cases: cases.length,
-      fixtureSha256: digest(fixture), catalogueSha256: digest(catalogue) }) + "\n");
+      fixtureSha256: digest(fixture), catalogueSha256: digest(catalogue),
+      scriptSourceSha256 }) + "\n");
     return;
   }
   const start = option("--start") === undefined ? 1 : Number(option("--start"));
@@ -134,6 +137,7 @@ async function main(): Promise<void> {
     process.stdout.write(JSON.stringify({ startCase: start,
       selectedCaseIds: selected.map((test) => test.id),
       fixtureSha256: digest(fixture), catalogueSha256: digest(catalogue),
+      scriptSourceSha256,
       note: "Read-only selection; no model call was made." }) + "\n");
     return;
   }
@@ -161,6 +165,7 @@ async function main(): Promise<void> {
       selectedCases: selected.length,
       selectedCaseIds: selected.map((test) => test.id),
       fixtureSha256: digest(fixture), catalogueSha256: digest(catalogue),
+      scriptSourceSha256,
       runStatus: state.status, activeCaseId: state.activeCaseId,
       completedCases: results.length, maxEstimatedUsd: maxUsd,
       estimatedCostUsd: Math.round(estimatedCostUsd * 1e6) / 1e6,

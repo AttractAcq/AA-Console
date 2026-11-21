@@ -6,6 +6,7 @@ const ids = Array.from({ length: 20 }, (_, index) =>
   `${String(index + 1).padStart(2, "0")}-case`);
 const fixture = "f".repeat(64);
 const catalogue = "c".repeat(64);
+const scriptSource = "s".repeat(64);
 const sha = (value: unknown) => createHash("sha256")
   .update(JSON.stringify(value)).digest("hex");
 
@@ -14,6 +15,7 @@ function report(start: number, count: number) {
   return {
     kind: "video_script_review_evaluation_v1", model: "review-model",
     fixtureSha256: fixture, catalogueSha256: catalogue,
+    scriptSourceSha256: scriptSource,
     startCase: start, selectedCases: count, selectedCaseIds,
     completedCases: count, runStatus: "complete",
     activeCaseId: null as string | null,
@@ -35,7 +37,7 @@ describe("video evaluation report summary", () => {
   it("joins two disjoint ten-case batches without claiming provider invoice or final video acceptance", () => {
     const summary = summarizeVideoReports([
       input(report(1, 10), "a"), input(report(11, 10), "b"),
-    ], ids, fixture, catalogue);
+    ], ids, fixture, catalogue, scriptSource);
     expect(summary).toMatchObject({ selectedCases: 20, completedCases: 20,
       missingCaseIds: [], estimatedCostUsd: 4,
       writerValidateRate: 1, reviewerAcceptRate: 1,
@@ -49,7 +51,7 @@ describe("video evaluation report summary", () => {
     const summary = summarizeVideoReports([
       input(report(1, 10), "a"), input(report(11, 10), "b"),
       input(report(11, 10), "c"),
-    ], ids, fixture, catalogue);
+    ], ids, fixture, catalogue, scriptSource);
     expect(summary.scriptReviewGatePassed).toBe(false);
     expect(summary.blockers).toContain("report 3: duplicate selected case 11-case");
   });
@@ -63,7 +65,7 @@ describe("video evaluation report summary", () => {
     second.estimatedCostUsd = 1.8;
     const summary = summarizeVideoReports([
       input(report(1, 10), "a"), input(second, "b"),
-    ], ids, fixture, catalogue);
+    ], ids, fixture, catalogue, scriptSource);
     expect(summary.completedCases).toBe(19);
     expect(summary.uncertainBillingCaseIds).toEqual([ids[19]]);
     expect(summary.blockers).toContain("report 2: batch is incomplete or has an active case");
@@ -77,9 +79,9 @@ describe("video evaluation report summary", () => {
     first.results[0]!.reviewerAccepted = false;
     const summary = summarizeVideoReports([
       input(first, "a"), input(report(11, 10), "b"),
-    ], ids, fixture, catalogue);
+    ], ids, fixture, catalogue, scriptSource);
     expect(summary.failedCaseIds).toEqual([ids[0]]);
-    expect(summary.blockers).toContain("report 1: fixture or catalogue hash differs from current source");
+    expect(summary.blockers).toContain("report 1: fixture, catalogue or prompt-source hash differs from current source");
     expect(summary.blockers).toContain("report 1: reported estimated cost disagrees with results");
     expect(summary.scriptReviewGatePassed).toBe(false);
   });
@@ -91,7 +93,7 @@ describe("video evaluation report summary", () => {
     second.model = "different-model";
     const summary = summarizeVideoReports([
       input(first, "a"), input(second, "b"),
-    ], ids, fixture, catalogue);
+    ], ids, fixture, catalogue, scriptSource);
     expect(summary.failedCaseIds).toEqual([ids[0]]);
     expect(summary.blockers).toContain("Reports use different or missing models");
     expect(summary.scriptReviewGatePassed).toBe(false);
@@ -103,10 +105,20 @@ describe("video evaluation report summary", () => {
     first.results[1]!.sceneSources = [];
     const summary = summarizeVideoReports([
       input(first, "a"), input(report(11, 10), "b"),
-    ], ids, fixture, catalogue);
+    ], ids, fixture, catalogue, scriptSource);
     expect(summary.failedCaseIds).toEqual([ids[0], ids[1]]);
     expect(summary.blockers).toContain(`report 1: accepted case ${ids[0]} lacks intact IR or citations`);
     expect(summary.blockers).toContain(`report 1: accepted case ${ids[1]} lacks intact IR or citations`);
+    expect(summary.scriptReviewGatePassed).toBe(false);
+  });
+
+  it("holds old batches after storyboard or reviewer source changes", () => {
+    const first = report(1, 10);
+    first.scriptSourceSha256 = "0".repeat(64);
+    const summary = summarizeVideoReports([
+      input(first, "a"), input(report(11, 10), "b"),
+    ], ids, fixture, catalogue, scriptSource);
+    expect(summary.blockers).toContain("report 1: fixture, catalogue or prompt-source hash differs from current source");
     expect(summary.scriptReviewGatePassed).toBe(false);
   });
 });

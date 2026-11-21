@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { reserveJsonReport } from "./video-report.js";
+import { videoScriptSourceSha256 } from "./video-source.js";
 
 type Row = Record<string, unknown>;
 type Input = { sha256: string; value: unknown };
@@ -38,7 +39,8 @@ function acceptedEvidenceIsIntact(result: Row): boolean {
 }
 
 export function summarizeVideoReports(inputs: Input[], expectedIds: string[],
-  fixtureSha256: string, catalogueSha256: string) {
+  fixtureSha256: string, catalogueSha256: string,
+  scriptSourceSha256: string) {
   if (inputs.length === 0 || expectedIds.length !== 20
     || new Set(expectedIds).size !== expectedIds.length) {
     throw new Error("Provide reports and the exact 20-case evaluation manifest.");
@@ -61,8 +63,9 @@ export function summarizeVideoReports(inputs: Input[], expectedIds: string[],
       continue;
     }
     if (report.fixtureSha256 !== fixtureSha256
-      || report.catalogueSha256 !== catalogueSha256) {
-      blockers.push(`${label}: fixture or catalogue hash differs from current source`);
+      || report.catalogueSha256 !== catalogueSha256
+      || report.scriptSourceSha256 !== scriptSourceSha256) {
+      blockers.push(`${label}: fixture, catalogue or prompt-source hash differs from current source`);
     }
     if (typeof report.model !== "string" || !report.model.trim()) {
       blockers.push(`${label}: model is missing`);
@@ -137,7 +140,7 @@ export function summarizeVideoReports(inputs: Input[], expectedIds: string[],
     && completedCases === expectedIds.length;
   return {
     kind: "video_script_review_summary_v1",
-    fixtureSha256, catalogueSha256,
+    fixtureSha256, catalogueSha256, scriptSourceSha256,
     model: models.size === 1 ? [...models][0] : null,
     reportSha256: inputs.map((input) => input.sha256),
     selectedCases: seen.size, completedCases,
@@ -175,7 +178,8 @@ async function main() {
     return { sha256: digest(raw), value: JSON.parse(raw) as unknown };
   }));
   const summary = summarizeVideoReports(inputs,
-    manifest.map((item) => (item as Row).id as string), digest(fixture), digest(catalogue));
+    manifest.map((item) => (item as Row).id as string),
+    digest(fixture), digest(catalogue), await videoScriptSourceSha256());
   await reserveJsonReport(resolve(out), summary);
   process.stdout.write(JSON.stringify({ completedCases: summary.completedCases,
     missingCaseIds: summary.missingCaseIds,
