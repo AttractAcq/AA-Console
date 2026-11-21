@@ -39,6 +39,10 @@ vi.mock("react-router-dom", () => ({
     createElement("a", { href: to, ...rest }, children as never),
 }));
 vi.mock("../../lib/callRuntime", () => ({ callRuntime }));
+vi.mock("../lead-magnet/LeadMagnetStudioPanel", () => ({
+  LeadMagnetStudioPanel: ({ campaignId }: { campaignId: string }) =>
+    createElement("div", { "data-testid": "inline-magnet-studio" }, campaignId),
+}));
 // Only the hook is faked; agentLabel and elapsedLabel are real, because the
 // activity bar renders them.
 vi.mock("../../lib/useAgentJobs", async (importOriginal) => ({
@@ -293,6 +297,9 @@ describe("campaign pages", () => {
       "Plan", "Organic", "Lead Magnet", "Launch",
     ]);
     expect(screen.getByText(/Standalone campaign. No market opportunity is required/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Lead Magnet" }));
+    expect(within(screen.getByRole("region", { name: "Campaign lead magnet studio" }))
+      .getByTestId("inline-magnet-studio")).toHaveTextContent("camp-1");
   });
 
   it("opens paid production and the exact operator export from a typed campaign", async () => {

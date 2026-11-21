@@ -60,7 +60,7 @@ import {
  * referred to.
  */
 
-export function LeadMagnetStudioPanel() {
+export function LeadMagnetStudioPanel({ campaignId }: { campaignId?: string } = {}) {
   const { clientId } = useParams<{ clientId: string }>();
   const [magnets, setMagnets] = useState<LeadMagnet[]>([]);
   const [versions, setVersions] = useState<LeadMagnetVersion[]>([]);
@@ -77,6 +77,9 @@ export function LeadMagnetStudioPanel() {
   const [error, setError] = useState<string | null>(null);
   const [building, setBuilding] = useState(false);
   const [versioning, setVersioning] = useState<LeadMagnet | null>(null);
+  const visibleMagnets = campaignId
+    ? magnets.filter((magnet) => magnet.campaign_id === campaignId)
+    : magnets;
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -192,11 +195,13 @@ export function LeadMagnetStudioPanel() {
       <IndexDetail
         title="Magnets"
         paramKey="magnet"
-        items={magnets}
+        items={visibleMagnets}
         nameOf={(magnet) => magnet.name}
-        emptyLabel={loading ? "Loading magnets…" : "No magnets yet — start with what the client already gives people"}
+        emptyLabel={loading ? "Loading magnets…" : campaignId
+          ? "No magnet is linked to this campaign yet. Run the campaign conversion draft above."
+          : "No magnets yet — start with what the client already gives people"}
         unselectedLabel="Choose a magnet to see its versions and decide on them."
-        action={<Button onClick={() => setBuilding(true)}>New magnet</Button>}
+        action={campaignId ? undefined : <Button onClick={() => setBuilding(true)}>New magnet</Button>}
         columns={[
           {
             label: "Magnet",
@@ -320,6 +325,7 @@ export function LeadMagnetStudioPanel() {
         ]}
         onSubmit={async (values) => {
           if (!clientId) throw new Error("No client selected.");
+          if (campaignId) throw new Error("Create this campaign's magnet through its conversion draft.");
           await createMagnet({
             clientId,
             name: String(values.name),
@@ -345,7 +351,7 @@ export function LeadMagnetStudioPanel() {
         fields={[
           {
             name: "magnet_id", label: "Magnet", kind: "select", required: true,
-            options: magnets.map((m) => ({ value: m.id, label: m.name })),
+            options: visibleMagnets.map((m) => ({ value: m.id, label: m.name })),
           },
           { name: "file", label: "File", kind: "file", required: true },
           {
@@ -368,6 +374,9 @@ export function LeadMagnetStudioPanel() {
         initialValues={versioning ? { magnet_id: versioning.id } : undefined}
         onSubmit={async (values) => {
           if (!clientId) throw new Error("No client selected.");
+          if (campaignId && !visibleMagnets.some((magnet) => magnet.id === String(values.magnet_id))) {
+            throw new Error("Choose a magnet linked to this campaign.");
+          }
           const file = values.file;
           if (!(file instanceof File)) throw new Error("Choose a file.");
           await addVersion({
