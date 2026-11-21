@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { CodeVideoRenderCandidatesPanel } from "./CodeVideoRenderCandidatesPanel";
@@ -21,12 +21,16 @@ type BriefBinding = { briefId: string; title: string;
   campaignId: string | null; routePackageId: string | null;
   route: string | null; routeVersion: number | null };
 
-export function CodeVideoProjectsPanel() {
+type CampaignBinding = { briefId: string; campaignId: string; route: "paid" | "organic" };
+
+export function CodeVideoProjectsPanel({ campaignBinding }: { campaignBinding?: CampaignBinding } = {}) {
   const { clientId } = useParams<{ clientId: string }>();
   const [params] = useSearchParams();
-  const requestedBriefId = params.get("videoBrief");
-  const requestedCampaignId = params.get("videoCampaign");
-  const requestedRoute = params.get("videoRoute");
+  const scopedBriefId = campaignBinding?.briefId;
+  const scopedCampaignId = campaignBinding?.campaignId;
+  const requestedBriefId = scopedBriefId ?? params.get("videoBrief");
+  const requestedCampaignId = scopedCampaignId ?? params.get("videoCampaign");
+  const requestedRoute = campaignBinding?.route ?? params.get("videoRoute");
   const bindingRequested = Boolean(requestedBriefId || requestedCampaignId || requestedRoute);
   const [binding, setBinding] = useState<BriefBinding | null>(null);
   const [bindingLoading, setBindingLoading] = useState(false);
@@ -106,10 +110,22 @@ export function CodeVideoProjectsPanel() {
 
   const refresh = useCallback(async () => {
     if (!clientId) return;
+    const scoped = scopedBriefId && scopedCampaignId
+      ? await supabase.from("video_projects").select("id")
+        .eq("client_id", clientId).eq("campaign_id", scopedCampaignId)
+        .eq("brief_id", scopedBriefId)
+        .order("created_at", { ascending: false }).limit(30)
+      : null;
+    if (scoped?.error) { setProjects([]); setError(scoped.error.message); return; }
+    const scopedIds = (scoped?.data ?? []).map((project) => project.id);
+    const statusQuery = supabase.from("video_project_status_v1")
+      .select("id,idea,audience,stage,stage_error,ir_version,source_snapshot,created_at,cost_usd,scene_count,audio_scene_count,candidate_count,accepted_candidate_count,critic_loop_count,asset_id,asset_review_status,human_approved_at,scheduled_post_count,recorded_external_post_count,last_recorded_external_post_at,unconfirmed_published_row_count")
+      .eq("client_id", clientId);
     const [projectResult, sourceResult, agentResult, audioAgentResult] = await Promise.all([
-      supabase.from("video_project_status_v1")
-        .select("id,idea,audience,stage,stage_error,ir_version,source_snapshot,created_at,cost_usd,scene_count,audio_scene_count,candidate_count,accepted_candidate_count,critic_loop_count,asset_id,asset_review_status,human_approved_at,scheduled_post_count,recorded_external_post_count,last_recorded_external_post_at,unconfirmed_published_row_count")
-        .eq("client_id", clientId).order("created_at", { ascending: false }).limit(30),
+      scopedBriefId && scopedCampaignId && scopedIds.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : (scopedBriefId && scopedCampaignId ? statusQuery.in("id", scopedIds) : statusQuery)
+          .order("created_at", { ascending: false }).limit(30),
       supabase.from("model_section_review_state_v7")
         .select("record_id,title,domain,observed_on,review_state")
         .eq("client_id", clientId).eq("review_state", "supported")
@@ -119,6 +135,7 @@ export function CodeVideoProjectsPanel() {
     ]);
     if (projectResult.error || sourceResult.error || agentResult.error
       || audioAgentResult.error) {
+      setProjects([]);
       setError(projectResult.error?.message ?? sourceResult.error?.message
         ?? agentResult.error?.message ?? audioAgentResult.error?.message
         ?? "Could not load code-rendered video projects.");
@@ -128,8 +145,11 @@ export function CodeVideoProjectsPanel() {
     setSources((sourceResult.data ?? []) as Source[]);
     setAgentPaused(agentResult.data?.paused !== false);
     setAudioAgentPaused(audioAgentResult.data?.paused !== false);
-  }, [clientId]);
+    setError(null);
+  }, [clientId, scopedBriefId, scopedCampaignId]);
   useEffect(() => { void refresh(); }, [refresh]);
+
+  const visibleProjectIds = useMemo(() => projects.map((project) => project.id), [projects]);
 
   async function createDraft() {
     if (!clientId || (bindingRequested && !binding)) return;
@@ -258,8 +278,10 @@ export function CodeVideoProjectsPanel() {
           stage={projects.find((project) => project.id === activeReview)!.stage} />}
     </div>
     <CodeVideoRenderCandidatesPanel clientId={clientId}
+      projectIds={campaignBinding ? visibleProjectIds : undefined}
       titles={new Map(projects.map((project) => [project.id, project.idea]))} />
     <CodeVideoAttachmentsPanel clientId={clientId}
+      projectIds={campaignBinding ? visibleProjectIds : undefined}
       titles={new Map(projects.map((project) => [project.id, project.idea]))} />
   </section>;
 }
