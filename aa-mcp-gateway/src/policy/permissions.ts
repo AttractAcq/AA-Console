@@ -82,6 +82,7 @@ export const PRODUCTION_ONLY_TOOLS = new Set([
   "content.assign_production",
   "content.create_upload_url",
   "content.submit_asset",
+  "content.create_video_project",
 ]);
 /**
  * Sec Phase 10 Alex CLEAR (2026-09-09): distribution schedule/publication

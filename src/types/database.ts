@@ -30517,6 +30517,7 @@ export type Database = {
           job_id: string | null
           music_path: string | null
           music_prompt: string | null
+          origin_bot_id: string | null
           request_hash: string | null
           request_key: string | null
           research: Json | null
@@ -30552,6 +30553,7 @@ export type Database = {
           job_id?: string | null
           music_path?: string | null
           music_prompt?: string | null
+          origin_bot_id?: string | null
           request_hash?: string | null
           request_key?: string | null
           research?: Json | null
@@ -30587,6 +30589,7 @@ export type Database = {
           job_id?: string | null
           music_path?: string | null
           music_prompt?: string | null
+          origin_bot_id?: string | null
           request_hash?: string | null
           request_key?: string | null
           research?: Json | null
@@ -43881,6 +43884,7 @@ export type Database = {
           job_id: string | null
           music_path: string | null
           music_prompt: string | null
+          origin_bot_id: string | null
           request_hash: string | null
           request_key: string | null
           research: Json | null
@@ -45853,6 +45857,25 @@ export type Database = {
           p_execution_id: string
           p_filename?: string
           p_request_id: string
+        }
+        Returns: Json
+      }
+      mcp_create_video_project_v1: {
+        Args: {
+          p_aspects: string[]
+          p_audience: string
+          p_bot_id: string
+          p_brief_id: string
+          p_campaign_id: string
+          p_client_id: string
+          p_execution_id: string
+          p_idea: string
+          p_record_ids: string[]
+          p_request_id: string
+          p_request_key: string
+          p_route_package_id: string
+          p_target_length_sec: number
+          p_tone: string
         }
         Returns: Json
       }

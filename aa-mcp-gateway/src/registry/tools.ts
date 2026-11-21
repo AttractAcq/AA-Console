@@ -6,7 +6,7 @@ const domains: Record<string, string> = {
     "list_clients get_client get_status get_plan get_blockers get_next_action create_task get_client_health",
   campaign: "list get create update get_status request_approval plan provision launch get_readiness",
   content:
-    "list_ideas generate_ideas get_idea select_idea generate_brief get_brief assign_production get_production_status video_project_status create_upload_url submit_asset request_revision request_approval approve_asset create_repurpose_plan queue_distribution record_publication get_performance",
+    "list_ideas generate_ideas get_idea select_idea generate_brief get_brief assign_production get_production_status video_project_status create_video_project create_upload_url submit_asset request_revision request_approval approve_asset create_repurpose_plan queue_distribution record_publication get_performance",
   conversion:
     "list_pages get_page create_page generate_structure generate_copy request_approval get_performance audit_page revise_page revert_page",
   sales_agents:
@@ -233,6 +233,24 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         delete fields.limit;
         delete fields.asset_id;
         fields.project_id = id;
+      }
+      if (name === "content.create_video_project") {
+        delete fields.asset_id;
+        delete fields.title;
+        delete fields.summary;
+        fields.idea = z.string().trim().min(15).max(4000);
+        fields.audience = z.string().trim().min(1).max(200);
+        fields.tone = z.enum(["calm", "confident", "energetic"]);
+        fields.target_length_sec = z.number().int().min(30).max(900);
+        fields.aspects = z.array(z.enum(["16:9", "9:16", "1:1"])).min(1).max(3)
+          .refine((items) => new Set(items).size === items.length);
+        fields.record_ids = z.array(id).min(1).max(12)
+          .refine((items) => new Set(items).size === items.length);
+        fields.brief_id = id.optional();
+        fields.campaign_id = id.optional();
+        fields.route_package_id = id.optional();
+        fields.idempotency_key = z.string().min(8).max(120)
+          .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/);
       }
       if (name === "content.request_revision") {
         fields.summary = text;
@@ -737,6 +755,7 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         "content.request_revision",
         "content.get_production_status",
         "content.video_project_status",
+        "content.create_video_project",
         "content.create_repurpose_plan",
         "content.request_approval",
         // Sec Phase 9b: bot_production only, enforced by allowed() below, not
@@ -848,7 +867,11 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         ].includes(name)
           ? "real"
           : "stub";
-      const input = z.object(fields).strict();
+      const input = name === "content.create_video_project"
+        ? z.object(fields).strict().refine((value) =>
+          Boolean(value.campaign_id) === Boolean(value.route_package_id)
+          && (!value.campaign_id || Boolean(value.brief_id)))
+        : z.object(fields).strict();
       return {
         name,
         domain,
@@ -872,6 +895,7 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
           "record_sale",
           "approve_asset",
           "record_publication",
+          "create_video_project",
         ].includes(action) &&
         name !== "sites.provision" &&
         name !== "sites.publish_page",

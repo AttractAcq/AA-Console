@@ -72,7 +72,7 @@ async function mockAa(
 }
 
 test("Phase 16c: registry is 103 post-A+B+C; funnel/content/brand/sites are real; generate_report stays stub", () => {
-  assert.equal(registry.length, 105);
+  assert.equal(registry.length, 106);
   for (const name of [
     "attribution.get_conversion_funnel",
     "attribution.get_content_performance",

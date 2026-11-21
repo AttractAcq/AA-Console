@@ -62,6 +62,7 @@ test("Phase 5 tools are real and generate_brief stays accepted", async (t) => {
     "content.approve_asset",
     "content.assign_production",
     "content.create_upload_url",
+    "content.create_video_project",
     "content.submit_asset",
   ])
     assert.ok(real.includes(name), name);
@@ -262,6 +263,7 @@ test("gateway denies other-client and unauthorized bots before AA for every real
     "content.assign_production",
     "content.create_repurpose_plan",
     "content.create_upload_url",
+    "content.create_video_project",
     "content.generate_brief",
     "content.get_brief",
     "content.get_idea",
@@ -293,6 +295,13 @@ test("gateway denies other-client and unauthorized bots before AA for every real
     "content.get_brief": { client_id: other, idea_id: idea },
     "content.get_production_status": { client_id: other, idea_id: idea },
     "content.video_project_status": { client_id: other, project_id: idea },
+    "content.create_video_project": {
+      client_id: other,
+      idea: "Explain the reviewed service to prospective buyers.",
+      audience: "Local buyers", tone: "confident", target_length_sec: 120,
+      aspects: ["16:9"], record_ids: [idea],
+      idempotency_key: "scope-video-create",
+    },
     "content.request_revision": {
       client_id: other,
       brief_id: brief,
