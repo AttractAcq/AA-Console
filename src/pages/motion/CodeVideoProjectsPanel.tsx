@@ -39,6 +39,8 @@ export function CodeVideoProjectsPanel({ campaignBinding }: { campaignBinding?: 
   const [sources, setSources] = useState<Source[]>([]);
   const [agentPaused, setAgentPaused] = useState(true);
   const [audioAgentPaused, setAudioAgentPaused] = useState(true);
+  const [renderAgentPaused, setRenderAgentPaused] = useState(true);
+  const [workerStatusLoaded, setWorkerStatusLoaded] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [activeDraft, setActiveDraft] = useState<string | null>(null);
   const [activeReview, setActiveReview] = useState<string | null>(null);
@@ -116,12 +118,12 @@ export function CodeVideoProjectsPanel({ campaignBinding }: { campaignBinding?: 
         .eq("brief_id", scopedBriefId)
         .order("created_at", { ascending: false }).limit(30)
       : null;
-    if (scoped?.error) { setProjects([]); setError(scoped.error.message); return; }
+    if (scoped?.error) { setProjects([]); setWorkerStatusLoaded(false); setError(scoped.error.message); return; }
     const scopedIds = (scoped?.data ?? []).map((project) => project.id);
     const statusQuery = supabase.from("video_project_status_v1")
       .select("id,idea,audience,stage,stage_error,ir_version,source_snapshot,created_at,cost_usd,scene_count,audio_scene_count,candidate_count,accepted_candidate_count,critic_loop_count,asset_id,asset_review_status,human_approved_at,scheduled_post_count,recorded_external_post_count,last_recorded_external_post_at,unconfirmed_published_row_count")
       .eq("client_id", clientId);
-    const [projectResult, sourceResult, agentResult, audioAgentResult] = await Promise.all([
+    const [projectResult, sourceResult, agentResult, audioAgentResult, renderAgentResult] = await Promise.all([
       scopedBriefId && scopedCampaignId && scopedIds.length === 0
         ? Promise.resolve({ data: [], error: null })
         : (scopedBriefId && scopedCampaignId ? statusQuery.in("id", scopedIds) : statusQuery)
@@ -132,12 +134,15 @@ export function CodeVideoProjectsPanel({ campaignBinding }: { campaignBinding?: 
         .order("title").limit(100),
       supabase.from("agents").select("paused").eq("agent_key", "video_script").maybeSingle(),
       supabase.from("agents").select("paused").eq("agent_key", "video_audio").maybeSingle(),
+      supabase.from("agents").select("paused").eq("agent_key", "video_render").maybeSingle(),
     ]);
     if (projectResult.error || sourceResult.error || agentResult.error
-      || audioAgentResult.error) {
+      || audioAgentResult.error || renderAgentResult.error) {
       setProjects([]);
+      setWorkerStatusLoaded(false);
       setError(projectResult.error?.message ?? sourceResult.error?.message
         ?? agentResult.error?.message ?? audioAgentResult.error?.message
+        ?? renderAgentResult.error?.message
         ?? "Could not load code-rendered video projects.");
       return;
     }
@@ -145,11 +150,15 @@ export function CodeVideoProjectsPanel({ campaignBinding }: { campaignBinding?: 
     setSources((sourceResult.data ?? []) as Source[]);
     setAgentPaused(agentResult.data?.paused !== false);
     setAudioAgentPaused(audioAgentResult.data?.paused !== false);
+    setRenderAgentPaused(renderAgentResult.data?.paused !== false);
+    setWorkerStatusLoaded(true);
     setError(null);
   }, [clientId, scopedBriefId, scopedCampaignId]);
   useEffect(() => { void refresh(); }, [refresh]);
 
   const visibleProjectIds = useMemo(() => projects.map((project) => project.id), [projects]);
+  const pausedStages = [agentPaused && "script", audioAgentPaused && "audio",
+    renderAgentPaused && "render"].filter(Boolean).join(", ");
 
   async function createDraft() {
     if (!clientId || (bindingRequested && !binding)) return;
@@ -188,6 +197,10 @@ export function CodeVideoProjectsPanel({ campaignBinding }: { campaignBinding?: 
   return <section aria-label="Code-rendered video projects" className="space-y-4 rounded-lg border border-border p-4">
     <div><h2 className="text-sm font-semibold">Code-rendered video projects</h2>
       <p className="text-xs text-muted-foreground">Save a draft, choose reviewed business sources, then start a sourced storyboard. Rendering and publication require later review.</p></div>
+    {workerStatusLoaded && pausedStages && <p role="status" className="text-xs text-muted-foreground">
+      Video production is held: {pausedStages} worker{pausedStages.includes(",") ? "s" : ""} paused.
+      Drafts can be saved; later stages wait for these workers to be released.
+    </p>}
     {bindingLoading && <p className="text-xs text-muted-foreground">Checking video brief and campaign route…</p>}
     {bindingError && <p role="alert" className="text-xs text-destructive">{bindingError}</p>}
     {binding && <p className="text-xs">Source brief: {binding.title}
@@ -252,7 +265,8 @@ export function CodeVideoProjectsPanel({ campaignBinding }: { campaignBinding?: 
       {projects.map((project) => <div key={project.id} className="flex items-start justify-between gap-3 border-t border-border pt-2 text-xs">
         <div><p className="font-medium">{project.idea}</p>
           <p className="text-muted-foreground">{project.stage}{project.stage_error ? ` · ${project.stage_error}` : ""}
-            {project.stage === "timing" && audioAgentPaused ? " · Audio worker paused" : ""}</p>
+            {project.stage === "timing" && audioAgentPaused ? " · Audio worker paused" : ""}
+            {project.stage === "timed" && renderAgentPaused ? " · Render worker paused" : ""}</p>
           <p className="text-muted-foreground">Recorded: {project.scene_count} scenes · audio ready {project.audio_scene_count}/{project.scene_count}
             · render candidates accepted {project.accepted_candidate_count}/{project.candidate_count}
             · {project.critic_loop_count} critic loops · estimated cost ${Number(project.cost_usd ?? 0).toFixed(4)}</p>
