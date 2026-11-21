@@ -135,6 +135,25 @@ it("reports an unavailable exact review read instead of calling the bundle unapp
   expect(screen.queryByRole("button", { name: "Download exact JSON" })).not.toBeInTheDocument();
 });
 
+it("rechecks current approval when downloading a creative after the screen loaded", async () => {
+  rows.paid_operator_bundles_v7 = [{ id: "bundle-1", client_id: "client-1",
+    campaign_id: "campaign-1", package_id: "package-1", platform: "meta", version: 1,
+    snapshot_hash: "a".repeat(64), snapshot: { source: { campaign_name: "Local offer",
+      creative: [{ asset_id: "asset-1", storage_path: "client/one.png",
+        file_sha256: "a".repeat(64) }] } },
+    created_at: "2026-11-16T00:00:00Z", created_by: "user-1" }];
+  render(<PaidOperatorBundles clientId="client-1" platform="meta" />);
+  const file = await screen.findByRole("button", { name: "Download verified asset-1" });
+  expect(file).toBeEnabled();
+  rpc.mockImplementation((name: string) => Promise.resolve({
+    data: name === "paid_operator_bundle_approved_v7", error: null,
+  }));
+  await userEvent.click(file);
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "The bundle or its approval changed");
+  expect(file).toBeDisabled();
+});
+
 it("requires a reported verified download before the handoff button is usable", async () => {
   rows.paid_operator_bundles_v7 = [{ id: "bundle-1", client_id: "client-1",
     campaign_id: "campaign-1", package_id: "package-1", platform: "meta", version: 1,
