@@ -15,11 +15,13 @@
     "render:gold": "node scripts/render-gold.mjs",
     "render:ir": "node scripts/render-ir.mjs",
     "render:thumbnail": "node scripts/render-thumbnail.mjs",
-    "test": "vitest run"
+    "deploy:lambda": "node scripts/deploy-lambda.mjs",
+    "test": "vitest run && node --test scripts/deploy-lambda.test.mjs"
   },
   "dependencies": {
     "@remotion/captions": "4.0.545",
     "@remotion/cli": "4.0.545",
+    "@remotion/lambda": "4.0.545",
     "@remotion/media": "4.0.545",
     "@remotion/renderer": "4.0.545",
     "@remotion/transitions": "4.0.545",
