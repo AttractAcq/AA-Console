@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { ProductionAttemptComparison } from "../../components/ProductionAttemptComparison";
+import { DailyCodeVideoControls } from "./DailyCodeVideoControls";
 
 type Package = { id: string; run_id: string; package_day: string; platform: string };
 type Run = { id: string; workflow_version: string; status: string; blocker: string | null };
@@ -21,6 +22,7 @@ export function DailyProductionOverview() {
   const [stepBlockers, setStepBlockers] = useState<StepBlocker[]>([]);
   const [counts, setCounts] = useState<Count[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!clientId) return;
@@ -60,11 +62,13 @@ export function DailyProductionOverview() {
     };
     void load();
     return () => { active = false; };
-  }, [clientId]);
+  }, [clientId, refreshKey]);
 
   if (!clientId) return null;
 
-  return <section className="mb-5 rounded-lg border border-border bg-card p-4" aria-label="Daily production requests">
+  return <><DailyCodeVideoControls clientId={clientId}
+    onPlanned={() => setRefreshKey((value) => value + 1)} />
+  <section className="mb-5 rounded-lg border border-border bg-card p-4" aria-label="Daily production requests">
     <h2 className="font-semibold">Daily production requests</h2>
     {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
     {!error && !packages.length && <p className="mt-2 text-xs text-muted-foreground">No daily packages have been requested for this client.</p>}
@@ -88,5 +92,5 @@ export function DailyProductionOverview() {
         </ul>
       </div>;})}
     </div>}
-  </section>;
+  </section></>;
 }

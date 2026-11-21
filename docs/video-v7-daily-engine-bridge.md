@@ -78,8 +78,13 @@ insert triggers only inside the rollback transaction; those stages have their
 own V5 render fixture. A separate rollback case proves an in-flight v5
 package keeps its 14-step edit graph and queues an idea job beside a v6
 package. The daily production overview now displays graph type, run state
-and step blockers. A real provider-run attachment and operator controls for
-choosing route/model sources and requesting a v6 day remain unverified.
+and step blockers. An AAL2 runtime route lets an assigned manager or admin
+save the current organic route and 1–12 supported model sources, then
+explicitly request one v6 day. The browser offers those controls only when
+the client already has daily package settings; the route still rechecks
+client authority and the service-only SQL checks source currency and cutoff.
+A real provider-run attachment, signed-in use, and a Dashboard setup path
+for clients without daily package settings remain unverified.
 Then inspect the signed-in client page and run one scoped preparation case before calling the bridge
 operational. Keep outbound switches off until separate approval and provider
 receipt gates pass.

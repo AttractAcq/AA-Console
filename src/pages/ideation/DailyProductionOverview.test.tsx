@@ -4,6 +4,7 @@ import { expect, it, vi } from "vitest";
 
 const { from } = vi.hoisted(() => ({ from: vi.fn() }));
 vi.mock("../../lib/supabase", () => ({ supabase: { from } }));
+vi.mock("./DailyCodeVideoControls", () => ({ DailyCodeVideoControls: () => null }));
 
 import { DailyProductionOverview } from "./DailyProductionOverview";
 
