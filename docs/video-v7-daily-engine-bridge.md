@@ -75,6 +75,13 @@ cannot enter production without one. The existing brief lineage trigger still
 checks that a supplied brief came from the bound campaign's idea. Historical
 attached assets remain readable; no existing project is rewritten.
 
+The attached-video review page now fetches each requested MP4 and compares
+its bytes with that render candidate's filed SHA-256 before offering the
+download. If the first-aspect receipt is absent or points to another asset
+path, the page holds its download and human approval controls. This is a
+browser-side check at review time; provider execution and Storage permanence
+still need their separate receipts.
+
 ## Required execution contract
 
 1. Keep all v5 rows and their graph readable and executable; never rewrite
