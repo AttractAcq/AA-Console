@@ -7,7 +7,8 @@ operator-only idea without external facts. These records are evaluation data,
 not publishable client evidence.
 
 `npm run eval:video -- --check` validates the fixture count and prints its
-SHA-256 and the component-catalogue SHA-256. It makes no model call.
+SHA-256, the component-catalogue SHA-256 and a conservative fingerprint of the
+storyboard/review source files that form the paid prompts. It makes no model call.
 
 `npm run eval:video -- --plan --start 11 --limit 10` prints the selected case
 IDs and the same hashes without a model call. `--start` is one-based and
@@ -33,6 +34,32 @@ runtime error with unknown billing stops the batch before the next case.
 stop. `selectedCaseIds`, fixture/catalogue hashes and the model make separate
 batch reports comparable. A non-accepted review fails `qualityGatePassed` and
 the command exits nonzero even when the report is complete.
+
+After separate batches finish, reconcile them offline with a new summary file:
+
+```sh
+npm run eval:video:summary -- --out /private/tmp/aa-video-eval-summary.json \
+  /private/tmp/aa-video-eval-01-10.json /private/tmp/aa-video-eval-11-20.json
+```
+
+The summary reads the current 20-case manifest and component catalogue, then
+checks each report's fixture, catalogue and prompt-source hashes, model, case
+order, result count, duplicates,
+active case, estimated cost, writer/reviewer outcomes and accepted IR/citation
+integrity. It records each input
+file's SHA-256 and writes a new owner-only JSON file; it never calls a model.
+An incomplete, interrupted, changed-source or failed-review batch produces a
+summary with explicit blockers and a nonzero exit. `scriptReviewGatePassed`
+applies only to script and independent-review evaluation. Its cost is a model
+usage estimate, `providerInvoiceReconciled` remains false, and
+`providerCallsVerified` remains false because local JSON is not a provider
+receipt. `videoAcceptance` remains `not_assessed` until audio, render, vision critic and
+human review have separate evidence. Reconcile an in-flight case's outcome and
+billing before deciding whether to run it again.
+
+Reports from before the prompt-source fingerprint was added are held by the
+summary. A changed storyboard or reviewer implementation requires a new paid
+evaluation batch to support current-source claims.
 
 The `--max-usd` value is an **estimated stop threshold checked between cases**,
 not a hard provider spend cap. A case can pass the threshold and a provider
