@@ -17,6 +17,16 @@ version and model review state. It leaves the Engine and video workers
 unchanged, creates no project, and makes no provider request. The receipt is
 mutable for the next run; each run must snapshot it and recheck currency.
 
+Migration 696 adds an atomic service-only start for an explicitly versioned
+daily item. It requires a sealed v6 daily run, accepted and approved video
+brief, matching frozen route/source receipt, enabled daily settings, available
+video script worker and unexpired cutoff. One transaction creates one
+`video_projects` row, one script job and one step binding. A duplicate start
+returns the same IDs. It also binds the exact brief-body hash and daily source
+digest into downstream source checks, so a changed brief or review holds
+later workers. The deployed v5 planner does not create v6 runs, so this start
+path is not automatically invoked yet.
+
 ## Required execution contract
 
 1. Add a new workflow version for newly planned daily packages. Keep all v5
@@ -24,12 +34,10 @@ mutable for the next run; each run must snapshot it and recheck currency.
 2. Before sealing a new run, require the current organic route, accepted
    campaign plan, supported model sources and approved brief policy. Freeze
    their IDs, review hashes and plan fingerprint in the run snapshot.
-3. For each video role, stop after accepted ideation and briefing. Create one
-   source-bound code-video project from that exact brief. Use a **daily
-   service authority**, not an impersonated MCP bot or manager. The start
-   transaction must check the video agent is available and create exactly one
-   project/job under a stable daily item key. A paused worker leaves the item
-   visibly held and no partial project.
+3. For each video role, stop after accepted ideation and briefing. Call the
+   daily service start from the reconciler, without impersonating an MCP bot
+   or manager. A paused worker must leave the item visibly held and no
+   partial project.
 4. Reconcile the project as a long-running item. Completion of its script job
    is not completion of the video. Bind a final asset only after every
    requested aspect has an accepted candidate, stored bytes pass read-back,

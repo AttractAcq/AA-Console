@@ -30576,6 +30576,9 @@ export type Database = {
           created_at: string
           created_by: string | null
           critic_reports: Json
+          daily_brief_body_sha256: string | null
+          daily_item_id: string | null
+          daily_source_digest: string | null
           id: string
           idea: string
           ir: Json | null
@@ -30612,6 +30615,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           critic_reports?: Json
+          daily_brief_body_sha256?: string | null
+          daily_item_id?: string | null
+          daily_source_digest?: string | null
           id?: string
           idea: string
           ir?: Json | null
@@ -30648,6 +30654,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           critic_reports?: Json
+          daily_brief_body_sha256?: string | null
+          daily_item_id?: string | null
+          daily_source_digest?: string | null
           id?: string
           idea?: string
           ir?: Json | null
@@ -30762,6 +30771,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_projects_daily_item_id_fkey"
+            columns: ["daily_item_id"]
+            isOneToOne: true
+            referencedRelation: "daily_package_items"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_projects_job_id_fkey"
@@ -43951,6 +43967,9 @@ export type Database = {
           created_at: string
           created_by: string | null
           critic_reports: Json
+          daily_brief_body_sha256: string | null
+          daily_item_id: string | null
+          daily_source_digest: string | null
           id: string
           idea: string
           ir: Json | null
@@ -50168,6 +50187,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      start_daily_video_project_v1: {
+        Args: { p_item_id: string }
+        Returns: Json
       }
       start_google_build_v6: {
         Args: { p_execution_id: string }
