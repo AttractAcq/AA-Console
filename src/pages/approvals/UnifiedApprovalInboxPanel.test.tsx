@@ -801,10 +801,6 @@ function wireDatabase() {
       in: (_column: string, ids: string[]) => {
         historyIds.push(ids);
         if (table === "campaign_action_due") return Promise.resolve({ data: campaignDueRows, error: null });
-        if (table === "proof_approval_execution_evidence_v6")
-          return Promise.resolve({ data: proofOutcomeRows, error: null });
-        if (["google_reply_execution_overview_v6", "google_profile_execution_overview_v6",
-          "meta_profile_execution_overview_v6"].includes(table)) return Promise.resolve({ data: [], error: null });
         return query;
       },
       maybeSingle: async () => ({
@@ -812,8 +808,7 @@ function wireDatabase() {
         error: requestError,
       }),
       order: () => table === "approval_inbox_v6" ? query
-        : Promise.resolve({ data: table === "gateway_tool_execution_overview_v6"
-          ? gatewayOutcomes : decisions, error: decisionError }),
+        : Promise.resolve({ data: decisions, error: decisionError }),
       range: async (start: number, end: number) => {
         requestRanges.push([start, end]);
         const filtered = requests.filter((row) => filters.every(([column, value]) =>
@@ -843,7 +838,13 @@ beforeEach(() => {
   campaignDueRows = [];
   proofOutcomeRows = [];
   getAAL.mockResolvedValue({ data: { currentLevel: "aal2" }, error: null });
-  rpc.mockResolvedValue({ data: null, error: null });
+  rpc.mockImplementation((name: string) => name === "list_gateway_tool_execution_overview_v6"
+    ? { select: () => ({ order: async () => ({ data: gatewayOutcomes, error: null }) }) }
+    : name === "list_proof_approval_execution_evidence_v6"
+      ? { select: () => ({ in: async () => ({ data: proofOutcomeRows, error: null }) }) }
+    : name.startsWith("list_")
+      ? { select: () => ({ in: async () => ({ data: [], error: null }) }) }
+      : Promise.resolve({ data: null, error: null }));
   wireDatabase();
 });
 

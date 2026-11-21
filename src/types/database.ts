@@ -45570,6 +45570,47 @@ export type Database = {
           unread_inbound: number
         }[]
       }
+      list_campaign_budget_readback_overview_v6: {
+        Args: { p_client_id: string }
+        Returns: {
+          account_id: string | null
+          ad_set_external_id: string | null
+          checked_at: string | null
+          client_id: string | null
+          execution_id: string | null
+          id: string | null
+          observed_currency: string | null
+          observed_daily_budget_minor: number | null
+          result: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "campaign_budget_readback_overview_v6"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      list_campaign_page_readback_overview_v6: {
+        Args: { p_client_id: string }
+        Returns: {
+          checked_at: string | null
+          checked_ref: string | null
+          client_id: string | null
+          execution_id: string | null
+          id: string | null
+          observed_sha256: string | null
+          repository_name: string | null
+          repository_owner: string | null
+          result: string | null
+          site_path: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "campaign_page_readback_overview_v6"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       list_client_external_outcomes_v6: {
         Args: { p_client_id?: string }
         Returns: {
@@ -45594,6 +45635,121 @@ export type Database = {
           id: string
           name: string
         }[]
+      }
+      list_gateway_tool_execution_overview_v6: {
+        Args: { p_approval_ids: string[] }
+        Returns: {
+          approval_id: string | null
+          canonical_request_id: string | null
+          claimed_at: string | null
+          client_id: string | null
+          execution_status: string | null
+          finished_at: string | null
+          result_hash: string | null
+          sites_invocation_id: string | null
+          sites_invoked_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "gateway_tool_execution_overview_v6"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      list_google_profile_execution_overview_v6: {
+        Args: { p_client_id: string }
+        Returns: {
+          approval_request_id: string | null
+          attempt_id: string | null
+          change_id: string | null
+          client_id: string | null
+          field: string | null
+          finished_at: string | null
+          location_ref: string | null
+          observed_value: string | null
+          outcome_note: string | null
+          provider_ref: string | null
+          reconciled_at: string | null
+          reconciliation_result: string | null
+          reserved_at: string | null
+          started_at: string | null
+          status: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "google_profile_execution_overview_v6"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      list_google_reply_execution_overview_v6: {
+        Args: { p_client_id: string }
+        Returns: {
+          approval_request_id: string | null
+          attempt_id: string | null
+          client_id: string | null
+          finished_at: string | null
+          observed_body_hash: string | null
+          outcome_note: string | null
+          provider_state: string | null
+          provider_update_time: string | null
+          reconciled_at: string | null
+          reconciled_provider_state: string | null
+          reconciliation_result: string | null
+          reply_id: string | null
+          reserved_at: string | null
+          started_at: string | null
+          status: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "google_reply_execution_overview_v6"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      list_meta_profile_execution_overview_v6: {
+        Args: { p_client_id: string }
+        Returns: {
+          approval_request_id: string | null
+          attempt_id: string | null
+          change_id: string | null
+          client_id: string | null
+          field: string | null
+          finished_at: string | null
+          observed_value: string | null
+          outcome_note: string | null
+          page_id: string | null
+          provider_ref: string | null
+          reconciled_at: string | null
+          reconciliation_result: string | null
+          reserved_at: string | null
+          started_at: string | null
+          status: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "meta_profile_execution_overview_v6"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      list_proof_approval_execution_evidence_v6: {
+        Args: { p_client_id: string }
+        Returns: {
+          client_id: string | null
+          detail: string | null
+          external_ref: string | null
+          request_id: string | null
+          source_kind: string | null
+          state: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "proof_approval_execution_evidence_v6"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       lock_down_definer_functions: { Args: never; Returns: number }
       main_offer_source_current_v7: {

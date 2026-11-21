@@ -35,12 +35,18 @@ export async function loadApprovalExecutionEvidence(
 ): Promise<Map<string, ApprovalExecutionEvidence>> {
   const result = new Map<string, ApprovalExecutionEvidence>();
   const eligible = requests.filter(shouldShowExecutionEvidence);
-  const groups = new Map<string, ApprovalExecutionIdentity[]>();
+  const groups = new Map<string, { kind: string; clientId: string;
+    rows: ApprovalExecutionIdentity[] }>();
   for (const request of eligible) {
-    groups.set(request.source_kind, [...(groups.get(request.source_kind) ?? []), request]);
+    const clientId = request.client_id!;
+    const groupKey = `${request.source_kind}:${clientId}`;
+    const group = groups.get(groupKey) ?? { kind: request.source_kind,
+      clientId, rows: [] };
+    group.rows.push(request);
+    groups.set(groupKey, group);
   }
 
-  await Promise.all([...groups.entries()].map(async ([kind, rows]) => {
+  await Promise.all([...groups.values()].map(async ({ kind, clientId, rows }) => {
     const key = kind === "campaign_action" ? "source_id" : "id";
     const ids = rows.map((row) => row[key]);
     const byId = new Map(rows.map((row) => [row[key], row]));
@@ -50,7 +56,8 @@ export async function loadApprovalExecutionEvidence(
           ? await supabase.from("lead_magnet_approval_execution_evidence_v6")
             .select("request_id,client_id,source_kind,state,detail,external_ref")
             .in("request_id", ids)
-          : await supabase.from("proof_approval_execution_evidence_v6")
+          : await supabase.rpc("list_proof_approval_execution_evidence_v6",
+            { p_client_id: clientId })
             .select("request_id,client_id,source_kind,state,detail,external_ref")
             .in("request_id", ids);
         if (error) throw error;
@@ -80,7 +87,8 @@ export async function loadApprovalExecutionEvidence(
           });
         }
       } else if (kind === "google_review_reply") {
-        const { data, error } = await supabase.from("google_reply_execution_overview_v6")
+        const { data, error } = await supabase.rpc(
+          "list_google_reply_execution_overview_v6", { p_client_id: clientId })
           .select("approval_request_id,client_id,status,reconciliation_result,provider_state")
           .in("approval_request_id", ids);
         if (error) throw error;
@@ -96,10 +104,10 @@ export async function loadApprovalExecutionEvidence(
           });
         }
       } else {
-        const table = kind === "google_profile_change"
-          ? "google_profile_execution_overview_v6" as const
-          : "meta_profile_execution_overview_v6" as const;
-        const { data, error } = await supabase.from(table)
+        const fn = kind === "google_profile_change"
+          ? "list_google_profile_execution_overview_v6" as const
+          : "list_meta_profile_execution_overview_v6" as const;
+        const { data, error } = await supabase.rpc(fn, { p_client_id: clientId })
           .select("approval_request_id,client_id,status,reconciliation_result,provider_ref")
           .in("approval_request_id", ids);
         if (error) throw error;

@@ -80,10 +80,8 @@ function database(options: {
         case "google_profile_due": return options.due ?? [due()];
         case "google_profile_changes": return options.changes ?? [];
         case "approval_inbox_v6": return options.profileCards ?? [];
-        case "google_profile_execution_overview_v6": return options.profileOutcomes ?? [];
         case "google_reviews": return options.reviews ?? [review()];
         case "google_review_replies": return options.replies ?? [];
-        case "google_reply_execution_overview_v6": return options.replyOutcomes ?? [];
         case "agent_jobs": return options.replyJobs ?? [];
         case "proof_placement_provider_read_latest_v8": return options.providerReads ?? [];
         default: return options.placements ?? [];
@@ -102,7 +100,15 @@ function database(options: {
     });
     return chain;
   });
-  rpc.mockResolvedValue({ data: null, error: null });
+  rpc.mockImplementation((name: string) => {
+    if (name === "list_google_profile_execution_overview_v6"
+      || name === "list_google_reply_execution_overview_v6") {
+      const data = name === "list_google_profile_execution_overview_v6"
+        ? options.profileOutcomes ?? [] : options.replyOutcomes ?? [];
+      return { select: async () => ({ data, error: null }) };
+    }
+    return Promise.resolve({ data: null, error: null });
+  });
 }
 
 type ReadResult = { data: unknown[]; error: { message: string } | null };
@@ -150,7 +156,11 @@ function routeDatabase(pending: Record<string, Promise<ReadResult>> = {}) {
     });
     return chain;
   });
-  rpc.mockResolvedValue({ data: null, error: null });
+  rpc.mockImplementation((name: string) =>
+    name === "list_google_profile_execution_overview_v6"
+      || name === "list_google_reply_execution_overview_v6"
+      ? { select: async () => ({ data: [], error: null }) }
+      : Promise.resolve({ data: null, error: null }));
 }
 
 type CapturedModal = {
@@ -389,7 +399,9 @@ describe("the location", () => {
     expect(latestModal("Draft a reply").open).toBe(false);
     await expect(oldReply.onSubmit({ body: "A stale draft" }))
       .rejects.toThrow("Client selection changed. Reopen the form.");
-    expect(rpc).not.toHaveBeenCalled();
+    expect(rpc.mock.calls.every(([name]) =>
+      name === "list_google_profile_execution_overview_v6"
+      || name === "list_google_reply_execution_overview_v6")).toBe(true);
   });
 });
 

@@ -83,16 +83,6 @@ function database(
         order: async () => ({ data: options.attempts ?? [], error: null }) };
       return { select: () => query };
     }
-    if (table === "campaign_budget_readback_overview_v6") {
-      const query = { in: () => query,
-        order: async () => ({ data: options.readbacks ?? [], error: null }) };
-      return { select: () => query };
-    }
-    if (table === "campaign_page_readback_overview_v6") {
-      const query = { in: () => query,
-        order: async () => ({ data: options.pageReadbacks ?? [], error: null }) };
-      return { select: () => query };
-    }
     if (table === "campaign_proof_release_observations_v6") {
       return { select: () => ({ in: async () => ({ data: options.proofRows ?? [], error: null }) }) };
     }
@@ -119,10 +109,18 @@ function database(
     };
     return query;
   });
-  rpc.mockImplementation(async (name: string) => {
-    if (name === "client_runtime_controls_v6") return { data: options.runtime ?? null, error: null };
+  rpc.mockImplementation((name: string) => {
+    if (name === "list_campaign_budget_readback_overview_v6"
+      || name === "list_campaign_page_readback_overview_v6") {
+      const query = { in: () => query,
+        order: async () => ({ data: name === "list_campaign_budget_readback_overview_v6"
+          ? options.readbacks ?? [] : options.pageReadbacks ?? [], error: null }) };
+      return { select: () => query };
+    }
+    if (name === "client_runtime_controls_v6")
+      return Promise.resolve({ data: options.runtime ?? null, error: null });
     if (name === "decide_campaign_action_approval_v6") records = [];
-    return { error: null };
+    return Promise.resolve({ error: null });
   });
 }
 

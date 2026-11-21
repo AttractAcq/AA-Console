@@ -437,4 +437,12 @@ else
   exit 1
 fi
 
+if psql_local -qAt -f scripts/phase9-profile-execution-scoped-read-smoke.sql \
+  >"$run_dir/phase9-profile-execution-scoped-read.private.log" 2>&1; then
+  echo 'Phase 9 profile execution scoped read rollback fixture passed.'
+else
+  grep -E 'ERROR:|psql:' "$run_dir/phase9-profile-execution-scoped-read.private.log" | tail -3 >&2 || true
+  exit 1
+fi
+
 echo "Schema replay, upgrade equivalence, catalog contract and generated types passed."
