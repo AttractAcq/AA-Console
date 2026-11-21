@@ -15,8 +15,10 @@ REMOTION_AWS_REGION=eu-west-1 npm run deploy:lambda -- --expected-sha=<full-revi
 ```
 
 The command above prints a read-only plan. After the Remotion licence and AWS
-account/region are confirmed, the authorized release operator can set
-`AA_REMOTION_LICENSE_CONFIRMED=1` and append `--execute` to that command.
+account/region are confirmed, the authorized release operator sets
+`AA_REMOTION_LICENSE_CONFIRMED=1` and `AA_REMOTION_LICENSE_BASIS` to either
+`free-up-to-three` or `company-automators`, then appends `--execute`. The
+basis and its evidence are described in [LICENSE-NOTE.md](../video-render/LICENSE-NOTE.md).
 The script requires a clean checkout and exact SHA, deploys the version-pinned
 function and immutable SHA-named site, reads the function configuration back,
 and checks for `VideoThumbnail` and all three `VideoIR` compositions. Only a

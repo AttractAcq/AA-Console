@@ -10,7 +10,7 @@ const expectedCompositions = Object.freeze([
 ]);
 
 export function releasePlan({ sha, expectedSha, region, clean,
-  licenseConfirmed, execute }) {
+  licenseConfirmed, licenseBasis, execute }) {
   if (!/^[0-9a-f]{40}$/.test(sha)
     || !/^[0-9a-f]{40}$/.test(expectedSha)
     || sha !== expectedSha) throw new Error("Renderer release SHA does not match the reviewed commit.");
@@ -18,11 +18,13 @@ export function releasePlan({ sha, expectedSha, region, clean,
   if (!/^[a-z]{2}(?:-[a-z]+)+-[1-9]$/.test(region ?? "")) {
     throw new Error("REMOTION_AWS_REGION must identify one AWS region.");
   }
-  if (execute && !licenseConfirmed) {
-    throw new Error("Remotion licence eligibility must be confirmed before provisioning.");
+  if (execute && (!licenseConfirmed
+    || !["free-up-to-three", "company-automators"].includes(licenseBasis))) {
+    throw new Error("Remotion licence eligibility and its automation basis must be confirmed before provisioning.");
   }
   return { sha, region, siteName: `aa-video-${sha.slice(0,12)}`,
-    functionSpec, expectedCompositions, execute };
+    functionSpec, expectedCompositions,
+    licenseBasis: licenseBasis ?? null, execute };
 }
 
 function git(...args) {
@@ -66,6 +68,7 @@ export async function deployVerified(plan, provider) {
     throw new Error("The deployed site is missing a required video composition.");
   }
   return { sourceSha: plan.sha, region: plan.region,
+    licenseBasis: plan.licenseBasis,
     functionName, serveUrl, siteName,
     functionVersion: functionInfo.version,
     compositions: plan.expectedCompositions };
@@ -79,6 +82,7 @@ async function main() {
     expectedSha, region: process.env.REMOTION_AWS_REGION,
     clean: git("status", "--porcelain").length === 0,
     licenseConfirmed: process.env.AA_REMOTION_LICENSE_CONFIRMED === "1",
+    licenseBasis: process.env.AA_REMOTION_LICENSE_BASIS,
     execute });
   if (!execute) {
     process.stdout.write(`${JSON.stringify({ ...plan,
