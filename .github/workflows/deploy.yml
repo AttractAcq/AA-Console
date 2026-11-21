@@ -10,6 +10,7 @@ on:
     types: [completed]
 
 permissions:
+  actions: read
   contents: read
   pages: write
   id-token: write
@@ -164,6 +165,29 @@ jobs:
         env:
           TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
         run: bash scripts/assert-current-deploy-sha.sh "$TESTED_SHA"
+
+      # Artifact upload can finish before the Actions artifact-list API indexes
+      # it. deploy-pages queries that API immediately and otherwise sees zero.
+      # A rerun can also leave duplicate artifacts under the same run ID.
+      - name: Require one indexed Pages artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in {1..12}; do
+            count="$(timeout 15s gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts" \
+              --jq '[.artifacts[] | select(.name == "github-pages" and .expired == false)] | length')" || count=""
+            if [ "$count" = 1 ]; then
+              echo "Exactly one Pages artifact is indexed."
+              exit 0
+            fi
+            if [[ "$count" =~ ^[0-9]+$ ]] && [ "$count" -gt 1 ]; then
+              echo "::error::Multiple Pages artifacts exist in this run; start a fresh workflow run."
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "::error::Pages artifact was not indexed within the wait window."
+          exit 1
 
       - name: Deploy to GitHub Pages
         id: deployment
