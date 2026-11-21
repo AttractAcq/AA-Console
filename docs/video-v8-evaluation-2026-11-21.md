@@ -43,7 +43,8 @@ npm run eval:video:summary -- --out /private/tmp/aa-video-eval-summary.json \
 
 The summary reads the current 20-case manifest and component catalogue, then
 checks each report's hashes, model, case order, result count, duplicates,
-active case, estimated cost and writer/reviewer outcomes. It records each input
+active case, estimated cost, writer/reviewer outcomes and accepted IR/citation
+integrity. It records each input
 file's SHA-256 and writes a new owner-only JSON file; it never calls a model.
 An incomplete, interrupted, changed-source or failed-review batch produces a
 summary with explicit blockers and a nonzero exit. `scriptReviewGatePassed`

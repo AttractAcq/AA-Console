@@ -18,6 +18,25 @@ const strings = (value: unknown): string[] | null =>
 const money = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0;
 
+function acceptedEvidenceIsIntact(result: Row): boolean {
+  const ir = object(result.reviewedIr);
+  if (!ir || !Array.isArray(ir.scenes) || ir.scenes.length === 0
+    || typeof result.irSha256 !== "string"
+    || !/^[a-f0-9]{64}$/.test(result.irSha256)
+    || digest(JSON.stringify(ir)) !== result.irSha256
+    || !Array.isArray(result.sceneSources)
+    || result.sceneSources.length !== ir.scenes.length) return false;
+  const sceneIds = ir.scenes.map((scene) => object(scene)?.id);
+  const cited = result.sceneSources.map((entry) => object(entry));
+  return sceneIds.every((id) => typeof id === "string")
+    && new Set(sceneIds).size === sceneIds.length
+    && cited.every((entry) => entry
+      && typeof entry.sceneId === "string"
+      && sceneIds.includes(entry.sceneId)
+      && strings(entry.sourceIds)?.length)
+    && new Set(cited.map((entry) => entry?.sceneId)).size === cited.length;
+}
+
 export function summarizeVideoReports(inputs: Input[], expectedIds: string[],
   fixtureSha256: string, catalogueSha256: string) {
   if (inputs.length === 0 || expectedIds.length !== 20
@@ -87,6 +106,10 @@ export function summarizeVideoReports(inputs: Input[], expectedIds: string[],
       else failedCaseIds.push(id);
       if (result.reviewerAccepted === true) reviewerAcceptedCases++;
       else failedCaseIds.push(id);
+      if (result.reviewerAccepted === true && !acceptedEvidenceIsIntact(result)) {
+        blockers.push(`${label}: accepted case ${id} lacks intact IR or citations`);
+        if (!failedCaseIds.includes(id)) failedCaseIds.push(id);
+      }
       if (result.error !== null && !failedCaseIds.includes(id))
         failedCaseIds.push(id);
       if (result.error === "provider_or_runtime_error")

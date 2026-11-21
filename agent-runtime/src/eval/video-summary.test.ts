@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { summarizeVideoReports } from "./video-summary.js";
 
@@ -5,6 +6,8 @@ const ids = Array.from({ length: 20 }, (_, index) =>
   `${String(index + 1).padStart(2, "0")}-case`);
 const fixture = "f".repeat(64);
 const catalogue = "c".repeat(64);
+const sha = (value: unknown) => createHash("sha256")
+  .update(JSON.stringify(value)).digest("hex");
 
 function report(start: number, count: number) {
   const selectedCaseIds = ids.slice(start - 1, start - 1 + count);
@@ -16,8 +19,13 @@ function report(start: number, count: number) {
     activeCaseId: null as string | null,
     costCoverage: "model_usage_estimate_not_provider_invoice",
     estimatedCostUsd: count * 0.2,
-    results: selectedCaseIds.map((id) => ({ id, writerValid: true,
-      reviewerAccepted: true, estimatedCostUsd: 0.2, error: null })),
+    results: selectedCaseIds.map((id) => {
+      const reviewedIr = { scenes: [{ id: `${id}-scene` }] };
+      return { id, writerValid: true, reviewerAccepted: true,
+        estimatedCostUsd: 0.2, error: null, reviewedIr,
+        irSha256: sha(reviewedIr),
+        sceneSources: [{ sceneId: `${id}-scene`, sourceIds: ["operator_prompt"] }] };
+    }),
   };
 }
 
@@ -85,6 +93,19 @@ describe("video evaluation report summary", () => {
     ], ids, fixture, catalogue);
     expect(summary.failedCaseIds).toEqual([ids[0]]);
     expect(summary.blockers).toContain("Reports use different or missing models");
+    expect(summary.scriptReviewGatePassed).toBe(false);
+  });
+
+  it("holds a claimed acceptance when the reviewed IR digest or citation is missing", () => {
+    const first = report(1, 10);
+    first.results[0]!.irSha256 = "0".repeat(64);
+    first.results[1]!.sceneSources = [];
+    const summary = summarizeVideoReports([
+      input(first, "a"), input(report(11, 10), "b"),
+    ], ids, fixture, catalogue);
+    expect(summary.failedCaseIds).toEqual([ids[0], ids[1]]);
+    expect(summary.blockers).toContain(`report 1: accepted case ${ids[0]} lacks intact IR or citations`);
+    expect(summary.blockers).toContain(`report 1: accepted case ${ids[1]} lacks intact IR or citations`);
     expect(summary.scriptReviewGatePassed).toBe(false);
   });
 });
