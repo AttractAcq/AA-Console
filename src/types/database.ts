@@ -47131,6 +47131,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      reconcile_daily_code_video_steps_v1: {
+        Args: { p_limit?: number }
+        Returns: {
+          assets_accepted: number
+          projects_started: number
+          steps_held: number
+        }[]
+      }
       reconcile_unmerged_production_release_merge_lease_v6: {
         Args: {
           p_evidence_sha256: string

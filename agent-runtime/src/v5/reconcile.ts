@@ -41,6 +41,16 @@ export function startWorkflowReconciler(sb: SupabaseClient, config: RuntimeConfi
         if (qa && (qa.steps_accepted || qa.steps_blocked)) {
           logger.info("v5_daily_internal_qa", qa);
         }
+        const { data: videoData, error: videoError } = await sb.rpc(
+          "reconcile_daily_code_video_steps_v1", { p_limit: 20 },
+        );
+        if (videoError) throw new Error(videoError.message);
+        const video = (Array.isArray(videoData) ? videoData[0] : videoData) as {
+          projects_started?: number; assets_accepted?: number; steps_held?: number;
+        } | null;
+        if (video && (video.projects_started || video.assets_accepted || video.steps_held)) {
+          logger.info("daily_code_video_reconciled", video);
+        }
         const attested = await attestCampaignCreativeWorkflowOutputs(sb);
         if (attested > 0) logger.info("campaign_creative_bytes_attested", { count: attested });
         const magnetAttested = await attestCampaignMagnetWorkflowOutputs(sb);

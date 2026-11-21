@@ -242,7 +242,9 @@ begin
   if exists(select 1 from public.video_projects where daily_item_id=item_id) then
     raise exception 'Paused start left a partial project'; end if;
   update public.agents set paused=false where agent_key='video_script';
-  result:=public.start_daily_video_project_v1(item_id);
+  perform public.reconcile_daily_code_video_steps_v1(20);
+  select jsonb_build_object('project_id',p.id,'job_id',p.job_id)
+    into result from public.video_projects p where p.daily_item_id=item_id;
   select * into project from public.video_projects
     where id=(result->>'project_id')::uuid;
   select * into step from public.workflow_steps
@@ -264,6 +266,15 @@ begin
   if replay->>'project_id'<>project.id::text
     or replay->>'job_id'<>project.job_id::text then
     raise exception 'Daily video replay duplicated project or job'; end if;
+  update public.agent_jobs set status='completed' where id=project.job_id;
+  perform public.reconcile_workflow_runs(100);
+  perform public.reconcile_daily_code_video_steps_v1(20);
+  select * into step from public.workflow_steps where id=step.id;
+  if step.status not in ('queued','running')
+    or exists(select 1 from public.workflow_artifacts
+      where step_id=step.id) then
+    raise exception 'Completed script job was treated as a finished MP4';
+  end if;
   update public.client_briefs set body=body||' Revised.'
     where id=project.brief_id;
   if public.video_project_source_current_v1(project.id) then

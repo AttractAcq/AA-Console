@@ -33,8 +33,17 @@ the four daily roles, and gives each video role a `video_script` project step
 instead of the old footage build/edit chain. The generic workflow reconciler
 skips these code-video steps so it cannot queue a script job against a brief
 ID or treat script completion as a final MP4. Image steps and all existing v5
-runs keep their current logic. The dedicated project reconciler is still
-required before this planned graph can finish.
+runs keep their current logic.
+
+Migration 698 adds the dedicated long-running project reconciler and connects
+it to the runtime loop. It starts eligible pending video steps and leaves
+script/audio/render work open. It accepts an attached MP4 only after checking
+the exact project, brief, route, supported model snapshot, accepted render
+candidates, attested bytes and current Storage object. Attachment now carries
+the brief and daily content format onto the asset. The resulting artifact
+passes the existing daily role/campaign/pillar validation trigger. A failed
+or stale project retains a visible blocker; a completed script job alone
+cannot finish the step.
 
 ## Required execution contract
 
@@ -59,11 +68,11 @@ required before this planned graph can finish.
 
 ## Exit evidence
 
-Use a disposable rollback fixture with an existing v5 package and a new
-versioned package in the same database. Verify one current video brief creates
-one project, pause and stale-source paths leave no project, retries do not
-duplicate jobs or assets, attached bytes and route/brief lineage match, and
-the old v5 run still reconciles. Then inspect the signed-in client page and
-run one scoped production preparation case before calling the bridge
+The rollback fixture verifies one current brief creates one project, pause
+and stale-source paths leave no project, retries do not duplicate jobs, and
+script completion produces no final artifact. The full attached-MP4 positive
+path, a stale Storage negative case, and coexistence with an in-flight v5
+package still need a dedicated fixture. Then inspect the signed-in client
+page and run one scoped preparation case before calling the bridge
 operational. Keep outbound switches off until separate approval and provider
 receipt gates pass.
