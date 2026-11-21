@@ -198,10 +198,12 @@ export function LeadMagnetStudioPanel({ campaignId }: { campaignId?: string } = 
         items={visibleMagnets}
         nameOf={(magnet) => magnet.name}
         emptyLabel={loading ? "Loading magnets…" : campaignId
-          ? "No magnet is linked to this campaign yet. Run the campaign conversion draft above."
+          ? "No magnet is linked to this campaign yet. Run the campaign sweep in Plan, then refresh here."
           : "No magnets yet — start with what the client already gives people"}
         unselectedLabel="Choose a magnet to see its versions and decide on them."
-        action={campaignId ? undefined : <Button onClick={() => setBuilding(true)}>New magnet</Button>}
+        action={campaignId
+          ? <Button onClick={() => void refresh()}>Refresh magnets</Button>
+          : <Button onClick={() => setBuilding(true)}>New magnet</Button>}
         columns={[
           {
             label: "Magnet",
