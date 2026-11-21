@@ -1,0 +1,19 @@
+{
+  "steps": [
+    {
+      "label": "Discover",
+      "detail": "Identify a buying situation",
+      "icon": "Target"
+    },
+    {
+      "label": "Develop",
+      "detail": "Build an offer around it",
+      "icon": "Sparkles"
+    },
+    {
+      "label": "Review",
+      "detail": "Check every release asset",
+      "icon": "ShieldCheck"
+    }
+  ]
+}

@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "colours": {
+      "type": "object",
+      "properties": {
+        "background": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "surface": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "primary": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "secondary": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "accent": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "text": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "muted": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "success": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "warning": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "dark": {
+      "type": "object",
+      "properties": {
+        "background": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "surface": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "primary": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "secondary": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "accent": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "text": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "muted": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "success": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "warning": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "type": {
+      "type": "object",
+      "properties": {
+        "heading": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "mono": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "scale": {
+          "type": "object",
+          "properties": {
+            "display": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "h1": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "h2": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "body": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "caption": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "spacing": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "radii": {
+      "type": "object",
+      "properties": {
+        "card": {
+          "type": "number",
+          "minimum": 0
+        },
+        "pill": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "strokes": {
+      "type": "object",
+      "properties": {
+        "thin": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "regular": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "bold": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "iconStyle": {
+      "type": "string",
+      "enum": [
+        "outline",
+        "duotone",
+        "solid"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

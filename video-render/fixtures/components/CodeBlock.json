@@ -1,0 +1,15 @@
+{
+  "language": "TypeScript",
+  "code": "const opportunity = discover();\nconst offer = buildOffer(opportunity);\nconst campaign = review(offer);",
+  "revealLines": [
+    [
+      0
+    ],
+    [
+      1
+    ],
+    [
+      2
+    ]
+  ]
+}

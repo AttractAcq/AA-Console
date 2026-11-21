@@ -1,0 +1,38 @@
+{
+  "nodes": [
+    {
+      "id": "signal",
+      "label": "Buying signal",
+      "icon": "Target"
+    },
+    {
+      "id": "offer",
+      "label": "Relevant offer",
+      "icon": "Sparkles"
+    },
+    {
+      "id": "review",
+      "label": "Human review",
+      "icon": "ShieldCheck"
+    },
+    {
+      "id": "release",
+      "label": "Release",
+      "icon": "ArrowRight"
+    }
+  ],
+  "edges": [
+    {
+      "from": "signal",
+      "to": "offer"
+    },
+    {
+      "from": "offer",
+      "to": "review"
+    },
+    {
+      "from": "review",
+      "to": "release"
+    }
+  ]
+}

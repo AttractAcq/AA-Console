@@ -2,16 +2,51 @@
   "name": "@aa/video-render",
   "private": true,
   "type": "module",
-  "engines": { "node": "22.x" },
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/export-brand-schema.mjs && node scripts/export-brand-fixture.mjs",
-    "test": "vitest run"
+    "prebuild": "node scripts/export-gold-fixture.mjs && node scripts/export-v2-fixture.mjs",
+    "build": "tsc -p tsconfig.json && node scripts/export-brand-schema.mjs && node scripts/export-brand-fixture.mjs && node scripts/export-ir-schema.mjs --check",
+    "studio": "remotion studio src/index.ts",
+    "compositions": "remotion compositions src/index.ts",
+    "test:visual": "node scripts/visual-snapshots.mjs",
+    "snapshots:update": "node scripts/visual-snapshots.mjs --update",
+    "render:gold": "node scripts/render-gold.mjs",
+    "render:ir": "node scripts/render-ir.mjs",
+    "render:thumbnail": "node scripts/render-thumbnail.mjs",
+    "deploy:lambda": "node scripts/deploy-lambda.mjs",
+    "test": "vitest run && node --test scripts/deploy-lambda.test.mjs"
   },
   "dependencies": {
+    "@remotion/captions": "4.0.545",
+    "@remotion/cli": "4.0.545",
+    "@remotion/lambda": "4.0.545",
+    "@remotion/media": "4.0.545",
+    "@remotion/renderer": "4.0.545",
+    "@remotion/transitions": "4.0.545",
+    "d3-scale": "4.0.3",
+    "d3-shape": "3.2.1",
+    "katex": "0.19.1",
+    "lucide-react": "1.39.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.545",
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@remotion/bundler": "4.0.545",
+    "@remotion/tailwind-v4": "4.0.545",
+    "@types/d3-scale": "4.0.9",
+    "@types/d3-shape": "3.2.0",
     "@types/node": "^24.13.3",
+    "@types/pngjs": "6.0.5",
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
+    "ajv": "8.20.0",
+    "pixelmatch": "8.0.0",
+    "pngjs": "7.0.0",
+    "tailwindcss": "4.2.0",
     "typescript": "~6.0.2",
     "vitest": "^4.1.11"
   }

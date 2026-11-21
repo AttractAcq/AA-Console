@@ -999,6 +999,7 @@ function CampaignExecutionPanelContent() {
             {c.campaign_kind && (v2Tab === "paid" || v2Tab === "organic") && clientId && (
               contentSpec ? <CampaignContentPanel key={`${clientId}:${c.id}:${v2Tab}`} clientId={clientId}
                 campaignId={c.id} contentCount={contentSpec.filter((piece) => piece.route === v2Tab).length}
+                route={v2Tab}
                 routePositions={contentSpec.flatMap((piece, index) => piece.route === v2Tab ? [index + 1] : [])}
                 builtAt={c.built_at} contentIdeasGeneratedAt={c.content_ideas_generated_at}
                 template={c.template} mirrorsTemplate={c.mirrors_template} onChanged={refresh}

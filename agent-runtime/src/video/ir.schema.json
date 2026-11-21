@@ -1,0 +1,905 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "audience": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "tone": {
+      "type": "string",
+      "enum": [
+        "calm",
+        "confident",
+        "energetic"
+      ]
+    },
+    "aspects": {
+      "minItems": 1,
+      "maxItems": 3,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "16:9",
+          "9:16",
+          "1:1"
+        ]
+      }
+    },
+    "music": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "mood": {
+          "type": "string",
+          "maxLength": 80
+        }
+      },
+      "required": [
+        "enabled",
+        "mood"
+      ],
+      "additionalProperties": false
+    },
+    "scenes": {
+      "minItems": 3,
+      "maxItems": 40,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^s\\d{2}$"
+          },
+          "component": {
+            "type": "string",
+            "enum": [
+              "TitleCard",
+              "SectionCard",
+              "KineticHeadline",
+              "BulletReveal",
+              "StepFlow",
+              "Compare",
+              "Timeline",
+              "ProcessDiagram",
+              "BigNumber",
+              "Chart",
+              "Equation",
+              "CodeBlock",
+              "Quote",
+              "Outro"
+            ]
+          },
+          "props": {},
+          "narration": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 600
+          },
+          "transitionIn": {
+            "default": "cut",
+            "type": "string",
+            "enum": [
+              "cut",
+              "fade",
+              "slideLeft",
+              "slideUp",
+              "wipeBrand"
+            ]
+          },
+          "minDurationSec": {
+            "type": "number",
+            "minimum": 2,
+            "maximum": 25
+          },
+          "chapter": {
+            "default": false,
+            "type": "boolean"
+          },
+          "locked": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "component",
+          "props",
+          "narration"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "component": {
+                  "const": "TitleCard"
+                }
+              },
+              "required": [
+                "component"
+              ]
+            },
+            "then": {
+              "properties": {
+                "props": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 60
+                    },
+                    "subtitle": {
+                      "type": "string",
+                      "maxLength": 90
+                    },
+                    "kicker": {
+                      "type": "string",
+                      "maxLength": 24
+                    }
+                  },
+                  "required": [
+                    "title"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "component": {
+                  "const": "SectionCard"
+                }
+              },
+              "required": [
+                "component"
+              ]
+            },
+            "then": {
+              "properties": {
+                "props": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "index": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 50
+                    }
+                  },
+                  "required": [
+                    "index",
+                    "title"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "component": {
+                  "const": "KineticHeadline"
+                }
+              },
+              "required": [
+                "component"
+              ]
+            },
+            "then": {
+              "properties": {
+                "props": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "words": {
+                      "minItems": 1,
+                      "maxItems": 12,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 24
+                      }
+                    },
+                    "emphasis": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "revealAt": {
+                      "type": "array",
+                      "items": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
+                  },
+                  "required": [
+                    "words"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "component": {
+                  "const": "BulletReveal"
+                }
+              },
+              "required": [
+                "component"
+              ]
+            },
+            "then": {
+              "properties": {
+                "props": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "heading": {
+                      "type": "string",
+                      "maxLength": 50
+                    },
+                    "items": {
+                      "minItems": 2,
+                      "maxItems": 6,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 48
+                      }
+                    },
+                    "revealAt": {
+                      "type": "array",
+                      "items": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    },
+                    "icon": {
+                      "type": "string",
+                      "enum": [
+                        "ArrowRight",
+                        "ChartNoAxesCombined",
+                        "CircleCheck",
+                        "FileText",
+                        "Lightbulb",
+                        "Megaphone",
+                        "ShieldCheck",
+                        "Sparkles",
+                        "Target",
+                        "Workflow"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "component": {
+                  "const": "StepFlow"
+                }
+              },
+              "required": [
+                "component"
+              ]
+            },
+            "then": {
+              "properties": {
+                "props": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "steps": {
+                      "minItems": 2,
+                      "maxItems": 6,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 28
+                          },
+                          "detail": {
+                            "type": "string",
+                            "maxLength": 60
+                          },
+                          "icon": {
+                            "type": "string",
+                            "enum": [
+                              "ArrowRight",
+                              "ChartNoAxesCombined",
+                              "CircleCheck",
+                              "FileText",
+                              "Lightbulb",
+                              "Megaphone",
+                              "ShieldCheck",
+                              "Sparkles",
+                              "Target",
+                              "Workflow"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "label"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "direction": {
+                      "default": "auto",
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "horizontal",
+                        "vertical"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "steps"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "component": {
+                  "const": "Compare"
+                }
+              },
+              "required": [
+                "component"
+              ]
+            },
+            "then": {
+              "properties": {
+                "props": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "left": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 35
+                        },
+                        "points": {
+                          "minItems": 1,
+                          "maxItems": 4,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 48
+                          }
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "points"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "right": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 35
+                        },
+                        "points": {
+                          "minItems": 1,
+                          "maxItems": 4,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 48
+                          }
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "points"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "left",
+                    "right"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "component": {
+                  "const": "Timeline"
+                }
+              },
+              "required": [
+                "component"
+              ]
+            },
+            "then": {
+              "properties": {
+                "props": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "events": {
+                      "minItems": 2,
+                      "maxItems": 7,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 28
+                          },
+                          "at": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 18
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "at"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "events"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "component": {
+                  "const": "ProcessDiagram"
+                }
+              },
+              "required": [
+                "component"
+              ]
+            },
+            "then": {
+              "properties": {
+                "props": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "nodes": {
+                      "minItems": 2,
+                      "maxItems": 7,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9_]*$"
+                          },
+                          "label": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 24
+                          },
+                          "icon": {
+                            "type": "string",
+                            "enum": [
+                              "ArrowRight",
+                              "ChartNoAxesCombined",
+                              "CircleCheck",
+                              "FileText",
+                              "Lightbulb",
+                              "Megaphone",
+                              "ShieldCheck",
+                              "Sparkles",
+                              "Target",
+                              "Workflow"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "edges": {
+                      "minItems": 1,
+                      "maxItems": 9,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "from": {
+                            "type": "string"
+                          },
+                          "to": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string",
+                            "maxLength": 20
+                          }
+                        },
+                        "required": [
+                          "from",
+                          "to"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "nodes",
+                    "edges"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "component": {
+                  "const": "BigNumber"
+                }
+              },
+              "required": [
+                "component"
+              ]
+            },
+            "then": {
+              "properties": {
+                "props": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    },
+                    "unit": {
+                      "type": "string",
+                      "maxLength": 8
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 60
+                    },
+                    "from": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "label"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "component": {
+                  "const": "Chart"
+                }
+              },
+              "required": [
+                "component"
+              ]
+            },
+            "then": {
+              "properties": {
+                "props": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "bar",
+                        "line",
+                        "pie"
+                      ]
+                    },
+                    "series": {
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 28
+                          },
+                          "values": {
+                            "type": "array",
+                            "items": {
+                              "type": "number",
+                              "minimum": 0
+                            }
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "values"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "categories": {
+                      "minItems": 2,
+                      "maxItems": 8,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 32
+                      }
+                    },
+                    "highlight": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "series",
+                    "categories"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "component": {
+                  "const": "Equation"
+                }
+              },
+              "required": [
+                "component"
+              ]
+            },
+            "then": {
+              "properties": {
+                "props": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "latex": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "highlightTerms": {
+                      "maxItems": 5,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 30
+                      }
+                    }
+                  },
+                  "required": [
+                    "latex"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "component": {
+                  "const": "CodeBlock"
+                }
+              },
+              "required": [
+                "component"
+              ]
+            },
+            "then": {
+              "properties": {
+                "props": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "language": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 600
+                    },
+                    "revealLines": {
+                      "maxItems": 12,
+                      "type": "array",
+                      "items": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "language",
+                    "code"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "component": {
+                  "const": "Quote"
+                }
+              },
+              "required": [
+                "component"
+              ]
+            },
+            "then": {
+              "properties": {
+                "props": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 180
+                    },
+                    "attribution": {
+                      "type": "string",
+                      "maxLength": 60
+                    }
+                  },
+                  "required": [
+                    "text"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "component": {
+                  "const": "Outro"
+                }
+              },
+              "required": [
+                "component"
+              ]
+            },
+            "then": {
+              "properties": {
+                "props": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "headline": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 50
+                    },
+                    "cta": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 40
+                    },
+                    "url": {
+                      "type": "string",
+                      "maxLength": 40
+                    }
+                  },
+                  "required": [
+                    "headline",
+                    "cta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "version",
+    "title",
+    "audience",
+    "tone",
+    "aspects",
+    "music",
+    "scenes"
+  ],
+  "additionalProperties": false
+}

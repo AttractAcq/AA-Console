@@ -1,0 +1,202 @@
+{
+  "version": 1,
+  "title": "A clearer route to growth",
+  "audience": "Service-business owners and AA account managers",
+  "tone": "confident",
+  "aspects": [
+    "16:9",
+    "9:16",
+    "1:1"
+  ],
+  "music": {
+    "enabled": false,
+    "mood": ""
+  },
+  "scenes": [
+    {
+      "id": "s01",
+      "component": "TitleCard",
+      "props": {
+        "title": "A clearer route to growth",
+        "subtitle": "From buying moment to a reviewed campaign",
+        "kicker": "ATTRACT ACQUISITION"
+      },
+      "narration": "Growth becomes easier to understand when every campaign starts with a real buying moment, a relevant offer, and a clear path from first contact to outcome.",
+      "transitionIn": "cut",
+      "chapter": false,
+      "locked": false
+    },
+    {
+      "id": "s02",
+      "component": "SectionCard",
+      "props": {
+        "index": 1,
+        "title": "Start with the market"
+      },
+      "narration": "First, look for a specific situation that makes a service useful now. Record what you know, what you infer, and what still needs evidence before activation.",
+      "transitionIn": "wipeBrand",
+      "chapter": true,
+      "locked": false
+    },
+    {
+      "id": "s03",
+      "component": "BulletReveal",
+      "props": {
+        "heading": "Check the opportunity",
+        "items": [
+          "A clear buying trigger",
+          "Evidence behind the need",
+          "A service that can deliver"
+        ]
+      },
+      "narration": "A useful opportunity has three parts: a recognizable trigger, evidence that the need exists, and a service the business can actually deliver. Human review keeps hypotheses honest.",
+      "transitionIn": "fade",
+      "chapter": false,
+      "locked": false
+    },
+    {
+      "id": "s04",
+      "component": "StepFlow",
+      "props": {
+        "steps": [
+          {
+            "label": "Discover",
+            "detail": "Name the buying situation"
+          },
+          {
+            "label": "Build",
+            "detail": "Shape a relevant offer"
+          },
+          {
+            "label": "Review",
+            "detail": "Approve the exact version"
+          }
+        ]
+      },
+      "narration": "The operator moves from discovery to a service offer, then reviews the exact version. The campaign inherits that approved source instead of silently changing when the offer is edited.",
+      "transitionIn": "slideLeft",
+      "chapter": false,
+      "locked": false
+    },
+    {
+      "id": "s05",
+      "component": "Compare",
+      "props": {
+        "left": {
+          "title": "Broad message",
+          "points": [
+            "Same claim for every audience",
+            "Unclear next action"
+          ]
+        },
+        "right": {
+          "title": "Specific offer",
+          "points": [
+            "One buying situation",
+            "One relevant next step"
+          ]
+        }
+      },
+      "narration": "Compare a broad message with a specific offer. The latter makes the buying situation visible and gives the prospect one relevant next step. The distinction guides creative and page copy.",
+      "transitionIn": "slideUp",
+      "chapter": false,
+      "locked": false
+    },
+    {
+      "id": "s06",
+      "component": "ProcessDiagram",
+      "props": {
+        "nodes": [
+          {
+            "id": "plan",
+            "label": "Campaign plan"
+          },
+          {
+            "id": "assets",
+            "label": "Content assets"
+          },
+          {
+            "id": "review",
+            "label": "Human review"
+          },
+          {
+            "id": "release",
+            "label": "Release gate"
+          }
+        ],
+        "edges": [
+          {
+            "from": "plan",
+            "to": "assets"
+          },
+          {
+            "from": "assets",
+            "to": "review"
+          },
+          {
+            "from": "review",
+            "to": "release"
+          }
+        ]
+      },
+      "narration": "A campaign plan names the assets it needs. Content and conversion pages are produced to a review gate. Only the approved versions can proceed to an operator handoff or distribution.",
+      "transitionIn": "fade",
+      "chapter": true,
+      "locked": false
+    },
+    {
+      "id": "s07",
+      "component": "Chart",
+      "props": {
+        "kind": "bar",
+        "series": [
+          {
+            "name": "Illustrative steps",
+            "values": [
+              1,
+              2,
+              3,
+              4
+            ]
+          }
+        ],
+        "categories": [
+          "Signal",
+          "Offer",
+          "Assets",
+          "Review"
+        ],
+        "highlight": "Review"
+      },
+      "narration": "This chart is an illustration of workflow stages, not a performance claim. Actual campaign reporting needs provider reads, intake source, spend, and recorded sales before it can show trustworthy ratios.",
+      "transitionIn": "fade",
+      "chapter": false,
+      "locked": false
+    },
+    {
+      "id": "s08",
+      "component": "Quote",
+      "props": {
+        "text": "Approval records decisions, not external execution.",
+        "attribution": "AA operating principle"
+      },
+      "narration": "The central control is simple: approval belongs to a particular version and action. A scheduled item, an exported bundle, and a provider receipt are different pieces of evidence.",
+      "transitionIn": "slideLeft",
+      "chapter": false,
+      "locked": false
+    },
+    {
+      "id": "s09",
+      "component": "Outro",
+      "props": {
+        "headline": "Turn the plan into reviewed work",
+        "cta": "Choose the next opportunity",
+        "url": "attractacq.com"
+      },
+      "narration": "When the record is connected, the team can see what was planned, what was approved, what was released, and what outcome followed. Choose the next opportunity with that context.",
+      "transitionIn": "fade",
+      "chapter": false,
+      "locked": false
+    }
+  ]
+}

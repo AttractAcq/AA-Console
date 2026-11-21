@@ -7,6 +7,7 @@ import { GoogleProfilePanel } from "./google-profile/GoogleProfilePanel";
 import { GoogleAdsStudioPanel } from "./google-ads/GoogleAdsStudioPanel";
 import { MetaProfilePanel } from "./distribution/MetaProfilePanel";
 import { MotionDesignPanel } from "./motion/MotionDesignPanel";
+import { CodeVideoProjectsPanel } from "./motion/CodeVideoProjectsPanel";
 import { MotionScenesPanel } from "./motion/MotionScenesPanel";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useState } from "react";
@@ -125,7 +126,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   // belonged to a page that walked one asset through stages, and these are
   // four queues.
   "content-production-factory": {
-    generation: () => <><CampaignProductionOverview /><DailyProductionOverview /><GenerationPanel showJourney={false} /></>,
+    generation: () => <><CampaignProductionOverview /><DailyProductionOverview /><GenerationPanel showJourney={false} /><CodeVideoProjectsPanel /></>,
     briefs: () => <BriefsPanel showJourney={false} />,
     // Create is the assets nobody has signed off, not the briefs waiting for
     // one: a brief with nothing made from it stays in Briefs, where

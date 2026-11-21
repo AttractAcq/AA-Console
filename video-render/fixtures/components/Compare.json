@@ -1,0 +1,16 @@
+{
+  "left": {
+    "title": "Broad message",
+    "points": [
+      "Same claim for everyone",
+      "Unclear next action"
+    ]
+  },
+  "right": {
+    "title": "Specific offer",
+    "points": [
+      "Clear buying situation",
+      "One relevant next step"
+    ]
+  }
+}

@@ -144,6 +144,64 @@ const ROUTES: Record<string, Route> = {
       };
     },
   },
+  '/internal/mcp/content/video-project-status': {
+    rpc: 'mcp_video_project_status_v1',
+    kind: 'read',
+    parse: (body) => {
+      const client_id = uuid(body, 'client_id');
+      const project_id = uuid(body, 'project_id');
+      if (!client_id || !project_id
+          || keysOf(body) !== 'client_id,project_id') return undefined;
+      return { p_bot_id: null, p_client_id: client_id,
+        p_project_id: project_id };
+    },
+  },
+  '/internal/mcp/content/create-video-project': {
+    rpc: 'mcp_create_video_project_v1',
+    kind: 'write', maxBodyBytes: 8192,
+    parse: (body) => {
+      const client_id = uuid(body, 'client_id');
+      const idea = str(body, 'idea')?.trim();
+      const audience = str(body, 'audience')?.trim();
+      const tone = str(body, 'tone');
+      const target_length_sec = body.target_length_sec;
+      const aspects = body.aspects;
+      const record_ids = body.record_ids;
+      const brief_id = body.brief_id == null ? null : uuid(body, 'brief_id');
+      const campaign_id = body.campaign_id == null ? null : uuid(body, 'campaign_id');
+      const route_package_id = body.route_package_id == null
+        ? null : uuid(body, 'route_package_id');
+      const request_key = str(body, 'idempotency_key');
+      if (!client_id || !idea || idea.length < 15 || idea.length > 4000
+          || !audience || audience.length > 200
+          || !['calm', 'confident', 'energetic'].includes(tone ?? '')
+          || typeof target_length_sec !== 'number'
+          || !Number.isInteger(target_length_sec)
+          || target_length_sec < 30 || target_length_sec > 900
+          || !Array.isArray(aspects) || aspects.length < 1 || aspects.length > 3
+          || aspects.some((value) => !['16:9', '9:16', '1:1'].includes(value))
+          || new Set(aspects).size !== aspects.length
+          || !Array.isArray(record_ids) || record_ids.length < 1
+          || record_ids.length > 12 || record_ids.some((value) =>
+            typeof value !== 'string' || !UUID.test(value))
+          || new Set(record_ids).size !== record_ids.length
+          || (body.brief_id != null && !brief_id)
+          || (body.campaign_id != null && !campaign_id)
+          || (body.route_package_id != null && !route_package_id)
+          || Boolean(campaign_id) !== Boolean(route_package_id)
+          || (campaign_id !== null && brief_id === null)
+          || !request_key || !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,119}$/.test(request_key)
+          || !subset(body, ['client_id', 'idea', 'audience', 'tone',
+            'target_length_sec', 'aspects', 'record_ids', 'brief_id',
+            'campaign_id', 'route_package_id', 'idempotency_key'])) return undefined;
+      return { p_bot_id: null, p_client_id: client_id, p_idea: idea,
+        p_audience: audience, p_tone: tone,
+        p_target_length_sec: target_length_sec, p_aspects: aspects,
+        p_record_ids: record_ids, p_brief_id: brief_id,
+        p_campaign_id: campaign_id, p_route_package_id: route_package_id,
+        p_request_key: request_key };
+    },
+  },
   '/internal/mcp/content/request-revision': {
     rpc: 'mcp_request_revision',
     kind: 'write',

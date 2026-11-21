@@ -85,6 +85,31 @@ const ROUTES: Record<
       })
       .refine((v) => Boolean(v.idea_id || v.brief_id || v.asset_id)),
   },
+  "content.video_project_status": {
+    path: "/internal/mcp/content/video-project-status",
+    kind: "read",
+    input: z.object({ client_id: uuid, project_id: uuid }).strict(),
+  },
+  "content.create_video_project": {
+    path: "/internal/mcp/content/create-video-project",
+    kind: "write",
+    input: z.object({
+      client_id: uuid, idea: z.string().trim().min(15).max(4000),
+      audience: z.string().trim().min(1).max(200),
+      tone: z.enum(["calm", "confident", "energetic"]),
+      target_length_sec: z.number().int().min(30).max(900),
+      aspects: z.array(z.enum(["16:9", "9:16", "1:1"])).min(1).max(3),
+      record_ids: z.array(uuid).min(1).max(12),
+      brief_id: uuid.optional(), campaign_id: uuid.optional(),
+      route_package_id: uuid.optional(),
+      idempotency_key: z.string().min(8).max(120)
+        .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/),
+    }).strict().refine((value) =>
+      new Set(value.aspects).size === value.aspects.length
+      && new Set(value.record_ids).size === value.record_ids.length
+      && Boolean(value.campaign_id) === Boolean(value.route_package_id)
+      && (!value.campaign_id || Boolean(value.brief_id))),
+  },
   "content.request_revision": {
     path: "/internal/mcp/content/request-revision",
     kind: "write",
@@ -350,6 +375,10 @@ const codes = new Set([
   "incident_not_found",
   "task_not_found",
   "campaign_not_found",
+  "video_project_not_found",
+  "video_agent_unavailable",
+  "video_source_invalid",
+  "video_route_stale",
   "invalid_assignee",
   "task_completed",
   "client_not_found",
@@ -483,6 +512,16 @@ function aaBody(
     if (input.asset_id) body.asset_id = input.asset_id;
     return body;
   }
+  if (tool === "content.video_project_status")
+    return { client_id: input.client_id, project_id: input.project_id };
+  if (tool === "content.create_video_project")
+    return { client_id: input.client_id, idea: input.idea,
+      audience: input.audience, tone: input.tone,
+      target_length_sec: input.target_length_sec, aspects: input.aspects,
+      record_ids: input.record_ids, brief_id: input.brief_id ?? null,
+      campaign_id: input.campaign_id ?? null,
+      route_package_id: input.route_package_id ?? null,
+      idempotency_key: input.idempotency_key };
   if (tool === "content.request_revision") {
     const body: Record<string, unknown> = {
       client_id: input.client_id,
@@ -683,6 +722,38 @@ export class AAApiAdapter implements Adapter {
         scoped.data.client_id !== input.client_id
       )
         return fail("malformed_response", response.status);
+      if (tool.name === "content.video_project_status") {
+        const status = z.object({
+          client_id: uuid, project_id: uuid, stage: z.string(),
+          ir_version: z.number().int().nonnegative(),
+          scenes: z.number().int().nonnegative(),
+          audio_scenes: z.number().int().nonnegative(),
+          render_candidates: z.number().int().nonnegative(),
+          accepted_candidates: z.number().int().nonnegative(),
+          critic_loops: z.number().int().nonnegative(),
+          cost_usd_estimate: z.number().nonnegative(),
+          asset_id: uuid.nullable(),
+          asset_review_status: z.enum(["pending", "approved", "rejected"]).nullable(),
+          human_approved_at: z.string().nullable(),
+          stage_error: z.string().nullable(),
+          scheduled_posts: z.number().int().nonnegative(),
+          recorded_external_posts: z.number().int().nonnegative(),
+          last_recorded_external_post_at: z.string().nullable(),
+          unconfirmed_published_rows: z.number().int().nonnegative(),
+        }).strict().safeParse(raw);
+        if (!status.success || status.data.project_id !== input.project_id)
+          return fail("malformed_response", response.status);
+        return { status: "completed", capability: tool.name, data: status.data };
+      }
+      if (tool.name === "content.create_video_project") {
+        const started = z.object({ client_id: uuid, project_id: uuid,
+          job_id: uuid, stage: z.string() }).strict().safeParse(raw);
+        if (!started.success || !["queued", "scripting", "scripted", "timing",
+          "timed", "rendering", "rendered", "attached", "published",
+          "failed", "needs_human"].includes(started.data.stage))
+          return fail("malformed_response", response.status);
+        return { status: "completed", capability: tool.name, data: started.data };
+      }
       if (tool.domain === "admin") {
         const event = z
           .object({

@@ -1,5 +1,6 @@
 /**
- * The only module here that runs ffmpeg or ffprobe.
+ * The supplied-footage editing module that runs ffmpeg and ffprobe. The
+ * separate code-rendered video audio stage also uses them for loudness.
  *
  * execFile, never a shell: every argument arrives as one argv entry, so a
  * path or caption cannot become a second command. The runtime image installs

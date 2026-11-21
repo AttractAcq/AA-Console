@@ -36,6 +36,7 @@ jobs:
           AA_SCHEMA_PHASE7_SMOKES: '1'
           AA_SCHEMA_PHASE7_ONLY: 'organic-uncertain-outcome'
           AA_SCHEMA_PHASE8_SMOKES: '1'
+          AA_SCHEMA_VIDEO_V2_SMOKE: '1'
         run: bash scripts/schema-replay-ci.sh
       - uses: actions/upload-artifact@v4
         if: always()
@@ -146,3 +147,5 @@ jobs:
       - run: npx tsc -p tsconfig.json
       - run: node scripts/export-brand-schema.mjs --check
       - run: node scripts/export-brand-fixture.mjs --check
+      - run: node scripts/export-v2-fixture.mjs --check
+      - run: node scripts/export-ir-schema.mjs --check

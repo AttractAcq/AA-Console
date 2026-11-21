@@ -210,6 +210,95 @@ diff -u src/types/database.ts "$evidence_dir/database.generated.ts" \
     exit 1
   }
 
+if [[ "${AA_SCHEMA_VIDEO_V2_SMOKE:-0}" == "1" ]]; then
+  if psql_local -qAt -f scripts/video-v2-project-schema-smoke.sql \
+    >"$run_dir/video-v2-project-schema-smoke.private.log" 2>&1; then
+    printf 'passed\n' >"$evidence_dir/video-v2-project-schema-smoke.status.txt"
+    echo 'Video V2 project schema rollback fixture passed.'
+  else
+    printf 'failed\n' >"$evidence_dir/video-v2-project-schema-smoke.status.txt"
+    grep -E 'ERROR:|psql:' "$run_dir/video-v2-project-schema-smoke.private.log" | tail -3 >&2 || true
+    exit 1
+  fi
+  if [[ -f scripts/video-v2-project-draft-smoke.sql ]]; then
+    if psql_local -qAt -f scripts/video-v2-project-draft-smoke.sql \
+      >"$run_dir/video-v2-project-draft-smoke.private.log" 2>&1; then
+      printf 'passed\n' >"$evidence_dir/video-v2-project-draft-smoke.status.txt"
+      echo 'Video V2 project draft rollback fixture passed.'
+    else
+      printf 'failed\n' >"$evidence_dir/video-v2-project-draft-smoke.status.txt"
+      grep -E 'ERROR:|psql:' "$run_dir/video-v2-project-draft-smoke.private.log" | tail -3 >&2 || true
+      exit 1
+    fi
+  fi
+  if [[ -f scripts/video-v3-project-start-smoke.sql ]]; then
+    if psql_local -qAt -f scripts/video-v3-project-start-smoke.sql \
+      >"$run_dir/video-v3-project-start-smoke.private.log" 2>&1; then
+      printf 'passed\n' >"$evidence_dir/video-v3-project-start-smoke.status.txt"
+      echo 'Video V3 project start rollback fixture passed.'
+    else
+      printf 'failed\n' >"$evidence_dir/video-v3-project-start-smoke.status.txt"
+      grep -E 'ERROR:|psql:' "$run_dir/video-v3-project-start-smoke.private.log" | tail -3 >&2 || true
+      exit 1
+    fi
+  fi
+  if [[ -f scripts/video-v3-scene-commit-smoke.sql ]]; then
+    if psql_local -qAt -f scripts/video-v3-scene-commit-smoke.sql \
+      >"$run_dir/video-v3-scene-commit-smoke.private.log" 2>&1; then
+      printf 'passed\n' >"$evidence_dir/video-v3-scene-commit-smoke.status.txt"
+      echo 'Video V3 scene commit rollback fixture passed.'
+    else
+      printf 'failed\n' >"$evidence_dir/video-v3-scene-commit-smoke.status.txt"
+      grep -E 'ERROR:|psql:' "$run_dir/video-v3-scene-commit-smoke.private.log" | tail -3 >&2 || true
+      exit 1
+    fi
+  fi
+  if [[ -f scripts/video-v4-scene-audio-smoke.sql ]]; then
+    if psql_local -qAt -f scripts/video-v4-scene-audio-smoke.sql \
+      >"$run_dir/video-v4-scene-audio-smoke.private.log" 2>&1; then
+      printf 'passed\n' >"$evidence_dir/video-v4-scene-audio-smoke.status.txt"
+      echo 'Video V4 scene audio receipt rollback fixture passed.'
+    else
+      printf 'failed\n' >"$evidence_dir/video-v4-scene-audio-smoke.status.txt"
+      grep -E 'ERROR:|psql:' "$run_dir/video-v4-scene-audio-smoke.private.log" | tail -3 >&2 || true
+      exit 1
+    fi
+  fi
+  if [[ -f scripts/video-v4-project-music-smoke.sql ]]; then
+    if psql_local -qAt -f scripts/video-v4-project-music-smoke.sql \
+      >"$run_dir/video-v4-project-music-smoke.private.log" 2>&1; then
+      printf 'passed\n' >"$evidence_dir/video-v4-project-music-smoke.status.txt"
+      echo 'Video V4 project music receipt rollback fixture passed.'
+    else
+      printf 'failed\n' >"$evidence_dir/video-v4-project-music-smoke.status.txt"
+      grep -E 'ERROR:|psql:' "$run_dir/video-v4-project-music-smoke.private.log" | tail -3 >&2 || true
+      exit 1
+    fi
+  fi
+  if [[ -f scripts/video-v5-render-attempt-smoke.sql ]]; then
+    if psql_local -qAt -f scripts/video-v5-render-attempt-smoke.sql \
+      >"$run_dir/video-v5-render-attempt-smoke.private.log" 2>&1; then
+      printf 'passed\n' >"$evidence_dir/video-v5-render-attempt-smoke.status.txt"
+      echo 'Video V5 render attempt rollback fixture passed.'
+    else
+      printf 'failed\n' >"$evidence_dir/video-v5-render-attempt-smoke.status.txt"
+      grep -E 'ERROR:|psql:' "$run_dir/video-v5-render-attempt-smoke.private.log" | tail -3 >&2 || true
+      exit 1
+    fi
+  fi
+  if [[ -f scripts/video-v7-mcp-create-smoke.sql ]]; then
+    if psql_local -qAt -f scripts/video-v7-mcp-create-smoke.sql \
+      >"$run_dir/video-v7-mcp-create-smoke.private.log" 2>&1; then
+      printf 'passed\n' >"$evidence_dir/video-v7-mcp-create-smoke.status.txt"
+      echo 'Video V7 MCP create rollback fixture passed.'
+    else
+      printf 'failed\n' >"$evidence_dir/video-v7-mcp-create-smoke.status.txt"
+      grep -E 'ERROR:|psql:' "$run_dir/video-v7-mcp-create-smoke.private.log" | tail -3 >&2 || true
+      exit 1
+    fi
+  fi
+fi
+
 if [[ "${AA_SCHEMA_PHASE2_SMOKES:-0}" == "1" ]]; then
   smoke_count=0
   for smoke_file in scripts/phase2-*-smoke.sql; do

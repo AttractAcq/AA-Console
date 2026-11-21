@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "title": "From opportunity to offer",
+  "audience": "Service business owners",
+  "tone": "calm",
+  "aspects": ["16:9", "9:16", "1:1"],
+  "music": { "enabled": false, "mood": "" },
+  "scenes": [
+    {
+      "id": "s01", "component": "TitleCard",
+      "props": { "title": "A relevant offer starts here", "subtitle": "Name the buying situation", "kicker": "ATTRACT ACQUISITION" },
+      "narration": "A relevant offer starts by naming a specific buying situation.",
+      "transitionIn": "cut", "chapter": false, "locked": false
+    },
+    {
+      "id": "s02", "component": "BulletReveal",
+      "props": { "heading": "Test the opportunity", "items": ["A clear trigger", "Evidence of the need", "A service that fits"] },
+      "narration": "Check the trigger, the evidence behind the need, and whether the service fits.",
+      "transitionIn": "wipeBrand", "chapter": true, "locked": false
+    },
+    {
+      "id": "s03", "component": "StepFlow",
+      "props": { "steps": [
+        { "label": "Discover", "detail": "Record the situation" },
+        { "label": "Validate", "detail": "Review the evidence" },
+        { "label": "Build", "detail": "Shape the offer" }
+      ] },
+      "narration": "The team records the situation, validates the evidence, and then shapes the offer.",
+      "transitionIn": "slideLeft", "chapter": false, "locked": false
+    },
+    {
+      "id": "s04", "component": "Compare",
+      "props": {
+        "left": { "title": "Unreviewed idea", "points": ["A broad assumption", "No source decision"] },
+        "right": { "title": "Reviewed offer", "points": ["A defined audience", "An exact approved version"] }
+      },
+      "narration": "A reviewed offer has a defined audience and an exact approved version.",
+      "transitionIn": "slideUp", "chapter": false, "locked": false
+    },
+    {
+      "id": "s05", "component": "Outro",
+      "props": { "headline": "Review before production", "cta": "Approve the exact version" },
+      "narration": "Review the exact offer version before it enters production.",
+      "transitionIn": "fade", "chapter": false, "locked": false
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "scenes": [
+    {
+      "id": "s01",
+      "audioSrc": null,
+      "durationSec": 13.46,
+      "words": []
+    },
+    {
+      "id": "s02",
+      "audioSrc": null,
+      "durationSec": 13.46,
+      "words": []
+    },
+    {
+      "id": "s03",
+      "audioSrc": null,
+      "durationSec": 13.46,
+      "words": []
+    },
+    {
+      "id": "s04",
+      "audioSrc": null,
+      "durationSec": 13.46,
+      "words": []
+    },
+    {
+      "id": "s05",
+      "audioSrc": null,
+      "durationSec": 13.46,
+      "words": []
+    },
+    {
+      "id": "s06",
+      "audioSrc": null,
+      "durationSec": 13.46,
+      "words": []
+    },
+    {
+      "id": "s07",
+      "audioSrc": null,
+      "durationSec": 13.46,
+      "words": []
+    },
+    {
+      "id": "s08",
+      "audioSrc": null,
+      "durationSec": 13.46,
+      "words": []
+    },
+    {
+      "id": "s09",
+      "audioSrc": null,
+      "durationSec": 13.46,
+      "words": []
+    }
+  ]
+}

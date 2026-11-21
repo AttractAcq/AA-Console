@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "77a417c156569882b29e651b2703d79ac2d66089ece537886f95cb7082bbc5f9",
-  "generatedTypesSha256": "b49316bb5d8d8cc69a65dcdd8ee18ded7147ecd214bf5ce07811a8c9cba2a721",
-  "generatedSchemaBodySha256": "1e13f4802c82e9c4a1566ea95488fa483e53438f18d6efad4db56b12e43f546d",
+  "migrationSourceDigest": "642d1f8c930eae5d431250e337617181ee9919350c3e665d45d9bf292b11df9e",
+  "generatedTypesSha256": "c0614d594a373ca678c7ee14eeab4b85690b1fa72ab880b94d276670f0ac797b",
+  "generatedSchemaBodySha256": "751480a0f77d7bce9b7f1e224c1e0043497c8ab09cebc418e4bb9f89805c5543",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4770,6 +4770,216 @@
       "filename": "20261124053900_664_client_video_brand.sql",
       "sha256": "2b309e903e2ef6e3bf9547240b8e86c566659812530c7dd918ea56354982a0c8",
       "trimmedMd5": "f6b2ec8eed2ccd96fa095b96040106d3"
+    },
+    {
+      "version": "20261124054000",
+      "name": "665_video_projects_core",
+      "filename": "20261124054000_665_video_projects_core.sql",
+      "sha256": "cd52ebb70b23159f79f491ac063ff5bea4a5f9797fc1304a0b8c6e1b22d1c0f1",
+      "trimmedMd5": "755d94e33e652eefc5a9ca7e04644667"
+    },
+    {
+      "version": "20261124054100",
+      "name": "666_video_project_drafts",
+      "filename": "20261124054100_666_video_project_drafts.sql",
+      "sha256": "3390bf22a7c2f8857940f22650d0e4d381ee0c65ac9bb32353a2d7067135fa28",
+      "trimmedMd5": "c2bd5590445f70a03e6fbb5f7bc6fb0e"
+    },
+    {
+      "version": "20261124054200",
+      "name": "667_video_script_start",
+      "filename": "20261124054200_667_video_script_start.sql",
+      "sha256": "8957b89387846599d20c7c7d82b1a0a8b9a670faaf5003ae530654ec8a777643",
+      "trimmedMd5": "0a8afac559cd5140fa7aa8c4cb85ca42"
+    },
+    {
+      "version": "20261124054300",
+      "name": "668_video_storyboard_scene_commit",
+      "filename": "20261124054300_668_video_storyboard_scene_commit.sql",
+      "sha256": "d2c900bb3d9051e32890b1f992095cb74199a0637891191ce7f8e0736e25d508",
+      "trimmedMd5": "c776094b5b63e1a040acef2f86cd351e"
+    },
+    {
+      "version": "20261124054400",
+      "name": "669_video_scene_audio_receipts",
+      "filename": "20261124054400_669_video_scene_audio_receipts.sql",
+      "sha256": "5100ba7122534057b02e539bfac9b4e68bc1ae25ec90c72639b174e9f121602b",
+      "trimmedMd5": "4fc3a3a4c2ceb37c4559bed1ffafd280"
+    },
+    {
+      "version": "20261124054500",
+      "name": "670_video_audio_queue",
+      "filename": "20261124054500_670_video_audio_queue.sql",
+      "sha256": "b1b2dd9440ab3462863f1d822e7fa027ed6853324b9aa4ae8e0fcc9c34f772df",
+      "trimmedMd5": "a7ed84d0d57a0883aa84c146c1096c4a"
+    },
+    {
+      "version": "20261124054600",
+      "name": "671_video_scene_speech_cost",
+      "filename": "20261124054600_671_video_scene_speech_cost.sql",
+      "sha256": "a692939f3d561837816e42abed2beb3605c898fa0b7f8e07ad72b246fe8ed172",
+      "trimmedMd5": "e428eb6fc52f14acd36a13a65f88ca42"
+    },
+    {
+      "version": "20261124054700",
+      "name": "672_video_project_music_receipt",
+      "filename": "20261124054700_672_video_project_music_receipt.sql",
+      "sha256": "8d64d2eb478288cafe40e5f89a9d07bcba10a0dbdeff222703e688f7489dde98",
+      "trimmedMd5": "7a357050e4ca3193cb96977952f2beb2"
+    },
+    {
+      "version": "20261124054800",
+      "name": "673_video_render_attempts",
+      "filename": "20261124054800_673_video_render_attempts.sql",
+      "sha256": "b299e8243052a8bace3e3b79e4171de706784e9f437df6297412b56969eacb6f",
+      "trimmedMd5": "7e957d9a52fd490ce5dfb76de4edf2d3"
+    },
+    {
+      "version": "20261124054900",
+      "name": "674_video_render_queue",
+      "filename": "20261124054900_674_video_render_queue.sql",
+      "sha256": "40dd75e75e38f2d5605cb808dfa29c1db1e1cde436789394183940e5d6540582",
+      "trimmedMd5": "4a39dc2042961d00c2eb1f528954f3ab"
+    },
+    {
+      "version": "20261124055000",
+      "name": "675_video_render_site_identity",
+      "filename": "20261124055000_675_video_render_site_identity.sql",
+      "sha256": "36994ceb84ccfd221dbdb60a87e667452dd1c97a1bdbea02ab18559c609007b0",
+      "trimmedMd5": "03b45913b1c2daeac9b67557682017cb"
+    },
+    {
+      "version": "20261124055100",
+      "name": "676_video_project_render_candidates",
+      "filename": "20261124055100_676_video_project_render_candidates.sql",
+      "sha256": "181cfeaa4b689374bc28c1ccc3c8f8b7cce174200608166963d9f4d1f92bbfee",
+      "trimmedMd5": "b57410606f8c84608deb12372dd39d48"
+    },
+    {
+      "version": "20261124055200",
+      "name": "677_video_project_render_cost",
+      "filename": "20261124055200_677_video_project_render_cost.sql",
+      "sha256": "e5d50fd6ce92daaff58834ba0cb0bcf3f151e34424ba9dd8387dfd0558b41d28",
+      "trimmedMd5": "e3a786b0a9f0ec5faaf5b2dd9ca7037b"
+    },
+    {
+      "version": "20261124055300",
+      "name": "678_video_project_candidate_review",
+      "filename": "20261124055300_678_video_project_candidate_review.sql",
+      "sha256": "3e069b4caa91c7ff60a3316f11cc53fada1062abe3202a36e0ff0f51948ffec1",
+      "trimmedMd5": "6fb2256ae4a3927ac39f34ac9261c835"
+    },
+    {
+      "version": "20261124055400",
+      "name": "679_video_project_candidate_attachment",
+      "filename": "20261124055400_679_video_project_candidate_attachment.sql",
+      "sha256": "ee7a437e99974c52d8af019b8bbe15239bf9e56e9bc47250c4c40493cb581159",
+      "trimmedMd5": "326bdba67ed9e0c2cf8f7dd774392b87"
+    },
+    {
+      "version": "20261124055500",
+      "name": "680_video_project_creative_attempt",
+      "filename": "20261124055500_680_video_project_creative_attempt.sql",
+      "sha256": "d8e49a348a16cf5cda292262c1daf070b7fe01816d792d3ef42559bcc9035db1",
+      "trimmedMd5": "364ac18e9a46995a2354c2f3d0f318f9"
+    },
+    {
+      "version": "20261124055600",
+      "name": "681_video_prerender_critic_receipt",
+      "filename": "20261124055600_681_video_prerender_critic_receipt.sql",
+      "sha256": "d733b744bb03e1d31ef50ba53aebde939b942c55337b51f627b4d8efab275a75",
+      "trimmedMd5": "5feeb01fa516b48327d132bda2c4bdf5"
+    },
+    {
+      "version": "20261124055700",
+      "name": "682_video_audio_version_binding",
+      "filename": "20261124055700_682_video_audio_version_binding.sql",
+      "sha256": "4ad517481bdda0a7607cad67197b7db9e455255d3f793f4e2409dc0cc1c4f98d",
+      "trimmedMd5": "4a7acb57260fbea01d95d82f116c8b23"
+    },
+    {
+      "version": "20261124055800",
+      "name": "683_video_visual_critic_patch",
+      "filename": "20261124055800_683_video_visual_critic_patch.sql",
+      "sha256": "14082f2539d67baa73cebe9c7ef289101a5fff3fd4c7136be48ee6e8b221b182",
+      "trimmedMd5": "0cf2472f38efac95e47322f801cf917c"
+    },
+    {
+      "version": "20261124055900",
+      "name": "684_video_audio_revision_evidence",
+      "filename": "20261124055900_684_video_audio_revision_evidence.sql",
+      "sha256": "de0fbaf7b8ac54cb7667c064ee9cdca3515e561246005bd9604edde2b5d15f91",
+      "trimmedMd5": "8af9801743f0e00a278d69784b3f8127"
+    },
+    {
+      "version": "20261124060000",
+      "name": "685_video_narration_critic_patch",
+      "filename": "20261124060000_685_video_narration_critic_patch.sql",
+      "sha256": "60f75a9648c0f0f858230765432087f6e69e22e365ad1140974917af4dfd31ac",
+      "trimmedMd5": "67a46ce417263779f27a15f87dbfadaa"
+    },
+    {
+      "version": "20261124060100",
+      "name": "686_video_project_brand_snapshot",
+      "filename": "20261124060100_686_video_project_brand_snapshot.sql",
+      "sha256": "0e1650dd8603a95003c1eece417213a136533d5e8199242f57a476831991645d",
+      "trimmedMd5": "44776ead588bc0bbb1dbb0a15f83f1cf"
+    },
+    {
+      "version": "20261124060200",
+      "name": "687_video_project_voice_binding",
+      "filename": "20261124060200_687_video_project_voice_binding.sql",
+      "sha256": "2ca03dd60e10950cc386cddacea57ac35e0559cefdae166263f4943793f754e8",
+      "trimmedMd5": "b01cba839105da6ec1d9b2af49ea789a"
+    },
+    {
+      "version": "20261124060300",
+      "name": "688_video_project_thumbnail_receipt",
+      "filename": "20261124060300_688_video_project_thumbnail_receipt.sql",
+      "sha256": "09a4634b2a68f603779b4778a7b1540d30df678fbdd580710b4e51554a487932",
+      "trimmedMd5": "167c31ed2dfcfea09de2bc7a3d735597"
+    },
+    {
+      "version": "20261124060400",
+      "name": "689_video_attachment_thumbnail_gate",
+      "filename": "20261124060400_689_video_attachment_thumbnail_gate.sql",
+      "sha256": "48c35ce2f74c8bb73967ec96931bc12706a2781c49f482832e6db21ea9a98a9e",
+      "trimmedMd5": "b1965da2dd89965b981b6ab3c21196f6"
+    },
+    {
+      "version": "20261124060500",
+      "name": "690_video_brief_campaign_lineage",
+      "filename": "20261124060500_690_video_brief_campaign_lineage.sql",
+      "sha256": "d0f61b6e30941b5c951536b1cf1e2baf2d622d8f614b0a41e3877c2bab29e3b1",
+      "trimmedMd5": "2ae38c6973c82400f0240fb14c6c0dd4"
+    },
+    {
+      "version": "20261124060600",
+      "name": "691_video_project_status",
+      "filename": "20261124060600_691_video_project_status.sql",
+      "sha256": "482ab1899cfb1096ec76a443cce8d31351831fd22e2c2b0cd95b07ef376ec753",
+      "trimmedMd5": "03f5a7e92e36cf2b22748cbf352cea1a"
+    },
+    {
+      "version": "20261124060700",
+      "name": "692_mcp_video_project_status",
+      "filename": "20261124060700_692_mcp_video_project_status.sql",
+      "sha256": "039ad52c0dd76a6bb38f75600b676a5c222fee4549c9c9c3bd5135f3c92c1873",
+      "trimmedMd5": "4bc58c2623e8b5f0aafd48c218c9954b"
+    },
+    {
+      "version": "20261124060800",
+      "name": "693_video_project_distribution_status",
+      "filename": "20261124060800_693_video_project_distribution_status.sql",
+      "sha256": "1875503203880bc77e4c3c6b1a85fb32f8b39051d69fe72b5d9b6eff98cc9c39",
+      "trimmedMd5": "6cae2b6a5ed77cad8e8a0a44592f4262"
+    },
+    {
+      "version": "20261124060900",
+      "name": "694_mcp_create_video_project",
+      "filename": "20261124060900_694_mcp_create_video_project.sql",
+      "sha256": "ae48f4208c6c7259dbf062692facdc00cc482f02d6d6430dfe8c586b2048f74c",
+      "trimmedMd5": "1d01cd6853640f14bb03878e4f257061"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

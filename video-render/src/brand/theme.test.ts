@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AA_BRAND, VideoTokenOverridesSchema } from "./tokens.js";
-import { buildTheme, contrastRatio } from "./theme.js";
+import { buildTheme, buildThemeFromSnapshot, contrastRatio } from "./theme.js";
 
 describe("video brand theme", () => {
   it("uses the recorded AA palette and legible caption defaults", () => {
@@ -23,6 +23,15 @@ describe("video brand theme", () => {
     expect(theme.tokens.type.scale.h1).toBe(80);
     expect(theme.tokens.type.scale.h2).toBe(AA_BRAND.type.scale.h2);
     expect(theme.tokens.spacing).toBe(16);
+  });
+
+  it("builds the same client theme from a frozen project snapshot", () => {
+    const snapshot = { colour_primary: "#123456",
+      font_heading: "Client Heading", never_do: "No stock imagery",
+      video_tokens: { colours: { accent: "#F5A623" } } };
+    expect(buildThemeFromSnapshot(snapshot).tokens.colours.primary).toBe("#123456");
+    expect(buildThemeFromSnapshot(snapshot).tokens.colours.accent).toBe("#F5A623");
+    expect(() => buildThemeFromSnapshot(null)).toThrow(/exact project brand/);
   });
 
   it("chooses a readable caption colour when the requested text fails", () => {

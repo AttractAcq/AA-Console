@@ -1,5 +1,6 @@
 import { AA_BRAND, BrandTokensSchema, VideoTokenOverridesSchema } from "./tokens.js";
 import type { BrandTokens, VideoTokenOverrides } from "./tokens.js";
+import { z } from "zod";
 
 export interface ClientBrandRow {
   colour_primary?: string | null;
@@ -83,4 +84,26 @@ export function buildTheme(row: ClientBrandRow | null): Theme {
   const captionText = readableText(captionBackground, tokens.colours.text);
   return { tokens, captionText, captionBackground,
     captionContrast: contrastRatio(captionBackground, captionText) };
+}
+
+const BrandSnapshotSchema = z.strictObject({
+  colour_primary: z.string().nullable().optional(),
+  colour_secondary: z.string().nullable().optional(),
+  colour_accent: z.string().nullable().optional(),
+  colour_background: z.string().nullable().optional(),
+  colour_text: z.string().nullable().optional(),
+  font_heading: z.string().nullable().optional(),
+  font_body: z.string().nullable().optional(),
+  imagery_style: z.string().nullable().optional(),
+  never_do: z.string().nullable().optional(),
+  video_rulebook_notes: z.string().nullable().optional(),
+  narrator_voice_id: z.string().nullable().optional(),
+  video_tokens: z.unknown().optional(),
+});
+
+export function buildThemeFromSnapshot(value: unknown): Theme {
+  if (value === null || value === undefined) {
+    throw new Error("Rendered video needs its exact project brand snapshot.");
+  }
+  return buildTheme(BrandSnapshotSchema.parse(value));
 }

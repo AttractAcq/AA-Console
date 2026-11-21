@@ -23,6 +23,7 @@ export const grants: Record<Bot, string[]> = {
     "workflow.*",
     "attribution.*",
     "content.create_upload_url",
+    "content.video_project_status",
   ],
   bot_client_delivery: [
     "delivery.*",
@@ -81,6 +82,7 @@ export const PRODUCTION_ONLY_TOOLS = new Set([
   "content.assign_production",
   "content.create_upload_url",
   "content.submit_asset",
+  "content.create_video_project",
 ]);
 /**
  * Sec Phase 10 Alex CLEAR (2026-09-09): distribution schedule/publication
@@ -134,6 +136,9 @@ export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
     typeof botOrIdentity === "string"
       ? { bot: botOrIdentity, clients: [] }
       : botOrIdentity;
+  if (tool.name === "content.video_project_status"
+      && identity.bot !== "bot_production"
+      && identity.bot !== "bot_chief_of_staff") return false;
   if (PRODUCTION_ONLY_TOOLS.has(tool.name) && identity.bot !== "bot_production") {
     // CoS may read-check brief eligibility. The RPC returns no URL and no path.
     if (
