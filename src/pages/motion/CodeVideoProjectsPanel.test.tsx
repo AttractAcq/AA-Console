@@ -30,7 +30,7 @@ vi.mock("../../lib/supabase", () => ({ supabase: {
             : table === "campaign_route_packages_v6" ? records.routePackage : null,
         error: null }),
       then: (resolve: (value: unknown) => unknown) => Promise.resolve({
-        data: table === "video_projects" ? records.projects : records.sources,
+        data: table === "video_project_status_v1" ? records.projects : records.sources,
         error: null,
       }).then(resolve),
     };
@@ -69,7 +69,10 @@ it("saves a manual draft and keeps storyboard start held while the agent is paus
 it("shows supported sources but cannot start a draft with a paused worker", async () => {
   records.projects = [{ id: "project-1", idea: "Explain a reviewed service to buyers.",
     audience: "Local buyers", stage: "draft", stage_error: null, ir_version: 0,
-    source_snapshot: [], created_at: "2026-11-20" }];
+    source_snapshot: [], created_at: "2026-11-20", scene_count: 0,
+    audio_scene_count: 0, candidate_count: 0, accepted_candidate_count: 0,
+    critic_loop_count: 0, asset_id: null, asset_review_status: null,
+    human_approved_at: null }];
   const user = userEvent.setup();
   render(<MemoryRouter><CodeVideoProjectsPanel /></MemoryRouter>);
   await user.click(await screen.findByRole("button", { name: "Choose sources" }));
@@ -81,9 +84,26 @@ it("shows supported sources but cannot start a draft with a paused worker", asyn
 it("shows the paused audio worker on a queued narration project", async () => {
   records.projects = [{ id: "project-2", idea: "Explain reviewed evidence to buyers.",
     audience: "Local buyers", stage: "timing", stage_error: null, ir_version: 1,
-    source_snapshot: [], created_at: "2026-11-20" }];
+    source_snapshot: [], created_at: "2026-11-20", scene_count: 3,
+    audio_scene_count: 1, candidate_count: 0, accepted_candidate_count: 0,
+    critic_loop_count: 0, asset_id: null, asset_review_status: null,
+    human_approved_at: null }];
   render(<MemoryRouter><CodeVideoProjectsPanel /></MemoryRouter>);
   expect(await screen.findByText(/timing · Audio worker paused/)).toBeInTheDocument();
+  expect(screen.getByText(/Recorded: 3 scenes · audio ready 1\/3/)).toBeInTheDocument();
+});
+
+it("distinguishes an attached candidate from human asset approval", async () => {
+  records.projects = [{ id: "project-3", idea: "Explain the reviewed offer to buyers.",
+    audience: "Local buyers", stage: "attached", stage_error: null, ir_version: 2,
+    source_snapshot: [], created_at: "2026-11-20", scene_count: 3,
+    audio_scene_count: 3, candidate_count: 2, accepted_candidate_count: 2,
+    critic_loop_count: 1, asset_id: "asset-3", asset_review_status: "pending",
+    human_approved_at: null }];
+  render(<MemoryRouter><CodeVideoProjectsPanel /></MemoryRouter>);
+  expect(await screen.findByText(/render candidates accepted 2\/2/)).toBeInTheDocument();
+  expect(screen.getByText(/Attached asset: pending · human approval pending/))
+    .toBeInTheDocument();
 });
 
 it("saves the operator's exact ordered set of requested aspects", async () => {

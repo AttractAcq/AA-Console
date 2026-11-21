@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "a522e26c31faa2bc56f08a175f121c752bca0e9dd1e4e00db2fc5192fcb8f493",
-  "generatedTypesSha256": "0f52836128e39099989b2d55f4f841603fe4199d5f5d3a3b9f9417816b09f7cf",
-  "generatedSchemaBodySha256": "7765468943e38920901aad73519247399b8913cebe85424d0de694f02a55e653",
+  "migrationSourceDigest": "5ad072a63bd484878202fa1590694d724db09a20f9130f2d87876bf9763ed7a2",
+  "generatedTypesSha256": "a502998ddbb87332fa95bcbb8ba6e544f1a001a8f091f7afad7634effc074df2",
+  "generatedSchemaBodySha256": "3978350e6685617b59cba5315eae5d7f01f576856f99b09b2f347729a9864315",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -4952,6 +4952,13 @@
       "filename": "20261124060500_690_video_brief_campaign_lineage.sql",
       "sha256": "d0f61b6e30941b5c951536b1cf1e2baf2d622d8f614b0a41e3877c2bab29e3b1",
       "trimmedMd5": "2ae38c6973c82400f0240fb14c6c0dd4"
+    },
+    {
+      "version": "20261124060600",
+      "name": "691_video_project_status",
+      "filename": "20261124060600_691_video_project_status.sql",
+      "sha256": "482ab1899cfb1096ec76a443cce8d31351831fd22e2c2b0cd95b07ef376ec753",
+      "trimmedMd5": "03f5a7e92e36cf2b22748cbf352cea1a"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

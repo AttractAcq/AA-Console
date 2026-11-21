@@ -29550,6 +29550,13 @@ export type Database = {
             foreignKeyName: "video_project_attachments_v1_project_id_client_id_fkey"
             columns: ["project_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "video_project_status_v1"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "video_projects"
             referencedColumns: ["id", "client_id"]
           },
@@ -29623,6 +29630,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "metrics_pulls"
             referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_project_costs_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_project_status_v1"
+            referencedColumns: ["id", "client_id"]
           },
           {
             foreignKeyName: "video_project_costs_project_id_client_id_fkey"
@@ -29715,6 +29729,13 @@ export type Database = {
             foreignKeyName: "video_project_creative_attempts_v1_project_id_client_id_fkey"
             columns: ["project_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "video_project_status_v1"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_project_creative_attempts_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "video_projects"
             referencedColumns: ["id", "client_id"]
           },
@@ -29789,8 +29810,22 @@ export type Database = {
             foreignKeyName: "video_project_music_attempts_v1_project_id_client_id_fkey"
             columns: ["project_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "video_project_status_v1"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_project_music_attempts_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "video_projects"
             referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_project_music_attempts_v1_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "video_project_status_v1"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_project_music_attempts_v1_project_id_fkey"
@@ -29858,8 +29893,22 @@ export type Database = {
             foreignKeyName: "video_project_music_receipts_v1_project_id_client_id_fkey"
             columns: ["project_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "video_project_status_v1"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_project_music_receipts_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "video_projects"
             referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_project_music_receipts_v1_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "video_project_status_v1"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_project_music_receipts_v1_project_id_fkey"
@@ -29917,6 +29966,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "video_project_prerender_attempts_v1"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_narration_patches_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_project_status_v1"
+            referencedColumns: ["id", "client_id"]
           },
           {
             foreignKeyName: "video_project_narration_patches_v1_project_id_client_id_fkey"
@@ -30029,6 +30085,13 @@ export type Database = {
             foreignKeyName: "video_project_prerender_attempts_v1_project_id_client_id_fkey"
             columns: ["project_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "video_project_status_v1"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_project_prerender_attempts_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "video_projects"
             referencedColumns: ["id", "client_id"]
           },
@@ -30118,6 +30181,13 @@ export type Database = {
             foreignKeyName: "video_project_render_attempts_v1_project_id_client_id_fkey"
             columns: ["project_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "video_project_status_v1"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_project_render_attempts_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "video_projects"
             referencedColumns: ["id", "client_id"]
           },
@@ -30194,6 +30264,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "video_project_render_attempts_v1"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_render_candidates_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_project_status_v1"
+            referencedColumns: ["id", "client_id"]
           },
           {
             foreignKeyName: "video_project_render_candidates_v1_project_id_client_id_fkey"
@@ -30301,6 +30378,13 @@ export type Database = {
             foreignKeyName: "video_project_thumbnail_attempts_v1_project_id_client_id_fkey"
             columns: ["project_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "video_project_status_v1"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_project_thumbnail_attempts_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "video_projects"
             referencedColumns: ["id", "client_id"]
           },
@@ -30374,6 +30458,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "metrics_pulls"
             referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_project_visual_patches_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_project_status_v1"
+            referencedColumns: ["id", "client_id"]
           },
           {
             foreignKeyName: "video_project_visual_patches_v1_project_id_client_id_fkey"
@@ -31496,6 +31587,13 @@ export type Database = {
             foreignKeyName: "video_scene_audio_attempts_v1_project_id_client_id_fkey"
             columns: ["project_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "video_project_status_v1"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_scene_audio_attempts_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "video_projects"
             referencedColumns: ["id", "client_id"]
           },
@@ -31577,6 +31675,13 @@ export type Database = {
             foreignKeyName: "video_scene_audio_receipts_v1_project_id_client_id_fkey"
             columns: ["project_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "video_project_status_v1"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_scene_audio_receipts_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "video_projects"
             referencedColumns: ["id", "client_id"]
           },
@@ -31624,6 +31729,13 @@ export type Database = {
           source_attempt_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "video_scene_audio_revisions_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_project_status_v1"
+            referencedColumns: ["id", "client_id"]
+          },
           {
             foreignKeyName: "video_scene_audio_revisions_v1_project_id_client_id_fkey"
             columns: ["project_id", "client_id"]
@@ -31699,6 +31811,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "video_scenes_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_project_status_v1"
+            referencedColumns: ["id", "client_id"]
+          },
           {
             foreignKeyName: "video_scenes_project_id_client_id_fkey"
             columns: ["project_id", "client_id"]
@@ -39924,6 +40043,145 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "slot_board"
             referencedColumns: ["slot_id"]
+          },
+        ]
+      }
+      video_project_status_v1: {
+        Row: {
+          accepted_candidate_count: number | null
+          asset_id: string | null
+          asset_review_status:
+            | Database["public"]["Enums"]["review_status"]
+            | null
+          audience: string | null
+          audio_scene_count: number | null
+          candidate_count: number | null
+          client_id: string | null
+          cost_usd: number | null
+          created_at: string | null
+          critic_loop_count: number | null
+          human_approved_at: string | null
+          id: string | null
+          idea: string | null
+          ir_version: number | null
+          scene_count: number | null
+          source_snapshot: Json | null
+          stage: string | null
+          stage_error: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "content_archive_metric_coverage_v8"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "meta_profile_presence"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_attachments_v1_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }

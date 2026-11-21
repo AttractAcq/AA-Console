@@ -7,7 +7,11 @@ import { CodeVideoProjectReviewPanel } from "./CodeVideoProjectReviewPanel";
 
 type Project = { id: string; idea: string; audience: string | null;
   stage: string; stage_error: string | null; ir_version: number;
-  source_snapshot: unknown; created_at: string };
+  source_snapshot: unknown; created_at: string; cost_usd: number;
+  scene_count: number; audio_scene_count: number; candidate_count: number;
+  accepted_candidate_count: number; critic_loop_count: number;
+  asset_id: string | null; asset_review_status: string | null;
+  human_approved_at: string | null };
 type Source = { record_id: string; title: string; domain: string;
   observed_on: string | null; review_state: string };
 type BriefBinding = { briefId: string; title: string;
@@ -100,8 +104,8 @@ export function CodeVideoProjectsPanel() {
   const refresh = useCallback(async () => {
     if (!clientId) return;
     const [projectResult, sourceResult, agentResult, audioAgentResult] = await Promise.all([
-      supabase.from("video_projects")
-        .select("id,idea,audience,stage,stage_error,ir_version,source_snapshot,created_at")
+      supabase.from("video_project_status_v1")
+        .select("id,idea,audience,stage,stage_error,ir_version,source_snapshot,created_at,cost_usd,scene_count,audio_scene_count,candidate_count,accepted_candidate_count,critic_loop_count,asset_id,asset_review_status,human_approved_at")
         .eq("client_id", clientId).order("created_at", { ascending: false }).limit(30),
       supabase.from("model_section_review_state_v7")
         .select("record_id,title,domain,observed_on,review_state")
@@ -137,7 +141,7 @@ export function CodeVideoProjectsPanel() {
     });
     setBusy(false);
     if (result.error) { setError(result.error.message); return; }
-    const draft = result.data as Project;
+    const draft = result.data as { id: string };
     setActiveDraft(draft.id);
     setRequestKey(crypto.randomUUID());
     setNotice("Draft saved. Select reviewed sources before starting the script.");
@@ -225,7 +229,13 @@ export function CodeVideoProjectsPanel() {
       {projects.map((project) => <div key={project.id} className="flex items-start justify-between gap-3 border-t border-border pt-2 text-xs">
         <div><p className="font-medium">{project.idea}</p>
           <p className="text-muted-foreground">{project.stage}{project.stage_error ? ` · ${project.stage_error}` : ""}
-            {project.stage === "timing" && audioAgentPaused ? " · Audio worker paused" : ""}</p></div>
+            {project.stage === "timing" && audioAgentPaused ? " · Audio worker paused" : ""}</p>
+          <p className="text-muted-foreground">Recorded: {project.scene_count} scenes · audio ready {project.audio_scene_count}/{project.scene_count}
+            · render candidates accepted {project.accepted_candidate_count}/{project.candidate_count}
+            · {project.critic_loop_count} critic loops · estimated cost ${Number(project.cost_usd ?? 0).toFixed(4)}</p>
+          {project.asset_id && <p className="text-muted-foreground">Attached asset: {project.asset_review_status ?? "review unknown"}
+            {project.human_approved_at ? ` · human approved ${project.human_approved_at}` : " · human approval pending"}</p>}
+        </div>
         <div className="flex shrink-0 gap-3">
           {project.stage === "draft" && <button type="button" onClick={() => { setActiveDraft(project.id); setSelected([]); setNote(""); }}
             className="text-brand-strong hover:underline">Choose sources</button>}

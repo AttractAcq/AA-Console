@@ -162,6 +162,22 @@ begin
     'route-v2');
 end $checks$;
 
+set local role authenticated;
+do $status$
+declare status_row public.video_project_status_v1%rowtype;
+begin
+  select s.* into status_row from public.video_project_status_v1 s
+    join public.video_projects p on p.id=s.id and p.client_id=s.client_id
+    where p.request_key='linked-brief-route';
+  if status_row.id is null or status_row.stage <> 'draft'
+    or status_row.scene_count <> 0 or status_row.audio_scene_count <> 0
+    or status_row.candidate_count <> 0
+    or status_row.accepted_candidate_count <> 0
+    or status_row.asset_id is not null
+    or status_row.asset_review_status is not null then
+    raise exception 'Video status inflated an unproduced draft'; end if;
+end $status$;
+
 select set_config('request.jwt.claim.sub',
   'f3434343-3434-4343-8343-343434343434',true);
 do $manager$
@@ -186,6 +202,9 @@ select set_config('request.jwt.claim.sub',
   'f7777777-7777-4777-8777-777777777777',true);
 do $denied$
 begin
+  if exists(select 1 from public.video_project_status_v1
+    where client_id='f8888888-8888-4888-8888-888888888888') then
+    raise exception 'Other client video status was readable'; end if;
   begin
     perform public.create_video_project_draft_v1(
       'f8888888-8888-4888-8888-888888888888',
