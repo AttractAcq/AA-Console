@@ -34,6 +34,25 @@ stop. `selectedCaseIds`, fixture/catalogue hashes and the model make separate
 batch reports comparable. A non-accepted review fails `qualityGatePassed` and
 the command exits nonzero even when the report is complete.
 
+After separate batches finish, reconcile them offline with a new summary file:
+
+```sh
+npm run eval:video:summary -- --out /private/tmp/aa-video-eval-summary.json \
+  /private/tmp/aa-video-eval-01-10.json /private/tmp/aa-video-eval-11-20.json
+```
+
+The summary reads the current 20-case manifest and component catalogue, then
+checks each report's hashes, model, case order, result count, duplicates,
+active case, estimated cost and writer/reviewer outcomes. It records each input
+file's SHA-256 and writes a new owner-only JSON file; it never calls a model.
+An incomplete, interrupted, changed-source or failed-review batch produces a
+summary with explicit blockers and a nonzero exit. `scriptReviewGatePassed`
+applies only to script and independent-review evaluation. Its cost is a model
+usage estimate, `providerInvoiceReconciled` remains false, and
+`videoAcceptance` remains `not_assessed` until audio, render, vision critic and
+human review have separate evidence. Reconcile an in-flight case's outcome and
+billing before deciding whether to run it again.
+
 The `--max-usd` value is an **estimated stop threshold checked between cases**,
 not a hard provider spend cap. A case can pass the threshold and a provider
 error can have unknown billing. An existing output path is never overwritten by

@@ -13,7 +13,8 @@
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "eval:video": "tsx src/eval/video.ts"
+    "eval:video": "tsx src/eval/video.ts",
+    "eval:video:summary": "tsx src/eval/video-summary.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
