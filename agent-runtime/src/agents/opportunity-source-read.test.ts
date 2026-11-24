@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { runOpportunityDiscoveryJob } from "./opportunity_discovery/index.js";
 import { runOpportunityEvaluateJob } from "./opportunity_evaluate/index.js";
@@ -7,13 +7,19 @@ import { runOpportunityStrategiseJob } from "./opportunity_strategise/index.js";
 type ReadResult = { data: unknown; error: { message: string } | null };
 
 function reader(results: Record<string, ReadResult>) {
+  const selected = vi.fn<(table: string, columns: string) => void>();
   return {
+    selected,
     rpc: async () => ({ data: "a".repeat(64), error: null }),
     from(table: string) {
       const result = results[table];
       if (!result) throw new Error(`Unexpected read: ${table}`);
       const query: Record<string, unknown> = {};
-      for (const step of ["select", "eq", "in", "order", "limit"]) {
+      query.select = (columns: string) => {
+        selected(table, columns);
+        return query;
+      };
+      for (const step of ["eq", "in", "order", "limit"]) {
         query[step] = () => query;
       }
       query.maybeSingle = async () => result;
@@ -42,6 +48,7 @@ describe("opportunity agents require successful source reads", () => {
     await expect(runOpportunityDiscoveryJob(db as never, {} as never,
       { agent_key: "opportunity_discovery" } as never, job as never, Date.now() + 60_000))
       .rejects.toThrow("Offer lookup failed: read unavailable");
+    expect(db.selected).toHaveBeenCalledWith("service_offers", "service_name");
   });
 
   it("does not evaluate when Intelligence cannot be read", async () => {
@@ -65,6 +72,7 @@ describe("opportunity agents require successful source reads", () => {
     await expect(runOpportunityEvaluateJob(db as never, {} as never,
       { agent_key: "opportunity_evaluate" } as never, job as never, Date.now() + 60_000))
       .rejects.toThrow("Offer lookup failed: read unavailable");
+    expect(db.selected).toHaveBeenCalledWith("service_offers", "service_name, kind");
   });
 
   it("does not strategise when Intelligence cannot be read", async () => {
