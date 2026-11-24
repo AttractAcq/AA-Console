@@ -197,12 +197,12 @@ export async function runOpportunityEvaluateJob(
 
   const { data: offers, error: offersError } = await sb
     .from("service_offers")
-    .select("name, kind")
+    .select("service_name, kind")
     .eq("client_id", job.client_id)
     .limit(10);
   if (offersError) throw new Error(`Offer lookup failed: ${offersError.message}`);
   const offerLines = (offers ?? []).map(
-    (o) => `${String((o as { name?: string }).name ?? "")} (${String((o as { kind?: string }).kind ?? "main")})`,
+    (o) => `${String(o.service_name ?? "")} (${String((o as { kind?: string }).kind ?? "main")})`,
   ).filter((line) => line.trim().length > 1);
 
   const submitTool = {
