@@ -1,3 +1,4 @@
+import { requireDirectModelAccess } from "../orchestration/hard-budget.js";
 // The public sales-agent runtime: the only unauthenticated, internet-facing,
 // paid-compute endpoint in this system.
 //
@@ -302,6 +303,12 @@ export async function handlePublicSales(
     { role: "user" as const, content: checked.message },
   ];
   const system = systemFor(d);
+  try {
+    await requireDirectModelAccess(sb, d.client_id);
+  } catch {
+    deny("unavailable", allow);
+    return;
+  }
   const reserveUsd = maxSalesTurnCostUsd(config.model, system, messages);
   if (reserveUsd === null) {
     await log("denied");
