@@ -18,7 +18,7 @@ import {
   fetchEvaluationInputHash, fetchStrategyReviewHash, rejectProposal,
   requestEvaluation, requestStrategy,
   fetchOpportunities, fetchOpportunityOutputs, fetchOpportunityApprovalStates, fetchOpportunityActivationStates,
-  fetchReadiness, fetchScoreFactors, requireProof, fetchRequirementProof, satisfyProof, scoreOpportunity,
+  fetchReadiness, fetchScoreFactors, requireProof, fetchRequirementProof, retireProofRequirement, satisfyProof, scoreOpportunity,
   fetchStageTemplates, setStageTemplate, requestOpportunityApproval, requestOpportunityActivation,
   setAttributes, setAwarenessStage, setConfidence, setFields, setStatus,
   type Opportunity, type OpportunityConfidence, type OpportunityOutputs, type OpportunityProposal,
@@ -277,7 +277,7 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
             <>
               {proposals.filter((proposal) => proposal.opportunity_id === selected.id && proposal.kind === "strategy")
                 .map((proposal) => <StrategyProposalReview key={proposal.id} proposal={proposal} busy={busy === proposal.id} onAct={act} />)}
-              <StrategizeView key={selected.id} opportunity={selected} busy={busy === selected.id} onAct={act} />
+              <StrategizeView key={selected.id} opportunity={selected} busy={busy === selected.id} onAct={act} onRefresh={refresh} />
             </>
           )}
         </section>
@@ -304,7 +304,7 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
         <>
           {proposals.filter((proposal) => proposal.opportunity_id === selected.id && proposal.kind === "strategy")
             .map((proposal) => <StrategyProposalReview key={proposal.id} proposal={proposal} busy={busy === proposal.id} onAct={act} />)}
-          <StrategizeView key={selected.id} opportunity={selected} busy={busy === selected.id} onAct={act} />
+          <StrategizeView key={selected.id} opportunity={selected} busy={busy === selected.id} onAct={act} onRefresh={refresh} />
         </>
       )}
       {view === "activate" && (
@@ -1216,8 +1216,9 @@ function StrategyProposalReview({ proposal, busy, onAct }: {
 }
 
 function StrategizeView({
-  opportunity, busy, onAct,
+  opportunity, busy, onAct, onRefresh,
 }: {
+  onRefresh: () => Promise<void>;
   opportunity: Opportunity;
   busy: boolean;
   onAct: (id: string, work: () => Promise<void>, said: string) => Promise<void>;
@@ -1237,6 +1238,7 @@ function StrategizeView({
   const [message, setMessage] = useState("");
   const [requirement, setRequirement] = useState("");
   const [proofRows, setProofRows] = useState<Awaited<ReturnType<typeof fetchRequirementProof>> | null>(null);
+  const [retiring, setRetiring] = useState<string | null>(null);
   const [proofError, setProofError] = useState("");
   const [proofRevision, setProofRevision] = useState(0);
   useEffect(() => {
@@ -1248,6 +1250,11 @@ function StrategizeView({
     return () => { current = false; };
   }, [opportunity.client_id, opportunity.id, proofRevision]);
 
+
+  const requirements = proofRows?.requirements ?? [];
+  const satisfied = requirements.filter(row => row.proof_id).length;
+  const retired = requirements.filter(row => row.retired_at).length;
+  const open = requirements.length - satisfied - retired;
 
   return (
     <div className="grid gap-5 lg:grid-cols-2">
@@ -1391,10 +1398,20 @@ function StrategizeView({
             silence. It blocks approval until it is captured or the claim changes.
           </p>
           {proofError && <p role="alert">{proofError}</p>}
+          {proofRows && <p>{satisfied} satisfied · {retired} retired · {open} open</p>}
           {proofRows?.requirements.map((row) => (
             <fieldset key={row.id} className="space-y-2 rounded border border-border p-3" disabled={busy}>
               <legend>{row.requirement}</legend>
-              {row.proof_id ? (
+              {row.retired_at ? (
+                <div>
+                  <p>Retired — out of scope</p>
+                  <details>
+                    <summary>Retirement decision</summary>
+                    <p>{row.retirement_reason}</p>
+                    <p>Reviewer {row.retired_by} · <time dateTime={row.retired_at}>{new Date(row.retired_at).toLocaleString()}</time></p>
+                  </details>
+                </div>
+              ) : row.proof_id ? (
                 <p>Satisfied · {[row.proof?.ref_number, row.proof?.title].filter(Boolean).join(" · ") || row.proof_id}</p>
               ) : (
                 <>
@@ -1421,10 +1438,24 @@ function StrategizeView({
                       <button type="submit" className="rounded border border-border px-3 py-2 text-sm">Link proof</button>
                     </form>
                   )}
+                  {proofRows.canRetire && <button type="button" onClick={() => setRetiring(row.id)}>
+                    Retire as out of scope
+                  </button>}
                 </>
               )}
             </fieldset>
           ))}
+          {retiring && <FormModal open title="Retire proof requirement" submitLabel="Retire requirement"
+            intro={requirements.find(row => row.id === retiring)?.requirement}
+            fields={[{ name: "reason", label: "Why is this requirement outside the offer scope?", kind: "textarea", required: true }]}
+            onClose={() => setRetiring(null)}
+            onSubmit={async values => { await retireProofRequirement(retiring, String(values.reason).trim()); }}
+            onSaved={() => {
+              setProofRows(null);
+              setProofRevision(value => value + 1);
+              void onRefresh();
+            }}
+          />}
           <input
             aria-label="Proof requirement"
             placeholder="A completed garage conversion with costs"

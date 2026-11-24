@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "c40065b9e95e156f5d1d5a5c9d3e2e3469a94fe8d942ecfd6a5a2f3257c8ff0f",
-  "generatedTypesSha256": "0d0303315ffe1f4ab6ffc5bd43bb1a6edaff42e4dc9b1f18651c9bc874aa0d7b",
-  "generatedSchemaBodySha256": "f4788cf1f6f252b8b81739776f92fa54c79d676a95c577f111df19901abe14e4",
+  "migrationSourceDigest": "09a753aae1e8efb5f3ae15ae5a70a53fcba5ccea8b99b76201982bb1a05943a6",
+  "generatedTypesSha256": "bf4d325fb51eda6c1c9ffa140275d2e96ee01c6ffe29e3365b13c392f1dfd860",
+  "generatedSchemaBodySha256": "19c639262876697fd1b24232e627f9cb28d684c7c1855616d03cffafcc406df9",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -5043,6 +5043,13 @@
       "filename": "20261124061800_703_worker_hard_budget.sql",
       "sha256": "a888309c3546fb44c528bc0ca5fab033c95db731e5ec873f12c8b331f2e8f0ff",
       "trimmedMd5": "5abc902e2161606b59405d5eeb656b2d"
+    },
+    {
+      "version": "20261124061900",
+      "name": "704_retire_opportunity_proof_requirement",
+      "filename": "20261124061900_704_retire_opportunity_proof_requirement.sql",
+      "sha256": "d6a15a7eb396bf90076b0749cb471ed346e19cbc1cd9eb9b822074072d35ef43",
+      "trimmedMd5": "03b8bc1ce156fd324b9a91e7a504e014"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

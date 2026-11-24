@@ -168,6 +168,9 @@ diff -u "$evidence_dir/upgrade.fingerprint.json" \
     exit 1
   }
 
+psql_local -f scripts/test-opportunity-proof-retirement.sql >/dev/null
+echo 'Opportunity requirement retirement and approval readiness passed.'
+
 bash scripts/test-agent-hard-budget.sh "$((port_base + 2))"
 
 # Run a real two-session lock-order regression against the same disposable
