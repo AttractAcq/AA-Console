@@ -93,6 +93,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           error: string | null
+          hard_budget_required: boolean
+          hard_budget_retry_usd: number | null
           id: string
           input_id: string | null
           input_table: string | null
@@ -117,6 +119,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           error?: string | null
+          hard_budget_required?: boolean
+          hard_budget_retry_usd?: number | null
           id?: string
           input_id?: string | null
           input_table?: string | null
@@ -141,6 +145,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           error?: string | null
+          hard_budget_required?: boolean
+          hard_budget_retry_usd?: number | null
           id?: string
           input_id?: string | null
           input_table?: string | null
@@ -41892,6 +41898,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           error: string | null
+          hard_budget_required: boolean
+          hard_budget_retry_usd: number | null
           id: string
           input_id: string | null
           input_table: string | null
@@ -42263,6 +42271,10 @@ export type Database = {
       }
       client_for_meta_recipient_v6: {
         Args: { p_recipient_id: string }
+        Returns: string
+      }
+      client_model_budget_policy: {
+        Args: { p_client_id: string }
         Returns: string
       }
       client_money_currency_breakdown: {
@@ -46993,6 +47005,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           error: string | null
+          hard_budget_required: boolean
+          hard_budget_retry_usd: number | null
           id: string
           input_id: string | null
           input_table: string | null
@@ -48927,6 +48941,16 @@ export type Database = {
         Args: { p_generation_id: string; p_quality?: string; p_size?: string }
         Returns: string
       }
+      reserve_agent_budget_turn: {
+        Args: {
+          p_attempt: number
+          p_job_id: string
+          p_owner: string
+          p_turn: number
+          p_usd: number
+        }
+        Returns: undefined
+      }
       reserve_sales_runtime_v6: {
         Args: { p_deployment_id: string; p_reserved_usd: number }
         Returns: {
@@ -50337,6 +50361,16 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      settle_agent_budget_turn: {
+        Args: {
+          p_attempt: number
+          p_job_id: string
+          p_owner: string
+          p_turn: number
+          p_usd: number
+        }
+        Returns: undefined
       }
       settle_completed_blocked_daily_siblings: {
         Args: { p_limit?: number }

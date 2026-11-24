@@ -168,6 +168,8 @@ diff -u "$evidence_dir/upgrade.fingerprint.json" \
     exit 1
   }
 
+bash scripts/test-agent-hard-budget.sh "$((port_base + 2))"
+
 # Run a real two-session lock-order regression against the same disposable
 # local PostgreSQL server, in its own database so replay fingerprints stay
 # unchanged. PGlite cannot expose this class of deadlock.

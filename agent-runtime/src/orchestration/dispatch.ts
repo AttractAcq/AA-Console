@@ -79,6 +79,7 @@ import { runPageReviseJob } from "../agents/page_revise/index.js";
 import { runMetaBuildJob } from "../agents/meta_build/index.js";
 import { runRecruitmentMetaBuildJob } from "../agents/recruitment_meta_build/index.js";
 import { runMetaBuildSheetJob } from "../agents/meta_build_sheet/index.js";
+import { hardBudget } from "./hard-budget.js";
 import { checkClientBudget } from "./budget.js";
 
 export interface JobResult {
@@ -260,6 +261,12 @@ export async function dispatchJob(
   // here whatever the agent is, including one added later that forgets to
   // ask. Non-retryable, because a retry spends the money the cap refused and
   // three attempts at the same refusal is three lies about having tried.
+  if (job.hard_budget_required) {
+    if (!hardBudget.getStore()?.owns(job)) {
+      return { ok: false, retryable: false, hold: true, failureMessage: "Missing hard-budget reservation." };
+    }
+    return runner(sb, config, agent, job, deadlineFromNow(config, job.agent_key));
+  }
   const budget = await checkClientBudget(sb, job.client_id);
   if (!budget.allowed) {
     // Held, not failed. The cap passes when somebody raises it or when the

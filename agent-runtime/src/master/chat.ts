@@ -1,3 +1,4 @@
+import { requireDirectModelAccess } from "../orchestration/hard-budget.js";
 // The Master AI conversation loop.
 //
 // Unlike a record agent, this does not end on a single structured submit —
@@ -106,6 +107,7 @@ export async function runChatTurn(opts: {
   while (turns < MAX_TURNS) {
     turns += 1;
 
+    if (scope.kind === "client") await requireDirectModelAccess(sb, scope.clientId);
     const stream = anthropic.messages.stream({
       model: config.model,
       max_tokens: MAX_OUTPUT_TOKENS,

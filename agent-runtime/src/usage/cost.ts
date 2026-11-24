@@ -23,6 +23,7 @@ const WEB_SEARCH_USD_PER_1K = 10;
 
 const RATES: Record<string, Rates> = {
   opus: { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+  sonnet46: { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 },
   sonnet: { input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.2 },
   haiku: { input: 1, output: 5, cacheWrite: 1.25, cacheRead: 0.1 },
   fable: { input: 10, output: 50, cacheWrite: 12.5, cacheRead: 1 },
@@ -35,6 +36,7 @@ const RATES: Record<string, Rates> = {
 function ratesFor(model: string): Rates {
   const value = model.toLowerCase();
   if (value.includes("haiku")) return RATES.haiku!;
+  if (value === "claude-sonnet-4-6") return RATES.sonnet46!;
   if (value.includes("sonnet")) return RATES.sonnet!;
   if (value.includes("fable") || value.includes("mythos")) return RATES.fable!;
   if (value.includes("sol")) return RATES.sol!;
