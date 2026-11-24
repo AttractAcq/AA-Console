@@ -2,7 +2,10 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { briefStatus } = vi.hoisted(() => ({ briefStatus: { value: "in_production" } }));
+const { briefStatus, update, eq, resultRow } = vi.hoisted(() => ({
+  briefStatus: { value: "in_production" }, update: vi.fn(), eq: vi.fn(),
+  resultRow: { found: true },
+}));
 
 vi.mock("../../lib/useAgentJobs", () => ({ useAgentJobs: () => ({ inFlight: [], recentFailures: [] }) }));
 vi.mock("../../lib/supabase", () => ({
@@ -11,6 +14,10 @@ vi.mock("../../lib/supabase", () => ({
       const data = table === "client_briefs" ? [{
         id: "brief-1", title: "Founder video", body: "Record the founder", media_type: "video",
         content_format: "single", target_platform: "instagram", brief_ref: "BR-1",
+        ...(briefStatus.value === "draft" ? {
+          media_type: "text", argument: "Old argument", script: "Old script", updated_at: "revision-1",
+          body: "## Argument\n\nOld argument\n\n## Script\n\nOld script", purpose: "client", archived_at: null,
+        } : {}),
         status: briefStatus.value, source_idea_id: "idea-1", created_at: "2026-10-10",
       }] : table === "job_assignments" ? [{
         id: "assignment-1", brief_id: "brief-1", stage: "delivered", asset_id: "asset-1",
@@ -18,7 +25,9 @@ vi.mock("../../lib/supabase", () => ({
       }] : [{ assignment_id: "assignment-1", email_status: "skipped" }];
       const result = { data, error: null };
       const chain = {
-        select: () => chain, eq: () => chain, neq: () => chain, is: () => chain,
+        update: (payload: unknown) => { update(payload); return chain; },
+        maybeSingle: () => Promise.resolve({ data: resultRow.found ? { id: "brief-1" } : null, error: null }),
+        select: () => chain, eq: (...args: unknown[]) => { eq(...args); return chain; }, neq: () => chain, is: () => chain,
         order: () => chain, limit: () => chain, in: () => Promise.resolve(result),
         then: (resolve: (value: typeof result) => unknown) => Promise.resolve(result).then(resolve),
       };
@@ -56,5 +65,27 @@ describe("BriefsPanel human Create handoff", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Actions for / }));
     expect(screen.getByRole("menuitem", { name: "Start code video from brief" }))
       .toBeInTheDocument();
+  });
+});
+
+describe("reviewing the source brief before building", () => {
+  it.each([true, false])("saves both fields and the worker body only on the same draft revision (found=%s)", async found => {
+    briefStatus.value = "draft";
+    resultRow.found = found;
+    update.mockClear();
+    eq.mockClear();
+    render(<MemoryRouter initialEntries={["/?tab=briefs&brief=brief-1"]}><BriefsPanel /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Edit draft copy" }));
+    fireEvent.change(screen.getByDisplayValue("Old argument"), { target: { value: "New argument" } });
+    fireEvent.change(screen.getByDisplayValue("Old script"), { target: { value: "New script" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save brief" }));
+    expect(await screen.findByText(found ? "Brief saved." : /Refresh before saving/)).toBeInTheDocument();
+    expect(update).toHaveBeenCalledExactlyOnceWith({
+      argument: "New argument", script: "New script", body: "## Argument\n\nNew argument\n\n## Script\n\nNew script",
+    });
+    for (const filter of [["id", "brief-1"], ["client_id", "client-1"], ["updated_at", "revision-1"], ["status", "draft"]]) {
+      expect(eq).toHaveBeenCalledWith(...filter);
+    }
   });
 });

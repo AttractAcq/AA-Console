@@ -14,6 +14,8 @@ import { BriefDetailModal } from "../../components/briefs/BriefDetailModal";
 import { formatFilters, formatLabel } from "../../lib/contentFormat";
 import { platformLabel } from "../../lib/postPlatform";
 import type { FormatFilterId } from "../../lib/contentFormat";
+import { FormModal } from "../../components/forms/FormModal";
+import { revisedBriefBody } from "./textBriefCopy";
 import { ContentJourney } from "../../components/ContentJourney";
 
 type Brief = {
@@ -30,6 +32,11 @@ type Brief = {
   status: string;
   source_idea_id: string | null;
   created_at: string;
+  updated_at: string;
+  purpose: string;
+  archived_at: string | null;
+  script: string | null;
+  argument: string | null;
 };
 
 type Assignment = {
@@ -52,6 +59,7 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
   const [emailStatus, setEmailStatus] = useState<ReadonlyMap<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [building, setBuilding] = useState<Brief | null>(null);
+  const [editingCopy, setEditingCopy] = useState<Brief | null>(null);
   const [viewing, setViewing] = useState<Brief | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   /** The brief whose delete or archive is running, so its menu disables. */
@@ -69,7 +77,7 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
       let query = supabase
         .from("client_briefs")
         .select(
-          "id, title, body, avatar_brief, editor_brief, media_type, content_format, target_platform, format_code, frame_plan, brief_ref, status, source_idea_id, created_at, hook, premise, argument, proof, script, visual_direction, shot_requirements, b_roll, call_to_action, channel_intent, production_method, proof_asset_id",
+          "id, title, body, avatar_brief, editor_brief, media_type, content_format, target_platform, format_code, frame_plan, brief_ref, status, source_idea_id, created_at, updated_at, purpose, archived_at, hook, premise, argument, proof, script, visual_direction, shot_requirements, b_roll, call_to_action, channel_intent, production_method, proof_asset_id",
         )
         .eq("client_id", clientId)
         .neq("purpose", "recruitment")
@@ -252,6 +260,8 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
                 ? [{ label: "Start code video from brief",
                   onSelect: () => navigate(`/clients/${clientId}/delivery/content-production-factory?tab=generation&videoBrief=${b.id}`) }]
                 : []),
+              ...(b.purpose === "client" && !b.archived_at && b.media_type === "text" && b.status === "draft" && b.script && b.argument && b.body
+                ? [{ label: "Edit draft copy", onSelect: () => setEditingCopy(b) }] : []),
               { label: "View brief", onSelect: () => setViewing(b) },
               { label: "Archive", busyLabel: "Archiving…", onSelect: () => void archiveBrief(b) },
               { label: "Delete", destructive: true, busyLabel: "Deleting…", onSelect: () => void deleteBrief(b) },
@@ -259,6 +269,32 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
           />,
         ])}
       />
+
+      {editingCopy && <FormModal
+        open title="Edit draft copy" submitLabel="Save brief"
+        fields={[
+          { name: "argument", label: "Argument", kind: "textarea", rows: 6, required: true },
+          { name: "script", label: "Script", kind: "textarea", rows: 8, required: true },
+        ]}
+        initialValues={{ argument: editingCopy.argument ?? "", script: editingCopy.script ?? "" }}
+        onClose={() => setEditingCopy(null)}
+        onSubmit={async values => {
+          if (!clientId || !editingCopy.body || !editingCopy.script || !editingCopy.argument) {
+            throw new Error("The source brief is unavailable.");
+          }
+          const copy = { argument: String(values.argument), script: String(values.script) };
+          const body = revisedBriefBody(editingCopy.body, {
+            script: editingCopy.script, argument: editingCopy.argument,
+          }, copy);
+          const { data, error } = await supabase.from("client_briefs").update({ ...copy, body })
+            .eq("client_id", clientId).eq("id", editingCopy.id).eq("updated_at", editingCopy.updated_at)
+            .eq("purpose", "client").eq("media_type", "text").eq("status", "draft").is("archived_at", null)
+            .select("id").maybeSingle();
+          if (error) throw new Error(error.message);
+          if (!data) throw new Error("The brief changed or is unavailable for editing. Refresh before saving.");
+        }}
+        onSaved={() => { setNotice("Brief saved."); void refresh(); }}
+      />}
 
       <BriefDetailModal brief={viewing} open={viewing !== null} onClose={() => setViewing(null)} />
 
