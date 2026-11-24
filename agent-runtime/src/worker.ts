@@ -5,6 +5,7 @@
 // up once lease_until passes. There is deliberately no reconciler — the
 // lease IS the recovery mechanism.
 
+import { AgentBudget, hardBudget, HardBudgetHold } from "./orchestration/hard-budget.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "./config.js";
 import {
@@ -100,6 +101,16 @@ export async function runOneJob(
   }
 
   const agent = await getAgent(sb, job.agent_key);
+  const budget = job.hard_budget_required ? new AgentBudget(sb, job, leaseOwner) : undefined;
+  if (budget) {
+    try {
+      await budget.prepare(config.model);
+    } catch (error) {
+      if (!(error instanceof HardBudgetHold)) throw error;
+      await holdBudgetLease(sb, job, leaseOwner, error);
+      return;
+    }
+  }
   await markJobRunning(sb, job.id, leaseOwner);
   await appendEvent(sb, job.id, `${agent.name} started.`, "info", { agent_key: job.agent_key });
 
@@ -107,7 +118,10 @@ export async function runOneJob(
     job.agent_key);
 
   try {
-    const result = await dispatchJob(sb, config, agent, job);
+    const run = () => dispatchJob(sb, config, agent, job);
+    const result = budget
+      ? await hardBudget.run(budget, run).finally(() => budget.finish())
+      : await run();
     renewal.stop();
 
     if (result.ok) {
@@ -154,6 +168,10 @@ export async function runOneJob(
     }
   } catch (error) {
     renewal.stop();
+    if (error instanceof HardBudgetHold) {
+      await holdBudgetLease(sb, job, leaseOwner, error);
+      return;
+    }
     const message = error instanceof Error ? error.message : String(error);
     // An unexpected throw is retryable while attempts remain — the next
     // claim will pick it up rather than losing the work.
@@ -230,4 +248,15 @@ function startLeaseRenewal(
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Do not pause a newer claimant if a reservation response arrived after expiry.
+async function holdBudgetLease(sb: SupabaseClient, job: AgentJobRow, owner: string, hold: HardBudgetHold) {
+  const { error, count } = await sb.from("agent_jobs").update({
+    status: "paused", error: hold.message, hard_budget_retry_usd: hold.requiredUsd ?? -1, lease_owner: null, lease_until: null,
+    started_at: null, completed_at: null, terminal: false,
+  }, { count: "exact" }).eq("id", job.id).eq("lease_owner", owner).eq("attempts", job.attempts)
+    .in("status", ["claimed","running"]);
+  if (error || count !== 1) throw new Error("Could not hold the current budget lease.");
+  await appendEvent(sb, job.id, hold.message, "warn", { held: true });
 }

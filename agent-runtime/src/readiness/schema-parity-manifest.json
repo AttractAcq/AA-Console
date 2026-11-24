@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "9c7ab7416d3eb3666c83d69dc60994e48a6ef4bd58fe188855b3a63df16ee2c0",
-  "generatedTypesSha256": "620a364cdf1409fecf87a37d22c980e49fa745dc607afc100e791ad7b160fba6",
-  "generatedSchemaBodySha256": "ebfd59270e0e9d4a1115ae72496f1b22310c7628664662638857cb88f3df8247",
+  "migrationSourceDigest": "145508152277aad6b791ffbaa80560e635d58270d8662c20543324ec4696e8c5",
+  "generatedTypesSha256": "6aae8adcb43ef6c52d5eeb31225b2bb2b0162d24e05a977c8362067913cd6620",
+  "generatedSchemaBodySha256": "ac832da24c278998b3d15763a3985b66f8c6ff12ee50e2946f064f624814afaf",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -5036,6 +5036,13 @@
       "filename": "20261124061700_702_scoped_profile_execution_reads.sql",
       "sha256": "62e72b7fec0b81c27fa1de8f3d25e3b7a784181e9049cec78700f581576caa53",
       "trimmedMd5": "e1e882b706670e5f42b28e23a4c1da28"
+    },
+    {
+      "version": "20261124061800",
+      "name": "703_worker_hard_budget",
+      "filename": "20261124061800_703_worker_hard_budget.sql",
+      "sha256": "3244b82175331ca7a119ec0a0f13583b01291443f4757416b0e128a624eb8182",
+      "trimmedMd5": "2d379e449028284be2f239c639d455f5"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

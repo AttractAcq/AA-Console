@@ -16,6 +16,7 @@ export interface AgentJobRow {
   max_attempts: number;
   lease_owner: string | null;
   lease_until: string | null;
+  hard_budget_required?: boolean;
 }
 
 export interface JobUsage {

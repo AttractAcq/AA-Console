@@ -12,6 +12,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "../logging/logger.js";
+import { hardBudget, OUTPUT_TOKEN_LIMIT, strictUsageUsd } from "../orchestration/hard-budget.js";
 import { estimateCostUsd, type TokenUsage } from "../usage/cost.js";
 
 import { missingStrictObjectClosures, unsupportedStrictKeywords } from "./schema.js";
@@ -128,7 +129,10 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
   // the expiry that is supposed to recover a wedged job never fires. This is
   // the bound that makes the call eventually fail instead.
   const timeoutMs = options.timeoutMs ?? 600_000;
-  const client = new Anthropic({ apiKey, maxRetries: 2, timeout: timeoutMs });
+  const budget = hardBudget.getStore();
+  const client = new Anthropic({ apiKey, maxRetries: budget ? 0 : 2, timeout: timeoutMs,
+    ...(budget ? { baseURL: "https://api.anthropic.com", fetchOptions: { redirect: "error" as const } } : {}),
+  });
 
   // Checked before the request, because the API's refusal names a keyword and
   // not the agent that carries it — and because retrying sends exactly the
@@ -193,6 +197,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       );
     }
 
+    const reservedTurn = await budget?.beforeCall(model, enableWebSearch ? maxSearches : 0);
     let response: Anthropic.Messages.Message;
     try {
       // A hard bound on this request, including the SDK's own retries: an
@@ -204,7 +209,8 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       const stream = client.messages.stream(
         {
           model,
-          max_tokens: 32000,
+          max_tokens: OUTPUT_TOKEN_LIMIT,
+          ...(budget ? { service_tier: "standard_only" as const, inference_geo: "global" } : {}),
           system,
           messages,
           tools,
@@ -220,6 +226,9 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       throw new ProviderError(message, retryable, usageWithCost());
     }
 
+    if (budget && reservedTurn !== undefined) {
+      await budget.settle(reservedTurn, strictUsageUsd(response.usage, enableWebSearch));
+    }
     totals.inputTokens += response.usage.input_tokens ?? 0;
     totals.outputTokens += response.usage.output_tokens ?? 0;
     totals.cacheReadTokens = (totals.cacheReadTokens ?? 0) + (response.usage.cache_read_input_tokens ?? 0);

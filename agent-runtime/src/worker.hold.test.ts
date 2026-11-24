@@ -55,6 +55,7 @@ function database() {
         return chain;
       },
       eq: () => chain,
+      in: () => chain,
       then: (resolve: (v: unknown) => unknown) =>
         Promise.resolve({ error: null, count: 1 }).then(resolve),
     });
@@ -144,4 +145,20 @@ describe("a job that worked", () => {
     expect(rpc).not.toHaveBeenCalledWith("pause_agent_job", expect.anything());
     expect(failSlot).not.toHaveBeenCalled();
   });
+});
+
+it("holds hard-budget work before dispatch when the reservation cannot be read", async () => {
+  const { sb, rpc, updates } = database();
+  rpc.mockRejectedValueOnce(new Error("fixture transport failure"));
+  await runOneJob(sb, { ...config, model: "claude-opus-5" }, { ...JOB, agent_key: "icp", hard_budget_required: true }, "owner");
+  expect(dispatchJob).not.toHaveBeenCalled();
+  expect(updates).toEqual([expect.objectContaining({ status: "paused", lease_owner: null })]);
+});
+
+it("holds an unpriced agent before it can reach any provider", async () => {
+  const { sb, rpc, updates } = database();
+  await runOneJob(sb, config, { ...JOB, hard_budget_required: true }, "owner");
+  expect(dispatchJob).not.toHaveBeenCalled();
+  expect(rpc).not.toHaveBeenCalled();
+  expect(updates[0]?.status).toBe("paused");
 });
