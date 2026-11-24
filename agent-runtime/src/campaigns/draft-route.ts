@@ -179,6 +179,7 @@ ${
 Call ${SUBMIT_TOOL.name} once when you are done.`;
 
     const result = await runAgentLoop({
+      directClient: { db: sb, id: clientId },
       apiKey: anthropicKeyForAgent(config, "campaign_draft"),
       model: config.model,
       timeoutMs: config.providerTimeoutMs,

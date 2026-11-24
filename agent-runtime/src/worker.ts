@@ -104,7 +104,8 @@ export async function runOneJob(
   const budget = job.hard_budget_required ? new AgentBudget(sb, job, leaseOwner) : undefined;
   if (budget) {
     try {
-      await budget.prepare(config.model);
+      const model = await budget.prepare(config.model);
+      if (model !== config.model) config = { ...config, model };
     } catch (error) {
       if (!(error instanceof HardBudgetHold)) throw error;
       await holdBudgetLease(sb, job, leaseOwner, error);

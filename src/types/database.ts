@@ -42273,6 +42273,10 @@ export type Database = {
         Args: { p_recipient_id: string }
         Returns: string
       }
+      client_model_budget_policy: {
+        Args: { p_client_id: string }
+        Returns: string
+      }
       client_money_currency_breakdown: {
         Args: { p_client_id: string; p_since: string; p_until: string }
         Returns: {

@@ -153,6 +153,7 @@ async function runWidgetTurn(options: {
   budget?: { allowed: boolean; reason: string; reservation_id: string | null };
   settlement?: { data: boolean | null; error: Error | null };
   providerFailure?: boolean;
+  clientPolicy?: string;
 } = {}) {
   if (options.providerFailure) provider.create.mockResolvedValue({ usage: null, content: [] });
   else provider.create.mockResolvedValue({
@@ -183,6 +184,7 @@ async function runWidgetTurn(options: {
     order.push(name);
     if (name === "admit_public_route_v6") return { data: true, error: null };
     if (name === "resolve_sales_deployment") return { data: [deployment], error: null };
+    if (name === "client_model_budget_policy") return { data: options.clientPolicy ?? "legacy", error: null };
     if (name === "reserve_sales_runtime_v6") return { data: [options.budget ?? { allowed: true, reason: "ok", reservation_id: "reserve-1" }], error: null };
     if (name === "settle_sales_runtime_v6") return options.settlement ?? { data: false, error: null };
     return { data: null, error: null };
@@ -271,4 +273,11 @@ describe("WIDGET_SOURCE", () => {
   it("scopes itself in a shadow root so it cannot fight the page's CSS", () => {
     expect(WIDGET_SOURCE).toContain("attachShadow");
   });
+});
+
+it("holds enrolled sales clients before the daily quota or provider can be used", async () => {
+  const { order } = await runWidgetTurn({ clientPolicy: "reserved" });
+  expect(order).toContain("client_model_budget_policy");
+  expect(order).not.toContain("reserve_sales_runtime_v6");
+  expect(provider.create).not.toHaveBeenCalled();
 });

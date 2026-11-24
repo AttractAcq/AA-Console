@@ -6,7 +6,8 @@ revoke all on schema agent_budget_private from public, anon, authenticated, serv
 create table agent_budget_private.caps (
   client_id uuid not null references public.clients(id),
   month date not null check (extract(day from month)=1),
-  ceiling_usd numeric(12,6) not null check (ceiling_usd >= 0 and ceiling_usd < 'Infinity'),
+  ceiling_usd numeric(12,6) not null default 100 check (ceiling_usd between 0 and 100),
+  market_model text check (market_model='claude-sonnet-4-6'),
   reservation_revision bigint not null default 0,
   primary key (client_id,month)
 );
@@ -63,6 +64,19 @@ begin
 end $$;
 create trigger guard_hard_budget_claim before insert or update of status on public.agent_jobs
 for each row when (new.status in ('claimed','running')) execute function agent_budget_private.guard_claim();
+
+-- Read by the service before client-scoped synchronous provider calls and
+-- before selecting the enrolled Market model. A missing month stays enrolled.
+create function public.client_model_budget_policy(p_client_id uuid) returns text
+language plpgsql stable security definer set search_path=pg_catalog as $$
+begin
+  if auth.role() is distinct from 'service_role' or p_client_id is null then raise insufficient_privilege; end if;
+  if not exists(select 1 from agent_budget_private.caps c where c.client_id=p_client_id) then return 'legacy'; end if;
+  return coalesce((select c.market_model from agent_budget_private.caps c where c.client_id=p_client_id
+    and c.month=date_trunc('month',now() at time zone 'UTC')::date),'reserved');
+end $$;
+revoke all on function public.client_model_budget_policy(uuid) from public,anon,authenticated;
+grant execute on function public.client_model_budget_policy(uuid) to service_role;
 
 -- Turn zero reserves the first call before running. Immediately before sending,
 -- replace it with turn one. Further turns and queue retries each reserve anew.

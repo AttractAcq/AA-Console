@@ -38,7 +38,7 @@ const JOB = {
 function database() {
   const updates: Array<Record<string, unknown>> = [];
   const events: Array<Record<string, unknown>> = [];
-  const rpc = vi.fn(async () => ({ data: null, error: null }));
+  const rpc = vi.fn(async (_name: string, _args: unknown) => ({ data: null as string | null, error: null as { message: string } | null }));
   const from = vi.fn((table: string) => {
     if (table === "agent_job_events") {
       return {
@@ -161,4 +161,26 @@ it("holds an unpriced agent before it can reach any provider", async () => {
   expect(dispatchJob).not.toHaveBeenCalled();
   expect(rpc).not.toHaveBeenCalled();
   expect(updates[0]?.status).toBe("paused");
+});
+
+it("dispatches Market with its reserved tenant model without changing the shared worker config", async () => {
+  const { sb, rpc } = database();
+  const settings = { ...config, model: "claude-opus-5" };
+  rpc.mockResolvedValueOnce({ data: "claude-sonnet-4-6", error: null });
+  dispatchJob.mockResolvedValue({ ok: true, retryable: false });
+  const job = { ...JOB, agent_key: "market", hard_budget_required: true };
+  await runOneJob(sb, settings, job, "owner");
+  expect(rpc).toHaveBeenCalledWith("client_model_budget_policy", { p_client_id: job.client_id });
+  expect(rpc).toHaveBeenCalledWith("reserve_agent_budget_turn", expect.objectContaining({ p_usd: 67.86456 }));
+  expect(dispatchJob).toHaveBeenCalledWith(sb, expect.objectContaining({ model: "claude-sonnet-4-6" }), expect.anything(), job);
+  expect(settings.model).toBe("claude-opus-5");
+});
+
+it("holds Market before dispatch if the approved model reservation does not fit", async () => {
+  const { sb, rpc, updates } = database();
+  rpc.mockResolvedValueOnce({ data: "claude-sonnet-4-6", error: null })
+    .mockResolvedValueOnce({ data: null, error: { message: "Hard cap: call requires USD 67.86456, available USD 50" } });
+  await runOneJob(sb, { ...config, model: "claude-opus-5" }, { ...JOB, agent_key: "market", hard_budget_required: true }, "owner");
+  expect(dispatchJob).not.toHaveBeenCalled();
+  expect(updates[0]).toMatchObject({ status: "paused", hard_budget_retry_usd: 67.86456 });
 });

@@ -1,24 +1,30 @@
-# Opt-in monthly worker budget
+# Monthly agent budget
 
-This control applies to AA Console agent jobs. Enrollment requires a reviewed database change after deploying compatible workers. The migration enrolls zero clients. PR 448 has its own release approval.
+The AA Console ceiling is USD 100 per enrolled client per UTC calendar month. The first rollout is the November 2026 QA client. Migration 20261124061800 creates the controls and enrolls zero clients.
 
-## Enrollment and release
+## Release and enrollment
 
-1. Identify the intended Console tenant and UTC budget month. Verify its authorized maximum and its existing Account budget. Enroll before the first worker attempt in the month. Check any non-queue AI surfaces separately before claiming an account-wide limit. The QA exercise uses the agent queue only.
-2. Apply the reviewed migration, release the compatible worker and verify the Railway revision and heartbeat through the existing release process. A fresh claim carries the database's enrollment decision. The database refuses an older worker's transition to running for an enrolled client without an attempt reservation.
-3. A database administrator inserts the exact client UUID, first day of the month and approved USD ceiling into `agent_budget_private.caps`. The effective cap is the lower of this ceiling and the existing `client_engine_budgets` amount. An enrolled client with a missing month or Account cap is held. The pilot's authorized ceiling is USD 10 in November 2026.
-4. Verify `client_budget_state` as an authorized operator. Posted spend includes settled provider turns across all attempts. Remaining funds also deduct outstanding reservations. Review the next agent's reservation before submitting any job. Check existing job IDs before retrying.
+1. Obtain release approval for the Discovery repair and the spending control. Check the Console Supabase ref and Railway environment before each change. Apply the migration before rolling the worker. Verify the actual worker revision on every replica and confirm the frontend's release identity.
+2. Verify the intended client, month and Account budget. Enroll before its first paid action that month. Check for active or historical worker attempts, direct client chat or draft calls, public sales traffic and outstanding provider work. Quiesce those routes during enrollment. If a previous call has an unresolved cost, hold enrollment for reconciliation.
+3. Insert the verified client UUID and the first day of the month into `agent_budget_private.caps`. The private ceiling defaults to USD 100. A lower Account cap or private ceiling takes precedence. For QA Market research, set `market_model` to `claude-sonnet-4-6` on that monthly row. The selection applies only to Market for that tenant and month. A missing month or Account budget holds enrolled work.
+4. Verify `client_budget_state` with the operator's credentials and check the matching private receipts. The remaining balance equals the effective cap less settled usage and open reservations. Verify the active scope, current worker, available balance and any existing job before submitting or retrying. Expand enrollment only after QA passes.
 
-## Provider coverage
+## Discovery prerequisites and reservations
 
-The priced path is the standard global Anthropic Messages API using `claude-opus-5`. The reviewed agents are Market, ICP, Offer Strategy, Opportunity Discovery, Evaluation and Strategy, Offer Compile and Campaign Plan. Other runners and model IDs hold for opted-in clients. Revalidate model pricing, tool charges and sampling limits before activation or changing provider configuration.
+Console's Discovery enqueue checks for completed Market and ICP jobs for the selected client. A saved section supplies content. A source review cannot produce the required job receipt. The supported Market agent researches public sources. The QA model selection preserves its prompt, structured submission and 15-search limit.
 
-Each text-only call reserves USD 7.3536. This covers 1,048,576 input tokens at up to the default five-minute cache-write rate and 32,000 output tokens. The request does not opt into one-hour caching. The reservation is conservative and independent of prompt size. [Opus 5 limits and prices](https://platform.claude.com/docs/en/models/opus-5/overview)
+| Request | Model | Maximum reservation per provider call |
+|---|---|---:|
+| Market with web search | Opus 5 | USD 113.0076 |
+| Market with web search, QA configuration | Sonnet 4.6 | USD 67.86456 |
+| Text-only workflow with the default model | Opus 5 | USD 7.3536 |
 
-Market's 15-search configuration reserves USD 113.0076 per request. The bound allows ten server sampling iterations, a full context at the higher cache-write rate and maximum output on each iteration, plus the search charge. A single HTTP request can incur token charges while the server continues searching. At USD 10 available this configuration must hold, with a reservation shortfall of USD 103.0076. These amounts are upper bounds. [Server sampling limit](https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons) · [Search billing](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool)
+The research bound allows ten server sampling iterations, each with a full 1,048,576-token input at the higher cache-write tariff and 32,000 output tokens, plus up to 15 paid searches. The standard text-only request uses one iteration and the five-minute write tariff. Each new Messages request requires another reservation. [Opus 5 pricing](https://platform.claude.com/docs/en/models/opus-5/overview) · [Sonnet 4.6 pricing](https://platform.claude.com/docs/en/models/sonnet-4-6/overview) · [Server iteration limit](https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons) · [Search billing](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool)
 
-## Receipts and recovery
+## Coverage and recovery
 
-Turn zero reserves before worker dispatch. Turn one atomically replaces it immediately before the first provider request. Each subsequent turn and queue retry reserves independently against the same locked monthly allowance. SDK retries and redirects are disabled for enrolled jobs. Standard global inference is explicit. Incomplete usage, a lost provider response or an unconfirmed settlement retains the full sent reservation. Confirmed usage settles in microdollars, rounded upward, using the upper cache-write tariff for unsplit usage.
+Market, ICP, Offer Strategy, Opportunity Discovery, Evaluation, Opportunity Strategy, Offer Compile and Campaign Plan use the shared reservation protocol. Other queue agents hold before dispatch. Client-scoped direct draft routes, Master chat and the public sales widget check enrollment before provider use and hold enrolled clients. A failed policy lookup holds the request. Revalidate model prices, tool charges and limits before enabling a new configuration.
 
-Insufficient funds hold the job until the required reservation fits. An unpriced request or uncertain receipt requires operator reconciliation. Read the private receipt by client, job, attempt and turn. Review the provider's authoritative usage before releasing any uncertain funds. A process crash or expired lease alone gives no evidence of a zero-cost request. Preserve receipts across worker rollback. Keep the affected client held and verify the production identity before resuming.
+Turn zero reserves before dispatch. The first provider turn atomically replaces it. Every subsequent turn and retry competes for the same client-month balance. The enrolled worker disables SDK retries and redirects and requests standard global inference. An older worker cannot enter running for an enrolled job without the matching dispatch reservation.
+
+A confirmed provider receipt settles token usage by model and cache TTL, plus search charges, rounded upward to a microdollar. Lost responses, incomplete usage and ambiguous settlements retain the sent reservation. Inspect receipts by client, job, attempt and turn before retrying. Reconcile against provider records before releasing any uncertain charge. Preserve the private ledger on rollback and hold the client until production identity and enforcement are verified.

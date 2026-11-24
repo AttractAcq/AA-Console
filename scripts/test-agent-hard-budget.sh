@@ -87,4 +87,48 @@ reject "select public.reserve_agent_budget_turn('$id1',2,'worker-1',0,1)" 'no ro
 [[ $(pg -c "set role service_role; select capped and cap_usd=0 and remaining_usd=0 from public.client_budget_state('00000000-0000-0000-0000-000000000001')") == t ]]
 [[ $(pg -c "set role authenticated; select count(*) from public.client_budget_state('00000000-0000-0000-0000-000000000001')") == 0 ]]
 [[ $(pg -c "set role service_role; select capped and cap_usd=10 and remaining_usd=10 from public.client_budget_state('00000000-0000-0000-0000-000000000002')") == t ]]
+pg <<'SQL'
+do $$
+declare
+  tenant uuid := '00000000-0000-0000-0000-000000000003';
+  market uuid := '10000000-0000-0000-0000-000000000004';
+  icp uuid := '10000000-0000-0000-0000-000000000005';
+  month_start date := date_trunc('month',now() at time zone 'UTC')::date;
+  balance record;
+begin
+  insert into clients values (tenant);
+  insert into client_engine_budgets values (tenant,month_start,100);
+  begin
+    insert into agent_budget_private.caps(client_id,month,ceiling_usd) values(tenant,month_start,101);
+    raise exception 'accepted an excessive cap';
+  exception when check_violation then null;
+  end;
+  insert into agent_budget_private.caps(client_id,month,market_model) values(tenant,month_start,'claude-sonnet-4-6');
+  insert into agent_jobs(id,client_id,agent_key,attempts,status,lease_owner,lease_until)
+    values(market,tenant,'market',1,'claimed','worker',now()+interval '1 hour'),
+          (icp,tenant,'icp',1,'claimed','worker',now()+interval '1 hour');
+  if has_function_privilege('anon','public.client_model_budget_policy(uuid)','execute')
+    or has_function_privilege('authenticated','public.client_model_budget_policy(uuid)','execute') then
+    raise exception 'unexpected policy access';
+  end if;
+  set local role service_role;
+  if public.client_model_budget_policy(tenant) <> 'claude-sonnet-4-6'
+    or public.client_model_budget_policy('00000000-0000-0000-0000-000000000001') <> 'reserved'
+    or public.client_model_budget_policy('00000000-0000-0000-0000-000000000002') <> 'legacy' then
+    raise exception 'unexpected policy';
+  end if;
+  perform public.reserve_agent_budget_turn(market,1,'worker',0,67.86456);
+  begin
+    perform public.reserve_agent_budget_turn(icp,1,'worker',0,32.135441);
+    raise exception 'exceeded shared allowance';
+  exception when raise_exception then
+    if sqlerrm not like 'Hard cap: call requires USD %, available USD 32.13544%' then raise; end if;
+  end;
+  perform public.reserve_agent_budget_turn(icp,1,'worker',0,7.3536);
+  select * into strict balance from public.client_budget_state(tenant);
+  if balance.cap_usd<>100 or balance.remaining_usd<>24.78184 or balance.spent_usd<>0 then
+    raise exception 'incorrect cross-agent available or settled balance';
+  end if;
+end $$;
+SQL
 echo 'PASS isolated PostgreSQL concurrent reservations, usage settlement, unknown-outcome retry, missing cap, legacy worker and tenant scoping.'

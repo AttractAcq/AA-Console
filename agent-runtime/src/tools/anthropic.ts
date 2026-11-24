@@ -12,7 +12,8 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "../logging/logger.js";
-import { hardBudget, OUTPUT_TOKEN_LIMIT, strictUsageUsd } from "../orchestration/hard-budget.js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { hardBudget, OUTPUT_TOKEN_LIMIT, requireDirectModelAccess, strictUsageUsd } from "../orchestration/hard-budget.js";
 import { estimateCostUsd, type TokenUsage } from "../usage/cost.js";
 
 import { missingStrictObjectClosures, unsupportedStrictKeywords } from "./schema.js";
@@ -24,6 +25,7 @@ export interface SubmitToolSpec {
 }
 
 export interface AgentLoopOptions {
+  directClient?: { db: SupabaseClient; id: string };
   apiKey: string;
   /** Per-request timeout. Defaults to ten minutes if a caller omits it. */
   timeoutMs?: number;
@@ -197,6 +199,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       );
     }
 
+    if (options.directClient) await requireDirectModelAccess(options.directClient.db, options.directClient.id);
     const reservedTurn = await budget?.beforeCall(model, enableWebSearch ? maxSearches : 0);
     let response: Anthropic.Messages.Message;
     try {
@@ -227,7 +230,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     }
 
     if (budget && reservedTurn !== undefined) {
-      await budget.settle(reservedTurn, strictUsageUsd(response.usage, enableWebSearch));
+      await budget.settle(reservedTurn, strictUsageUsd(model, response.usage, enableWebSearch));
     }
     totals.inputTokens += response.usage.input_tokens ?? 0;
     totals.outputTokens += response.usage.output_tokens ?? 0;
