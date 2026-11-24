@@ -255,6 +255,34 @@ export async function fetchBaselineServices(clientId: string) {
   return data ?? [];
 }
 
+export async function fetchRequirementProof(clientId: string, opportunityId: string) {
+  const [requirements, permission] = await Promise.all([
+    supabase.from("opportunity_proof_requirements")
+      .select("id,requirement,proof_id,proof:client_proof_assets!opportunity_proof_requirements_proof_id_fkey(ref_number,title)")
+      .eq("client_id", clientId).eq("opportunity_id", opportunityId).order("created_at").order("id"),
+    supabase.rpc("can_shape_opportunity", { p_client_id: clientId }),
+  ]);
+  if (requirements.error) throw new Error(requirements.error.message);
+  if (permission.error) throw new Error(permission.error.message);
+  const choices: { id: string; ref_number: string | null; title: string | null }[] = [];
+  if (permission.data && requirements.data.some((row) => !row.proof_id)) {
+    const today = new Date().toISOString().slice(0, 10);
+    const assets = await supabase.from("client_proof_assets").select("id,ref_number,title")
+      .eq("client_id", clientId).eq("usage_rights", "approved")
+      .or(`expires_on.is.null,expires_on.gte.${today}`).order("ref_number").order("id");
+    if (assets.error) throw new Error(assets.error.message);
+    choices.push(...assets.data);
+  }
+  return { requirements: requirements.data, choices };
+}
+
+export async function satisfyProof(requirementId: string, proofId: string) {
+  const { error } = await supabase.rpc("satisfy_opportunity_proof_v6", {
+    p_requirement_id: requirementId, p_proof_id: proofId,
+  });
+  if (error) throw new Error(error.message);
+}
+
 export async function linkOpportunity(id: string, role: string, targetId: string): Promise<void> {
   const { error } = await supabase.rpc("link_opportunity_v6", {
     p_opportunity_id: id, p_role: role, p_target_id: targetId,

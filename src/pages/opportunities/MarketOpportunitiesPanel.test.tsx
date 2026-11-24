@@ -23,6 +23,7 @@ const {
   fetchOpportunities,
   fetchOpportunityOutputs,
   fetchBaselineServices,
+  fetchRequirementProof,
   fetchReadiness,
   fetchOpportunityApprovalStates,
   fetchOpportunityActivationStates,
@@ -44,6 +45,7 @@ const {
   fetchOpportunities: vi.fn(),
   fetchOpportunityOutputs: vi.fn(),
   fetchBaselineServices: vi.fn(),
+  fetchRequirementProof: vi.fn(),
   fetchReadiness: vi.fn(),
   fetchOpportunityApprovalStates: vi.fn(),
   fetchOpportunityActivationStates: vi.fn(),
@@ -69,6 +71,7 @@ vi.mock("../../lib/opportunities", async () => {
   return {
     ...actual,
     fetchBaselineServices,
+    fetchRequirementProof,
     createCampaignFromOpportunity,
     fetchOpportunityOfferVersions,
     fetchOpportunities,
@@ -138,7 +141,9 @@ const readiness = (over: Record<string, unknown> = {}) =>
 beforeEach(() => {
   vi.clearAllMocks();
   search.value = "";
+  fetchStageTemplates.mockResolvedValue([]);
   fetchBaselineServices.mockResolvedValue([]);
+  fetchRequirementProof.mockResolvedValue({ requirements: [], choices: [] });
   fetchOpportunities.mockResolvedValue([opportunity()]);
   fetchOpportunityOutputs.mockResolvedValue(new Map());
   fetchReadiness.mockResolvedValue(readiness());
@@ -158,6 +163,40 @@ beforeEach(() => {
 });
 
 describe("single-page opportunity flow", () => {
+  it("links cleared proof to the selected requirement and reads back its saved state", async () => {
+    search.value = "opportunity=opp-1&stage=strategize";
+    const item = { id: "req-1", requirement: "Show the route", proof_id: null, proof: null };
+    const other = { ...item, id: "req-2", requirement: "Show the plan" };
+    const asset = { id: "proof-2", ref_number: "PF-002", title: "Example" };
+    fetchRequirementProof.mockResolvedValue({ requirements: [item, other], choices: [asset] });
+    const user = userEvent.setup();
+    render(<MarketOpportunitiesPanel />);
+    const requirement = await screen.findByRole("group", { name: "Show the route" });
+    await user.selectOptions(within(requirement).getByRole("combobox"), "proof-2");
+    fetchRequirementProof.mockResolvedValue({
+      requirements: [{ ...item, proof_id: "proof-2", proof: asset }, other], choices: [asset],
+    });
+    await user.click(within(requirement).getByRole("button", { name: "Link proof" }));
+    expect(rpc).toHaveBeenCalledWith("satisfy_opportunity_proof_v6", {
+      p_requirement_id: "req-1", p_proof_id: "proof-2",
+    });
+    expect(await screen.findByText("Satisfied · PF-002 · Example")).toBeInTheDocument();
+    expect(within(screen.getByRole("group", { name: "Show the plan" })).getByText("Open")).toBeInTheDocument();
+    expect(fetchRequirementProof).toHaveBeenCalledWith("client-1", "opp-1");
+  });
+
+  it("shows an open requirement without a link action when there is no eligible proof", async () => {
+    search.value = "opportunity=opp-1&stage=strategize";
+    fetchRequirementProof.mockResolvedValue({
+      requirements: [{ id: "req-1", requirement: "Show the route", proof_id: null, proof: null }],
+      choices: [],
+    });
+    render(<MarketOpportunitiesPanel />);
+    const group = await screen.findByRole("group", { name: "Show the route" });
+    expect(within(group).getByText("Open")).toBeInTheDocument();
+    expect(within(group).queryByRole("button")).not.toBeInTheDocument();
+  });
+
   it("can link a baseline service to a discovered opportunity and refresh its readiness", async () => {
     search.value = "opportunity=opp-1";
     fetchOpportunities.mockResolvedValue([opportunity({ status: "discovered", confidence: "hypothesis" })]);

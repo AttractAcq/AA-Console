@@ -18,7 +18,7 @@ import {
   fetchEvaluationInputHash, fetchStrategyReviewHash, rejectProposal,
   requestEvaluation, requestStrategy,
   fetchOpportunities, fetchOpportunityOutputs, fetchOpportunityApprovalStates, fetchOpportunityActivationStates,
-  fetchReadiness, fetchScoreFactors, requireProof, scoreOpportunity,
+  fetchReadiness, fetchScoreFactors, requireProof, fetchRequirementProof, satisfyProof, scoreOpportunity,
   fetchStageTemplates, setStageTemplate, requestOpportunityApproval, requestOpportunityActivation,
   setAttributes, setAwarenessStage, setConfidence, setFields, setStatus,
   type Opportunity, type OpportunityConfidence, type OpportunityOutputs, type OpportunityProposal,
@@ -277,7 +277,7 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
             <>
               {proposals.filter((proposal) => proposal.opportunity_id === selected.id && proposal.kind === "strategy")
                 .map((proposal) => <StrategyProposalReview key={proposal.id} proposal={proposal} busy={busy === proposal.id} onAct={act} />)}
-              <StrategizeView opportunity={selected} busy={busy === selected.id} onAct={act} />
+              <StrategizeView key={selected.id} opportunity={selected} busy={busy === selected.id} onAct={act} />
             </>
           )}
         </section>
@@ -304,7 +304,7 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
         <>
           {proposals.filter((proposal) => proposal.opportunity_id === selected.id && proposal.kind === "strategy")
             .map((proposal) => <StrategyProposalReview key={proposal.id} proposal={proposal} busy={busy === proposal.id} onAct={act} />)}
-          <StrategizeView opportunity={selected} busy={busy === selected.id} onAct={act} />
+          <StrategizeView key={selected.id} opportunity={selected} busy={busy === selected.id} onAct={act} />
         </>
       )}
       {view === "activate" && (
@@ -1236,6 +1236,18 @@ function StrategizeView({
   const [mindset, setMindset] = useState("");
   const [message, setMessage] = useState("");
   const [requirement, setRequirement] = useState("");
+  const [proofRows, setProofRows] = useState<Awaited<ReturnType<typeof fetchRequirementProof>> | null>(null);
+  const [proofError, setProofError] = useState("");
+  const [proofRevision, setProofRevision] = useState(0);
+  useEffect(() => {
+    let current = true;
+    void fetchRequirementProof(opportunity.client_id, opportunity.id).then(
+      (data) => { if (current) { setProofRows(data); setProofError(""); } },
+      (err) => { if (current) setProofError(err instanceof Error ? err.message : "Could not read proof requirements."); },
+    );
+    return () => { current = false; };
+  }, [opportunity.client_id, opportunity.id, proofRevision]);
+
 
   return (
     <div className="grid gap-5 lg:grid-cols-2">
@@ -1378,6 +1390,41 @@ function StrategizeView({
             A requirement with no proof against it is a gap, and a gap is a job rather than a
             silence. It blocks approval until it is captured or the claim changes.
           </p>
+          {proofError && <p role="alert">{proofError}</p>}
+          {proofRows?.requirements.map((row) => (
+            <fieldset key={row.id} className="space-y-2 rounded border border-border p-3" disabled={busy}>
+              <legend>{row.requirement}</legend>
+              {row.proof_id ? (
+                <p>Satisfied · {[row.proof?.ref_number, row.proof?.title].filter(Boolean).join(" · ") || row.proof_id}</p>
+              ) : (
+                <>
+                  <p>Open</p>
+                  {proofRows.choices.length > 0 && (
+                    <form onSubmit={(event) => {
+                      event.preventDefault();
+                      const id = String(new FormData(event.currentTarget).get("proof") ?? "");
+                      if (!proofRows.choices.some((asset) => asset.id === id)) return;
+                      void onAct(opportunity.id, async () => {
+                        await satisfyProof(row.id, id);
+                        setProofRows(null);
+                        setProofRevision((value) => value + 1);
+                      }, "Proof linked.");
+                    }}>
+                      <label className="text-sm">Cleared proof
+                        <select name="proof" required defaultValue="" className="mx-2 rounded border border-border bg-background p-2">
+                          <option value="">Choose proof</option>
+                          {proofRows.choices.map((asset) => <option key={asset.id} value={asset.id}>
+                            {[asset.ref_number, asset.title].filter(Boolean).join(" · ") || asset.id}
+                          </option>)}
+                        </select>
+                      </label>
+                      <button type="submit" className="rounded border border-border px-3 py-2 text-sm">Link proof</button>
+                    </form>
+                  )}
+                </>
+              )}
+            </fieldset>
+          ))}
           <input
             aria-label="Proof requirement"
             placeholder="A completed garage conversion with costs"
@@ -1393,6 +1440,8 @@ function StrategizeView({
                 opportunity.id,
                 async () => {
                   await requireProof(opportunity.id, requirement);
+                  setProofRows(null);
+                  setProofRevision((value) => value + 1);
                   setRequirement("");
                 },
                 "Recorded as a proof gap.",
