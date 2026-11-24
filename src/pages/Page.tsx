@@ -316,6 +316,7 @@ function PageContent({ node, clientId }: { node: NavNode; clientId: string | und
       const next = new URLSearchParams(current);
       if (id === tabs[0].id) next.delete("tab");
       else next.set("tab", id);
+      if (node.id === "content-production-factory" && id !== "create") next.delete("draft");
       if (id !== "assets") {
         next.delete("asset");
         next.delete("library");

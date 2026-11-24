@@ -255,7 +255,7 @@ export function ConceptWorkspace({
       <div>
         <div className="mb-2 flex items-center justify-between gap-2">
           <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Concept
+            {isImage ? "Concept" : "Text draft"}
             {generation.concept_edited_at && (
               <span className="ml-2 rounded-full bg-secondary px-2 py-0.5 text-[0.7rem] font-medium normal-case tracking-normal text-secondary-foreground">
                 edited by hand
@@ -307,7 +307,7 @@ export function ConceptWorkspace({
                 onClick={() => void saveConcept()}
                 className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
               >
-                {busy === "save" ? "Saving…" : "Save concept"}
+                {busy === "save" ? "Saving…" : isImage ? "Save concept" : "Save draft"}
               </button>
               <button
                 type="button"
@@ -318,8 +318,9 @@ export function ConceptWorkspace({
               </button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Saving does not re-render. The next render composes its prompt from this text, so an
-              edit costs nothing until you ask for an image.
+              {isImage
+                ? "The next render uses your saved concept."
+                : "Save updates the working copy. The filed Markdown contains the original render."}
             </p>
           </div>
         ) : (

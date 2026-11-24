@@ -54,7 +54,7 @@ export function ApproveAndBuildModal({
   brief: Brief | null;
   open: boolean;
   onClose: () => void;
-  onDone: () => void;
+  onDone: (route: "ai" | "human") => void;
 }) {
   const { clientId } = useParams<{ clientId: string }>();
   const [route, setRoute] = useState<"ai" | "human" | null>(null);
@@ -200,7 +200,7 @@ export function ApproveAndBuildModal({
         });
         if (rpcError) throw new Error(rpcError.message);
       }
-      onDone();
+      onDone(route === "ai" ? "ai" : "human");
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");

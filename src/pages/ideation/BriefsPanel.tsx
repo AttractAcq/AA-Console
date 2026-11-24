@@ -266,9 +266,10 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
         brief={building}
         open={building !== null}
         onClose={() => setBuilding(null)}
-        onDone={() => {
-          setNotice(
-            "Queued. Follow generated reels under Media → Reel shots. Human assignments appear on the recipient dashboard; email depends on Resend configuration.",
+        onDone={(route) => {
+          setNotice(route === "ai" && building?.media_type === "text"
+            ? "Draft queued. When the build finishes, open Create and select Text to review the draft."
+            : "Queued. Follow generated reels under Media → Reel shots. Human assignments appear on the recipient dashboard; email depends on Resend configuration.",
           );
           void refresh();
         }}

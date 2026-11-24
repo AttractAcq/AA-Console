@@ -168,6 +168,8 @@ function creativeHarness(brief: Record<string, unknown>, generationMedia = "imag
                 return {
                   data: {
                     id: "render-1",
+                    job_id: "job-1",
+                    client_id: "client-1",
                     generation_id: "gen-1",
                     quality: "medium",
                     size: "1024x1536",
@@ -180,6 +182,7 @@ function creativeHarness(brief: Record<string, unknown>, generationMedia = "imag
                 return {
                   data: {
                     id: "gen-1",
+                    client_id: "client-1",
                     brief_id: "brief-1",
                     media_type: generationMedia,
                     quality: "medium",
@@ -316,5 +319,20 @@ describe("creative_build reel stills gate", () => {
     );
     expect(result.failureMessage).toMatch(/No image renderer is configured/);
     expect(result.failureMessage).not.toMatch(/opening still/i);
+  });
+});
+
+describe("hard-budget creative builds", () => {
+  const text = {
+    id: "brief-1", client_id: "client-1", purpose: "client", media_type: "text", content_format: "single",
+  };
+  it.each([
+    { ...text, media_type: "image" }, { ...text, media_type: "video" },
+    { ...text, content_format: "carousel" }, { ...text, client_id: "other-client" },
+    { ...text, purpose: "recruitment" },
+  ])("holds unpriced or mismatched $media_type/$content_format routes before provider access", async brief => {
+    await expect(runCreativeBuildJob(creativeHarness(brief, brief.media_type),
+      runtime, agent, { ...job, hard_budget_required: true }, Date.now() + 1000))
+      .rejects.toThrow("reviewed creative budget bound");
   });
 });

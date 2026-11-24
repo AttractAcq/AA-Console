@@ -21,7 +21,7 @@ import { loadUpstreamRecords } from "../shared.js";
 import { briefSubmitTool, composeBody, composeAvatarBody, composeEditorBody, briefColumns, fieldsFor, framePlanColumns } from "./fields.js";
 import { isMultiFrame } from "../../content/format.js";
 import { loadIdentity, identityWriterBlock } from "../identity.js";
-import { loadUsableProof, renderProof, proofIdForRef } from "../proof.js";
+import { loadUsableProof, loadSelectedBriefProof, renderProof, proofIdForRef } from "../proof.js";
 import { completeMissingFinalReelCaption, reelBriefProblem, reelCopyProblem, reelPlannerNote } from "./shots.js";
 import { brandConceptBlock, loadBrandProfile } from "../creative_build/brand.js";
 import { loadCampaignBriefContext } from "./campaign-context.js";
@@ -163,14 +163,10 @@ export async function runBriefJob(
     return { ok: false, retryable: false, failureMessage: "The idea and job select different proof sources." };
   const pinnedProofId = jobProofId ?? idea.proof_id;
   if (pinnedProofId) {
-    const { data: selected, error: selectedError } = await sb.from("client_proof_assets")
-      .select("*").eq("id", pinnedProofId).eq("client_id", job.client_id).maybeSingle();
-    if (selectedError) throw new Error(selectedError.message);
-    if (!selected || selected.usage_rights !== "approved" || !selected.permission_basis?.trim()
-      || (selected.expires_on && selected.expires_on < new Date().toISOString().slice(0, 10))) {
+    usable = await loadSelectedBriefProof(sb, job.client_id, pinnedProofId);
+    if (!usable.length) {
       return { ok: false, retryable: false, failureMessage: "The selected proof is no longer cleared for production." };
     }
-    usable = [selected];
   }
   const proof = renderProof(usable, { held: held ?? 0 });
 
