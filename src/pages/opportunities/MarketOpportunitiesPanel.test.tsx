@@ -22,6 +22,7 @@ const {
   fetchOpportunityOfferVersions,
   fetchOpportunities,
   fetchOpportunityOutputs,
+  fetchBaselineServices,
   fetchReadiness,
   fetchOpportunityApprovalStates,
   fetchOpportunityActivationStates,
@@ -42,6 +43,7 @@ const {
   fetchOpportunityOfferVersions: vi.fn(),
   fetchOpportunities: vi.fn(),
   fetchOpportunityOutputs: vi.fn(),
+  fetchBaselineServices: vi.fn(),
   fetchReadiness: vi.fn(),
   fetchOpportunityApprovalStates: vi.fn(),
   fetchOpportunityActivationStates: vi.fn(),
@@ -66,6 +68,7 @@ vi.mock("../../lib/opportunities", async () => {
   const actual = await vi.importActual<Record<string, unknown>>("../../lib/opportunities");
   return {
     ...actual,
+    fetchBaselineServices,
     createCampaignFromOpportunity,
     fetchOpportunityOfferVersions,
     fetchOpportunities,
@@ -135,6 +138,7 @@ const readiness = (over: Record<string, unknown> = {}) =>
 beforeEach(() => {
   vi.clearAllMocks();
   search.value = "";
+  fetchBaselineServices.mockResolvedValue([]);
   fetchOpportunities.mockResolvedValue([opportunity()]);
   fetchOpportunityOutputs.mockResolvedValue(new Map());
   fetchReadiness.mockResolvedValue(readiness());
@@ -154,6 +158,30 @@ beforeEach(() => {
 });
 
 describe("single-page opportunity flow", () => {
+  it("can link a baseline service to a discovered opportunity and refresh its readiness", async () => {
+    search.value = "opportunity=opp-1";
+    fetchOpportunities.mockResolvedValue([opportunity({ status: "discovered", confidence: "hypothesis" })]);
+    fetchBaselineServices.mockResolvedValue([{ id: "baseline-1", service_name: "Garage workshop design" }]);
+    const user = userEvent.setup();
+    render(<MarketOpportunitiesPanel />);
+    await user.selectOptions(await screen.findByLabelText("Baseline service"), "baseline-1");
+    await user.click(screen.getByRole("button", { name: "Link service" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("link_opportunity_v6", {
+      p_opportunity_id: "opp-1", p_role: "offer", p_target_id: "baseline-1",
+    }));
+    expect(fetchBaselineServices).toHaveBeenCalledWith("client-1");
+    await waitFor(() => expect(fetchReadiness).toHaveBeenCalledTimes(2));
+  });
+
+  it("opens the selected client's Offer Studio when there is no baseline to link", async () => {
+    search.value = "opportunity=opp-1";
+    fetchOpportunities.mockResolvedValue([opportunity({ status: "discovered" })]);
+    render(<MarketOpportunitiesPanel />);
+    expect(await screen.findByRole("link", { name: "Create a baseline service in Offer Studio" }))
+      .toHaveAttribute("href", "/clients/client-1/delivery/offer-studio?tab=build");
+    expect(screen.queryByRole("button", { name: "Link service" })).not.toBeInTheDocument();
+  });
+
   it("shows linked offers and campaigns on the selected record", async () => {
     search.value = "opportunity=opp-1";
     fetchOpportunityOutputs.mockResolvedValue(new Map([["opp-1", {

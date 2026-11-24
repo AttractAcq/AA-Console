@@ -245,6 +245,16 @@ export async function setAwarenessStage(
   if (error) throw new Error(error.message);
 }
 
+export async function fetchBaselineServices(clientId: string) {
+  const permission = await supabase.rpc("can_shape_opportunity", { p_client_id: clientId });
+  if (permission.error) throw new Error(permission.error.message);
+  if (!permission.data) return null;
+  const { data, error } = await supabase.from("service_offers").select("id,service_name")
+    .eq("client_id", clientId).eq("kind", "main").is("archived_at", null).order("service_name");
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
 export async function linkOpportunity(id: string, role: string, targetId: string): Promise<void> {
   const { error } = await supabase.rpc("link_opportunity_v6", {
     p_opportunity_id: id, p_role: role, p_target_id: targetId,

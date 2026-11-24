@@ -13,7 +13,7 @@ import { dayOrDash } from "../../lib/contentRecords";
 import {
   ATTRIBUTE_KINDS, AWARENESS_STAGES, CLASSIFICATION_HINT, CONFIDENCE_LEVELS,
   createCampaignFromOpportunity,
-  fetchOpportunityOfferVersions,
+  fetchOpportunityOfferVersions, fetchBaselineServices, linkOpportunity,
   acceptScoreProposal, acceptStrategyProposal, fetchOpenProposals,
   fetchEvaluationInputHash, fetchStrategyReviewHash, rejectProposal,
   requestEvaluation, requestStrategy,
@@ -236,6 +236,12 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
               loading={loading}
             />
           )}
+          {clientId === selected.client_id && !loading && !outputsError
+            && (selected.status === "discovered" || selected.status === "validated")
+            && !outputs.get(selected.id)?.offers.length && (
+              <BaselineServiceLink key={selected.id} clientId={selected.client_id} busy={busy !== null}
+                onLink={(serviceId) => act(selected.id, () => linkOpportunity(selected.id, "offer", serviceId), "Baseline service linked.")} />
+            )}
           {detailStage === "activate" && (
             <ActivationDetail
               opportunity={selected}
@@ -436,6 +442,41 @@ export function MarketOpportunitiesPanel({ view }: { view?: View }) {
           void refresh();
         }}
       />
+    </div>
+  );
+}
+
+function BaselineServiceLink({ clientId, busy, onLink }: {
+  clientId: string; busy: boolean; onLink: (serviceId: string) => Promise<void>;
+}) {
+  const [services, setServices] = useState<Array<{ id: string; service_name: string }> | null>(null);
+  const [serviceId, setServiceId] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let current = true;
+    void fetchBaselineServices(clientId).then(
+      (rows) => { if (current) setServices(rows); },
+      () => { if (current) setError("Baseline services could not be loaded."); },
+    );
+    return () => { current = false; };
+  }, [clientId]);
+  if (error) return <p role="alert">{error}</p>;
+  if (services === null) return null;
+  if (!services.length) return (
+    <Link className="text-brand-strong underline" to={`/clients/${clientId}/delivery/offer-studio?tab=build`}>
+      Create a baseline service in Offer Studio
+    </Link>
+  );
+  return (
+    <div className="flex flex-wrap items-end gap-2">
+      <label className="text-sm">Baseline service
+        <select className="mt-1 block rounded border border-border bg-background p-2"
+          value={serviceId} onChange={(event) => setServiceId(event.target.value)}>
+          <option value="">Choose a service</option>
+          {services.map((service) => <option key={service.id} value={service.id}>{service.service_name}</option>)}
+        </select>
+      </label>
+      <Button disabled={busy || !serviceId} onClick={() => void onLink(serviceId)}>Link service</Button>
     </div>
   );
 }
