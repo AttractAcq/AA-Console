@@ -128,8 +128,8 @@ describe("hard-budget Messages dispatch", () => {
     return { rpc, budget };
   }
   const model = "claude-opus-5";
-  it("reserves before dispatch and send, disables hidden SDK retries and settles priced usage", async () => {
-    const { rpc, budget } = setup();
+  it.each(["icp", "brief", "creative_build"])("reserves %s before dispatch and send, disables hidden SDK retries and settles priced usage", async agent => {
+    const { rpc, budget } = setup(agent);
     streamMock.mockReturnValue({ finalMessage: async () => ({
       content: [{ type: "tool_use", name: "submit", id: "t", input: { ok: true } }],
       usage: { input_tokens: 10, output_tokens: 5, cache_creation_input_tokens: null, cache_read_input_tokens: null },

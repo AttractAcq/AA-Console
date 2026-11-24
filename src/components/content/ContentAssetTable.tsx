@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
+import { TextDraftDialog } from "./TextDraftDialog";
 import { DataTable } from "../DataTable";
 import { ActionMenu } from "../ActionMenu";
 import { BriefDetailModal } from "../briefs/BriefDetailModal";
@@ -58,6 +59,7 @@ type BriefRow = {
 export function ContentAssetTable({ approved }: { approved: boolean }) {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
+  const [search, setSearch] = useSearchParams();
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [briefs, setBriefs] = useState<ReadonlyMap<string, BriefRow>>(new Map());
@@ -84,7 +86,7 @@ export function ContentAssetTable({ approved }: { approved: boolean }) {
         const { data, error } = await supabase
           .from("client_briefs")
           .select("id, title, body, media_type, brief_ref, status, target_platform, source_idea_id, created_at")
-          .in("id", briefIds);
+          .eq("client_id", clientId).in("id", briefIds);
         if (error) throw new Error(error.message);
         setBriefs(new Map(((data ?? []) as BriefRow[]).map((brief) => [brief.id, brief])));
       } else {
@@ -159,6 +161,18 @@ export function ContentAssetTable({ approved }: { approved: boolean }) {
     );
   }
 
+  const requestedDraft = search.get("draft");
+  const draft = assets.find(asset => asset.id === requestedDraft && asset.client_id === clientId && asset.media_type === "text");
+  const source = draft?.brief_id ? briefs.get(draft.brief_id) : undefined;
+  function selectDraft(id: string | null) {
+    setSearch(current => {
+      const next = new URLSearchParams(current);
+      if (id) next.set("draft", id);
+      else next.delete("draft");
+      return next;
+    });
+  }
+
   const shown = assets.filter((asset) => asset.media_type === activeFilter);
   const activeLabel = mediaFilters.find((filter) => filter.id === activeFilter)?.label ?? "";
 
@@ -197,9 +211,12 @@ export function ContentAssetTable({ approved }: { approved: boolean }) {
         }
         rows={shown.map((asset) => {
           const brief = asset.brief_id ? briefs.get(asset.brief_id) : undefined;
+          const editableText = !approved && asset.media_type === "text" && brief && asset.storage_path.startsWith(`${asset.client_id}/generated/`);
           return [
             <span key="t">
-              {asset.title ?? "Untitled"}
+              {editableText
+                ? <button type="button" onClick={() => selectDraft(asset.id)} className="font-medium text-brand-strong hover:underline">{asset.title ?? "Open draft"}</button>
+                : asset.title ?? "Untitled"}
               {asset.ref_number && (
                 <span className="block text-xs text-muted-foreground">{asset.ref_number}</span>
               )}
@@ -226,7 +243,9 @@ export function ContentAssetTable({ approved }: { approved: boolean }) {
                       onSelect: () => void approveForDistribution(asset),
                     }]),
                 ...(brief ? [{ label: "View brief", onSelect: () => setViewing(brief) }] : []),
-                { label: "Edit", onSelect: () => openEditTab(asset) },
+                ...(editableText
+                  ? [{ label: "Edit draft", onSelect: () => selectDraft(asset.id) }]
+                  : [{ label: "Edit", onSelect: () => openEditTab(asset) }]),
                 { label: "Repurpose", onSelect: () => openEditTab(asset) },
                 { label: "Archive", busyLabel: "Archiving…", onSelect: () => void archive(asset) },
                 { label: "Delete", destructive: true, busyLabel: "Deleting…", onSelect: () => void terminate(asset) },
@@ -236,6 +255,9 @@ export function ContentAssetTable({ approved }: { approved: boolean }) {
         })}
       />
 
+      {!approved && requestedDraft && !loading && (draft && source
+        ? <TextDraftDialog key={draft.id} asset={draft} brief={source} onClose={() => selectDraft(null)} />
+        : <p role="status">This draft is unavailable for the selected client.</p>)}
       <BriefDetailModal brief={viewing} open={viewing !== null} onClose={() => setViewing(null)} />
     </div>
   );

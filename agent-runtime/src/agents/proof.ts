@@ -26,6 +26,7 @@ export interface ProofRecord {
   body: string | null;
   source: string | null;
   captured_on: string | null;
+  permission_basis?: string | null;
 }
 
 /** Resolve a reference the model chose back to the record it names. */
@@ -50,6 +51,17 @@ export async function loadUsableProof(
     p_limit: 12,
   });
   return (data ?? []) as ProofRecord[];
+}
+
+/** A text draft can cite only the source selected on its own brief. */
+export async function loadSelectedBriefProof(sb: SupabaseClient, clientId: string, proofId: string | null) {
+  if (!proofId) return [];
+  const { data, error } = await sb.from("client_proof_assets").select("*")
+    .eq("id", proofId).eq("client_id", clientId).maybeSingle();
+  if (error) throw new Error("Could not verify the brief's selected proof.");
+  if (!data || data.usage_rights !== "approved" || !data.permission_basis?.trim() ||
+      (data.expires_on && data.expires_on < new Date().toISOString().slice(0, 10))) return [];
+  return [data as ProofRecord];
 }
 
 function line(label: string, value: string | null): string | null {
@@ -81,6 +93,7 @@ export function renderProof(records: ProofRecord[], counts?: { held: number }): 
         line("Lands with", p.avatar_relevance),
         line("Service", p.services),
         line("Source", p.source),
+        line("Permitted use", p.permission_basis ?? null),
         line("Captured", p.captured_on),
       ].filter(Boolean);
       return [head, ...rest].join("\n");

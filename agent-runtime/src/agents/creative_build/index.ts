@@ -25,11 +25,13 @@ import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
 import { handOffToSlot } from "../../engine/slot.js";
 import { appendEvent } from "../../queue.js";
+import { HardBudgetHold } from "../../orchestration/hard-budget.js";
 import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { OpenAiError, runStructuredCompletion } from "../../tools/openai.js";
 import { estimateCostUsd } from "../../usage/cost.js";
 import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../../storage/signed-url-policy.js";
 import { renderContext, renderUpstream } from "../shared.js";
+import { loadUsableProof, renderProof, loadSelectedBriefProof } from "../proof.js";
 import { loadConceptContext } from "./context.js";
 import { remakeBlock, conceptProblem, recruitmentConceptProblem, briefRequestsCard, TREATMENTS } from "./concept.js";
 import {
@@ -107,6 +109,7 @@ interface BriefRow {
   visual_direction: string | null;
   media_type: "image" | "text" | "video";
   brief_ref: string | null;
+  proof_asset_id: string | null;
   /** 'client' or 'recruitment'. A hiring ad is a different deliverable. */
   purpose: string | null;
   recruitment_role: string | null;
@@ -478,7 +481,7 @@ export async function runCreativeBuildJob(
 
   const { data: render, error: renderError } = await sb
     .from("creative_renders")
-    .select("id, generation_id, quality, size, reference_path")
+    .select("id, client_id, job_id, generation_id, quality, size, reference_path")
     .eq("id", renderId)
     .maybeSingle();
   if (renderError) throw new Error(`Could not load the render: ${renderError.message}`);
@@ -489,7 +492,7 @@ export async function runCreativeBuildJob(
   const generationId = render.generation_id as string;
   const { data: generation, error: genError } = await sb
     .from("creative_generations")
-    .select("id, brief_id, media_type, quality, size, concept, stage, reference_path, remake_feedback")
+    .select("id, client_id, brief_id, media_type, quality, size, concept, stage, reference_path, remake_feedback")
     .eq("id", generationId)
     .maybeSingle();
   if (genError) throw new Error(`Could not load the generation: ${genError.message}`);
@@ -513,13 +516,24 @@ export async function runCreativeBuildJob(
 
   const { data: brief, error: briefError } = await sb
     .from("client_briefs")
-    .select("id, client_id, title, body, visual_direction, media_type, brief_ref, purpose, recruitment_role, content_format, format_code, frame_count, frame_plan")
+    .select("id, client_id, title, body, visual_direction, media_type, brief_ref, proof_asset_id, purpose, recruitment_role, content_format, format_code, frame_count, frame_plan")
     .eq("id", generation.brief_id)
     .maybeSingle();
   if (briefError) throw new Error(`Could not load the brief: ${briefError.message}`);
   if (!brief) return { ok: false, retryable: false, failureMessage: "That brief no longer exists." };
 
   const typed = brief as BriefRow;
+  // Only single text builds on the reserved Messages loop have a priced bound.
+  // Read the persisted route before any concept, renderer or provider side effect.
+  if (job.hard_budget_required) {
+    if (render.client_id !== job.client_id || render.job_id !== job.id ||
+        generation.client_id !== job.client_id || typed.client_id !== job.client_id ||
+        typed.purpose !== "client" || typed.media_type !== "text" || typed.content_format !== "single" ||
+        generation.media_type !== "text" || remake || render.reference_path || generation.reference_path) {
+      throw new HardBudgetHold("Only a same-client single text draft has a reviewed creative budget bound.");
+    }
+    config = { ...config, conceptProvider: "anthropic" };
+  }
   const cardRequested = briefRequestsCard(typed);
   // A Phase 1 reel's opening stills are an image generation on a video brief.
   // Every other video still stops here. Carousel, story and single never
@@ -705,14 +719,15 @@ export async function runCreativeBuildJob(
   // read as "nothing on file" and quietly go back to blank corners.
   const onFile = Object.entries(identity).filter(([, v]) => v).map(([k]) => k);
 
-  const { data: proofRows } = await sb
-    .from("client_proof_assets")
-    .select("title, body, source")
-    .eq("client_id", job.client_id)
-    .limit(15);
-  const proof = (proofRows ?? [])
-    .map((p) => `- ${p.title ?? "Untitled"}${p.source ? ` (${p.source})` : ""}: ${p.body ?? "[file]"}`)
-    .join("\n");
+  const proofRows = typed.media_type === "text"
+    ? await loadSelectedBriefProof(sb, job.client_id, typed.proof_asset_id)
+    : await loadUsableProof(sb, job.client_id);
+  if (typed.media_type === "text" && typed.proof_asset_id && !proofRows.length) {
+    const message = "The source brief's selected proof is no longer cleared for this client.";
+    await fail(message);
+    return { ok: false, retryable: false, failureMessage: message };
+  }
+  const proof = renderProof(proofRows);
 
   const hasReference = Boolean(renderReference);
   const submitTool = remake
@@ -775,7 +790,7 @@ ${renderUpstream(upstream)}
 
 ${brandConceptBlock(brand)}
 
-PROOF ON FILE — the only proof this asset may reference
+PROOF ON FILE — observe the recorded permission terms. Preserve synthetic labels. Never present fictional examples as customer evidence.
 ${proof || "None. Make no proof claim."}
 
 IDENTITY ON FILE — the only identity details that exist
@@ -911,41 +926,35 @@ Call ${submitTool.name} once when you are done.`;
     const path = `${job.client_id}/generated/${renderId}.md`;
     const document = [`# ${String(concept.headline ?? typed.title)}`, "", body, "", `**Call to action:** ${String(concept.call_to_action ?? "")}`].join("\n");
     const existingAssetId = await reusableGeneratedAsset(sb, String(job.client_id), typed.id, path, "text");
-    const documentBytes = Buffer.from(document, "utf8");
-    const { error: uploadError } = await sb.storage
-      .from(BUCKET)
-      .upload(path, documentBytes, {
+    // Persist the editable result before filing the snapshot. A retry after a
+    // storage failure can reuse it without commissioning a second draft.
+    if (needsConcept) {
+      await sb.from("creative_generations").update({
+        concept, concept_model: conceptModel, cost_usd: usage.costUsd,
+      }).eq("id", generationId).throwOnError();
+    }
+    let assetId = existingAssetId;
+    if (assetId) {
+      await attestCreativeAssetBytes(sb, job.client_id, assetId);
+    } else {
+      const documentBytes = Buffer.from(document, "utf8");
+      const { error: uploadError } = await sb.storage.from(BUCKET).upload(path, documentBytes, {
         contentType: "text/markdown", upsert: true, cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS,
       });
-    if (uploadError) throw new Error(`Could not store the copy: ${uploadError.message}`);
-
-    const assetId = existingAssetId ?? await insertAsset(sb, job, typed, path, "text");
-    await attestCreativeAssetBytes(sb, String(job.client_id), assetId, documentBytes);
-    await sb
-      .from("creative_renders")
-      .update({
-        status: "done",
-        asset_id: assetId,
-        model: conceptModel,
-        cost_usd: usage.costUsd,
-        error: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", renderId);
-    await sb
-      .from("creative_generations")
-      .update({
-        stage: "done",
-        concept,
-        concept_model: conceptModel,
-        asset_id: assetId,
-        cost_usd: usage.costUsd,
-        error: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", generationId);
-
-    await markBriefComplete(sb, typed.id);
+      if (uploadError) throw new Error(`Could not store the copy: ${uploadError.message}`);
+      assetId = await insertAsset(sb, job, typed, path, "text");
+      await attestCreativeAssetBytes(sb, job.client_id, assetId, documentBytes);
+    }
+    const updatedAt = new Date().toISOString();
+    await sb.from("creative_renders").update({
+      status: "done", asset_id: assetId, model: conceptModel,
+      ...(needsConcept ? { cost_usd: usage.costUsd } : {}),
+      error: null, updated_at: updatedAt,
+    }).eq("id", renderId).throwOnError();
+    await sb.from("creative_generations").update({
+      stage: "done", asset_id: assetId, error: null, updated_at: updatedAt,
+    }).eq("id", generationId).throwOnError();
+    await sb.from("client_briefs").update({ status: "complete" }).eq("id", typed.id).throwOnError();
     await appendEvent(sb, job.id, "Copy written and filed under the client's assets.");
     return { ok: true, retryable: false, usage };
   }

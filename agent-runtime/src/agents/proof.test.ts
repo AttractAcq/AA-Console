@@ -102,3 +102,8 @@ describe("resolving a chosen reference back to its record", () => {
     expect(proofIdForRef([], "HD-0019")).toBeNull();
   });
 });
+
+it("includes exact-use limits with an authorized synthetic example", () => {
+  const out = renderProof([rec({ permission_basis: "Only the two labeled sentences." })]);
+  expect(out).toContain("Permitted use: Only the two labeled sentences.");
+});

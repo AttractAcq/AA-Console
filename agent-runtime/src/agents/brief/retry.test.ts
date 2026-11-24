@@ -9,7 +9,7 @@ vi.mock('../../tools/anthropic.js', async () => ({
 }));
 vi.mock('../shared.js', () => ({ loadUpstreamRecords: async () => [] }));
 vi.mock('../identity.js', () => ({ loadIdentity: async () => ({}), identityWriterBlock: () => 'Identity' }));
-vi.mock('../proof.js', () => ({ loadUsableProof: async () => [], renderProof: () => 'No proof', proofIdForRef: (rows: {id:string;ref_number:string}[], ref: string) => rows.find((r) => r.ref_number === ref)?.id ?? null }));
+vi.mock('../proof.js', async () => ({ ...await vi.importActual('../proof.js'), loadUsableProof: async () => [], renderProof: () => 'No proof', proofIdForRef: (rows: {id:string;ref_number:string}[], ref: string) => rows.find((r) => r.ref_number === ref)?.id ?? null }));
 import { runBriefJob } from './index.js';
 
 const job = { id: 'job', client_id: 'client', input_table: 'client_ideas', input_id: 'idea' } as AgentJobRow;
