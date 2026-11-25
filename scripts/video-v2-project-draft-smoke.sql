@@ -317,4 +317,22 @@ begin
     or public.file_faceless_reel_preview_v1(e.client_id,pid,p.source_digest,2,repeat('a',64),2048,1080,1920,870,30)<>dest
     then raise exception 'Preview receipt mismatch'; end if;
 end $reel$;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','f6666666-6666-4666-8666-666666666666',true);
+select set_config('request.jwt.claim.role','authenticated',true);
+-- Match the Storage API transaction; the authenticated role still enforces RLS.
+set local storage.allow_delete_query = 'true';
+do $object_guard$
+declare existing text;
+begin
+  select storage_path into strict existing from public.faceless_reel_previews_v1;
+  begin
+    insert into storage.objects(bucket_id,name) values('client-media',replace(existing,'ir-v2','ir-v3'));
+    raise exception 'Reviewer inserted a renderer-owned file'; exception when insufficient_privilege then null;
+  end;
+  update storage.objects set metadata='{}' where bucket_id='client-media' and name=existing;
+  if found then raise exception 'Reviewer replaced the draft'; end if;
+  delete from storage.objects where bucket_id='client-media' and name=existing;
+  if found then raise exception 'Reviewer removed the draft'; end if;
+end $object_guard$;
 rollback;

@@ -21,6 +21,19 @@ create policy faceless_reel_read on public.faceless_reel_previews_v1 for select 
 revoke all on public.faceless_reel_previews_v1 from public,anon,authenticated,service_role;
 grant select on public.faceless_reel_previews_v1 to authenticated,service_role;
 
+-- Client-media also accepts operator uploads. Reserve only the new file names
+-- for the trusted renderer, including rename, replace and delete operations.
+create policy faceless_draft_insert_v1 on storage.objects as restrictive
+  for insert to authenticated
+  with check (bucket_id <> 'client-media' or name !~ '^[0-9a-f-]{36}/video/projects/[0-9a-f-]{36}/ir-v[0-9]+/draft-[0-9a-f]{64}[.]mp4$');
+create policy faceless_draft_update_v1 on storage.objects as restrictive
+  for update to authenticated
+  using (bucket_id <> 'client-media' or name !~ '^[0-9a-f-]{36}/video/projects/[0-9a-f-]{36}/ir-v[0-9]+/draft-[0-9a-f]{64}[.]mp4$')
+  with check (bucket_id <> 'client-media' or name !~ '^[0-9a-f-]{36}/video/projects/[0-9a-f-]{36}/ir-v[0-9]+/draft-[0-9a-f]{64}[.]mp4$');
+create policy faceless_draft_delete_v1 on storage.objects as restrictive
+  for delete to authenticated
+  using (bucket_id <> 'client-media' or name !~ '^[0-9a-f-]{36}/video/projects/[0-9a-f-]{36}/ir-v[0-9]+/draft-[0-9a-f]{64}[.]mp4$');
+
 -- Keep narrated projects' length and release gates intact. A silent preview
 -- cannot transition to any queue, accepted, attached or published stage.
 alter table public.video_projects add column draft_renderer text;

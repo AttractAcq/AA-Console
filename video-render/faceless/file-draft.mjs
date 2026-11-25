@@ -46,7 +46,12 @@ const item = rel => path.join(folder,rel);
 const env = {PATH:process.env.PATH, HOME:process.env.HOME, TMPDIR:tmpdir(), DO_NOT_TRACK:"1", HYPERFRAMES_NO_TELEMETRY:"1", HYPERFRAMES_NO_UPDATE_CHECK:"1"};
 const digest = data => createHash("sha256").update(data).digest("hex");
 function run(command,args) {
-  return execFileSync(command,args,{cwd:folder, env, stdio:["ignore","pipe","pipe"],maxBuffer:64*1024*1024});
+  try {
+    return execFileSync(command,args,{cwd:folder, env, stdio:["ignore","pipe","pipe"],maxBuffer:64*1024*1024});
+  } catch {
+    // Third-party stderr may contain storyboard text or private file paths.
+    throw new Error("Local render or media probe failed. No publication action was taken.");
+  }
 }
 function probe(file) {
   const {streams} = JSON.parse(run("ffprobe",["-v","error","-show_streams","-of","json",file]));
