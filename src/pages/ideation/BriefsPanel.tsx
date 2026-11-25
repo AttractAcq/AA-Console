@@ -250,7 +250,7 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
   return (
     <div>
       {showJourney && <ContentJourney clientId={clientId} current={stage} briefId={focusedBrief} />}
-      {pilot && pilotBrief && <FacelessReelStoryboard key={pilot.brief_id} preview={pilot} updatedAt={pilotBrief.updated_at} reload={refresh} />}
+      {pilot && pilotBrief && <FacelessReelStoryboard key={pilot.brief_id} preview={pilot} briefRef={pilotBrief.brief_ref} updatedAt={pilotBrief.updated_at} reload={refresh} />}
       {stage === "create" && !pilot && <p className="mb-4 text-sm text-muted-foreground">
         Choose a brief to create with AI or assign to a person. Track generated reels in Media → Reel shots and returned footage in Edit / Repurpose.
       </p>}

@@ -14,9 +14,9 @@ describe("faceless storyboard from a saved brief", () => {
   it("requires the reviewed revision before creating the draft", async () => {
     const reload = vi.fn();
     rpc.mockResolvedValue({error:null,data:"project"});
-    const {rerender} = render(<FacelessReelStoryboard preview={preview} updatedAt="changed" reload={reload}/>);
+    const {rerender} = render(<FacelessReelStoryboard briefRef="BR-1" preview={preview} updatedAt="changed" reload={reload}/>);
     expect(screen.getByRole("button",{name:"Approve brief and save storyboard"})).toBeDisabled();
-    rerender(<FacelessReelStoryboard preview={preview} updatedAt="v1" reload={reload}/>);
+    rerender(<FacelessReelStoryboard briefRef="BR-1" preview={preview} updatedAt="v1" reload={reload}/>);
     fireEvent.click(screen.getByRole("button",{name:"Approve brief and save storyboard"}));
     await waitFor(() => expect(reload).toHaveBeenCalledOnce());
     expect(rpc).toHaveBeenCalledWith("prepare_faceless_reel_preview_v1",{
@@ -32,9 +32,10 @@ describe("faceless storyboard from a saved brief", () => {
         order:async()=>({data:scenes,error:null})}; return chain;
     });
     urls.set("stored-draft","signed-preview");
-    render(<FacelessReelStoryboard updatedAt="v2" reload={vi.fn()} preview={{...preview,project_id:"project",
+    render(<FacelessReelStoryboard briefRef="BR-1" updatedAt="v2" reload={vi.fn()} preview={{...preview,project_id:"project",
       storage_path:"stored-draft",filed_at:"today"}}/>);
     expect(await screen.findByRole("link",{name:"Source campaign"})).toHaveAttribute("href","/clients/client/delivery/campaign-factory/campaign");
+    expect(screen.getByRole("link",{name:"Source brief · BR-1"})).toHaveAttribute("href","/clients/client/delivery/content-production-factory?tab=briefs&brief=brief");
     expect(screen.getAllByRole("listitem")).toHaveLength(7);
     expect(screen.getByLabelText("Faceless reel draft")).toHaveAttribute("src","signed-preview");
     expect(screen.queryByRole("button",{name:/Approve|Edit scene/})).toBeNull();
