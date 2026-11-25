@@ -3,7 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { briefStatus, update, eq, resultRow } = vi.hoisted(() => ({
-  briefStatus: { value: "in_production" }, update: vi.fn(), eq: vi.fn(),
+  briefStatus: { value: "in_production", media: "text" }, update: vi.fn(), eq: vi.fn(),
   resultRow: { found: true },
 }));
 
@@ -15,8 +15,12 @@ vi.mock("../../lib/supabase", () => ({
         id: "brief-1", title: "Founder video", body: "Record the founder", media_type: "video",
         content_format: "single", target_platform: "instagram", brief_ref: "BR-1",
         ...(briefStatus.value === "draft" ? {
-          media_type: "text", argument: "Old argument", script: "Old script", updated_at: "revision-1",
+          media_type: briefStatus.media, argument: "Old argument", script: "Old script", updated_at: "revision-1",
           body: "## Argument\n\nOld argument\n\n## Script\n\nOld script", purpose: "client", archived_at: null,
+          ...(briefStatus.media === "image" ? {
+            visual_direction: "Old art direction",
+            body: "## Visual direction\n\nOld art direction\n\n## Argument\n\nOld argument\n\n## Script\n\nOld script",
+          } : {}),
         } : {}),
         status: briefStatus.value, source_idea_id: "idea-1", created_at: "2026-10-10",
       }] : table === "job_assignments" ? [{
@@ -71,6 +75,7 @@ describe("BriefsPanel human Create handoff", () => {
 describe("reviewing the source brief before building", () => {
   it.each([true, false])("saves both fields and the worker body only on the same draft revision (found=%s)", async found => {
     briefStatus.value = "draft";
+    briefStatus.media = "text";
     resultRow.found = found;
     update.mockClear();
     eq.mockClear();
@@ -87,5 +92,22 @@ describe("reviewing the source brief before building", () => {
     for (const filter of [["id", "brief-1"], ["client_id", "client-1"], ["updated_at", "revision-1"], ["status", "draft"]]) {
       expect(eq).toHaveBeenCalledWith(...filter);
     }
+  });
+  it("saves art direction with both copy fields on the reviewed single image", async () => {
+    briefStatus.value = "draft";
+    briefStatus.media = "image";
+    resultRow.found = true;
+    update.mockClear();
+    render(<MemoryRouter initialEntries={["/?brief=brief-1"]}><BriefsPanel /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Edit draft copy" }));
+    fireEvent.change(screen.getByDisplayValue("Old art direction"), { target: { value: "Use the original PNG." } });
+    fireEvent.click(screen.getByRole("button", { name: "Save brief" }));
+    expect(await screen.findByText("Brief saved.")).toBeInTheDocument();
+    expect(update).toHaveBeenCalledExactlyOnceWith({
+      script: "Old script", argument: "Old argument", visual_direction: "Use the original PNG.",
+      body: "## Visual direction\n\nUse the original PNG.\n\n## Argument\n\nOld argument\n\n## Script\n\nOld script",
+    });
+    expect(eq).toHaveBeenCalledWith("media_type", "image");
   });
 });
