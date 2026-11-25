@@ -6458,6 +6458,7 @@ export type Database = {
           created_at: string
           derived_from_asset_id: string | null
           editor_brief: string | null
+          excluded_artwork_proof_id: string | null
           format_code: string | null
           frame_count: number | null
           frame_plan: string[] | null
@@ -6502,6 +6503,7 @@ export type Database = {
           created_at?: string
           derived_from_asset_id?: string | null
           editor_brief?: string | null
+          excluded_artwork_proof_id?: string | null
           format_code?: string | null
           frame_count?: number | null
           frame_plan?: string[] | null
@@ -6546,6 +6548,7 @@ export type Database = {
           created_at?: string
           derived_from_asset_id?: string | null
           editor_brief?: string | null
+          excluded_artwork_proof_id?: string | null
           format_code?: string | null
           frame_count?: number | null
           frame_plan?: string[] | null
@@ -6686,6 +6689,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_briefs_excluded_artwork_proof_id_fkey"
+            columns: ["excluded_artwork_proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_briefs_excluded_artwork_proof_id_fkey"
+            columns: ["excluded_artwork_proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
           },
           {
             foreignKeyName: "client_briefs_job_id_fkey"
@@ -45030,6 +45047,15 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      exclude_brief_artwork_proof: {
+        Args: {
+          p_brief_id: string
+          p_client_id: string
+          p_proof_id: string
+          p_revision: string
+        }
+        Returns: undefined
+      }
       exit_lead_from_sequence_v6: {
         Args: { p_enrollment_id: string; p_reason: string }
         Returns: undefined
@@ -49771,6 +49797,7 @@ export type Database = {
           created_at: string
           derived_from_asset_id: string | null
           editor_brief: string | null
+          excluded_artwork_proof_id: string | null
           format_code: string | null
           frame_count: number | null
           frame_plan: string[] | null

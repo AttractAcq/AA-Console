@@ -2,14 +2,15 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { briefStatus, update, eq, resultRow } = vi.hoisted(() => ({
+const { briefStatus, update, eq, resultRow, excludeProof } = vi.hoisted(() => ({
   briefStatus: { value: "in_production", media: "text" }, update: vi.fn(), eq: vi.fn(),
-  resultRow: { found: true },
+  resultRow: { found: true, independent: false }, excludeProof: vi.fn(),
 }));
 
 vi.mock("../../lib/useAgentJobs", () => ({ useAgentJobs: () => ({ inFlight: [], recentFailures: [] }) }));
 vi.mock("../../lib/supabase", () => ({
   supabase: {
+    rpc: excludeProof,
     from: (table: string) => {
       const data = table === "client_briefs" ? [{
         id: "brief-1", title: "Founder video", body: "Record the founder", media_type: "video",
@@ -18,15 +19,16 @@ vi.mock("../../lib/supabase", () => ({
           media_type: briefStatus.media, argument: "Old argument", script: "Old script", updated_at: "revision-1",
           body: "## Argument\n\nOld argument\n\n## Script\n\nOld script", purpose: "client", archived_at: null,
           ...(briefStatus.media === "image" ? {
-            visual_direction: "Old art direction",
+            visual_direction: "Old art direction", proof_asset_id: resultRow.independent ? null : "raw",
+            excluded_artwork_proof_id: resultRow.independent ? "raw" : null,
             body: "## Visual direction\n\nOld art direction\n\n## Argument\n\nOld argument\n\n## Script\n\nOld script",
           } : {}),
         } : {}),
         status: briefStatus.value, source_idea_id: "idea-1", created_at: "2026-10-10",
-      }] : table === "job_assignments" ? [{
+      }] : table === "job_assignments" ? (briefStatus.value === "draft" ? [] : [{
         id: "assignment-1", brief_id: "brief-1", stage: "delivered", asset_id: "asset-1",
         team_members: { name: "Taylor" },
-      }] : [{ assignment_id: "assignment-1", email_status: "skipped" }];
+      }]) : [{ assignment_id: "assignment-1", email_status: "skipped" }];
       const result = { data, error: null };
       const chain = {
         update: (payload: unknown) => { update(payload); return chain; },
@@ -110,4 +112,24 @@ describe("reviewing the source brief before building", () => {
     });
     expect(eq).toHaveBeenCalledWith("media_type", "image");
   });
+});
+
+it("removes the exact active source from artwork and displays the independent generation hold", async () => {
+  briefStatus.value = "draft";
+  briefStatus.media = "image";
+  resultRow.independent = false;
+  excludeProof.mockImplementation(async () => {
+    resultRow.independent = true;
+    return { error: null };
+  });
+  render(<MemoryRouter initialEntries={["/?brief=brief-1"]}><BriefsPanel /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Exclude proof from artwork" }));
+  expect(await screen.findByText("Independent artwork · generation held")).toBeInTheDocument();
+  expect(excludeProof).toHaveBeenCalledExactlyOnceWith("exclude_brief_artwork_proof", {
+    p_client_id: "client-1", p_brief_id: "brief-1", p_revision: "revision-1", p_proof_id: "raw",
+  });
+  fireEvent.click(screen.getByRole("button", { name: /^Actions for / }));
+  expect(screen.queryByRole("menuitem", { name: "Approve & build" })).toBeNull();
+  resultRow.independent = false;
 });

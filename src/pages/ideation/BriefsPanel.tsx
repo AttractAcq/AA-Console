@@ -35,6 +35,8 @@ type Brief = {
   updated_at: string;
   purpose: string;
   archived_at: string | null;
+  proof_asset_id: string | null;
+  excluded_artwork_proof_id: string | null;
   script: string | null;
   argument: string | null;
   visual_direction: string | null;
@@ -78,7 +80,7 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
       let query = supabase
         .from("client_briefs")
         .select(
-          "id, title, body, avatar_brief, editor_brief, media_type, content_format, target_platform, format_code, frame_plan, brief_ref, status, source_idea_id, created_at, updated_at, purpose, archived_at, hook, premise, argument, proof, script, visual_direction, shot_requirements, b_roll, call_to_action, channel_intent, production_method, proof_asset_id",
+          "id, title, body, avatar_brief, editor_brief, media_type, content_format, target_platform, format_code, frame_plan, brief_ref, status, source_idea_id, created_at, updated_at, purpose, archived_at, hook, premise, argument, proof, script, visual_direction, shot_requirements, b_roll, call_to_action, channel_intent, production_method, proof_asset_id, excluded_artwork_proof_id",
         )
         .eq("client_id", clientId)
         .neq("purpose", "recruitment")
@@ -134,6 +136,24 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
       : b.media_type === activeFilter && (activeFormat === "all" || b.content_format === activeFormat),
   );
   const elsewhere = briefs.length - shown.length;
+
+  async function excludeArtwork(brief: Brief) {
+    if (!clientId || !brief.proof_asset_id || busyBrief) return;
+    setBusyBrief(brief.id);
+    try {
+      const { error } = await supabase.rpc("exclude_brief_artwork_proof", {
+        p_client_id: clientId, p_brief_id: brief.id, p_revision: brief.updated_at,
+        p_proof_id: brief.proof_asset_id,
+      });
+      if (error) throw error;
+      setNotice("Proof excluded from artwork. Image generation is held pending a verified spending ceiling.");
+      await refresh();
+    } catch (error) {
+      setNotice((error as { message?: string }).message ?? "Could not update the artwork source.");
+    } finally {
+      setBusyBrief(null);
+    }
+  }
 
   async function archiveBrief(brief: Brief) {
     if (busyBrief) return;
@@ -226,6 +246,7 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
             className="rounded text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {b.title}
+            {b.excluded_artwork_proof_id && <span className="block text-xs text-muted-foreground">Independent artwork · generation held</span>}
             {b.brief_ref && <span className="block text-xs text-muted-foreground">{b.brief_ref}</span>}
             {(assignments.get(b.id) ?? []).map((assignment) => (
               <span key={assignment.id} className="block text-xs text-muted-foreground">
@@ -256,13 +277,17 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
                   : (assignments.get(b.id) ?? []).some((assignment) => assignment.asset_id)
                     ? [{ label: "View delivery", onSelect: () => navigate(deliveryHref()) }]
                     : []
-                : [{ label: "Approve & build", onSelect: () => setBuilding(b) }]),
+                : b.excluded_artwork_proof_id ? [] : [{ label: "Approve & build", onSelect: () => setBuilding(b) }]),
               ...(b.media_type === "video" && b.status === "approved"
                 ? [{ label: "Start code video from brief",
                   onSelect: () => navigate(`/clients/${clientId}/delivery/content-production-factory?tab=generation&videoBrief=${b.id}`) }]
                 : []),
               ...(b.purpose === "client" && !b.archived_at && (b.media_type === "text" || (b.media_type === "image" && b.content_format === "single" && b.visual_direction)) && b.status === "draft" && b.script && b.argument && b.body
                 ? [{ label: "Edit draft copy", onSelect: () => setEditingCopy(b) }] : []),
+              ...(b.status === "draft" && b.purpose === "client" && b.media_type === "image"
+                && b.content_format === "single" && !b.archived_at && b.proof_asset_id
+                && !assignments.has(b.id)
+                ? [{ label: "Exclude proof from artwork", onSelect: () => void excludeArtwork(b) }] : []),
               { label: "View brief", onSelect: () => setViewing(b) },
               { label: "Archive", busyLabel: "Archiving…", onSelect: () => void archiveBrief(b) },
               { label: "Delete", destructive: true, busyLabel: "Deleting…", onSelect: () => void deleteBrief(b) },
