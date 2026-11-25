@@ -28,3 +28,9 @@ Market, ICP, Offer Strategy, Opportunity Discovery, Evaluation, Opportunity Stra
 Turn zero reserves before dispatch. The first provider turn atomically replaces it. Every subsequent turn and retry competes for the same client-month balance. The enrolled worker disables SDK retries and redirects and requests standard global inference. An older worker cannot enter running for an enrolled job without the matching dispatch reservation.
 
 A confirmed provider receipt settles token usage by model and cache TTL, plus search charges, rounded upward to a microdollar. Lost responses, incomplete usage and ambiguous settlements retain the sent reservation. Inspect receipts by client, job, attempt and turn before retrying. Reconcile against provider records before releasing any uncertain charge. Preserve the private ledger on rollback and hold the client until production identity and enforcement are verified.
+
+## One reviewed GPT-Image-2 attempt
+
+Migration 20261124062200 creates an empty private permit table. After a specific cost exception and release approval, the operator can insert one permit for the exact enrolled client, UTC month and brief. Bind it to the reviewed SHA-256 of the UTF-8 PostgreSQL JSON array text for Argument, Script and Visual direction. Keep the row as the permanent record of the decision. A repeated queue action returns its existing job.
+
+The worker transfers the dispatch reservation to the single Images API call and sends only Visual direction. The private receipt records the provider request ID and reported text input and image output tokens. Console prices those counters at the standard direct API tariff. A charge above the reservation is recorded in full and reduces the shared balance. Check the provider billing record for account-specific adjustments. Missing usage or an ambiguous outcome keeps the reservation open for reconciliation. Inspect the provider receipt, render storage path and filed draft before recovery.

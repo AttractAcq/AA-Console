@@ -59,7 +59,7 @@ import {
   remadeSet,
 } from "./frameRemake.js";
 import type { BusinessContext } from "../shared.js";
-import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
+import { RenderError, estimateImageCostUsd, renderImage, textOnlyImageUsage, type ReferenceImage } from "./render.js";
 import { attestCreativeAssetBytes } from "../../creative/attest-asset-route.js";
 import { reusableFramedRenderAsset, reusableGeneratedAsset } from "./generatedAsset.js";
 import { compositionNote, frameVerdict, isNearlyBlank, measureComposition } from "./screen.js";
@@ -527,6 +527,14 @@ export async function runCreativeBuildJob(
   // Independent artwork has no verified renderer ceiling. Stop before even
   // loading the proof library, a reference file, or a cached concept.
   if (typed.excluded_artwork_proof_id) {
+    if (job.hard_budget_required && job.max_attempts === 1 && job.attempts === 1 && job.lease_owner &&
+        render.job_id === job.id && render.client_id === job.client_id && generation.client_id === job.client_id &&
+        typed.client_id === job.client_id && typed.media_type === "image" && generation.media_type === "image" &&
+        typed.purpose === "client" && typed.content_format === "single" && !typed.proof_asset_id &&
+        !remake && !renderReference && !generation.reference_path && config.imageModel === "gpt-image-2" &&
+        config.openaiApiKey) {
+      return runReviewedImageAttempt(sb, config, job, typed, renderId, generationId);
+    }
     throw new HardBudgetHold("Independent artwork is held until the renderer has a verified per-call spending ceiling.");
   }
   // Only single text builds on the reserved Messages loop have a priced bound.
@@ -1360,6 +1368,58 @@ Call ${submitTool.name} once when you are done.`;
   );
   await handOffToSlot(sb, job, "creative_build");
   return { ok: true, retryable: false, usage };
+}
+
+/** The committed permit covers one provider submission, including across worker restarts. */
+async function runReviewedImageAttempt(
+  sb: SupabaseClient, config: RuntimeConfig, job: AgentJobRow, brief: BriefRow,
+  renderId: string, generationId: string,
+): Promise<JobResult> {
+  const claim = await sb.rpc("claim_reviewed_image_attempt", {
+    p_job_id: job.id, p_render_id: renderId, p_owner: job.lease_owner,
+  });
+  if (claim.error || typeof claim.data !== "string" || !claim.data.trim())
+    throw new HardBudgetHold("No unused image permission for this job and reviewed brief.");
+  let usage: JobResult["usage"];
+  try {
+    const image = await renderImage(config, claim.data, {
+      model: "gpt-image-2", quality: "medium", size: "1024x1536",
+      onReceipt: async receipt => {
+        const counts = textOnlyImageUsage(receipt);
+        // Keep billing evidence even if storage or settlement subsequently fails.
+        await appendEvent(sb, job.id, "Image provider responded.", "info", {
+          request_id: receipt.requestId, usage: receipt.usage ?? null,
+        });
+        if (!counts) return;
+        const settled = await sb.rpc("settle_reviewed_image_attempt", {
+          p_job_id: job.id, p_owner: job.lease_owner, p_request_id: counts.requestId,
+          p_input: counts.inputTokens, p_output: counts.outputTokens,
+        });
+        if (!settled.error && typeof settled.data === "number") {
+          usage = { inputTokens: counts.inputTokens, outputTokens: counts.outputTokens, costUsd: settled.data };
+        }
+      },
+    });
+    const path = `${brief.client_id}/generated/${renderId}.${image.extension}`;
+    const stored = await sb.storage.from(BUCKET).upload(path, image.bytes, {
+      contentType: image.contentType, upsert: false, cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS,
+    });
+    if (stored.error) throw new Error("Image storage failed");
+    await noteComposition(sb, job.id, image.bytes, "Draft image");
+    const asset = await insertAsset(sb, job, brief, path, "image");
+    await attestCreativeAssetBytes(sb, brief.client_id, asset, image.bytes);
+    await sb.from("creative_renders").update({ status: "done", asset_id: asset,
+      model: "gpt-image-2", ...(usage ? { cost_usd: usage.costUsd } : {}), updated_at: new Date().toISOString(),
+    }).eq("id", renderId).throwOnError();
+    await sb.from("creative_generations").update({ stage: "done", asset_id: asset,
+      updated_at: new Date().toISOString() }).eq("id", generationId).throwOnError();
+    await sb.from("client_briefs").update({ status: "complete" }).eq("id", brief.id).throwOnError();
+    if (usage) return { ok: true, retryable: false, usage };
+    return { ok: false, retryable: false, failureMessage: "Draft filed. Reconcile image usage against the reserved attempt." };
+  } catch {
+    return { ok: false, retryable: false, usage,
+      failureMessage: "Image attempt consumed. Inspect the provider receipt and stored result before recovery." };
+  }
 }
 
 /** Lands in the same table as anything a person uploaded, pending review. */

@@ -162,7 +162,7 @@ export function ContentAssetTable({ approved }: { approved: boolean }) {
   }
 
   const requestedDraft = search.get("draft");
-  const draft = assets.find(asset => asset.id === requestedDraft && asset.client_id === clientId && asset.media_type === "text");
+  const draft = assets.find(asset => asset.id === requestedDraft && asset.client_id === clientId && ["image", "text"].includes(asset.media_type));
   const source = draft?.brief_id ? briefs.get(draft.brief_id) : undefined;
   function selectDraft(id: string | null) {
     setSearch(current => {
@@ -256,7 +256,16 @@ export function ContentAssetTable({ approved }: { approved: boolean }) {
       />
 
       {!approved && requestedDraft && !loading && (draft && source
-        ? <TextDraftDialog key={draft.id} asset={draft} brief={source} onClose={() => selectDraft(null)} />
+        ? draft.media_type === "image"
+          ? <section aria-label="Image draft" className="mt-4 space-y-2">
+              <h3>{draft.title ?? "Image draft"}</h3>
+              <p>{draft.review_status} · <button className="underline" onClick={() => setViewing(source)}>{source.brief_ref ?? source.title}</button></p>
+              {urls.get(draft.storage_path)
+                ? <img src={urls.get(draft.storage_path)} alt={draft.title ?? "Draft image"} className="max-h-[70vh] max-w-full" />
+                : <p>Image preview unavailable.</p>}
+              <button onClick={() => selectDraft(null)}>Close draft</button>
+            </section>
+          : <TextDraftDialog key={draft.id} asset={draft} brief={source} onClose={() => selectDraft(null)} />
         : <p role="status">This draft is unavailable for the selected client.</p>)}
       <BriefDetailModal brief={viewing} open={viewing !== null} onClose={() => setViewing(null)} />
     </div>

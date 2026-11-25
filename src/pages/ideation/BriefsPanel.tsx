@@ -42,6 +42,8 @@ type Brief = {
   visual_direction: string | null;
 };
 
+type ImageAttempt = { brief_id: string; job_id: string | null; asset_id: string | null };
+
 type Assignment = {
   id: string;
   brief_id: string | null;
@@ -61,6 +63,7 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
   const [assignments, setAssignments] = useState<ReadonlyMap<string, Assignment[]>>(new Map());
   const [emailStatus, setEmailStatus] = useState<ReadonlyMap<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [imageAttempts, setImageAttempts] = useState<ImageAttempt[]>([]);
   const [building, setBuilding] = useState<Brief | null>(null);
   const [editingCopy, setEditingCopy] = useState<Brief | null>(null);
   const [viewing, setViewing] = useState<Brief | null>(null);
@@ -88,10 +91,12 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
         .limit(100);
       // Asset creation archives the brief immediately. Create must still
       // show it while a reel renders or human footage is being returned.
-      if (stage === "brief") query = query.is("archived_at", null);
+      if (focusedBrief) query = query.eq("id", focusedBrief);
+      else if (stage === "brief") query = query.is("archived_at", null);
       const { data, error } = await query;
       if (error) throw error;
-      const rows = (data ?? []) as Brief[];
+      const rows = ((data ?? []) as Brief[]).filter(b => stage !== "brief" || !b.archived_at ||
+        (b.id === focusedBrief && b.status === "complete" && b.excluded_artwork_proof_id));
       const briefIds = rows.map((row) => row.id);
       const [assigned, dispatches] = briefIds.length ? await Promise.all([
         supabase.from("job_assignments")
@@ -109,6 +114,11 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
         byBrief.set(assignment.brief_id, [...(byBrief.get(assignment.brief_id) ?? []), assignment]);
       }
       setBriefs(rows);
+      setImageAttempts([]);
+      if (rows.some(b => b.excluded_artwork_proof_id)) {
+        const attempts = await supabase.rpc("reviewed_image_attempt_state", { p_client_id: clientId });
+        if (!attempts.error) setImageAttempts(attempts.data ?? []);
+      }
       setAssignments(byBrief);
       setEmailStatus(new Map((dispatches.data ?? [])
         .filter((row) => row.assignment_id)
@@ -119,7 +129,7 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
     } finally {
       setLoading(false);
     }
-  }, [clientId, stage]);
+  }, [clientId, stage, focusedBrief]);
 
   useEffect(() => {
     void refresh();
@@ -136,6 +146,30 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
       : b.media_type === activeFilter && (activeFormat === "all" || b.content_format === activeFormat),
   );
   const elsewhere = briefs.length - shown.length;
+
+  async function queueImage(brief: Brief) {
+    if (!clientId || busyBrief) return;
+    setBusyBrief(brief.id);
+    try {
+      const { error } = await supabase.rpc("queue_reviewed_image_attempt", { p_client_id: clientId, p_brief_id: brief.id });
+      if (error) throw error;
+      setNotice("Image draft queued. Reopen this brief to view the result.");
+    } catch {
+      setNotice("Refresh this brief to check whether the image job was queued.");
+    } finally {
+      await refresh();
+      setBusyBrief(null);
+    }
+  }
+
+  function imageActions(brief: Brief) {
+    const attempt = imageAttempts.find(row => row.brief_id === brief.id);
+    if (attempt?.asset_id) return [{ label: "Open image draft", onSelect: () =>
+      navigate(`/clients/${clientId}/delivery/content-production-factory?tab=create&draft=${attempt.asset_id}`) }];
+    if (attempt && !attempt.job_id && brief.status === "draft" && !brief.archived_at)
+      return [{ label: "Generate one image draft", onSelect: () => void queueImage(brief) }];
+    return [];
+  }
 
   async function excludeArtwork(brief: Brief) {
     if (!clientId || !brief.proof_asset_id || busyBrief) return;
@@ -246,7 +280,7 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
             className="rounded text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {b.title}
-            {b.excluded_artwork_proof_id && <span className="block text-xs text-muted-foreground">Independent artwork · generation held</span>}
+            {b.excluded_artwork_proof_id && <span className="block text-xs text-muted-foreground">{imageAttempts.some(row => row.brief_id === b.id) ? "Independent artwork" : "Independent artwork · generation held"}</span>}
             {b.brief_ref && <span className="block text-xs text-muted-foreground">{b.brief_ref}</span>}
             {(assignments.get(b.id) ?? []).map((assignment) => (
               <span key={assignment.id} className="block text-xs text-muted-foreground">
@@ -268,6 +302,7 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
             name={b.title}
             busy={busyBrief === b.id}
             items={[
+              ...imageActions(b),
               ...(b.status === "in_production" || b.status === "complete"
                 ? b.media_type === "video" && b.content_format === "reel"
                   ? [{

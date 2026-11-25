@@ -126,10 +126,33 @@ it("removes the exact active source from artwork and displays the independent ge
   fireEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
   fireEvent.click(screen.getByRole("menuitem", { name: "Exclude proof from artwork" }));
   expect(await screen.findByText("Independent artwork · generation held")).toBeInTheDocument();
-  expect(excludeProof).toHaveBeenCalledExactlyOnceWith("exclude_brief_artwork_proof", {
+  expect(excludeProof.mock.calls.filter(([name]) => name === "exclude_brief_artwork_proof")).toHaveLength(1);
+  expect(excludeProof).toHaveBeenCalledWith("exclude_brief_artwork_proof", {
     p_client_id: "client-1", p_brief_id: "brief-1", p_revision: "revision-1", p_proof_id: "raw",
   });
   fireEvent.click(screen.getByRole("button", { name: /^Actions for / }));
   expect(screen.queryByRole("menuitem", { name: "Approve & build" })).toBeNull();
+  resultRow.independent = false;
+});
+
+it("queues one permitted image without a reference picker and reopens the filed result", async () => {
+  briefStatus.value = "draft";
+  briefStatus.media = "image";
+  resultRow.independent = true;
+  let queued = false;
+  excludeProof.mockImplementation(async name => {
+    if (name === "queue_reviewed_image_attempt") queued = true;
+    return { data: name === "reviewed_image_attempt_state"
+      ? [{ brief_id: "brief-1", job_id: queued ? "job" : null, asset_id: queued ? "asset" : null }]
+      : "job", error: null };
+  });
+  render(<MemoryRouter initialEntries={["/?brief=brief-1"]}><BriefsPanel /></MemoryRouter>);
+  await screen.findByText("Independent artwork");
+  fireEvent.click(screen.getByRole("button", { name: /^Actions for / }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Generate one image draft" }));
+  await screen.findByText(/Image draft queued/);
+  fireEvent.click(screen.getByRole("button", { name: /^Actions for / }));
+  expect(await screen.findByRole("menuitem", { name: "Open image draft" })).toBeInTheDocument();
+  expect(screen.queryByRole("menuitem", { name: "Generate one image draft" })).toBeNull();
   resultRow.independent = false;
 });
