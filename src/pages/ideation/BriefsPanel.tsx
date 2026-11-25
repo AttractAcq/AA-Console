@@ -15,6 +15,7 @@ import { formatFilters, formatLabel } from "../../lib/contentFormat";
 import { platformLabel } from "../../lib/postPlatform";
 import type { FormatFilterId } from "../../lib/contentFormat";
 import { FormModal } from "../../components/forms/FormModal";
+import { FacelessReelStoryboard, type ReelPreview } from "../motion/FacelessReelStoryboard";
 import { prepareReelCopy } from "./reelBriefCopy";
 import { revisedBriefBody } from "./textBriefCopy";
 import { ContentJourney } from "../../components/ContentJourney";
@@ -73,6 +74,7 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
   const [imageAttempts, setImageAttempts] = useState<ImageAttempt[]>([]);
   const [building, setBuilding] = useState<Brief | null>(null);
   const [editingCopy, setEditingCopy] = useState<Brief | null>(null);
+  const [reelPreviews, setReelPreviews] = useState<ReelPreview[]>([]);
   const [editingReel, setEditingReel] = useState<{ brief: Brief; form: ReturnType<typeof prepareReelCopy> } | null>(null);
   const [viewing, setViewing] = useState<Brief | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -121,6 +123,11 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
         if (!assignment.brief_id) continue;
         byBrief.set(assignment.brief_id, [...(byBrief.get(assignment.brief_id) ?? []), assignment]);
       }
+      if (rows.some(b => b.media_type === "video" && b.content_format === "reel")) {
+        const result = await supabase.from("faceless_reel_previews_v1").select("*").eq("client_id",clientId);
+        if (result.error) throw result.error;
+        setReelPreviews(result.data ?? []);
+      } else setReelPreviews([]);
       setBriefs(rows);
       setImageAttempts([]);
       if (rows.some(b => b.excluded_artwork_proof_id)) {
@@ -236,12 +243,15 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
     return `/clients/${clientId}/delivery/content-production-factory?tab=create`;
   }
 
+  const pilot = reelPreviews.find(p => p.client_id === clientId && p.brief_id === focusedBrief);
+  const pilotBrief = briefs.find(b => b.id === pilot?.brief_id);
   if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>
       {showJourney && <ContentJourney clientId={clientId} current={stage} briefId={focusedBrief} />}
-      {stage === "create" && <p className="mb-4 text-sm text-muted-foreground">
+      {pilot && pilotBrief && <FacelessReelStoryboard key={pilot.brief_id} preview={pilot} updatedAt={pilotBrief.updated_at} reload={refresh} />}
+      {stage === "create" && !pilot && <p className="mb-4 text-sm text-muted-foreground">
         Choose a brief to create with AI or assign to a person. Track generated reels in Media → Reel shots and returned footage in Edit / Repurpose.
       </p>}
       <AgentActivityBar inFlight={inFlight} failures={recentFailures} />
@@ -311,7 +321,9 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
             busy={busyBrief === b.id}
             items={[
               ...imageActions(b),
-              ...(b.status === "in_production" || b.status === "complete"
+              ...(reelPreviews.some(p => p.client_id === clientId && p.brief_id === b.id)
+                ? [{ label: "Open motion storyboard", onSelect: () => navigate(`/clients/${clientId}/delivery/content-production-factory?tab=briefs&brief=${b.id}`) }]
+                : b.status === "in_production" || b.status === "complete"
                 ? b.media_type === "video" && b.content_format === "reel"
                   ? [{
                       label: "Track reel",
@@ -321,7 +333,7 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
                     ? [{ label: "View delivery", onSelect: () => navigate(deliveryHref()) }]
                     : []
                 : b.excluded_artwork_proof_id ? [] : [{ label: "Approve & build", onSelect: () => setBuilding(b) }]),
-              ...(b.media_type === "video" && b.status === "approved"
+              ...(b.media_type === "video" && b.status === "approved" && !reelPreviews.some(p => p.brief_id === b.id)
                 ? [{ label: "Start code video from brief",
                   onSelect: () => navigate(`/clients/${clientId}/delivery/content-production-factory?tab=generation&videoBrief=${b.id}`) }]
                 : []),

@@ -264,4 +264,57 @@ begin
     if SQLERRM<>'client_forbidden' then raise; end if;
   end;
 end $bot_status$;
+-- Faceless preview uses the approved campaign idea directly and never queues a model.
+reset role;
+update public.client_campaigns c set plan_approved_fingerprint=public.campaign_plan_fingerprint(c),plan_approved_at=now(),plan_approved_by='f6666666-6666-4666-8666-666666666666'
+where id='fbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+insert into public.client_briefs(id,client_id,source_idea_id,title,media_type,status)
+  select 'f0000000-0000-4000-8000-000000000711',client_id,source_idea_id,'Motion graphic layout example','video','draft'
+    from public.client_briefs where id='f1313131-1313-4131-8131-131313131313';
+update public.client_briefs set status='draft',content_format='reel',purpose='client',frame_count=7,
+  call_to_action='Compare layouts?',script=E'SHOT 1: Synthetic QA fixture · Illustrative example\nSHOT 2: Table?\nSHOT 3: Cart?\nSHOT 4: Route?\nSHOT 5: Move?\nSHOT 6: Compare?\nSHOT 7: Compare layouts?',
+  frame_plan=array(select jsonb_build_object('duration_sec',case when n=4 then 5 else 4 end)::text from generate_series(1,7) n)
+where id='f0000000-0000-4000-8000-000000000711';
+insert into public.faceless_reel_previews_v1(client_id,brief_id,reviewed_updated_at)
+  select client_id,id,updated_at from public.client_briefs where id='f0000000-0000-4000-8000-000000000711';
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','f7777777-7777-4777-8777-777777777777',true);
+do $reel$
+declare
+  e public.faceless_reel_previews_v1%rowtype;
+  p public.video_projects%rowtype;
+  pid uuid;
+  dest text;
+begin
+  select * into strict e from public.faceless_reel_previews_v1;
+  begin
+    perform public.prepare_faceless_reel_preview_v1(e.client_id,e.brief_id,e.reviewed_updated_at);
+    raise exception 'Client user created storyboard'; exception when insufficient_privilege then null;
+  end;
+  perform set_config('request.jwt.claim.sub','f6666666-6666-4666-8666-666666666666',true);
+  begin
+    perform public.prepare_faceless_reel_preview_v1(e.client_id,e.brief_id,e.reviewed_updated_at-interval '1 second');
+    raise exception 'Stale review created storyboard'; exception when check_violation then null;
+  end;
+  pid:=public.prepare_faceless_reel_preview_v1(e.client_id,e.brief_id,e.reviewed_updated_at);
+  select * into strict p from public.video_projects where id=pid;
+  if public.prepare_faceless_reel_preview_v1(e.client_id,e.brief_id,e.reviewed_updated_at)<>pid
+    or p.target_length_sec<>29 or p.brief_id<>e.brief_id or p.stage<>'draft'
+    or p.source_snapshot->0->>'campaign_id'<>'fbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    or (select count(*) from public.video_scenes where project_id=pid)<>7
+    or exists(select 1 from public.agent_jobs where input_id=pid) then raise exception 'Draft trace mismatch'; end if;
+  perform public.edit_faceless_reel_scene_v1(e.client_id,pid,p.source_digest,2,'Which table?',4);
+  select * into strict p from public.video_projects where id=pid;
+  if p.ir_version<>2 then raise exception 'Scene edit failed to advance revision'; end if;
+  begin
+    update public.video_projects set stage='queued' where id=pid;
+    raise exception 'Silent storyboard entered narration pipeline'; exception when check_violation then null;
+  end;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  dest:=e.client_id::text||'/video/projects/'||pid::text||'/ir-v2/draft-'||p.source_digest||'.mp4';
+  insert into storage.objects(bucket_id,name,metadata) values('client-media',dest,'{"size":2048,"mimetype":"video/mp4"}');
+  if public.file_faceless_reel_preview_v1(e.client_id,pid,p.source_digest,2,repeat('a',64),2048,1080,1920,870,30)<>dest
+    or public.file_faceless_reel_preview_v1(e.client_id,pid,p.source_digest,2,repeat('a',64),2048,1080,1920,870,30)<>dest
+    then raise exception 'Preview receipt mismatch'; end if;
+end $reel$;
 rollback;

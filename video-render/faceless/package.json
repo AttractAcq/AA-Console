@@ -1,0 +1,11 @@
+{
+  "name": "aa-faceless-draft-renderer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "gsap": "3.13.0",
+    "hyperframes": "0.9.96"
+  }
+}
