@@ -110,8 +110,9 @@ it("files the permitted image against its brief after one provider call, then re
     };
     return chain;
   } } as unknown as SupabaseClient;
-  const job = { id: "job", agent_key: "creative_build", client_id: "client", params: { render_id: "render" },
-    hard_budget_required: true, attempts: 1, max_attempts: 1, lease_owner: "worker" } as AgentJobRow;
+  const job: AgentJobRow = { id: "job", agent_key: "creative_build", client_id: "client", params: { render_id: "render" },
+    status: "running", input_table: null, input_id: null, lease_until: null,
+    hard_budget_required: true, attempts: 1, max_attempts: 1, lease_owner: "worker" };
   const config = { imageModel: "gpt-image-2", openaiApiKey: "fixture" } as RuntimeConfig;
   vi.stubGlobal("fetch", fetchMock);
   try {
