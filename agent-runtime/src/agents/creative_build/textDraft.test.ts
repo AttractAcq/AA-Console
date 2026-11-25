@@ -75,7 +75,11 @@ it.each([true, false])("holds independent artwork before reading proof or callin
     return query;
   });
   const db = { from } as unknown as SupabaseClient;
-  const job = { client_id: "client", params: { render_id: "render" }, hard_budget_required: enrolled } as AgentJobRow;
+  const job: AgentJobRow = {
+    id: "job", agent_key: "creative_build", client_id: "client", input_id: null, input_table: null,
+    params: { render_id: "render" }, hard_budget_required: enrolled, status: "running",
+    attempts: 1, max_attempts: 1, lease_owner: "worker", lease_until: null,
+  };
   await expect(runCreativeBuildJob(db, {} as RuntimeConfig, {} as AgentRow, job, Date.now() + 5000))
     .rejects.toThrow("verified per-call spending ceiling");
   expect(from.mock.calls.map(([table]) => table)).toEqual(Object.keys(rows));
