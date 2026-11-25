@@ -1,6 +1,16 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { composeBody, composeAvatarBody, composeEditorBody } from "../../../agent-runtime/src/agents/brief/fields";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+function savedReel() {
+  const frames = [4, 5].map(duration_sec => ({ beat: "Pan to the bench.", opening_state: "Start at the window.",
+    duration_sec, shot_source_kind: "ai_generated", motion_preset: "slow_pan" }));
+  const input = { frames, hook: "Old hook", argument: "Old argument", script: "SHOT 1: Start here.\nSHOT 2: Finish here.",
+    visual_direction: "Overhead.", shot_requirements: "Opening frames." };
+  return { ...input, content_format: "reel", format_code: "F6", frame_count: 2, frame_plan: frames.map(f => JSON.stringify(f)),
+    body: composeBody("video", input, "reel"), avatar_brief: composeAvatarBody(input), editor_brief: composeEditorBody(input) };
+}
 
 const { briefStatus, update, eq, resultRow, excludeProof } = vi.hoisted(() => ({
   briefStatus: { value: "in_production", media: "text" }, update: vi.fn(), eq: vi.fn(),
@@ -18,6 +28,7 @@ vi.mock("../../lib/supabase", () => ({
         ...(briefStatus.value === "draft" ? {
           media_type: briefStatus.media, argument: "Old argument", script: "Old script", updated_at: "revision-1",
           body: "## Argument\n\nOld argument\n\n## Script\n\nOld script", purpose: "client", archived_at: null,
+          ...(briefStatus.media === "video" ? savedReel() : {}),
           ...(briefStatus.media === "image" ? {
             visual_direction: "Old art direction", proof_asset_id: resultRow.independent ? null : "raw",
             excluded_artwork_proof_id: resultRow.independent ? "raw" : null,
@@ -155,4 +166,25 @@ it("queues one permitted image without a reference picker and reopens the filed 
   expect(await screen.findByRole("menuitem", { name: "Open image draft" })).toBeInTheDocument();
   expect(screen.queryByRole("menuitem", { name: "Generate one image draft" })).toBeNull();
   resultRow.independent = false;
+});
+
+
+it("saves the current client’s draft reel and renderer inputs together through the reviewer form", async () => {
+  briefStatus.value = "draft";
+  briefStatus.media = "video";
+  resultRow.found = true;
+  update.mockClear();
+  render(<MemoryRouter initialEntries={["/?brief=brief-1"]}><BriefsPanel /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Edit draft reel" }));
+  fireEvent.change(screen.getAllByDisplayValue("Start at the window.")[0], { target: { value: "Start at the cart." } });
+  fireEvent.click(screen.getByRole("button", { name: "Save reel brief" }));
+  expect(await screen.findByText("Reel brief saved.")).toBeInTheDocument();
+  const patch = update.mock.calls[0][0];
+  expect(update).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(patch.frame_plan[0]).opening_state).toBe("Start at the cart.");
+  for (const text of [patch.avatar_brief, patch.editor_brief, patch.body]) expect(text).toContain("Start at the cart.");
+  for (const filter of [["id", "brief-1"], ["client_id", "client-1"], ["updated_at", "revision-1"], ["status", "draft"], ["content_format", "reel"]]) {
+    expect(eq).toHaveBeenCalledWith(...filter);
+  }
 });

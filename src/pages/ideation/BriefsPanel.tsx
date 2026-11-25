@@ -15,6 +15,7 @@ import { formatFilters, formatLabel } from "../../lib/contentFormat";
 import { platformLabel } from "../../lib/postPlatform";
 import type { FormatFilterId } from "../../lib/contentFormat";
 import { FormModal } from "../../components/forms/FormModal";
+import { prepareReelCopy } from "./reelBriefCopy";
 import { revisedBriefBody } from "./textBriefCopy";
 import { ContentJourney } from "../../components/ContentJourney";
 
@@ -27,6 +28,11 @@ type Brief = {
   format_code?: string | null;
   target_platform?: string | null;
   frame_plan?: string[] | null;
+  frame_count: number | null;
+  avatar_brief: string | null;
+  editor_brief: string | null;
+  shot_requirements: string | null;
+  hook: string | null;
   production_method?: string | null;
   brief_ref: string | null;
   status: string;
@@ -66,6 +72,7 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
   const [imageAttempts, setImageAttempts] = useState<ImageAttempt[]>([]);
   const [building, setBuilding] = useState<Brief | null>(null);
   const [editingCopy, setEditingCopy] = useState<Brief | null>(null);
+  const [editingReel, setEditingReel] = useState<{ brief: Brief; form: ReturnType<typeof prepareReelCopy> } | null>(null);
   const [viewing, setViewing] = useState<Brief | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   /** The brief whose delete or archive is running, so its menu disables. */
@@ -83,7 +90,7 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
       let query = supabase
         .from("client_briefs")
         .select(
-          "id, title, body, avatar_brief, editor_brief, media_type, content_format, target_platform, format_code, frame_plan, brief_ref, status, source_idea_id, created_at, updated_at, purpose, archived_at, hook, premise, argument, proof, script, visual_direction, shot_requirements, b_roll, call_to_action, channel_intent, production_method, proof_asset_id, excluded_artwork_proof_id",
+          "id, title, body, avatar_brief, editor_brief, media_type, content_format, target_platform, format_code, frame_plan, frame_count, brief_ref, status, source_idea_id, created_at, updated_at, purpose, archived_at, hook, premise, argument, proof, script, visual_direction, shot_requirements, b_roll, call_to_action, channel_intent, production_method, proof_asset_id, excluded_artwork_proof_id",
         )
         .eq("client_id", clientId)
         .neq("purpose", "recruitment")
@@ -323,6 +330,12 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
                 && b.content_format === "single" && !b.archived_at && b.proof_asset_id
                 && !assignments.has(b.id)
                 ? [{ label: "Exclude proof from artwork", onSelect: () => void excludeArtwork(b) }] : []),
+              ...(b.purpose === "client" && b.status === "draft" && !b.archived_at && !assignments.has(b.id)
+                && b.media_type === "video" && b.content_format === "reel" && (b.format_code === "F6" || b.format_code === "F7")
+                ? [{ label: "Edit draft reel", onSelect: () => {
+                  try { setEditingReel({ brief: b, form: prepareReelCopy(b) }); }
+                  catch (error) { setNotice(error instanceof Error ? error.message : "The reel could not be opened for editing."); }
+                } }] : []),
               { label: "View brief", onSelect: () => setViewing(b) },
               { label: "Archive", busyLabel: "Archiving…", onSelect: () => void archiveBrief(b) },
               { label: "Delete", destructive: true, busyLabel: "Deleting…", onSelect: () => void deleteBrief(b) },
@@ -330,6 +343,28 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
           />,
         ])}
       />
+
+      {editingReel && <FormModal open title="Edit draft reel" submitLabel="Save reel brief"
+        fields={editingReel.form.fields} initialValues={editingReel.form.initialValues}
+        onClose={() => setEditingReel(null)}
+        onSubmit={async values => {
+          if (!clientId) throw new Error("Select a client before editing.");
+          const { data: brand, error: brandError } = await supabase.from("client_brand_profiles")
+            .select("never_do, colour_primary, colour_secondary, colour_accent, colour_background, colour_text")
+            .eq("client_id", clientId).maybeSingle();
+          if (brandError) throw new Error(brandError.message);
+          const palette = brand ? [brand.colour_primary, brand.colour_secondary, brand.colour_accent,
+            brand.colour_background, brand.colour_text].filter((colour): colour is string => !!colour) : null;
+          const patch = editingReel.form.revision(values, brand?.never_do ?? "", palette);
+          const { data, error } = await supabase.from("client_briefs").update(patch)
+            .eq("client_id", clientId).eq("id", editingReel.brief.id).eq("updated_at", editingReel.brief.updated_at)
+            .eq("purpose", "client").eq("media_type", "video").eq("content_format", "reel")
+            .eq("status", "draft").is("archived_at", null).select("id").maybeSingle();
+          if (error) throw new Error(error.message);
+          if (!data) throw new Error("The reel changed or is unavailable for editing. Refresh before saving.");
+        }}
+        onSaved={() => { setNotice("Reel brief saved."); void refresh(); }}
+      />}
 
       {editingCopy && <FormModal
         open title="Edit draft copy" submitLabel="Save brief"
