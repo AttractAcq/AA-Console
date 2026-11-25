@@ -7,7 +7,7 @@ function savedReel() {
   const frames = [4, 5].map(duration_sec => ({ beat: "Pan to the bench.", opening_state: "Start at the window.",
     duration_sec, shot_source_kind: "ai_generated", motion_preset: "slow_pan" }));
   const input = { frames, hook: "Old hook", argument: "Old argument", script: "SHOT 1: Start here.\nSHOT 2: Finish here.",
-    visual_direction: "Overhead.", shot_requirements: "Opening frames." };
+    call_to_action: "Book a visit.", visual_direction: "Overhead.", shot_requirements: "Opening frames." };
   return { ...input, content_format: "reel", format_code: "F6", frame_count: 2, frame_plan: frames.map(f => JSON.stringify(f)),
     body: composeBody("video", input, "reel"), avatar_brief: composeAvatarBody(input), editor_brief: composeEditorBody(input) };
 }
@@ -177,11 +177,15 @@ it("saves the current client’s draft reel and renderer inputs together through
   render(<MemoryRouter initialEntries={["/?brief=brief-1"]}><BriefsPanel /></MemoryRouter>);
   fireEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
   fireEvent.click(screen.getByRole("menuitem", { name: "Edit draft reel" }));
+  fireEvent.change(screen.getByDisplayValue("Book a visit."), { target: { value: "Finish here." } });
   fireEvent.change(screen.getAllByDisplayValue("Start at the window.")[0], { target: { value: "Start at the cart." } });
   fireEvent.click(screen.getByRole("button", { name: "Save reel brief" }));
   expect(await screen.findByText("Reel brief saved.")).toBeInTheDocument();
   const patch = update.mock.calls[0][0];
   expect(update).toHaveBeenCalledTimes(1);
+  expect(patch.call_to_action).toBe("Finish here.");
+  for (const doc of [patch.body, patch.editor_brief, patch.avatar_brief]) expect(doc).not.toContain("Book a visit.");
+  expect(patch.body).toContain("## Call to action\n\nFinish here.");
   expect(JSON.parse(patch.frame_plan[0]).opening_state).toBe("Start at the cart.");
   for (const text of [patch.avatar_brief, patch.editor_brief, patch.body]) expect(text).toContain("Start at the cart.");
   for (const filter of [["id", "brief-1"], ["client_id", "client-1"], ["updated_at", "revision-1"], ["status", "draft"], ["content_format", "reel"]]) {
