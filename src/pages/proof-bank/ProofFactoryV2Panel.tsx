@@ -1,3 +1,4 @@
+import { callRuntime } from "../../lib/callRuntime";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { enqueueAgentJob, supabase } from "../../lib/supabase";
@@ -81,8 +82,10 @@ function ProofProductionWorkspace({
   const [form, setForm] = useState(false);
   const [upload, setUpload] = useState(false);
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
+  const [filing, setFiling] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [rawOpen, setRawOpen] = useState<Raw | null>(null);
+  const [exactPreview, setExactPreview] = useState<{ id: string; text: string } | null>(null);
   const [assetOpen, setAssetOpen] = useState<MediaAsset | null>(null);
   const [building, setBuilding] = useState<Brief | null>(null);
   const [viewBrief, setViewBrief] = useState<Brief | null>(null);
@@ -192,7 +195,24 @@ function ProofProductionWorkspace({
     tab === "repurpose" ? Boolean(r.source_asset_id) : !r.source_asset_id,
   );
   const preview = (a: MediaAsset) => (
-    <button className={button} onClick={() => setAssetOpen(a)}>
+    <button className={button} onClick={async () => {
+      if (a.storage_path?.startsWith(`${clientId}/proof-drafts/`)) {
+        try {
+          const file = await supabase.storage.from("client-media").download(a.storage_path);
+          if (file.error || !file.data) throw new Error();
+          const bytes = await file.data.arrayBuffer();
+          const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+          const hash = Array.from(digest, x => x.toString(16).padStart(2, "0")).join("");
+          if (hash !== a.delivery_bytes_sha256) throw new Error();
+          const content = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+          setExactPreview({ id: a.id, text: content });
+        } catch {
+          setError("The stored text could not be verified. Refresh before reopening it.");
+          return;
+        }
+      }
+      setAssetOpen(a);
+    }}>
       Preview
     </button>
   );
@@ -391,11 +411,8 @@ function ProofProductionWorkspace({
                   <td className="p-3">
                     {a.title ?? a.ref_number}
                     <span className="block text-xs text-muted-foreground">
-                      {raw.find(
-                        (p) =>
-                          p.id ===
-                          byBrief.get(a.brief_id ?? "")?.proof_asset_id,
-                      )?.title ?? "Linked proof"}
+                      {raw.filter(p => p.id === byBrief.get(a.brief_id ?? "")?.proof_asset_id)
+                        .map(p => [p.ref_number, p.title].filter(Boolean).join(" · "))[0] || "Linked proof"}
                     </span>
                   </td>
                   <td className="p-3">
@@ -430,6 +447,11 @@ function ProofProductionWorkspace({
           <h3 className="font-semibold">Production requests</h3>
           {pending.map((r) => {
             const b = briefs.find((x) => x.source_idea_id === r.idea_id);
+            const source = raw.find(p => p.id === r.source_proof_id);
+            const canFile = !r.auto_produce && !r.source_asset_id && r.production_status === "briefing"
+              && b?.status === "draft" && !b.archived_at && b.media_type === "text" && b.content_format === "single"
+              && source?.media_type === "text" && source.usage_rights === "approved" && source.approved_rights_request_id
+              && !!b.script && b.script === source.body && !assets.some(a => a.brief_id === b.id);
             const j = jobs.find((x) => x.id === r.job_id);
             const summary = counts.find((x) => x.request_id === r.id);
             return (
@@ -492,12 +514,26 @@ function ProofProductionWorkspace({
                     <button className={button} onClick={() => setViewBrief(b)}>
                       Brief
                     </button>
+                    {canFile && <button type="button" className={button} disabled={filing !== null}
+                      onClick={async () => {
+                        setFiling(r.id);
+                        setNotice(null);
+                        setError(null);
+                        try {
+                          await callRuntime("/admin/proof/file-reviewed-text", { clientId, requestId: r.id,
+                            briefId: b.id, revision: b.updated_at, rightsId: source.approved_rights_request_id });
+                          await refresh();
+                          setNotice("Reviewed text filed. Open Assets → Produced to preview it.");
+                        } catch (cause) {
+                          setError(cause instanceof Error ? cause.message : "Could not file the reviewed text.");
+                        } finally { setFiling(null); }
+                      }}>{filing === r.id ? "Filing…" : "File reviewed Script verbatim"}</button>}
                     <button
                       disabled={
-                        r.auto_produce &&
+                        r.production_status === "complete" || (r.auto_produce &&
                         !["failed", "needs_attention"].includes(
                           r.production_status,
-                        )
+                        ))
                       }
                       className={button}
                       onClick={() => setBuilding(b)}
@@ -719,8 +755,8 @@ function ProofProductionWorkspace({
             ? urls.get(assetOpen.render_path || assetOpen.storage_path)
             : undefined
         }
-        body={assetOpen ? textBodies.get(assetOpen.id) : undefined}
-        onClose={() => setAssetOpen(null)}
+        body={assetOpen && exactPreview?.id === assetOpen.id ? exactPreview.text : assetOpen ? textBodies.get(assetOpen.id) : undefined}
+        onClose={() => { setAssetOpen(null); setExactPreview(null); }}
       />
       <BriefDetailModal
         brief={viewBrief}

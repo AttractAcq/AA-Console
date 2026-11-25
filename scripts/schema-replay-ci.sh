@@ -168,6 +168,9 @@ diff -u "$evidence_dir/upgrade.fingerprint.json" \
     exit 1
   }
 
+psql_local -f scripts/test-file-reviewed-proof-text.sql >/dev/null
+echo 'Reviewed text filing and Produced source receipt passed.'
+
 psql_local -f scripts/test-opportunity-proof-retirement.sql >/dev/null
 echo 'Opportunity requirement retirement and approval readiness passed.'
 

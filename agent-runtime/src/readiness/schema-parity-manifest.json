@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "09a753aae1e8efb5f3ae15ae5a70a53fcba5ccea8b99b76201982bb1a05943a6",
-  "generatedTypesSha256": "bf4d325fb51eda6c1c9ffa140275d2e96ee01c6ffe29e3365b13c392f1dfd860",
-  "generatedSchemaBodySha256": "19c639262876697fd1b24232e627f9cb28d684c7c1855616d03cffafcc406df9",
+  "migrationSourceDigest": "c2280c1c728fae6dadfc729bdd9c25c2e399e26e212a623b5ae28d8dfab26512",
+  "generatedTypesSha256": "a6fb17bc014ee080e41ef320052d3fe95535ad15403bfe79e31ff41f47e2c574",
+  "generatedSchemaBodySha256": "3bde14101f061c7f353ca60e5be723d5a6415050d57d95e51682b9bd212891df",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -5050,6 +5050,13 @@
       "filename": "20261124061900_704_retire_opportunity_proof_requirement.sql",
       "sha256": "d6a15a7eb396bf90076b0749cb471ed346e19cbc1cd9eb9b822074072d35ef43",
       "trimmedMd5": "03b8bc1ce156fd324b9a91e7a504e014"
+    },
+    {
+      "version": "20261124062000",
+      "name": "705_file_reviewed_proof_text",
+      "filename": "20261124062000_705_file_reviewed_proof_text.sql",
+      "sha256": "7ceed1304e5cb78214b53c3892ce4c3ff57aa17103e85f01aa2265a55c1e2a5b",
+      "trimmedMd5": "51ab153af5d673358aa0ab32ef2609a3"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

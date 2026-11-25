@@ -1,10 +1,11 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
-const { from, rpc, enqueueAgentJob } = vi.hoisted(() => ({
-  from: vi.fn(), rpc: vi.fn(), enqueueAgentJob: vi.fn(),
+const { from, rpc, enqueueAgentJob, callRuntime, download } = vi.hoisted(() => ({
+  from: vi.fn(), rpc: vi.fn(), enqueueAgentJob: vi.fn(), callRuntime: vi.fn(), download: vi.fn(),
 }));
-vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc }, enqueueAgentJob }));
+vi.mock("../../lib/callRuntime", () => ({ callRuntime }));
+vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc, storage: { from: () => ({ download }) } }, enqueueAgentJob }));
 vi.mock("react-router-dom", () => ({
   useParams: () => ({ clientId: "client-a" }),
   Link: ({ children }: { children: React.ReactNode }) => (
@@ -29,7 +30,7 @@ vi.mock("../../components/proof/ProofDetailModal", () => ({
   ProofDetailModal: () => null,
 }));
 vi.mock("../../components/MediaDetailModal", () => ({
-  MediaDetailModal: () => null,
+  MediaDetailModal: ({ open, body }: { open: boolean; body?: string }) => open ? <p>{body}</p> : null,
 }));
 vi.mock("../../components/briefs/ApproveAndBuildModal", () => ({
   ApproveAndBuildModal: () => null,
@@ -38,11 +39,12 @@ vi.mock("../../components/briefs/BriefDetailModal", () => ({
   BriefDetailModal: () => null,
 }));
 import { ProofFactoryV2Panel } from "./ProofFactoryV2Panel";
+let rows: Record<string, unknown[]>;
 beforeEach(() => {
   vi.clearAllMocks();
   rpc.mockResolvedValue({ data: "request-1", error: null });
   enqueueAgentJob.mockResolvedValue(undefined);
-  const rows: Record<string, unknown[]> = {
+  rows = {
     client_proof_assets: [
       {
         id: "proof-1",
@@ -189,4 +191,44 @@ it("can still send the proof discovery agent looking, which only v1 could", asyn
       clientId: "client-a",
     }),
   );
+});
+
+it.each([true, false])("offers exact filing only for a matching draft script (exact=%s)", async exact => {
+  rows.client_proof_assets = [{ id: "proof", media_type: "text", usage_rights: "approved",
+    approved_rights_request_id: "rights", title: "Storage", body: "Raw text" }];
+  rows.client_media_assets = [];
+  rows.client_briefs = [{ id: "brief", source_idea_id: "idea", proof_asset_id: "proof",
+    status: "draft", media_type: "text", content_format: "single", updated_at: "rev",
+    script: exact ? "Raw text" : "Changed text" }];
+  rows.proof_production_requests = [{ id: "request", idea_id: "idea", source_proof_id: "proof",
+    auto_produce: false, production_status: "briefing" }];
+  render(<ProofFactoryV2Panel tab="produce" />);
+  await screen.findByText("Production requests");
+  const action = screen.queryByRole("button", { name: "File reviewed Script verbatim" });
+  if (!exact) {
+    expect(action).toBeNull();
+    return;
+  }
+  await userEvent.click(action!);
+  expect(callRuntime).toHaveBeenCalledExactlyOnceWith("/admin/proof/file-reviewed-text", {
+    clientId: "client-a", requestId: "request", briefId: "brief", revision: "rev", rightsId: "rights",
+  });
+  expect(await screen.findByText(/Reviewed text filed/)).toBeInTheDocument();
+});
+
+it.each([true, false])("verifies exact stored text before opening its full preview (match=%s)", async same => {
+  const { createHash } = await import("node:crypto");
+  const text = "Synthetic QA fixture " + "x".repeat(4020);
+  const data = new TextEncoder().encode(text);
+  download.mockResolvedValue({ data: { arrayBuffer: async () => data.buffer }, error: null });
+  rows.client_media_assets = [{ id: "asset", brief_id: "brief-1", media_type: "text",
+    title: "Exact file", client_id: "client-a", review_status: "pending",
+    storage_path: "client-a/proof-drafts/request/file.txt",
+    delivery_bytes_sha256: same ? createHash("sha256").update(text).digest("hex") : "stale",
+  }];
+  render(<ProofFactoryV2Panel tab="assets" />);
+  await userEvent.click(await screen.findByRole("button", { name: "Produced" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Preview" }));
+  if (same) expect(await screen.findByText(text)).toBeInTheDocument();
+  else expect(await screen.findByRole("alert")).toHaveTextContent("stored text could not be verified");
 });

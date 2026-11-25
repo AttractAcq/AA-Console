@@ -1,3 +1,4 @@
+import { handleFileReviewedText } from "./proof-rights/file-reviewed-text.js";
 import { handlePublicProof } from "./proof-capture/public-route.js";
 import { handleProofCaptureAdmin } from "./proof-capture/admin-route.js";
 import { handleDailyVideoOperator } from "./video/daily-operator-route.js";
@@ -396,6 +397,10 @@ function dispatchRequest(req: http.IncomingMessage, res: http.ServerResponse): v
   }
   if (req.url === "/admin/lead-magnets/attest") {
     void handleLeadMagnetAttestation(req, res, sb);
+    return;
+  }
+  if (req.url === "/admin/proof/file-reviewed-text") {
+    void handleFileReviewedText(req, res, sb);
     return;
   }
   if (req.url === "/admin/proof-rights/request-media") {

@@ -45047,6 +45047,18 @@ export type Database = {
         }
         Returns: boolean
       }
+      file_reviewed_proof_text: {
+        Args: {
+          p_actor_id: string
+          p_brief_id: string
+          p_client_id: string
+          p_request_id: string
+          p_revision: string
+          p_rights_id: string
+          p_verified_object?: Json
+        }
+        Returns: Json
+      }
       file_video_project_thumbnail_v1: {
         Args: {
           p_attempt_id: string
