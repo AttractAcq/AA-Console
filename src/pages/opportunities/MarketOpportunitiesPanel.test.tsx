@@ -185,6 +185,31 @@ describe("single-page opportunity flow", () => {
     expect(fetchRequirementProof).toHaveBeenCalledWith("client-1", "opp-1");
   });
 
+  it("retires only an open requirement, then shows the saved decision separately from satisfied proof", async () => {
+    search.value = "opportunity=opp-1&stage=strategize";
+    const open = { id: "req-1", requirement: "Show completed installation", proof_id: null, retired_at: null };
+    const satisfied = { ...open, id: "req-2", requirement: "Show the layout", proof_id: "proof-1", proof: { ref_number: "PF-01" } };
+    const data = { requirements: [open, satisfied], choices: [], canRetire: true };
+    fetchRequirementProof.mockResolvedValue(data);
+    const user = userEvent.setup();
+    render(<MarketOpportunitiesPanel />);
+    const group = await screen.findByRole("group", { name: open.requirement });
+    expect(screen.getByText("1 satisfied · 0 retired · 1 open")).toBeInTheDocument();
+    expect(within(screen.getByRole("group", { name: satisfied.requirement })).queryByRole("button")).toBeNull();
+    await user.click(within(group).getByRole("button", { name: "Retire as out of scope" }));
+    const reason = "The reviewed service delivers a layout.";
+    await user.type(screen.getByRole("textbox", { name: /outside the offer scope/ }), reason);
+    fetchRequirementProof.mockResolvedValue({ ...data, requirements: [
+      { ...open, retired_at: "2026-11-24T19:00:00Z", retired_by: "reviewer-1", retirement_reason: reason }, satisfied,
+    ] });
+    await user.click(screen.getByRole("button", { name: "Retire requirement" }));
+    expect(rpc).toHaveBeenCalledWith("retire_opportunity_proof_requirement", { p_requirement_id: open.id, p_reason: reason });
+    expect(await screen.findByText("1 satisfied · 1 retired · 0 open")).toBeInTheDocument();
+    expect(screen.getByText("Retired — out of scope")).toBeInTheDocument();
+    expect(screen.getByText(reason)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retire as out of scope" })).toBeNull();
+  });
+
   it("shows an open requirement without a link action when there is no eligible proof", async () => {
     search.value = "opportunity=opp-1&stage=strategize";
     fetchRequirementProof.mockResolvedValue({

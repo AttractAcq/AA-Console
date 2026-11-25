@@ -258,14 +258,14 @@ export async function fetchBaselineServices(clientId: string) {
 export async function fetchRequirementProof(clientId: string, opportunityId: string) {
   const [requirements, permission] = await Promise.all([
     supabase.from("opportunity_proof_requirements")
-      .select("id,requirement,proof_id,proof:client_proof_assets!opportunity_proof_requirements_proof_id_fkey(ref_number,title)")
+      .select("id,requirement,proof_id,retired_at,retired_by,retirement_reason,proof:client_proof_assets!opportunity_proof_requirements_proof_id_fkey(ref_number,title)")
       .eq("client_id", clientId).eq("opportunity_id", opportunityId).order("created_at").order("id"),
     supabase.rpc("can_shape_opportunity", { p_client_id: clientId }),
   ]);
   if (requirements.error) throw new Error(requirements.error.message);
   if (permission.error) throw new Error(permission.error.message);
   const choices: { id: string; ref_number: string | null; title: string | null }[] = [];
-  if (permission.data && requirements.data.some((row) => !row.proof_id)) {
+  if (permission.data && requirements.data.some((row) => !row.proof_id && !row.retired_at)) {
     const today = new Date().toISOString().slice(0, 10);
     const assets = await supabase.from("client_proof_assets").select("id,ref_number,title")
       .eq("client_id", clientId).eq("usage_rights", "approved")
@@ -273,7 +273,14 @@ export async function fetchRequirementProof(clientId: string, opportunityId: str
     if (assets.error) throw new Error(assets.error.message);
     choices.push(...assets.data);
   }
-  return { requirements: requirements.data, choices };
+  return { requirements: requirements.data, choices, canRetire: permission.data === true };
+}
+
+export async function retireProofRequirement(requirementId: string, reason: string) {
+  const { error } = await supabase.rpc("retire_opportunity_proof_requirement", {
+    p_requirement_id: requirementId, p_reason: reason,
+  });
+  if (error) throw new Error(error.message);
 }
 
 export async function satisfyProof(requirementId: string, proofId: string) {

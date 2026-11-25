@@ -22688,6 +22688,9 @@ export type Database = {
           opportunity_id: string
           proof_id: string | null
           requirement: string
+          retired_at: string | null
+          retired_by: string | null
+          retirement_reason: string | null
           satisfied_at: string | null
         }
         Insert: {
@@ -22697,6 +22700,9 @@ export type Database = {
           opportunity_id: string
           proof_id?: string | null
           requirement: string
+          retired_at?: string | null
+          retired_by?: string | null
+          retirement_reason?: string | null
           satisfied_at?: string | null
         }
         Update: {
@@ -22706,6 +22712,9 @@ export type Database = {
           opportunity_id?: string
           proof_id?: string | null
           requirement?: string
+          retired_at?: string | null
+          retired_by?: string | null
+          retirement_reason?: string | null
           satisfied_at?: string | null
         }
         Relationships: [
@@ -49098,6 +49107,10 @@ export type Database = {
         }
       }
       resume_paused_jobs: { Args: never; Returns: number }
+      retire_opportunity_proof_requirement: {
+        Args: { p_reason: string; p_requirement_id: string }
+        Returns: undefined
+      }
       retry_campaign_conversion_step_v7: {
         Args: { p_step_id: string }
         Returns: {
