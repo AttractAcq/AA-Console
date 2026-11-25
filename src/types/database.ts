@@ -14291,6 +14291,68 @@ export type Database = {
         }
         Relationships: []
       }
+      faceless_reel_previews_v1: {
+        Row: {
+          brief_id: string
+          client_id: string
+          file_bytes: number | null
+          file_sha256: string | null
+          filed_at: string | null
+          project_id: string | null
+          reviewed_updated_at: string
+          storage_path: string | null
+        }
+        Insert: {
+          brief_id: string
+          client_id: string
+          file_bytes?: number | null
+          file_sha256?: string | null
+          filed_at?: string | null
+          project_id?: string | null
+          reviewed_updated_at: string
+          storage_path?: string | null
+        }
+        Update: {
+          brief_id?: string
+          client_id?: string
+          file_bytes?: number | null
+          file_sha256?: string | null
+          filed_at?: string | null
+          project_id?: string | null
+          reviewed_updated_at?: string
+          storage_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "faceless_reel_previews_v1_brief_id_client_id_fkey"
+            columns: ["brief_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_briefs"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "faceless_reel_previews_v1_brief_id_client_id_fkey"
+            columns: ["brief_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive"
+            referencedColumns: ["brief_id", "client_id"]
+          },
+          {
+            foreignKeyName: "faceless_reel_previews_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_project_status_v1"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "faceless_reel_previews_v1_project_id_client_id_fkey"
+            columns: ["project_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
       finance_entries: {
         Row: {
           amount: number
@@ -30611,6 +30673,7 @@ export type Database = {
           daily_brief_body_sha256: string | null
           daily_item_id: string | null
           daily_source_digest: string | null
+          draft_renderer: string | null
           id: string
           idea: string
           ir: Json | null
@@ -30650,6 +30713,7 @@ export type Database = {
           daily_brief_body_sha256?: string | null
           daily_item_id?: string | null
           daily_source_digest?: string | null
+          draft_renderer?: string | null
           id?: string
           idea: string
           ir?: Json | null
@@ -30689,6 +30753,7 @@ export type Database = {
           daily_brief_body_sha256?: string | null
           daily_item_id?: string | null
           daily_source_digest?: string | null
+          draft_renderer?: string | null
           id?: string
           idea?: string
           ir?: Json | null
@@ -44023,6 +44088,7 @@ export type Database = {
           daily_brief_body_sha256: string | null
           daily_item_id: string | null
           daily_source_digest: string | null
+          draft_renderer: string | null
           id: string
           idea: string
           ir: Json | null
@@ -44824,6 +44890,17 @@ export type Database = {
         Args: { p_body: string; p_review_id: string }
         Returns: string
       }
+      edit_faceless_reel_scene_v1: {
+        Args: {
+          p_caption: string
+          p_client_id: string
+          p_duration_sec: number
+          p_position: number
+          p_project_id: string
+          p_source_digest: string
+        }
+        Returns: undefined
+      }
       engine_is_enabled: { Args: { p_client_id: string }; Returns: boolean }
       engine_jobs_in_flight: { Args: { p_client_id: string }; Returns: number }
       engine_slot_exact_hash_v6: {
@@ -45076,6 +45153,21 @@ export type Database = {
           p_project_id: string
         }
         Returns: boolean
+      }
+      file_faceless_reel_preview_v1: {
+        Args: {
+          p_bytes: number
+          p_client_id: string
+          p_fps: number
+          p_frames: number
+          p_height: number
+          p_ir_version: number
+          p_project_id: string
+          p_sha256: string
+          p_source_digest: string
+          p_width: number
+        }
+        Returns: string
       }
       file_reviewed_proof_text: {
         Args: {
@@ -47125,6 +47217,14 @@ export type Database = {
           created: number
           skipped: number
         }[]
+      }
+      prepare_faceless_reel_preview_v1: {
+        Args: {
+          p_brief_id: string
+          p_client_id: string
+          p_expected_updated_at: string
+        }
+        Returns: string
       }
       preview_slots: {
         Args: { p_client_id: string; p_days?: number; p_now?: string }
