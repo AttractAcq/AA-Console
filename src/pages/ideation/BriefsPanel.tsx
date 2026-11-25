@@ -33,6 +33,7 @@ type Brief = {
   editor_brief: string | null;
   shot_requirements: string | null;
   hook: string | null;
+  call_to_action: string | null;
   production_method?: string | null;
   brief_ref: string | null;
   status: string;

@@ -8,7 +8,7 @@ function source() {
     duration_sec: 4, shot_source_kind: "ai_generated", motion_preset: "slow_pan" };
   const input = { frames: [shot, { ...shot, duration_sec: 5 }], hook: "Old hook", argument: "Old argument",
     script: "SHOT 1: What fits?\nSHOT 2: Compare options.", visual_direction: "Old direction",
-    shot_requirements: "Record the tiled floor.", proof: "Exact-source permission.", production_notes: "Keep the illustrative label." };
+    call_to_action: null, shot_requirements: "Record the tiled floor.", proof: "Exact-source permission.", production_notes: "Keep the illustrative label." };
   const { production_notes: _notes, ...columns } = input;
   return { ...columns, frame_count: 2, frame_plan: input.frames.map(serializeShot),
     body: composeBody("video", input, "reel"), avatar_brief: composeAvatarBody(input), editor_brief: composeEditorBody(input) };
