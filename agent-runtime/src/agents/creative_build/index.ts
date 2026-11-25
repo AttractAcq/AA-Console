@@ -110,6 +110,7 @@ interface BriefRow {
   media_type: "image" | "text" | "video";
   brief_ref: string | null;
   proof_asset_id: string | null;
+  excluded_artwork_proof_id: string | null;
   /** 'client' or 'recruitment'. A hiring ad is a different deliverable. */
   purpose: string | null;
   recruitment_role: string | null;
@@ -516,13 +517,18 @@ export async function runCreativeBuildJob(
 
   const { data: brief, error: briefError } = await sb
     .from("client_briefs")
-    .select("id, client_id, title, body, visual_direction, media_type, brief_ref, proof_asset_id, purpose, recruitment_role, content_format, format_code, frame_count, frame_plan")
+    .select("id, client_id, title, body, visual_direction, media_type, brief_ref, proof_asset_id, excluded_artwork_proof_id, purpose, recruitment_role, content_format, format_code, frame_count, frame_plan")
     .eq("id", generation.brief_id)
     .maybeSingle();
   if (briefError) throw new Error(`Could not load the brief: ${briefError.message}`);
   if (!brief) return { ok: false, retryable: false, failureMessage: "That brief no longer exists." };
 
   const typed = brief as BriefRow;
+  // Independent artwork has no verified renderer ceiling. Stop before even
+  // loading the proof library, a reference file, or a cached concept.
+  if (typed.excluded_artwork_proof_id) {
+    throw new HardBudgetHold("Independent artwork is held until the renderer has a verified per-call spending ceiling.");
+  }
   // Only single text builds on the reserved Messages loop have a priced bound.
   // Read the persisted route before any concept, renderer or provider side effect.
   if (job.hard_budget_required) {

@@ -61,3 +61,27 @@ it("recovers the exact text draft after an interrupted file attestation without 
   expect(generation).toMatchObject({ asset_id: "asset", brief_id: "brief", concept: copy, stage: "done" });
   expect(brief).toMatchObject({ status: "complete" });
 });
+
+it.each([true, false])("holds independent artwork before reading proof or calling a provider (enrolled=%s)", async enrolled => {
+  messages.mockClear();
+  const rows: Record<string, object> = {
+    creative_renders: { id: "render", generation_id: "generation", reference_path: "excluded.png" },
+    creative_generations: { brief_id: "brief", concept: { subject: "cached source" } },
+    client_briefs: { id: "brief", media_type: "image", excluded_artwork_proof_id: "cleared-raw" },
+  };
+  const from = vi.fn((table: string) => {
+    if (!rows[table]) throw new Error("Unexpected read: " + table);
+    const query = { select: () => query, eq: () => query, maybeSingle: async () => ({ data: rows[table] }) };
+    return query;
+  });
+  const db = { from } as unknown as SupabaseClient;
+  const job: AgentJobRow = {
+    id: "job", agent_key: "creative_build", client_id: "client", input_id: null, input_table: null,
+    params: { render_id: "render" }, hard_budget_required: enrolled, status: "running",
+    attempts: 1, max_attempts: 1, lease_owner: "worker", lease_until: null,
+  };
+  await expect(runCreativeBuildJob(db, {} as RuntimeConfig, {} as AgentRow, job, Date.now() + 5000))
+    .rejects.toThrow("verified per-call spending ceiling");
+  expect(from.mock.calls.map(([table]) => table)).toEqual(Object.keys(rows));
+  expect(messages).not.toHaveBeenCalled();
+});

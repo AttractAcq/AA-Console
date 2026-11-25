@@ -168,6 +168,9 @@ diff -u "$evidence_dir/upgrade.fingerprint.json" \
     exit 1
   }
 
+psql_local -f scripts/test-independent-brief-artwork.sql >/dev/null
+echo 'Independent artwork source exclusion passed.'
+
 psql_local -f scripts/test-file-reviewed-proof-text.sql >/dev/null
 echo 'Reviewed text filing and Produced source receipt passed.'
 
