@@ -42174,6 +42174,10 @@ export type Database = {
         Args: { p_issued_at: string; p_nonce_hash: string }
         Returns: boolean
       }
+      claim_reviewed_image_attempt: {
+        Args: { p_job_id: string; p_owner: string; p_render_id: string }
+        Returns: string
+      }
       claim_video_project_creative_v1: {
         Args: { p_candidate_id: string; p_job_id: string }
         Returns: Json
@@ -47308,6 +47312,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      queue_reviewed_image_attempt: {
+        Args: { p_brief_id: string; p_client_id: string }
+        Returns: string
+      }
       queue_video_audio_v1: {
         Args: {
           p_ir_version: number
@@ -49425,6 +49433,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      reviewed_image_attempt_state: {
+        Args: { p_client_id: string }
+        Returns: {
+          asset_id: string
+          brief_id: string
+          job_id: string
+        }[]
+      }
       reviewed_offer_strategy_snapshot_v7: {
         Args: { p_client_id: string }
         Returns: Json
@@ -50426,6 +50442,16 @@ export type Database = {
       }
       settle_completed_blocked_daily_siblings: {
         Args: { p_limit?: number }
+        Returns: number
+      }
+      settle_reviewed_image_attempt: {
+        Args: {
+          p_input: number
+          p_job_id: string
+          p_output: number
+          p_owner: string
+          p_request_id: string
+        }
         Returns: number
       }
       settle_sales_runtime_v6: {

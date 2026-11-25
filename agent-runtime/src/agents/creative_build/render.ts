@@ -25,6 +25,25 @@ export class RenderError extends Error {
   }
 }
 
+export interface ImageUsageReceipt {
+  requestId: string | null;
+  usage?: {
+    input_tokens: number; output_tokens: number; total_tokens: number;
+    input_tokens_details?: { text_tokens: number; image_tokens: number };
+    output_tokens_details?: { text_tokens: number; image_tokens: number };
+  };
+}
+
+export function textOnlyImageUsage({ requestId, usage }: ImageUsageReceipt) {
+  if (!requestId || !usage || !Number.isSafeInteger(usage.input_tokens) || usage.input_tokens <= 0 ||
+      !Number.isSafeInteger(usage.output_tokens) || usage.output_tokens <= 0 ||
+      usage.total_tokens !== usage.input_tokens + usage.output_tokens ||
+      usage.input_tokens_details?.text_tokens !== usage.input_tokens || usage.input_tokens_details.image_tokens !== 0 ||
+      (usage.output_tokens_details && (usage.output_tokens_details.text_tokens !== 0 ||
+        usage.output_tokens_details.image_tokens !== usage.output_tokens))) return null;
+  return { requestId, inputTokens: usage.input_tokens, outputTokens: usage.output_tokens };
+}
+
 export interface RenderedImage {
   bytes: Buffer;
   contentType: string;
@@ -62,7 +81,7 @@ export interface ReferenceImage {
 export async function renderImage(
   config: RuntimeConfig,
   prompt: string,
-  opts: { size: string; quality: string; reference?: ReferenceImage | null; model?: string },
+  opts: { size: string; quality: string; reference?: ReferenceImage | null; model?: string; onReceipt?: (receipt: ImageUsageReceipt) => Promise<void> },
 ): Promise<RenderedImage> {
   if (!config.openaiApiKey) {
     throw new RenderError(
@@ -98,6 +117,7 @@ export async function renderImage(
       });
     } else {
       response = await fetch(GENERATE_ENDPOINT, {
+        ...(opts.onReceipt ? { redirect: "error" as const } : {}),
         method: "POST",
         signal: controller.signal,
         headers: {
@@ -116,8 +136,13 @@ export async function renderImage(
 
     const body = (await response.json().catch(() => null)) as {
       data?: Array<{ b64_json?: string; url?: string }>;
+      usage?: ImageUsageReceipt["usage"];
       error?: { message?: string; code?: string; type?: string };
     } | null;
+
+    if (opts.onReceipt) {
+      await opts.onReceipt({ requestId: response.headers.get("x-request-id"), usage: body?.usage });
+    }
 
     if (!response.ok) {
       const message = body?.error?.message ?? `Image API returned ${response.status}`;
@@ -141,7 +166,7 @@ export async function renderImage(
       };
     }
     // Some responses hand back a URL instead of inline base64.
-    if (first?.url) {
+    if (first?.url && !opts.onReceipt) {
       const file = await fetch(first.url, { signal: controller.signal });
       if (!file.ok) throw new RenderError(`Could not download the rendered image (${file.status}).`, true);
       const type = file.headers.get("content-type") ?? "image/png";

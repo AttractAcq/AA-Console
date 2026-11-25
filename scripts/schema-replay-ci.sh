@@ -168,6 +168,9 @@ diff -u "$evidence_dir/upgrade.fingerprint.json" \
     exit 1
   }
 
+psql_local -f scripts/test-reviewed-image-attempt.sql >/dev/null
+echo "Single image authorization, reservation, replay denial and settlement passed."
+
 psql_local -f scripts/test-independent-brief-artwork.sql >/dev/null
 echo 'Independent artwork source exclusion passed.'
 

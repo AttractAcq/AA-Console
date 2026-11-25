@@ -85,3 +85,46 @@ it.each([true, false])("holds independent artwork before reading proof or callin
   expect(from.mock.calls.map(([table]) => table)).toEqual(Object.keys(rows));
   expect(messages).not.toHaveBeenCalled();
 });
+
+it("files the permitted image against its brief after one provider call, then refuses replay", async () => {
+  const { default: sharp } = await import("sharp");
+  const png = await sharp(Buffer.from('<svg width="64" height="64"><rect width="64" height="64" fill="green"/><circle cx="32" cy="32" r="20" fill="navy"/></svg>')).png().toBuffer();
+  const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({
+    data: [{ b64_json: png.toString("base64") }],
+    usage: { input_tokens: 20, output_tokens: 100, total_tokens: 120, input_tokens_details: { image_tokens: 0, text_tokens: 20 } },
+  }), { headers: { "x-request-id": "req-test" } }));
+  const rpc = vi.fn().mockResolvedValueOnce({ data: "Reviewed fictional scene" })
+    .mockResolvedValueOnce({ data: 0.0031 }).mockResolvedValueOnce({ error: { message: "Consumed" } });
+  const rows: Record<string, Record<string, unknown>> = {
+    creative_generations: { id: "generation", client_id: "client", brief_id: "brief", media_type: "image" },
+    creative_renders: { id: "render", client_id: "client", job_id: "job", generation_id: "generation" },
+    client_briefs: { id: "brief", client_id: "client", purpose: "client", media_type: "image", content_format: "single", excluded_artwork_proof_id: "audit-only" },
+    client_media_assets: {}, agent_job_events: {},
+  };
+  const db = { rpc, storage: { from: () => ({ upload: async () => ({}) }) }, from: (table: string) => {
+    if (!rows[table]) throw new Error("Unexpected table: " + table);
+    const chain = { select: () => chain, eq: () => chain, throwOnError: () => chain,
+      maybeSingle: async () => ({ data: rows[table] }), single: async () => ({ data: { id: "asset" } }),
+      update: (v: object) => { Object.assign(rows[table]!, v); return chain; },
+      insert: (v: object) => { Object.assign(rows[table]!, v); return chain; },
+    };
+    return chain;
+  } } as unknown as SupabaseClient;
+  const job = { id: "job", agent_key: "creative_build", client_id: "client", params: { render_id: "render" },
+    hard_budget_required: true, attempts: 1, max_attempts: 1, lease_owner: "worker" } as AgentJobRow;
+  const config = { imageModel: "gpt-image-2", openaiApiKey: "fixture" } as RuntimeConfig;
+  vi.stubGlobal("fetch", fetchMock);
+  try {
+    const run = () => runCreativeBuildJob(db, config, {} as AgentRow, job, Date.now() + 5000);
+    expect(await run()).toMatchObject({ ok: true, usage: { costUsd: 0.0031 } });
+    expect(rows.client_media_assets).toMatchObject({ client_id: "client", brief_id: "brief", review_status: "pending" });
+    expect(rows.creative_renders).toMatchObject({ asset_id: "asset", model: "gpt-image-2", cost_usd: 0.0031 });
+    await expect(run()).rejects.toThrow("No unused image permission");
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1].body))).toEqual({
+      prompt: "Reviewed fictional scene", model: "gpt-image-2", n: 1, size: "1024x1536", quality: "medium",
+    });
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

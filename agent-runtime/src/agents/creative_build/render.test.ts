@@ -47,3 +47,22 @@ it("overrides the model only for a precision-first reel render", async () => {
     "A consistent founder", { size: "1024x1536", quality: "high", model: "gpt-image-2.5-sunburst" });
   expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.openai.com/v1/images/generations");
 });
+
+it("sends one text-only GPT-Image-2 generation and retains provider counters", async () => {
+  const usage = { input_tokens: 25, output_tokens: 100, total_tokens: 125,
+    input_tokens_details: { text_tokens: 25, image_tokens: 0 } };
+  const onReceipt = vi.fn();
+  const fetchMock = vi.fn(async (_url: string, options: RequestInit) => {
+    expect(options.redirect).toBe("error");
+    expect(JSON.parse(String(options.body))).toEqual({ model: "gpt-image-2", n: 1,
+      prompt: "Fictional illustration", size: "1024x1536", quality: "medium" });
+    return new Response(JSON.stringify({ data: [{ b64_json: "YWJj" }], usage }),
+      { headers: { "x-request-id": "req-fixture" } });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  await renderImage({ openaiApiKey: "test-key", imageModel: "gpt-image-2" } as RuntimeConfig,
+    "Fictional illustration", { size: "1024x1536", quality: "medium", onReceipt });
+  expect(fetchMock).toHaveBeenCalledOnce();
+  expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.openai.com/v1/images/generations");
+  expect(onReceipt).toHaveBeenCalledWith({ requestId: "req-fixture", usage });
+});

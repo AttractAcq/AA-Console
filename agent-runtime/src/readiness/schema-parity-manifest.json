@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "7f4d5f88f97a99ca2323eb421ca23e49727c4122370d2b4547b9dcff5f65db8d",
-  "generatedTypesSha256": "9007e2f8df01cdb656282832dfecdfb64abdab08b9d3bc00eb421910a405f803",
-  "generatedSchemaBodySha256": "9ef32b01772e38051795006401d0020519f988f88c931f166cf0753d7e993a14",
+  "migrationSourceDigest": "d1b2fba7a059a61e15fb31b035adb5d8a947f122058bcc55853b4f4c0b9bea99",
+  "generatedTypesSha256": "7fad0d23e32cf7bf38885eca7a210fed49e87ccfc72e0eaa61cb66574df79cc5",
+  "generatedSchemaBodySha256": "405bb130625ee9ac289a26b25b25fbb1bba6f26e72ace4979ba0daad29d35adb",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -5064,6 +5064,13 @@
       "filename": "20261124062100_706_independent_brief_artwork.sql",
       "sha256": "f1e26469c3f9b9ff14499a79c6eea97b832383776f41e66f54618e89b0012c8a",
       "trimmedMd5": "085ad2c7e804b9eb2f620f4e4b9a4a23"
+    },
+    {
+      "version": "20261124062200",
+      "name": "707_one_image_attempt",
+      "filename": "20261124062200_707_one_image_attempt.sql",
+      "sha256": "756a5824272ee3697f62ebaf0fc2aa51a1a4e065e3d31d45e13df77c35b23e58",
+      "trimmedMd5": "678dd68469475a26a862b64a6bc83e0d"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
