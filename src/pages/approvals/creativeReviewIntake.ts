@@ -34,15 +34,15 @@ export async function loadCreativeReviewIntake(clientId: string): Promise<Creati
       const [slots, reviews] = await Promise.all([
         supabase.from("content_slots").select("asset_id").eq("client_id", clientId)
           .eq("stage", "awaiting_approval").in("asset_id", ids),
-        supabase.from("approval_inbox_v6").select("source_id").eq("client_id", clientId)
+        supabase.from("approval_inbox_v6").select("destination").eq("client_id", clientId)
           .eq("source_system", "aa_console").eq("source_kind", "ordinary_media")
-          .eq("status", "pending").in("source_id", ids),
+          .eq("status", "pending").in("destination", ids.map((id) => `creative_source:${id}`)),
       ]);
       if (slots.error) throw slots.error;
       if (reviews.error) throw reviews.error;
       const excluded = new Set([
         ...(slots.data ?? []).map((slot) => slot.asset_id),
-        ...(reviews.data ?? []).map((review) => review.source_id),
+        ...(reviews.data ?? []).map((review) => review.destination?.slice("creative_source:".length)),
       ]);
       candidates.push(...eligible.filter((asset) => !excluded.has(asset.id)));
     }
