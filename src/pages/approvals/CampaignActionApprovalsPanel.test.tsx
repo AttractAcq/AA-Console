@@ -220,7 +220,7 @@ it("shows the generic hold and does not offer a switch-on action", async () => {
     await screen.findByText("External campaign actions are off for this client"),
   ).toBeInTheDocument();
   expect(screen.getByRole("status")).toHaveTextContent(/Runtime state has not been verified/);
-  expect(screen.getByRole("link", { name: "View controls on Dashboard" })).toHaveAttribute("href", "/clients/client-1/delivery/dashboard");
+  expect(screen.getByRole("link", { name: "View switches" })).toHaveAttribute("href", "/clients/client-1/delivery/switches");
   expect(rpc).not.toHaveBeenCalledWith("set_campaign_actions_enabled", expect.anything());
 });
 
