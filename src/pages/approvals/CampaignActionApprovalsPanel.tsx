@@ -345,7 +345,7 @@ export function CampaignActionApprovalsPanel() {
               : "Approvals are recorded while the client switch is off."}
           </p>
         </div>
-        <Link to={`/clients/${clientId}/delivery/dashboard`} className="text-sm text-primary underline">View controls on Dashboard</Link>
+        <Link to={`/clients/${clientId}/delivery/switches`} className="text-sm text-primary underline">View switches</Link>
       </div>
       {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
       {loading ? <p className="text-sm text-muted-foreground">Loading requests…</p>

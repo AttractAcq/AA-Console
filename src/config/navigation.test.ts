@@ -4,7 +4,7 @@ import { clientDeliverySections, clientNavGroups, legacyDeliveryNodes, legacyDel
 describe("client delivery navigation", () => {
   it("shows every acquisition module as its own Delivery page with the agreed utilities", () => {
     expect(clientNavGroups[0]?.children?.map((node) => node.label)).toEqual([
-      "Dashboard", "Approval Inbox", "Intelligence OS",
+      "Dashboard", "Switches", "Approval Inbox", "Intelligence OS",
       "Market Opportunities", "Offer Studio", "Campaign Factory", "Content Production Factory",
       "Organic Content Distribution", "Meta Ads Studio", "Meta Profile",
       "Google Ads Studio", "Google Studio",
@@ -16,7 +16,7 @@ describe("client delivery navigation", () => {
       null, "Primary Flow", "Meta", "Google", "Proof", "Secondary Flow", null,
     ]);
     expect(clientDeliverySections.map((section) => section.children.map((node) => node.label))).toEqual([
-      ["Dashboard", "Approval Inbox", "Intelligence OS"],
+      ["Dashboard", "Switches", "Approval Inbox", "Intelligence OS"],
       ["Market Opportunities", "Offer Studio", "Campaign Factory", "Content Production Factory"],
       ["Organic Content Distribution", "Meta Ads Studio", "Meta Profile"],
       ["Google Ads Studio", "Google Studio"],
@@ -25,7 +25,7 @@ describe("client delivery navigation", () => {
       ["Attribution OS", "Archive"],
     ]);
     expect(v6ModuleNodes).toHaveLength(16);
-    expect(new Set(clientNavGroups[0]?.children?.map((node) => node.path)).size).toBe(20);
+    expect(new Set(clientNavGroups[0]?.children?.map((node) => node.path)).size).toBe(21);
     expect(clientNavGroups[0]?.children?.find((node) => node.id === "motion-design")?.tabs?.map((tab) => tab.id))
       .toEqual(["brief", "scenes", "renders"]);
     // v1 is archived, so no page offers a version to choose between. The
