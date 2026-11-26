@@ -354,7 +354,11 @@ const strategyProposal = (over: Record<string, unknown> = {}) => scoreProposal({
   ...over,
 });
 
-/** Open the row's action menu on the Activate view. */
+function opportunityDialog() {
+  return within(screen.getByRole("dialog", { name: /^Actions for / }));
+}
+
+/** Open the row's action dialog on the Activate view. */
 async function openActions() {
   render(<MarketOpportunitiesPanel view="activate" />);
   await userEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
@@ -363,7 +367,7 @@ async function openActions() {
 describe("where the hand-off is offered", () => {
   it("offers it for an approved opportunity with nothing blocking", async () => {
     await openActions();
-    expect(await screen.findByRole("menuitem", { name: "Create a campaign" })).toBeInTheDocument();
+    expect(await opportunityDialog().findByRole("button", { name: "Create a campaign" })).toBeInTheDocument();
   });
 
   it("does not offer it while something is blocking", async () => {
@@ -373,7 +377,7 @@ describe("where the hand-off is offered", () => {
       readiness({ blocker: "1 claim has no proof on file. Capture it, or change the claim." }),
     );
     await openActions();
-    expect(screen.queryByRole("menuitem", { name: "Create a campaign" })).not.toBeInTheDocument();
+    expect(opportunityDialog().queryByRole("button", { name: "Create a campaign" })).not.toBeInTheDocument();
     expect(
       screen.getByText("1 claim has no proof on file. Capture it, or change the claim."),
     ).toBeInTheDocument();
@@ -383,21 +387,21 @@ describe("where the hand-off is offered", () => {
     fetchOpportunities.mockResolvedValue([opportunity({ status: "validated" })]);
     await openActions();
     // This opens review; it does not approve the opportunity itself.
-    expect(await screen.findByRole("menuitem", { name: "Request approval" })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Create a campaign" })).not.toBeInTheDocument();
+    expect(await opportunityDialog().findByRole("button", { name: "Request approval" })).toBeInTheDocument();
+    expect(opportunityDialog().queryByRole("button", { name: "Create a campaign" })).not.toBeInTheDocument();
   });
 
   it("does not offer campaign creation for a legacy or stale approval", async () => {
     fetchOpportunityApprovalStates.mockResolvedValue(new Map([["opp-1", "legacy"]]));
     await openActions();
-    expect(screen.queryByRole("menuitem", { name: "Create a campaign" })).not.toBeInTheDocument();
+    expect(opportunityDialog().queryByRole("button", { name: "Create a campaign" })).not.toBeInTheDocument();
     expect(screen.getByText(/legacy approval/)).toBeInTheDocument();
   });
 
   it("requests exact Inbox review instead of changing status directly", async () => {
     fetchOpportunities.mockResolvedValue([opportunity({ status: "validated" })]);
     await openActions();
-    await userEvent.click(screen.getByRole("menuitem", { name: "Request approval" }));
+    await userEvent.click(opportunityDialog().getByRole("button", { name: "Request approval" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_opportunity_approval_v6", {
       p_opportunity_id: "opp-1",
     }));
@@ -406,7 +410,7 @@ describe("where the hand-off is offered", () => {
 
   it("requests a separate activation decision for a currently approved opportunity", async () => {
     await openActions();
-    await userEvent.click(screen.getByRole("menuitem", { name: "Request activation" }));
+    await userEvent.click(opportunityDialog().getByRole("button", { name: "Request activation" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_opportunity_activation_v6", {
       p_opportunity_id: "opp-1",
     }));
@@ -418,7 +422,7 @@ describe("where the hand-off is offered", () => {
   it("keeps offering it once campaigns are already running against it", async () => {
     fetchOpportunities.mockResolvedValue([opportunity({ status: "active" })]);
     await openActions();
-    expect(await screen.findByRole("menuitem", { name: "Create a campaign" })).toBeInTheDocument();
+    expect(await opportunityDialog().findByRole("button", { name: "Create a campaign" })).toBeInTheDocument();
   });
 });
 
@@ -426,7 +430,7 @@ describe("creating the campaign", () => {
   it("creates on the chosen route, then queues the planner separately", async () => {
     const user = userEvent.setup();
     await openActions();
-    await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
+    await user.click(await opportunityDialog().findByRole("button", { name: "Create a campaign" }));
 
     expect(
       await screen.findByText(/choice is fixed after creation/),
@@ -465,7 +469,7 @@ describe("creating the campaign", () => {
     // the worst shape of this bug, which is why it is pinned.
     const user = userEvent.setup();
     await openActions();
-    await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
+    await user.click(await opportunityDialog().findByRole("button", { name: "Create a campaign" }));
 
     await user.selectOptions(screen.getByLabelText(/Route/), "both");
     await user.selectOptions(await screen.findByLabelText(/Approved secondary offer version/), "version-1");
@@ -488,7 +492,7 @@ describe("creating the campaign", () => {
     // names its inventory, and the route CHECK requires one.
     const user = userEvent.setup();
     await openActions();
-    await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
+    await user.click(await opportunityDialog().findByRole("button", { name: "Create a campaign" }));
     await user.selectOptions(await screen.findByLabelText(/Approved secondary offer version/), "version-1");
     await user.selectOptions(screen.getByLabelText(/Route/), "both");
     await user.click(screen.getByRole("button", { name: "Create and plan" }));
@@ -501,7 +505,7 @@ describe("creating the campaign", () => {
     fetchOpportunityOfferVersions.mockResolvedValue([]);
     const user = userEvent.setup();
     await openActions();
-    await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
+    await user.click(await opportunityDialog().findByRole("button", { name: "Create a campaign" }));
     await user.selectOptions(screen.getByLabelText(/Route/), "organic");
     await user.click(screen.getByRole("button", { name: "Create and plan" }));
     expect(await screen.findByText(/No signed secondary offer version/)).toBeInTheDocument();
@@ -512,7 +516,7 @@ describe("creating the campaign", () => {
   it("asks for a platform before letting a paid campaign through", async () => {
     const user = userEvent.setup();
     await openActions();
-    await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
+    await user.click(await opportunityDialog().findByRole("button", { name: "Create a campaign" }));
     await user.selectOptions(await screen.findByLabelText(/Approved secondary offer version/), "version-1");
     await user.selectOptions(screen.getByLabelText(/Route/), "paid");
     await user.click(screen.getByRole("button", { name: "Create and plan" }));
@@ -527,7 +531,7 @@ describe("creating the campaign", () => {
       new Error("Scored as reject at 31. Score it again or reject it properly."),
     );
     await openActions();
-    await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
+    await user.click(await opportunityDialog().findByRole("button", { name: "Create a campaign" }));
     await user.selectOptions(await screen.findByLabelText(/Approved secondary offer version/), "version-1");
     await user.selectOptions(screen.getByLabelText(/Route/), "organic");
     await user.click(screen.getByRole("button", { name: "Create and plan" }));
@@ -654,7 +658,7 @@ describe("the template planner", () => {
   });
 });
 
-/** Open the row's action menu on the Discover table. */
+/** Open the row's action dialog on the Discover table. */
 async function openDiscoverActions() {
   render(<MarketOpportunitiesPanel view="discover" />);
   await userEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
@@ -673,22 +677,22 @@ describe("the Discover table carries the whole progression", () => {
    */
   it("offers the campaign hand-off from the table, not only from Activate", async () => {
     await openDiscoverActions();
-    expect(await screen.findByRole("menuitem", { name: "Create a campaign" })).toBeInTheDocument();
+    expect(await opportunityDialog().findByRole("button", { name: "Create a campaign" })).toBeInTheDocument();
   });
 
   it("offers exact approval review from the table for a validated opportunity", async () => {
     fetchOpportunities.mockResolvedValue([opportunity({ status: "validated" })]);
     await openDiscoverActions();
-    expect(await screen.findByRole("menuitem", { name: "Request approval" })).toBeInTheDocument();
+    expect(await opportunityDialog().findByRole("button", { name: "Request approval" })).toBeInTheDocument();
   });
 
   it("offers the next step for each stage, and only that step", async () => {
     fetchOpportunities.mockResolvedValue([opportunity({ status: "active" })]);
     await openDiscoverActions();
-    expect(await screen.findByRole("menuitem", { name: "Mark learning" })).toBeInTheDocument();
+    expect(await opportunityDialog().findByRole("button", { name: "Mark learning" })).toBeInTheDocument();
     // Not two stages at once: scaling comes after learning, not beside it.
-    expect(screen.queryByRole("menuitem", { name: "Scale it" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Mark active" })).not.toBeInTheDocument();
+    expect(opportunityDialog().queryByRole("button", { name: "Scale it" })).not.toBeInTheDocument();
+    expect(opportunityDialog().queryByRole("button", { name: "Mark active" })).not.toBeInTheDocument();
   });
 
   it("labels a legacy activation and withholds progression until a current decision exists", async () => {
@@ -696,7 +700,7 @@ describe("the Discover table carries the whole progression", () => {
     fetchOpportunityActivationStates.mockResolvedValue(new Map([["opp-1", "legacy"]]));
     await openDiscoverActions();
     expect(screen.getByText(/legacy activation/)).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Mark learning" })).not.toBeInTheDocument();
+    expect(opportunityDialog().queryByRole("button", { name: "Mark learning" })).not.toBeInTheDocument();
   });
 
   it("still withholds the hand-off while something is blocking", async () => {
@@ -706,14 +710,14 @@ describe("the Discover table carries the whole progression", () => {
       readiness({ blocker: "1 claim has no proof on file. Capture it, or change the claim." }),
     );
     await openDiscoverActions();
-    expect(screen.queryByRole("menuitem", { name: "Create a campaign" })).not.toBeInTheDocument();
+    expect(opportunityDialog().queryByRole("button", { name: "Create a campaign" })).not.toBeInTheDocument();
   });
 
   it("does not offer Pause before anything is approved", async () => {
     fetchOpportunities.mockResolvedValue([opportunity({ status: "discovered" })]);
     await openDiscoverActions();
-    expect(await screen.findByRole("menuitem", { name: "Mark validated" })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Pause" })).not.toBeInTheDocument();
+    expect(await opportunityDialog().findByRole("button", { name: "Mark validated" })).toBeInTheDocument();
+    expect(opportunityDialog().queryByRole("button", { name: "Pause" })).not.toBeInTheDocument();
   });
 
   it("shows the status as its own column so an active one is visible at a glance", async () => {
@@ -797,11 +801,11 @@ describe("asking an agent, and deciding on what it says", () => {
     // gated the way approving or scaling is.
     const user = userEvent.setup();
     await openActions();
-    await user.click(await screen.findByRole("menuitem", { name: "Evaluate with an agent" }));
+    await user.click(await opportunityDialog().findByRole("button", { name: "Evaluate with an agent" }));
     await waitFor(() => expect(requestEvaluation).toHaveBeenCalledWith("client-1", "opp-1"));
 
     await openActions();
-    await user.click(await screen.findByRole("menuitem", { name: "Strategise with an agent" }));
+    await user.click(await opportunityDialog().findByRole("button", { name: "Strategise with an agent" }));
     await waitFor(() => expect(requestStrategy).toHaveBeenCalledWith("client-1", "opp-1"));
   });
 
