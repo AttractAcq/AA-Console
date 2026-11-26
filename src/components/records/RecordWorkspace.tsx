@@ -7,7 +7,7 @@ import { EmptyState } from "../EmptyState";
 import { FormModal } from "../forms/FormModal";
 import type { FieldDef } from "../forms/fields";
 import { AgentSteerForm, AGENT_FORMS } from "../forms/AgentSteerForm";
-import { supabase } from "../../lib/supabase";
+import { enqueueAgentJob, supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
 import { cn } from "../../lib/cn";
 import { AgentActivityBar } from "../agents/AgentActivityBar";
@@ -37,6 +37,15 @@ type Record_ = {
   edited_at: string | null;
   job_id: string | null;
   updated_at: string;
+};
+
+type DraftReview = {
+  recordId: string;
+  updatedAt: string;
+  sourceRef: string;
+  observedOn: string;
+  confidence: string;
+  note: string;
 };
 
 type SectionReview = {
@@ -92,6 +101,10 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
   const { clientId } = useParams<{ clientId: string }>();
   const config = AGENT_FORMS[domain];
 
+  const reviewJobKey = clientId ? `aa-source-review:${clientId}` : "";
+  const [reviewJobId, setReviewJobId] = useState<string | null>(() => reviewJobKey ? sessionStorage.getItem(reviewJobKey) : null);
+  const [reviewRunning, setReviewRunning] = useState(false);
+  const [reviewDrafts, setReviewDrafts] = useState<DraftReview[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [records, setRecords] = useState<Record_[]>([]);
   const [reviews, setReviews] = useState<SectionReview[]>([]);
@@ -246,6 +259,67 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
   const editFields: FieldDef[] = [
     { name: "body", label: editing?.title ?? "Content", kind: "textarea", rows: 12, required: true },
   ];
+  useEffect(() => {
+    if (!reviewJobId || !clientId) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      try {
+        const result = await supabase.from("agent_jobs").select("status,error")
+          .eq("client_id", clientId!).eq("agent_key", "source_review").eq("id", reviewJobId!).single();
+        if (stopped) return;
+        if (result.error) throw result.error;
+        const { status, error } = result.data;
+        if (status === "completed") {
+          const event = await supabase.from("agent_job_events").select("payload")
+            .eq("job_id", reviewJobId!).eq("description", "Source review drafts prepared.")
+            .order("created_at", { ascending: false }).limit(1).single();
+          if (stopped) return;
+          if (event.error) throw event.error;
+          const payload = event.data.payload as { source_review_drafts?: DraftReview[] } | null;
+          const drafts = payload?.source_review_drafts ?? [];
+          setReviewDrafts(drafts);
+          setSavedNotice(drafts.length ? `${drafts.length} source review drafts ready. Open Review source to check and save each draft.`
+            : "No source reviews needed for the current client records.");
+          setReviewRunning(false);
+          return;
+        }
+        if (!["queued", "claimed", "running"].includes(status)) {
+          throw new Error(error ?? `Source review job is ${status}.`);
+        }
+        setReviewRunning(true);
+        timer = setTimeout(() => void poll(), 2500);
+      } catch (error) {
+        if (stopped) return;
+        setReviewRunning(false);
+        setActionError((error as { message?: string })?.message ?? "Could not load the source review.");
+      }
+    }
+    void poll();
+    return () => { stopped = true; clearTimeout(timer); };
+  }, [clientId, reviewJobId]);
+
+  async function startSourceReview() {
+    if (!clientId || reviewRunning) return;
+    setActionError(null);
+    setReviewRunning(true);
+    try {
+      const id = await enqueueAgentJob({ agentKey: "source_review", clientId });
+      sessionStorage.setItem(reviewJobKey, id);
+      setReviewJobId(id);
+    } catch (error) {
+      setReviewRunning(false);
+      setActionError((error as { message?: string })?.message ?? "Could not queue source review.");
+    }
+  }
+
+  function draftFor(record: Record_) {
+    const state = reviews.find((review) => review.record_id === record.id)?.review_state;
+    if (state === "supported") return undefined;
+    return reviewDrafts.find((draft) => draft.recordId === record.id && draft.updatedAt === record.updated_at);
+  }
+
+  const reviewingDraft = reviewing ? draftFor(reviewing) : undefined;
   const reviewingState = reviews.find((item) => item.record_id === reviewing?.id);
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -271,6 +345,10 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
         <span className="text-xs text-muted-foreground">
           {filled}/{templates.length} generated
         </span>
+        {domain !== "reporting" && clientId && <Button disabled={reviewRunning || !shownRecords.some((record) => record.body?.trim())}
+          onClick={() => void startSourceReview()}>
+          {reviewRunning ? "Reviewing sources…" : "Review sources"}
+        </Button>}
         <Button icon={Play} onClick={() => setRunOpen(true)}>
           {config.title}
         </Button>
@@ -325,6 +403,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
                   <div className="mb-3 text-xs text-muted-foreground">
                     <p className={review?.review_state === "supported" ? "text-brand-strong" : "text-destructive"}>
                       Source review: {review?.review_state ?? "missing"}
+                      {draftFor(record) && " · AI draft ready"}
                     </p>
                     {record.job_id && <p>Model run: {record.job_id}</p>}
                     {review?.source_ref && <p>Source: {review.source_ref}{review.observed_on ? ` · observed ${review.observed_on}` : ""}</p>}
@@ -390,7 +469,8 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
         open={reviewing !== null}
         onClose={() => setReviewing(null)}
         title={reviewing ? `Review source for ${reviewing.title}` : "Review source"}
-        intro="Check the exact section against its source. Editing or rerunning the section makes this review stale."
+        intro={reviewingDraft ? "AI draft based on available client evidence. Verify the evidence and date before saving."
+          : "Check the exact section against its source. Editing or rerunning the section makes this review stale."}
         fields={[
           { name: "source_ref", label: "Source name or URL", kind: "text", required: true },
           { name: "observed_on", label: "Source observation date", kind: "date", required: true },
@@ -403,13 +483,13 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
           { name: "review_note", label: "Correction or review note", kind: "textarea", rows: 4 },
         ]}
         initialValues={{
-          source_ref: reviewingState?.source_ref ?? "",
-          observed_on: reviewingState?.observed_on ?? "",
+          source_ref: reviewingDraft?.sourceRef ?? reviewingState?.source_ref ?? "",
+          observed_on: reviewingDraft?.observedOn ?? reviewingState?.observed_on ?? "",
           // A changed section needs a fresh confidence decision. Never carry
           // its previous "supported" decision into a stale review form.
-          confidence: reviewingState?.review_state === "stale"
-            ? "" : reviewingState?.confidence ?? "",
-          review_note: reviewingState?.review_note ?? "",
+          confidence: reviewingDraft?.confidence ?? (reviewingState?.review_state === "stale"
+            ? "" : reviewingState?.confidence ?? ""),
+          review_note: reviewingDraft?.note ?? reviewingState?.review_note ?? "",
         }}
         onSubmit={async (values) => {
           if (!reviewing) throw new Error("Choose a section to review.");
