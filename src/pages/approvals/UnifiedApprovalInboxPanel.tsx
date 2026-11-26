@@ -5,13 +5,14 @@ import { Modal } from "../../components/Modal";
 import { supabase } from "../../lib/supabase";
 import { downloadVerifiedMagnetFile } from "../../lib/leadMagnets";
 import { downloadVerifiedProofFile } from "../../lib/proofRights";
-import { downloadVerifiedCreativeFile } from "../../lib/creativeReview";
+import { downloadVerifiedCreativeFile, requestOrdinaryMediaReview } from "../../lib/creativeReview";
 import { shouldShowExecutionEvidence, loadApprovalExecutionEvidence,
   type ApprovalExecutionEvidence } from "../../lib/approvalExecutionEvidence";
 import type { Database } from "../../types/database";
 import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 import { ExternalExecutionAlerts } from "./ExternalExecutionAlerts";
 import { HeldExternalJobs } from "./HeldExternalJobs";
+import { loadCreativeReviewIntake, type CreativeReviewCandidate } from "./creativeReviewIntake";
 
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
@@ -1661,6 +1662,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client", pendingTable = fal
   const scopeKey = multiClient ? scope : clientId ?? null;
   const initialSource = new URLSearchParams(location.search).get("source");
   const compact = pendingTable && !multiClient && !initialSource;
+  const [intake, setIntake] = useState<CreativeReviewCandidate[]>([]);
   const [review, setReview] = useState<{ id: string; decision: "approved" | "rejected" } | null>(null);
   const [requests, setRequests] = useState<UnifiedApprovalRequest[]>([]);
   const [decisions, setDecisions] = useState<UnifiedApprovalDecision[]>([]);
@@ -1703,6 +1705,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client", pendingTable = fal
         .order("id", { ascending: false })
         .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
       if (requestResult.error) throw requestResult.error;
+      const intakeRows = compact && clientId && page === 0 ? await loadCreativeReviewIntake(clientId) : [];
       const pageRows = (requestResult.data ?? []).map(validatedRequest);
       const rows = pageRows.slice(0, PAGE_SIZE);
       const ids = rows.map((row) => row.id);
@@ -1739,6 +1742,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client", pendingTable = fal
         setAal("unavailable");
       }
       setRequests(rows);
+      setIntake(intakeRows);
       setDecisions(decisionRows);
       setGatewayOutcomes(outcomeMap);
       setExecutionEvidence(executionMap);
@@ -1754,7 +1758,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client", pendingTable = fal
         setLoading(false);
       }
     }
-  }, [clientId, clientFilter, kindFilter, manager, multiClient, page, scopeKey, sourceDeepLink, statusFilter]);
+  }, [clientId, clientFilter, compact, kindFilter, manager, multiClient, page, scopeKey, sourceDeepLink, statusFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2088,6 +2092,20 @@ export function UnifiedApprovalInboxPanel({ scope = "client", pendingTable = fal
     return grouped;
   }, [decisions]);
 
+  async function requestCreativeReview(assetId: string) {
+    if (!clientId || busyId !== null) return;
+    setBusyId(assetId);
+    setDecisionError(null);
+    try {
+      await requestOrdinaryMediaReview(clientId, assetId);
+      await refresh();
+    } catch (cause) {
+      setDecisionError((cause as { message?: string })?.message ?? "Could not request creative review.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   if (compact && clientId) {
     const selected = requests.find((request) => request.id === review?.id);
     const decisionActions = [
@@ -2101,7 +2119,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client", pendingTable = fal
       {!selected && decisionError && <p role="alert" className="text-sm text-destructive">{decisionError}</p>}
       {!error && (waiting && !requests.length
         ? <p role="status" className="text-sm text-muted-foreground">Loading approvals…</p>
-        : requests.length === 0
+        : requests.length === 0 && intake.length === 0
           ? <p className="text-sm text-muted-foreground">{page ? "No pending approvals on this page." : "No pending approvals."}</p>
           : <div className="overflow-x-auto rounded-lg border border-border bg-card">
             <table className="w-full text-left text-sm">
@@ -2129,7 +2147,23 @@ export function UnifiedApprovalInboxPanel({ scope = "client", pendingTable = fal
                     </span>}
                   </div></td>
                 </tr>;
-              })}</tbody>
+              })}
+              {intake.map((asset) => <tr key={`intake:${asset.id}`} className="border-b border-border last:border-b-0">
+                <td className="p-3">
+                  <Link className="font-medium text-primary underline"
+                    to={`/clients/${clientId}/delivery/approval-inbox?tab=assets&media=${asset.media_type}&asset=${encodeURIComponent(asset.id)}`}>
+                    {asset.title ?? "Untitled creative"}
+                  </Link>
+                  <p className="mt-1 text-xs text-muted-foreground">Creative awaiting review</p>
+                </td>
+                <td className="p-3">
+                  <button type="button" disabled={waiting || busyId !== null}
+                    className="rounded-md border border-border px-3 py-2 disabled:opacity-50"
+                    onClick={() => void requestCreativeReview(asset.id)}>
+                    {busyId === asset.id ? "Requesting…" : "Request review"}
+                  </button>
+                </td>
+              </tr>)}</tbody>
             </table>
           </div>)}
       {(page > 0 || hasNextPage) && <nav aria-label="Approval pages" className="flex gap-3 text-sm">
