@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Search } from "lucide-react";
 
 import { Button } from "../../components/Button";
 import { DataTable } from "../../components/DataTable";
-import { ActionMenu } from "../../components/ActionMenu";
+import type { ActionItem } from "../../components/ActionMenu";
+import { Modal } from "../../components/Modal";
 import { FormModal } from "../../components/forms/FormModal";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
@@ -944,7 +946,7 @@ function DiscoverView({
           <ConfidenceTag key="c" confidence={o.confidence} />,
           <span key="p" className="capitalize">{o.proposed_by}</span>,
           <span key="d">{dayOrDash(o.created_at)}</span>,
-          <ActionMenu
+          <OpportunityActionsDialog
             key="a"
             name={o.name}
             busy={busy === o.id}
@@ -963,6 +965,43 @@ function DiscoverView({
       />
     </div>
   );
+}
+
+function OpportunityActionsDialog({ name, busy, items }: {
+  name: string;
+  busy: boolean;
+  items: ActionItem[];
+}) {
+  const [open, setOpen] = useState(false);
+  const title = `Actions for ${name}`;
+  const available = items.filter((item) => item.label.trim());
+  const ordered = [...available.filter((item) => !item.destructive), ...available.filter((item) => item.destructive)];
+  if (!ordered.length) return <span className="text-xs text-muted-foreground">—</span>;
+
+  return <>
+    <button type="button" aria-label={title} aria-haspopup="dialog" aria-expanded={open}
+      onClick={() => setOpen(true)}
+      className="rounded-md border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      {busy ? "Working…" : "Actions"}
+    </button>
+    {open && createPortal(
+      <Modal open title={title} onClose={() => setOpen(false)}>
+        <div className="grid gap-2">
+          {ordered.map((item) => (
+            <button key={item.label} type="button" disabled={busy || item.disabled}
+              onClick={() => {
+                setOpen(false);
+                item.onSelect();
+              }}
+              className={`rounded-md border border-border px-3 py-2.5 text-left text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${item.destructive ? "text-destructive" : "text-foreground"}`}>
+              {busy && item.busyLabel ? item.busyLabel : item.label}
+            </button>
+          ))}
+        </div>
+      </Modal>,
+      document.body,
+    )}
+  </>;
 }
 
 function ConfidenceTag({ confidence }: { confidence: string }) {
@@ -1542,7 +1581,7 @@ function ActivateView({
             <span key="b" className={blocker ? "text-destructive" : "text-brand-strong"}>
               {blocker ?? (approvalState === "current" ? "Approved for campaign planning" : "Ready to request review")}
             </span>,
-            <ActionMenu
+            <OpportunityActionsDialog
               key="a"
               name={o.name}
               busy={busy === o.id}
@@ -1597,7 +1636,7 @@ function ActivationDetail({
           </dd>
         </div>
       </dl>
-      <ActionMenu
+      <OpportunityActionsDialog
         name={opportunity.name}
         busy={busy}
         items={opportunityActions({
