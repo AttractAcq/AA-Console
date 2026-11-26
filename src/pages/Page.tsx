@@ -12,6 +12,7 @@ import { MotionScenesPanel } from "./motion/MotionScenesPanel";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { Download } from "lucide-react";
+import { ClientSwitchPanel } from "../components/switches/ClientSwitchPanel";
 import { ClientDashboardPanel } from "./dashboard/ClientDashboardPanel";
 import { DailyPackageSetupPanel } from "./dashboard/DailyPackageSetupPanel";
 import type { ReactNode } from "react";
@@ -251,11 +252,12 @@ const nodeTabPanels: Record<string, Record<string, (clientId?: string) => ReactN
   },
 };
 
-const nodePanels: Record<string, () => ReactNode> = {
+const nodePanels: Record<string, (clientId?: string) => ReactNode> = {
   dashboard: () => <DashboardPanel />,
   // distinct id from the agency dashboard; both live at a path segment
   // called "dashboard" but they are different pages
   "delivery-dashboard": () => <ClientDashboardPanel />,
+  "client-switches": (clientId) => clientId ? <ClientSwitchPanel clientId={clientId} /> : null,
   "campaign-factory": () => <CampaignExecutionPanel />,
   "market-opportunities": () => <MarketOpportunitiesPanel />,
   onboarding: () => <OnboardingPanel />,

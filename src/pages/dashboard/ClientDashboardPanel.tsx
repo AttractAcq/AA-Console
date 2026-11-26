@@ -3,7 +3,6 @@ import { useParams } from "react-router-dom";
 import { Panel } from "../../components/Panel";
 import { supabase } from "../../lib/supabase";
 import { MasterAIChatDialog } from "../../components/masterai/MasterAIChatDialog";
-import { ClientSwitchPanel } from "../../components/switches/ClientSwitchPanel";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { totalSpend, unresolvedFailures } from "../../lib/jobHistory";
@@ -89,8 +88,6 @@ export function ClientDashboardPanel() {
       <div className="flex flex-wrap items-center justify-end gap-2">
         {clientId && <MasterAIChatDialog scope={{ kind: "client", clientId }} triggerLabel="Master Ai Chat" />}
       </div>
-
-      {clientId && <ClientSwitchPanel clientId={clientId} />}
 
       <Panel title="Agent spend"><p className="text-2xl font-semibold text-card-foreground">
         {historyError ? "Unknown" : `$${spend.toFixed(2)}`}
