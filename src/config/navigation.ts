@@ -547,6 +547,7 @@ const moduleNode = (id: string) => v6ModuleNodes.find((node) => node.id === id)!
 export const clientDeliverySections: { id: string; label?: string; children: NavNode[] }[] = [
   { id: "entry", children: [
     legacyUtility("dashboard"),
+    { id: "client-switches", label: "Switches", path: "switches", icon: Settings2 },
     { id: "approval-inbox", label: "Approval Inbox", path: "approval-inbox", icon: CheckSquare,
       capability: "expanding", tabs: [
         { id: "engine-inbox", label: "Engine" }, { id: "assets", label: "Assets" },
