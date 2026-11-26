@@ -57,7 +57,7 @@ describe("client delivery navigation", () => {
       expect(live).toContain(target.split("?")[0]);
     }
     expect(v6ModuleNodes.find((node) => node.id === "content-production-factory")?.tabs?.map((tab) => tab.id))
-      .toEqual(["generation", "briefs", "create", "edit", "assets"]);
+      .toEqual(["generation", "briefs", "create", "edit", "assets", "engine"]);
     // This list is now empty, and that is the point: every one of the fifteen
     // modules has a console surface. Google Ads was the last to leave it, with
     // a build sheet rather than an adapter — `capability: "expanding"` says
