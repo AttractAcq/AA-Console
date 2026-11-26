@@ -1,9 +1,8 @@
+import type { MediaAsset } from "../../lib/media";
 import { supabase } from "../../lib/supabase";
 
-type ReviewShape = {
-  media_type: string;
-  content_format?: string | null;
-  render_path: string | null;
+type ReviewShape = Pick<MediaAsset, "media_type" | "render_path"> & {
+  content_format?: MediaAsset["content_format"] | null;
 };
 
 export function canRequestOrdinaryReview(asset: ReviewShape): boolean {
