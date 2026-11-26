@@ -3,12 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from, rpc, getAAL, downloadVerifiedProofFile, downloadVerifiedCreativeFile } = vi.hoisted(() => ({
+const { from, rpc, getAAL, downloadVerifiedProofFile, downloadVerifiedCreativeFile, loadCreativeReviewIntake, requestOrdinaryMediaReview } = vi.hoisted(() => ({
   from: vi.fn(), rpc: vi.fn(), getAAL: vi.fn(), downloadVerifiedProofFile: vi.fn(),
-  downloadVerifiedCreativeFile: vi.fn(),
+  downloadVerifiedCreativeFile: vi.fn(), loadCreativeReviewIntake: vi.fn(), requestOrdinaryMediaReview: vi.fn(),
 }));
 vi.mock("../../lib/proofRights", () => ({ downloadVerifiedProofFile }));
-vi.mock("../../lib/creativeReview", () => ({ downloadVerifiedCreativeFile }));
+vi.mock("../../lib/creativeReview", () => ({ downloadVerifiedCreativeFile, requestOrdinaryMediaReview }));
+vi.mock("./creativeReviewIntake", () => ({ loadCreativeReviewIntake }));
 vi.mock("../../lib/supabase", () => ({ supabase: {
   from, rpc, auth: { mfa: { getAuthenticatorAssuranceLevel: getAAL } },
 } }));
@@ -826,6 +827,8 @@ function show(scope: "client" | "global" | "manager" = "client", path = "/approv
 
 beforeEach(() => {
   vi.clearAllMocks();
+  loadCreativeReviewIntake.mockReset().mockResolvedValue([]);
+  requestOrdinaryMediaReview.mockReset();
   requests = [request];
   decisions = [];
   gatewayOutcomes = [];
@@ -849,6 +852,18 @@ beforeEach(() => {
 });
 
 describe("unified approval inbox", () => {
+  it("routes unsubmitted creative through the exact review request flow", async () => {
+    requests = [];
+    loadCreativeReviewIntake.mockResolvedValueOnce([{ id: "asset-1", title: "Spring creative", media_type: "image" }]);
+    requestOrdinaryMediaReview.mockResolvedValue("review-1");
+    render(<MemoryRouter><UnifiedApprovalInboxPanel pendingTable /></MemoryRouter>);
+    expect(await screen.findByRole("link", { name: "Spring creative" }))
+      .toHaveAttribute("href", "/clients/client-1/delivery/approval-inbox?tab=assets&media=image&asset=asset-1");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Request review" }));
+    expect(requestOrdinaryMediaReview).toHaveBeenCalledWith("client-1", "asset-1");
+    expect(await screen.findByText("No pending approvals.")).toBeInTheDocument();
+  });
+
   it("links pending rows to their source and removes a row after exact approval", async () => {
     const user = userEvent.setup();
     requests = [readyCampaign];
