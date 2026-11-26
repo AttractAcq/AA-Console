@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Eye } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { FilterPills } from "../../components/FilterPills";
 import { EmptyState } from "../../components/EmptyState";
 import { MediaCard, StatusBadge } from "../../components/MediaCard";
@@ -15,6 +15,7 @@ import { ContentJourney } from "../../components/ContentJourney";
 import { CreativeAuthorityStrip } from "./CreativeAuthorityStrip";
 import { VideoApprovalRoute } from "../../components/VideoApprovalRoute";
 import { requestOrdinaryMediaReview } from "../../lib/creativeReview";
+import { canRequestOrdinaryReview } from "./creativeReviewIntake";
 
 /**
  * The gate between "made" and "shippable". Only approved assets can be
@@ -22,7 +23,11 @@ import { requestOrdinaryMediaReview } from "../../lib/creativeReview";
  */
 export function ApprovalsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
-  const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedAssetId = searchParams.get("asset");
+  const [activeFilter, setActiveFilter] = useState<MediaFilterId>(
+    mediaFilters.find((filter) => filter.id === searchParams.get("media"))?.id ?? mediaFilters[0].id,
+  );
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const urls = useSignedPreviewPaths("client-media", assets.map((asset) =>
     asset.render_path ?? asset.storage_path));
@@ -37,7 +42,17 @@ export function ApprovalsPanel() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [preview, setPreview] = useState<MediaAsset | null>(null);
+  const [previewAsset, setPreview] = useState<MediaAsset | null>(null);
+  const preview = previewAsset ?? assets.find((asset) => asset.id === selectedAssetId) ?? null;
+
+  function closePreview() {
+    setPreview(null);
+    if (selectedAssetId) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("asset");
+      setSearchParams(next, { replace: true });
+    }
+  }
   // Rejecting without saying why sends the maker back with nothing to act on,
   // so the reason is asked for rather than left optional.
   const [rejecting, setRejecting] = useState<MediaAsset | null>(null);
@@ -127,9 +142,7 @@ export function ApprovalsPanel() {
     setError(null);
     setNotice(null);
     try {
-      if (decision === "approved" && (asset.media_type === "image" || asset.media_type === "text")
-        && ["single", "carousel", "story"].includes(asset.content_format ?? "single")
-        && ((asset.content_format ?? "single") === "single" || !asset.render_path)) {
+      if (decision === "approved" && canRequestOrdinaryReview(asset)) {
         if (!clientId) throw new Error("Client unavailable.");
         await requestOrdinaryMediaReview(clientId, asset.id);
         setNotice("Exact creative review requested. Decide it in Unified Approval Inbox.");
@@ -313,7 +326,7 @@ export function ApprovalsPanel() {
         sourceUrl={preview?.source_asset_id ? sourceUrls.get(preview.source_asset_id) : undefined}
         body={preview ? bodies.get(preview.id) : undefined}
         open={preview !== null}
-        onClose={() => setPreview(null)}
+        onClose={closePreview}
       />
     </div>
   );

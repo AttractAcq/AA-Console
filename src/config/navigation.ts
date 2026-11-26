@@ -549,9 +549,9 @@ export const clientDeliverySections: { id: string; label?: string; children: Nav
     legacyUtility("dashboard"),
     { id: "approval-inbox", label: "Approval Inbox", path: "approval-inbox", icon: CheckSquare,
       capability: "expanding", tabs: [
+        { id: "unified", label: "Unified" },
         { id: "engine-inbox", label: "Engine" }, { id: "assets", label: "Assets" },
         { id: "campaign-actions", label: "Campaign actions" },
-        { id: "unified", label: "Unified" },
       ] },
     moduleNode("intelligence-os"),
   ] },

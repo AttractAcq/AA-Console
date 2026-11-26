@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 
+import { Modal } from "../../components/Modal";
 import { supabase } from "../../lib/supabase";
 import { downloadVerifiedMagnetFile } from "../../lib/leadMagnets";
 import { downloadVerifiedProofFile } from "../../lib/proofRights";
-import { downloadVerifiedCreativeFile } from "../../lib/creativeReview";
+import { downloadVerifiedCreativeFile, requestOrdinaryMediaReview } from "../../lib/creativeReview";
 import { shouldShowExecutionEvidence, loadApprovalExecutionEvidence,
   type ApprovalExecutionEvidence } from "../../lib/approvalExecutionEvidence";
 import type { Database } from "../../types/database";
 import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 import { ExternalExecutionAlerts } from "./ExternalExecutionAlerts";
 import { HeldExternalJobs } from "./HeldExternalJobs";
+import { loadCreativeReviewIntake, type CreativeReviewCandidate } from "./creativeReviewIntake";
 
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
@@ -1300,7 +1302,7 @@ function exactHtml(preview: unknown): string | null {
   return typeof html === "string" && html.trim() ? html : null;
 }
 
-function RequestCard({ request, history, gatewayOutcome, executionEvidence, clientId, manager, aal, busy, onDecide }: {
+function RequestCard({ request, history, gatewayOutcome, executionEvidence, clientId, manager, aal, busy, onDecide, decisionOnly }: {
   request: UnifiedApprovalRequest;
   history: UnifiedApprovalDecision[];
   gatewayOutcome?: GatewayOutcome;
@@ -1309,6 +1311,7 @@ function RequestCard({ request, history, gatewayOutcome, executionEvidence, clie
   manager: boolean;
   aal: "aal2" | "aal1" | "unavailable";
   busy: boolean;
+  decisionOnly?: "approved" | "rejected";
   onDecide: (request: UnifiedApprovalRequest, decision: "approved" | "rejected" | "revoked", reason?: string) => Promise<void>;
 }) {
   const [rejectionReason, setRejectionReason] = useState("");
@@ -1362,8 +1365,8 @@ function RequestCard({ request, history, gatewayOutcome, executionEvidence, clie
     && (creativeAsset?.content_format === "carousel" || creativeAsset?.content_format === "story")
     && Array.isArray(request.source_kind === "engine_slot" ? creativePacket?.frames : creativePreview?.frames)
     ? (request.source_kind === "engine_slot" ? creativePacket?.frames : creativePreview?.frames) as Record<string, unknown>[] : null;
-  const canReject = !salesManagerCard && isRejectionReady(request, clientId);
-  const canApprove = !salesManagerCard && isApprovalReady(request, clientId);
+  const canReject = decisionOnly !== "approved" && !salesManagerCard && isRejectionReady(request, clientId);
+  const canApprove = decisionOnly !== "rejected" && !salesManagerCard && isApprovalReady(request, clientId);
   const canRevoke = !manager && isGatewayToolRevocable(request, clientId);
   const decisionLabel = request.source_kind === "archived_form_return"
     ? "Returning form contact" : request.source_kind === "archived_sales_return"
@@ -1601,7 +1604,7 @@ function RequestCard({ request, history, gatewayOutcome, executionEvidence, clie
             This calls the source owner for the exact version above. AAL2 is required;
             the source and database recheck the request before recording a decision.
           </p>
-          {!canApprove && canReject && <p className="text-xs text-muted-foreground">
+          {!decisionOnly && !canApprove && canReject && <p className="text-xs text-muted-foreground">
             This request cannot be approved. It can only be closed with a reasoned rejection.
           </p>}
           {aal !== "aal2" && <p role="status" className="text-sm text-destructive">
@@ -1650,7 +1653,7 @@ function RequestCard({ request, history, gatewayOutcome, executionEvidence, clie
   );
 }
 
-export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "client" | "global" | "manager" }) {
+export function UnifiedApprovalInboxPanel({ scope = "client", pendingTable = false }: { scope?: "client" | "global" | "manager"; pendingTable?: boolean }) {
   const { clientId } = useParams<{ clientId: string }>();
   const location = useLocation();
   const global = scope === "global";
@@ -1658,6 +1661,9 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
   const multiClient = global || manager;
   const scopeKey = multiClient ? scope : clientId ?? null;
   const initialSource = new URLSearchParams(location.search).get("source");
+  const compact = pendingTable && !multiClient && !initialSource;
+  const [intake, setIntake] = useState<CreativeReviewCandidate[]>([]);
+  const [review, setReview] = useState<{ id: string; decision: "approved" | "rejected" } | null>(null);
   const [requests, setRequests] = useState<UnifiedApprovalRequest[]>([]);
   const [decisions, setDecisions] = useState<UnifiedApprovalDecision[]>([]);
   const [gatewayOutcomes, setGatewayOutcomes] = useState<Record<string, GatewayOutcome>>({});
@@ -1699,6 +1705,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
         .order("id", { ascending: false })
         .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
       if (requestResult.error) throw requestResult.error;
+      const intakeRows = compact && clientId && page === 0 ? await loadCreativeReviewIntake(clientId) : [];
       const pageRows = (requestResult.data ?? []).map(validatedRequest);
       const rows = pageRows.slice(0, PAGE_SIZE);
       const ids = rows.map((row) => row.id);
@@ -1735,6 +1742,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
         setAal("unavailable");
       }
       setRequests(rows);
+      setIntake(intakeRows);
       setDecisions(decisionRows);
       setGatewayOutcomes(outcomeMap);
       setExecutionEvidence(executionMap);
@@ -1750,7 +1758,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
         setLoading(false);
       }
     }
-  }, [clientId, clientFilter, kindFilter, manager, multiClient, page, scopeKey, sourceDeepLink, statusFilter]);
+  }, [clientId, clientFilter, compact, kindFilter, manager, multiClient, page, scopeKey, sourceDeepLink, statusFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2036,7 +2044,8 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
         }) : null;
       if (!outcome) throw new Error("This request has no supported source decision function.");
       if (outcome.error) throw outcome.error;
-      setStatusFilter("all");
+      if (compact) setReview(null);
+      else setStatusFilter("all");
       await refresh();
     } catch (cause) {
       setDecisionError(cause instanceof Error ? cause.message
@@ -2082,6 +2091,101 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
     }
     return grouped;
   }, [decisions]);
+
+  async function requestCreativeReview(assetId: string) {
+    if (!clientId || busyId !== null) return;
+    setBusyId(assetId);
+    setDecisionError(null);
+    try {
+      await requestOrdinaryMediaReview(clientId, assetId);
+      await refresh();
+    } catch (cause) {
+      setDecisionError((cause as { message?: string })?.message ?? "Could not request creative review.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  if (compact && clientId) {
+    const selected = requests.find((request) => request.id === review?.id);
+    const decisionActions = [
+      { label: "Approve", decision: "approved", ready: isApprovalReady },
+      { label: "Delete", decision: "rejected", ready: isRejectionReady },
+    ] as const;
+    return <section aria-label="Pending approvals" className="space-y-4">
+      {error && <p role="alert" className="text-sm text-destructive">
+        {error} <button type="button" onClick={retry} className="underline">Retry</button>
+      </p>}
+      {!selected && decisionError && <p role="alert" className="text-sm text-destructive">{decisionError}</p>}
+      {!error && (waiting && !requests.length
+        ? <p role="status" className="text-sm text-muted-foreground">Loading approvals…</p>
+        : requests.length === 0 && intake.length === 0
+          ? <p className="text-sm text-muted-foreground">{page ? "No pending approvals on this page." : "No pending approvals."}</p>
+          : <div className="overflow-x-auto rounded-lg border border-border bg-card">
+            <table className="w-full text-left text-sm">
+              <thead><tr className="border-b border-border">
+                <th scope="col" className="p-3">Request</th><th scope="col" className="p-3">Actions</th>
+              </tr></thead>
+              <tbody>{requests.map((request) => {
+                const source = sourcePathForRequest(request, clientId);
+                const actions = decisionActions.filter(({ ready }) => ready(request, clientId));
+                return <tr key={request.id} className="border-b border-border last:border-b-0">
+                  <td className="p-3">
+                    {source ? <Link to={source} className="font-medium text-primary underline">{request.title}</Link>
+                      : <span className="font-medium">{request.title}</span>}
+                    <p className="mt-1 text-xs text-muted-foreground">{request.source_kind.replaceAll("_", " ")}</p>
+                  </td>
+                  <td className="p-3"><div className="flex gap-2">
+                    {actions.map(({ label, decision }) => <button key={decision} type="button"
+                      disabled={waiting || busyId !== null} aria-label={`${label} ${request.title}`}
+                      className={decision === "approved"
+                        ? "rounded-md bg-primary px-3 py-2 text-primary-foreground disabled:opacity-50"
+                        : "rounded-md border border-border px-3 py-2 disabled:opacity-50"}
+                      onClick={() => { setDecisionError(null); setReview({ id: request.id, decision }); }}>{label}</button>)}
+                    {!actions.length && <span className="text-xs text-muted-foreground">
+                      {source ? "Review at source" : "Decision unavailable"}
+                    </span>}
+                  </div></td>
+                </tr>;
+              })}
+              {intake.map((asset) => <tr key={`intake:${asset.id}`} className="border-b border-border last:border-b-0">
+                <td className="p-3">
+                  <Link className="font-medium text-primary underline"
+                    to={`/clients/${clientId}/delivery/approval-inbox?tab=assets&media=${asset.media_type}&asset=${encodeURIComponent(asset.id)}`}>
+                    {asset.title ?? "Untitled creative"}
+                  </Link>
+                  <p className="mt-1 text-xs text-muted-foreground">Creative awaiting review</p>
+                </td>
+                <td className="p-3">
+                  <button type="button" disabled={waiting || busyId !== null}
+                    className="rounded-md border border-border px-3 py-2 disabled:opacity-50"
+                    onClick={() => void requestCreativeReview(asset.id)}>
+                    {busyId === asset.id ? "Requesting…" : "Request review"}
+                  </button>
+                </td>
+              </tr>)}</tbody>
+            </table>
+          </div>)}
+      {(page > 0 || hasNextPage) && <nav aria-label="Approval pages" className="flex gap-3 text-sm">
+        <button type="button" disabled={page === 0 || waiting} className="underline disabled:opacity-50"
+          onClick={() => setPageState({ scopeKey, page: page - 1 })}>Previous</button>
+        <button type="button" disabled={!hasNextPage || waiting} className="underline disabled:opacity-50"
+          onClick={() => setPageState({ scopeKey, page: page + 1 })}>Next</button>
+      </nav>}
+      {selected && review && <Modal open title={review.decision === "approved" ? "Approve request" : "Delete request"}
+        onClose={() => { if (busyId === null) setReview(null); }}>
+        {decisionError && <p role="alert" className="mb-3 text-sm text-destructive">{decisionError}</p>}
+        {review.decision === "rejected" && <p className="mb-3 text-sm text-muted-foreground">
+          Deleting rejects this request and clears it from the pending inbox.
+        </p>}
+        <RequestCard key={selected.id} request={selected} history={[]}
+          gatewayOutcome={gatewayOutcomes[selected.source_id]}
+          executionEvidence={executionEvidence.get(selected.id)}
+          clientId={clientId} manager={false} aal={aal} busy={busyId !== null}
+          decisionOnly={review.decision} onDecide={decide} />
+      </Modal>}
+    </section>;
+  }
 
   return (
     <section className="space-y-5" aria-labelledby="unified-approvals-title">
