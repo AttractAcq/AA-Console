@@ -2,7 +2,7 @@ import { supabase } from "../../lib/supabase";
 
 type ReviewShape = {
   media_type: string;
-  content_format: string | null;
+  content_format?: string | null;
   render_path: string | null;
 };
 
