@@ -212,7 +212,7 @@ const nodeTabPanels: Record<string, Record<string, (clientId?: string) => ReactN
     "engine-inbox": () => <EngineInboxPanel />,
     assets: () => <ApprovalsPanel />,
     "campaign-actions": () => <CampaignActionApprovalsPanel />,
-    unified: () => <UnifiedApprovalInboxPanel />,
+    unified: () => <UnifiedApprovalInboxPanel pendingTable />,
   },
   admin: {
     "system-readiness": () => <SystemReadinessPanel />,
@@ -310,6 +310,7 @@ function PageContent({ node, clientId }: { node: NavNode; clientId: string | und
   const exportModule: ExportModule | null = v6Intelligence
     ? view === "strategy" ? "strategy" : "intelligence"
     : node.id === "intelligence" || node.id === "strategy" ? node.id : null;
+  const showTabs = node.id !== "approval-inbox" || activeTab?.id !== "unified";
   const sectionLabel = activeTab ? activeTab.label : node.label;
   const pageTitle = node.id === "intelligence-os" && view === "strategy" ? "Strategy" : node.label;
 
@@ -357,7 +358,7 @@ function PageContent({ node, clientId }: { node: NavNode; clientId: string | und
       {node.capability === "planned" && <p className="mb-4 text-sm text-muted-foreground">
         This module is visible in v6 and is not connected to an external service yet.
       </p>}
-      {tabs && activeTab && (
+      {showTabs && tabs && activeTab && (
         <div className="mb-6">
           <Tabs tabs={tabs} activeId={activeTab.id} onChange={handleTabChange} />
         </div>
@@ -372,8 +373,8 @@ function PageContent({ node, clientId }: { node: NavNode; clientId: string | und
       {exportError && <p role="alert" className="mb-4 text-sm text-destructive">{exportError}</p>}
       <div
         id={activeTab ? `tabpanel-${activeTab.id}` : undefined}
-        role={activeTab ? "tabpanel" : undefined}
-        aria-labelledby={activeTab ? `tab-${activeTab.id}` : undefined}
+        role={showTabs && activeTab ? "tabpanel" : undefined}
+        aria-labelledby={showTabs && activeTab ? `tab-${activeTab.id}` : undefined}
       >
         {getPanelBody(node, activeTab, sectionLabel, clientId)}
       </div>
