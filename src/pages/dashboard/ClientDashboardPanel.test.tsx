@@ -21,11 +21,8 @@ vi.mock("../../lib/supabase", () => ({
 vi.mock("../../lib/useAgentJobs", () => ({
   useAgentJobs: () => ({ inFlight: [], recentFailures: [], loaded: true, error: null }),
 }));
-vi.mock("./ClientOperationalBrief", () => ({ ClientOperationalBrief: () => null }));
-vi.mock("./DailyPackageSetupPanel", () => ({ DailyPackageSetupPanel: () => null }));
 vi.mock("../../components/switches/ClientSwitchPanel", () => ({ ClientSwitchPanel: () => null }));
 vi.mock("../../components/masterai/MasterAIChatDialog", () => ({ MasterAIChatDialog: () => null }));
-vi.mock("../../components/agents/RunAgentModal", () => ({ RunAgentModal: () => null }));
 
 it("rejects an incomplete paginated history instead of presenting partial totals", async () => {
   range.mockReset();
