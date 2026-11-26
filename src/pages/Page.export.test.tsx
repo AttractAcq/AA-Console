@@ -14,6 +14,9 @@ vi.mock("../components/content/ContentAssetTable", () => ({
 vi.mock("../lib/moduleExport", () => ({ downloadTabPdf, downloadModuleZip }));
 vi.mock("./intelligence/BusinessContextPanel", () => ({ BusinessContextPanel: () => <p>Business context panel</p> }));
 vi.mock("./intelligence/MarketPanel", () => ({ MarketPanel: () => <p>Market panel</p> }));
+vi.mock("./dashboard/DailyPackageSetupPanel", () => ({
+  DailyPackageSetupPanel: ({ clientId }: { clientId: string }) => <p>Daily package setup for {clientId}</p>,
+}));
 vi.mock("./ideation/GenerationPanel", () => ({ GenerationPanel: ({ showJourney = true }: { showJourney?: boolean }) => <p>Ideation panel · journey {String(showJourney)}</p> }));
 vi.mock("./motion/CodeVideoProjectsPanel", () => ({ CodeVideoProjectsPanel: () => <p>Code video projects</p> }));
 vi.mock("./campaigns/CampaignExecutionPanel", () => ({ CampaignExecutionPanel: () => <p>Campaign table</p> }));
@@ -149,7 +152,7 @@ it("shows only strategy tabs and its export in the strategy view", async () => {
   expect(downloadModuleZip).toHaveBeenLastCalledWith("client-1", "strategy", intelligenceOs.tabs!.slice(strategyStart));
 });
 
-it("gives Content Production five tabs and no stage bar", async () => {
+it("opens the Content Production workspace and shows daily package setup only in Engine", async () => {
   const content = v6ModuleNodes.find((node) => node.id === "content-production-factory")!;
   const user = userEvent.setup();
   render(<MemoryRouter initialEntries={["/clients/client-1/delivery/content-production-factory"]}>
@@ -158,8 +161,11 @@ it("gives Content Production five tabs and no stage bar", async () => {
   expect(screen.getByText("Ideation panel · journey false")).toBeInTheDocument();
   expect(screen.getByText("Code video projects")).toBeInTheDocument();
   expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-    "Ideation", "Briefs", "Create", "Edit / Repurpose", "Assets",
+    "Ideation", "Briefs", "Create", "Edit / Repurpose", "Assets", "Engine",
   ]);
+  expect(screen.queryByText("Daily package setup for client-1")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("tab", { name: "Engine" }));
+  expect(screen.getByRole("tabpanel", { name: "Engine" })).toHaveTextContent("Daily package setup for client-1");
   // Assets is the approved table with v1's six libraries nested under it,
   // which is the shape the 16 October specification asked for.
   await user.click(screen.getByRole("tab", { name: "Assets" }));

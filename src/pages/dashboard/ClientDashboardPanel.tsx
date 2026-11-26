@@ -1,18 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Play, Rocket } from "lucide-react";
-import { Button } from "../../components/Button";
 import { Panel } from "../../components/Panel";
-import { ConfirmModal } from "../../components/forms/FormModal";
-import { RunAgentModal } from "../../components/agents/RunAgentModal";
 import { supabase } from "../../lib/supabase";
 import { MasterAIChatDialog } from "../../components/masterai/MasterAIChatDialog";
 import { ClientSwitchPanel } from "../../components/switches/ClientSwitchPanel";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { totalSpend, unresolvedFailures } from "../../lib/jobHistory";
-import { ClientOperationalBrief } from "./ClientOperationalBrief";
-import { DailyPackageSetupPanel } from "./DailyPackageSetupPanel";
 
 type JobRow = {
   id: string;
@@ -54,9 +48,6 @@ export function ClientDashboardPanel() {
     clientId: string; jobs: JobRow[]; error: string | null;
   } | null>(null);
   const historyRequest = useRef(0);
-  const [runOpen, setRunOpen] = useState(false);
-  const [masterOpen, setMasterOpen] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) return;
@@ -96,27 +87,10 @@ export function ClientDashboardPanel() {
       {liveLoaded && !liveError && <AgentActivityBar inFlight={active} failures={recentFailures} />}
 
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {clientId && <MasterAIChatDialog scope={{ kind: "client", clientId }} />}
-        <Button icon={Play} onClick={() => setRunOpen(true)}>
-          Run Agent
-        </Button>
-        <Button icon={Rocket} onClick={() => setMasterOpen(true)}>
-          Run All Agents
-        </Button>
+        {clientId && <MasterAIChatDialog scope={{ kind: "client", clientId }} triggerLabel="Master Ai Chat" />}
       </div>
 
-      {notice && (
-        <p role="status" className="text-sm text-brand-strong">
-          {notice}
-        </p>
-      )}
-
-      {clientId && <ClientOperationalBrief key={clientId} clientId={clientId}
-        spend={historyError ? null : spend}
-        failedRuns={historyError ? null : failed.length}
-        activeRuns={!liveLoaded || liveError ? null : active.length} />}
       {clientId && <ClientSwitchPanel clientId={clientId} />}
-      {clientId && <DailyPackageSetupPanel clientId={clientId} />}
 
       <Panel title="Agent spend"><p className="text-2xl font-semibold text-card-foreground">
         {historyError ? "Unknown" : `$${spend.toFixed(2)}`}
@@ -134,31 +108,6 @@ export function ClientDashboardPanel() {
           </ul>
         </Panel>
       )}
-
-      <RunAgentModal
-        open={runOpen}
-        onClose={() => setRunOpen(false)}
-        clientId={clientId}
-        onQueued={() => {
-          setNotice("Queued. The worker picks it up within a few seconds.");
-          void refresh();
-        }}
-      />
-
-      <ConfirmModal
-        open={masterOpen}
-        onClose={() => setMasterOpen(false)}
-        title="Run all agents"
-        body="Queues this client's intelligence and strategy agents at once. They run in dependency order — each one waits until the agents it depends on have finished, so nothing has to be sequenced by hand. Anything already queued or running is skipped, as are the agents that act on a specific brief, render or page, which a master run has nothing to hand them. This costs roughly $3 in model usage."
-        confirmLabel="Queue all"
-        onConfirm={async () => {
-          if (!clientId) throw new Error("No client selected.");
-          const { error } = await supabase.rpc("start_master_run", { p_client_id: clientId });
-          if (error) throw new Error(error.message);
-          setNotice("All agents queued. They will run in dependency order.");
-        }}
-        onDone={refresh}
-      />
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useAuth } from "../../context/auth";
 import type { MasterScope } from "../../lib/masterAI";
 import { MasterAIChat } from "./MasterAIChat";
 
-export function MasterAIChatDialog({ scope }: { scope: MasterScope }) {
+export function MasterAIChatDialog({ scope, triggerLabel = "Open Master AI" }: { scope: MasterScope; triggerLabel?: string }) {
   const { profile } = useAuth();
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -17,7 +17,7 @@ export function MasterAIChatDialog({ scope }: { scope: MasterScope }) {
   return <>
     <button type="button" onClick={() => setOpen(true)}
       className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-      <Bot className="h-4 w-4" aria-hidden="true" /> Open Master AI
+      <Bot className="h-4 w-4" aria-hidden="true" /> {triggerLabel}
     </button>
     {open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4"
       role="dialog" aria-modal="true" aria-label="Master AI chat">

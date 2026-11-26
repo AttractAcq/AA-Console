@@ -13,6 +13,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { Download } from "lucide-react";
 import { ClientDashboardPanel } from "./dashboard/ClientDashboardPanel";
+import { DailyPackageSetupPanel } from "./dashboard/DailyPackageSetupPanel";
 import type { ReactNode } from "react";
 import type { NavNode, NavTab } from "../config/navigation";
 import { PageHeader } from "../components/PageHeader";
@@ -96,7 +97,7 @@ const strategyTabIds = new Set([
   "money-model-strategy",
 ]);
 
-const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
+const nodeTabPanels: Record<string, Record<string, (clientId?: string) => ReactNode>> = {
   "intelligence-os": {
     "business-context": () => <BusinessContextPanel />,
     market: () => <MarketPanel />,
@@ -134,6 +135,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     create: () => <ContentAssetTable approved={false} />,
     edit: () => <EditRepurposePanel showJourney={false} />,
     assets: () => <ContentAssetsWorkspace />,
+    engine: (clientId) => clientId ? <DailyPackageSetupPanel clientId={clientId} /> : null,
   },
   "content-distribution": {
     "distribution-assets": () => <AssetsPanel />,
@@ -269,11 +271,12 @@ function getPanelBody(
   node: NavNode,
   activeTab: NavTab | undefined,
   sectionLabel: string,
+  clientId: string | undefined,
 ): ReactNode {
   const renderPanel = activeTab
     ? nodeTabPanels[node.id]?.[activeTab.id]
     : nodePanels[node.id];
-  if (renderPanel) return renderPanel();
+  if (renderPanel) return renderPanel(clientId);
   return <EmptyState label={sectionLabel} />;
 }
 
@@ -372,7 +375,7 @@ function PageContent({ node, clientId }: { node: NavNode; clientId: string | und
         role={activeTab ? "tabpanel" : undefined}
         aria-labelledby={activeTab ? `tab-${activeTab.id}` : undefined}
       >
-        {getPanelBody(node, activeTab, sectionLabel)}
+        {getPanelBody(node, activeTab, sectionLabel, clientId)}
       </div>
     </div>
   );

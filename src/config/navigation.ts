@@ -439,7 +439,7 @@ export const v6ModuleNodes: NavNode[] = [
     icon: Clapperboard, capability: "expanding", tabs: [
       { id: "generation", label: "Ideation" }, { id: "briefs", label: "Briefs" },
       { id: "create", label: "Create" }, { id: "edit", label: "Edit / Repurpose" },
-      { id: "assets", label: "Assets" },
+      { id: "assets", label: "Assets" }, { id: "engine", label: "Engine" },
     ] },
   { id: "proof-distribution", label: "Proof Distribution", path: "proof-distribution", icon: Share2,
     capability: "expanding", tabs: [
