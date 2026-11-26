@@ -855,13 +855,17 @@ describe("unified approval inbox", () => {
   it("routes unsubmitted creative through the exact review request flow", async () => {
     requests = [];
     loadCreativeReviewIntake.mockResolvedValueOnce([{ id: "asset-1", title: "Spring creative", media_type: "image" }]);
-    requestOrdinaryMediaReview.mockResolvedValue("review-1");
+    requestOrdinaryMediaReview.mockImplementationOnce(async () => {
+      requests = [readyOrdinaryMedia];
+      return mediaReviewId;
+    });
     render(<MemoryRouter><UnifiedApprovalInboxPanel pendingTable /></MemoryRouter>);
     expect(await screen.findByRole("link", { name: "Spring creative" }))
       .toHaveAttribute("href", "/clients/client-1/delivery/approval-inbox?tab=assets&media=image&asset=asset-1");
     await userEvent.setup().click(screen.getByRole("button", { name: "Request review" }));
     expect(requestOrdinaryMediaReview).toHaveBeenCalledWith("client-1", "asset-1");
-    expect(await screen.findByText("No pending approvals.")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: `Approve ${readyOrdinaryMedia.title}` })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Request review" })).not.toBeInTheDocument();
   });
 
   it("links pending rows to their source and removes a row after exact approval", async () => {
