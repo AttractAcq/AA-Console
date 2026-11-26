@@ -89,5 +89,5 @@ export const runSourceReviewJob: JobRunner = async (sb, config, agent, job, dead
     payload: { source_review_drafts: proposals },
   });
   if (saved.error) return { ok: false, retryable: false, failureMessage: "Could not save draft source reviews.", usage };
-  return { ok: true, usage };
+  return { ok: true, retryable: false, usage };
 };
