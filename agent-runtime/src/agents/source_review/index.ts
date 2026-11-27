@@ -4,7 +4,7 @@ import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 
 const domains = [
   "icp", "competitor", "association", "market", "campaign_intel", "proof",
-  "brand_strategy", "offer_strategy", "money_model",
+  "brand_strategy", "money_model",
 ];
 
 export const runSourceReviewJob: JobRunner = async (sb, config, agent, job, deadlineAt) => {
