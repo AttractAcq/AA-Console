@@ -100,6 +100,7 @@ const JOB_LABEL: Record<JobStatus, string> = {
 export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
   const { clientId } = useParams<{ clientId: string }>();
   const config = AGENT_FORMS[domain];
+  const sourceReviewsEnabled = domain !== "offer_strategy";
 
   const reviewJobKey = clientId ? `aa-source-review:${clientId}` : "";
   const [reviewJobId, setReviewJobId] = useState<string | null>(() => reviewJobKey ? sessionStorage.getItem(reviewJobKey) : null);
@@ -149,13 +150,13 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
   }, [clientId, domain]);
 
   const loadReviews = useCallback(async () => {
-    if (!clientId) return;
+    if (!clientId || !sourceReviewsEnabled) return;
     const { data, error } = await supabase.from("model_section_review_state_v7")
       .select("record_id,review_state,source_ref,observed_on,confidence,reviewed_at,review_note")
       .eq("client_id", clientId).eq("domain", domain);
     if (error) throw error;
     setReviews((data ?? []) as SectionReview[]);
-  }, [clientId, domain]);
+  }, [clientId, domain, sourceReviewsEnabled]);
 
   const loadJob = useCallback(async () => {
     if (!clientId) return;
@@ -261,7 +262,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
     { name: "body", label: editing?.title ?? "Content", kind: "textarea", rows: 12, required: true },
   ];
   useEffect(() => {
-    if (!reviewJobId || !clientId) return;
+    if (!sourceReviewsEnabled || !reviewJobId || !clientId) return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
@@ -298,7 +299,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
     }
     void poll();
     return () => { stopped = true; clearTimeout(timer); };
-  }, [clientId, reviewJobId]);
+  }, [clientId, reviewJobId, sourceReviewsEnabled]);
 
   async function startSourceReview() {
     if (!clientId || reviewRunning) return;
@@ -404,11 +405,11 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
         <span className="text-xs text-muted-foreground">
           {filled}/{templates.length} generated
         </span>
-        {domain !== "reporting" && clientId && <Button disabled={reviewRunning || savingReviews || !shownRecords.some((record) => record.body?.trim())}
+        {sourceReviewsEnabled && domain !== "reporting" && clientId && <Button disabled={reviewRunning || savingReviews || !shownRecords.some((record) => record.body?.trim())}
           onClick={() => void startSourceReview()}>
           {reviewRunning ? "Reviewing sources…" : "Review sources"}
         </Button>}
-        {tabDrafts.length > 0 && <Button disabled={reviewRunning || savingReviews || !savableDrafts.length}
+        {sourceReviewsEnabled && tabDrafts.length > 0 && <Button disabled={reviewRunning || savingReviews || !savableDrafts.length}
           onClick={() => void saveAllReviewedSources()}>
           {savingReviews ? "Saving reviewed sources…" : "Save all reviewed sources"}
         </Button>}
@@ -462,7 +463,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
                   <EmptyState label={t.title} minHeight={100} />
                 )}
 
-                {record?.body && (
+                {sourceReviewsEnabled && record?.body && (
                   <div className="mb-3 text-xs text-muted-foreground">
                     <p className={review?.review_state === "supported" ? "text-brand-strong" : "text-destructive"}>
                       Source review: {review?.review_state ?? "missing"}
@@ -487,7 +488,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
                           : "Not generated"}
                   </span>
                   <div className="flex items-center gap-3">
-                  {record?.body && <button type="button" onClick={() => { setSavedNotice(null); setReviewing(record); }}
+                  {sourceReviewsEnabled && record?.body && <button type="button" onClick={() => { setSavedNotice(null); setReviewing(record); }}
                     className="rounded text-xs font-medium text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     Review source
                   </button>}
@@ -529,7 +530,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
       />
 
       <FormModal
-        open={reviewing !== null}
+        open={sourceReviewsEnabled && reviewing !== null}
         onClose={() => setReviewing(null)}
         title={reviewing ? `Review source for ${reviewing.title}` : "Review source"}
         intro={reviewingDraft ? "AI draft based on available client evidence. Verify the evidence and date before saving."
