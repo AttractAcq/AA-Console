@@ -86,18 +86,17 @@ type StrategySection = {
   record_hash: string;
 };
 
-export function reviewedOfferStrategy(records: StrategySection[]):
+export function offerStrategyInputs(records: StrategySection[]):
   | { sourceBlock: string; fingerprint: string }
   | { error: string } {
   const usable = records.filter((row) => typeof row.body === "string" && row.body.trim());
   if (usable.length === 0) {
-    return { error: "This client has no Offer Strategy sections yet. Run the strategist and review its sources first." };
-  }
-  if (usable.some((row) => row.review_state !== "supported" || !row.source_ref || !row.observed_on)) {
-    return { error: "Review every Offer Strategy section against dated source evidence before compiling a main offer." };
+    return { error: "This client has no Offer Strategy sections yet. Run the strategist first." };
   }
   const sourceBlock = `OFFER STRATEGY\n${usable.map((row) =>
-    `${row.title ?? ""}\n${row.body ?? ""}\nSource: ${row.source_ref} · observed ${row.observed_on}`,
+    `${row.title ?? ""}\n${row.body ?? ""}`
+      + (row.review_state === "supported" && row.source_ref && row.observed_on
+        ? `\nSource: ${row.source_ref} · observed ${row.observed_on}` : ""),
   ).join("\n\n")}`;
   return { sourceBlock,
     fingerprint: JSON.stringify(usable.map((row) => [row.record_id, row.record_hash]).sort()) };
@@ -328,11 +327,11 @@ Purchase trigger: ${o.purchase_trigger ?? "—"}`;
       p_client_id: job.client_id,
     });
     if (error) return { ok: false, retryable: false,
-      failureMessage: `Offer Strategy source review is unavailable: ${error.message}` };
+      failureMessage: `Offer Strategy is unavailable: ${error.message}` };
     if (!Array.isArray(snapshot)) return { ok: false, retryable: false,
-      failureMessage: "Offer Strategy returned no reviewed source snapshot." };
+      failureMessage: "Offer Strategy returned no source snapshot." };
     strategySnapshot = snapshot as StrategySection[];
-    const strategy = reviewedOfferStrategy(strategySnapshot);
+    const strategy = offerStrategyInputs(strategySnapshot);
     if ("error" in strategy) return { ok: false, retryable: false, failureMessage: strategy.error };
     reviewedStrategyFingerprint = strategy.fingerprint;
     sourceBlock = strategy.sourceBlock;
@@ -421,10 +420,10 @@ ${existingLines.length > 0 ? `\nWHAT THIS BUSINESS ALREADY SELLS\n${existingLine
       p_client_id: job.client_id,
     });
     const latest = Array.isArray(current)
-      ? reviewedOfferStrategy(current as StrategySection[]) : { error: "No source snapshot." };
+      ? offerStrategyInputs(current as StrategySection[]) : { error: "No source snapshot." };
     if (error || "error" in latest || latest.fingerprint !== reviewedStrategyFingerprint) {
       return { ok: false, retryable: false,
-        failureMessage: "Offer Strategy changed or lost source review during compilation. Run the compiler again.", usage };
+        failureMessage: "Offer Strategy changed during compilation. Run the compiler again.", usage };
     }
   }
   const { error: versionError } = kind === "secondary"

@@ -16,7 +16,7 @@ type SecondarySource = Database["public"]["Tables"]["secondary_offer_sources_v7"
 type MainSource = Database["public"]["Tables"]["main_offer_sources_v7"]["Row"];
 
 /** Offers lists existing versions and live-use drift. Build starts from a
- * reviewed baseline strategy or an approved opportunity, then uses the same
+ * internal baseline strategy or an approved opportunity, then uses the same
  * version and approval records for manual and agent-generated drafts. */
 export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build" }) {
   const { clientId } = useParams<{ clientId: string }>();
@@ -297,7 +297,7 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
               {opportunity.name} — {opportunity.micro_market}</option>)}
           </select>
         </label>}
-        {buildSource === "baseline" && <p className="text-sm text-muted-foreground">Uses the current reviewed Offer Strategy. The chosen service stays bound to this offer's versions.</p>}
+        {buildSource === "baseline" && <p className="text-sm text-muted-foreground">Uses the current Offer Strategy. The chosen service stays bound to this offer's versions.</p>}
         {buildSource && <label className="block text-sm">Business service
           <input className="mt-1 block w-full rounded border border-border bg-background px-2 py-1"
             maxLength={200} value={serviceName} onChange={(event) => setServiceName(event.target.value)}
@@ -374,8 +374,8 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
                 {offer.kind === "secondary"
                   ? "A secondary offer targets one micro-niche, and is compiled from that market opportunity."
                   : mainSource
-                    ? "This main offer is bound to reviewed Offer Strategy."
-                    : "This legacy main offer has no reviewed Offer Strategy snapshot bound."}
+                    ? "This main offer is bound to Offer Strategy."
+                    : "This legacy main offer has no Offer Strategy snapshot bound."}
               </p>
 
               {offer.kind === "secondary" && (
@@ -391,7 +391,7 @@ export function OfferStudioPanel({ view = "offers" }: { view?: "offers" | "build
 
               {offer.kind === "main" && mainSource && (
                 <p className="text-muted-foreground">
-                  Source: reviewed Offer Strategy snapshot {mainSource.strategy_hash.slice(0, 12)}. Later source edits hold new sign-off and campaign use.
+                  Source: Offer Strategy snapshot {mainSource.strategy_hash.slice(0, 12)}. Later source edits hold new sign-off and campaign use.
                 </p>
               )}
               {offer.kind === "main" && !mainSource && (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { compiledOfferArgs, requestedOffer, reviewedOfferStrategy, submitTool, validateOffer } from "./index.js";
+import { compiledOfferArgs, requestedOffer, offerStrategyInputs, submitTool, validateOffer } from "./index.js";
 
 /**
  * Two things worth pinning here.
@@ -86,23 +86,23 @@ describe("reading what the job asked for", () => {
   });
 });
 
-describe("reviewed Offer Strategy inputs", () => {
+describe("Offer Strategy inputs", () => {
   const section = { record_id: "section-1", title: "Core offer", body: "Garage conversion",
     review_state: "supported", source_ref: "Owner interview", observed_on: "2026-11-15", record_hash: "a".repeat(64) };
 
   it("includes dated source evidence and a stable exact-section fingerprint", () => {
-    expect(reviewedOfferStrategy([section])).toEqual({
+    expect(offerStrategyInputs([section])).toEqual({
       sourceBlock: "OFFER STRATEGY\nCore offer\nGarage conversion\nSource: Owner interview · observed 2026-11-15",
       fingerprint: JSON.stringify([["section-1", "a".repeat(64)]]),
     });
   });
 
-  it("holds missing or unsupported sections", () => {
-    expect(reviewedOfferStrategy([])).toHaveProperty("error", expect.stringContaining("no Offer Strategy sections"));
-    expect(reviewedOfferStrategy([{ ...section, review_state: "stale" }]))
-      .toHaveProperty("error", expect.stringContaining("Review every Offer Strategy"));
-    expect(reviewedOfferStrategy([{ ...section, source_ref: null }]))
-      .toHaveProperty("error", expect.stringContaining("Review every Offer Strategy"));
+  it("accepts internal sections without saved review and still requires strategy text", () => {
+    expect(offerStrategyInputs([])).toHaveProperty("error", expect.stringContaining("no Offer Strategy sections"));
+    for (const review_state of ["missing", "uncertain", "stale"]) {
+      expect(offerStrategyInputs([{ ...section, review_state, source_ref: null, observed_on: null }]))
+        .toHaveProperty("sourceBlock", "OFFER STRATEGY\nCore offer\nGarage conversion");
+    }
   });
 });
 
