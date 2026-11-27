@@ -1,4 +1,4 @@
--- Rollback-only proof that a main offer captures and rechecks reviewed Strategy.
+-- Rollback-only proof that a main offer captures and rechecks internal Strategy.
 begin;
 insert into auth.users(id,instance_id,aud,role,email,encrypted_password,created_at,updated_at)
 values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','00000000-0000-0000-0000-000000000000',
@@ -21,7 +21,7 @@ declare t record; record_id uuid; first_record uuid;
 begin
   begin
     perform public.create_main_offer_v7('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
-    raise exception 'Main offer was created without reviewed Strategy';
+    raise exception 'Main offer was created without required Strategy';
   exception when check_violation then null; end;
   for t in select item_key,item_type,title,display_order from public.record_templates
     where domain='offer_strategy' order by display_order,item_key loop
@@ -31,14 +31,16 @@ begin
       t.item_key,t.item_type,t.title,t.display_order,'Verified client service detail')
     returning id into record_id;
     if first_record is null then first_record:=record_id; end if;
-    perform public.review_model_section_v7(record_id,'Owner interview',current_date,
-      'supported','Verified against source');
+    if record_id = first_record then
+      perform public.review_model_section_v7(record_id,'Owner interview',current_date,
+        'uncertain','Customer demand still needs verification');
+    end if;
   end loop;
   if first_record is null then raise exception 'Fixture has no Offer Strategy templates'; end if;
   snapshot:=public.reviewed_offer_strategy_snapshot_v7('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
   offer:=public.create_main_offer_v7('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
   if not public.main_offer_source_current_v7(offer.id) then
-    raise exception 'Manual main offer did not retain reviewed Strategy'; end if;
+    raise exception 'Manual main offer did not retain internal Strategy'; end if;
   version:=public.create_service_offer_version_v6(offer.client_id,'New main offer',
     'Service business owners','A reviewed core service',array['Service'],array['Materials'],
     null,null,null,'[]'::jsonb,'main-source-version',offer.id);
