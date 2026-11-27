@@ -12,7 +12,7 @@ export const OUTPUT_TOKEN_LIMIT = 32_000;
 // model is held before dispatch. Review its provider paths before adding it.
 const searchLimits = new Map<string, number>([
   ["market", 15], ["icp", 0], ["offer_strategy", 0], ["opportunity_discovery", 0],
-  ["opportunity_evaluate", 0], ["opportunity_strategise", 0], ["offer_compile", 0], ["campaign_plan", 0],
+  ["opportunity_evaluate", 0], ["opportunity_strategise", 0], ["offer_compile", 0], ["source_review", 0], ["campaign_plan", 0],
   ["brief", 0], ["creative_build", 0], // Creative dispatch additionally validates the saved text route.
 ]);
 

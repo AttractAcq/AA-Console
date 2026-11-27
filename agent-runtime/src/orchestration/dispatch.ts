@@ -69,6 +69,7 @@ import { runProofArtifactJob } from "../agents/proof_artifact/index.js";
 import { runOpportunityDiscoveryJob } from "../agents/opportunity_discovery/index.js";
 import { runOpportunityEvaluateJob } from "../agents/opportunity_evaluate/index.js";
 import { runOpportunityStrategiseJob } from "../agents/opportunity_strategise/index.js";
+import { runSourceReviewJob } from "../agents/source_review/index.js";
 import { runOfferCompileJob } from "../agents/offer_compile/index.js";
 import { runCampaignSweepJob } from "../agents/campaign_sweep/index.js";
 import { runLeadMagnetBuildJob } from "../agents/lead_magnet_build/index.js";
@@ -134,6 +135,7 @@ const RUNNERS: Record<string, JobRunner> = {
   // Drafts an offer version, which the existing sign-off flow already
   // treats as a proposal. Leaves price and claims to a person.
   offer_compile: runOfferCompileJob,
+  source_review: runSourceReviewJob,
   // Composes a workflow run for an approved plan. The engine that drives it
   // already existed; this is the composer. Calls no model.
   campaign_sweep: runCampaignSweepJob,
