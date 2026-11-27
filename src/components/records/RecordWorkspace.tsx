@@ -103,6 +103,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
 
   const reviewJobKey = clientId ? `aa-source-review:${clientId}` : "";
   const [reviewJobId, setReviewJobId] = useState<string | null>(() => reviewJobKey ? sessionStorage.getItem(reviewJobKey) : null);
+  const [savingReviews, setSavingReviews] = useState(false);
   const [reviewRunning, setReviewRunning] = useState(false);
   const [reviewDrafts, setReviewDrafts] = useState<DraftReview[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -279,7 +280,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
           const payload = event.data.payload as { source_review_drafts?: DraftReview[] } | null;
           const drafts = payload?.source_review_drafts ?? [];
           setReviewDrafts(drafts);
-          setSavedNotice(drafts.length ? `${drafts.length} source review drafts ready. Open Review source to check and save each draft.`
+          setSavedNotice(drafts.length ? `${drafts.length} source review drafts ready. Check the drafts, then save them individually or together.`
             : "No source reviews needed for the current client records.");
           setReviewRunning(false);
           return;
@@ -314,9 +315,67 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
   }
 
   function draftFor(record: Record_) {
-    const state = reviews.find((review) => review.record_id === record.id)?.review_state;
-    if (state === "supported") return undefined;
-    return reviewDrafts.find((draft) => draft.recordId === record.id && draft.updatedAt === record.updated_at);
+    const current = reviews.find((review) => review.record_id === record.id);
+    if (current?.review_state === "supported") return undefined;
+    const draft = reviewDrafts.find((draft) => draft.recordId === record.id && draft.updatedAt === record.updated_at);
+    if (current && current.review_state !== "stale" && draft
+      && current.source_ref === draft.sourceRef && current.observed_on === draft.observedOn
+      && current.confidence === draft.confidence && (current.review_note ?? "") === draft.note) return undefined;
+    return draft;
+  }
+
+  const tabDrafts = shownRecords.flatMap((record) => {
+    const draft = draftFor(record);
+    return draft ? [{ record, draft }] : [];
+  });
+  const savableDrafts = tabDrafts.filter(({ draft }) => draft.sourceRef.trim() && /^\d{4}-\d{2}-\d{2}$/.test(draft.observedOn)
+    && ["supported", "uncertain", "unsupported"].includes(draft.confidence)
+    && (draft.confidence === "supported" || draft.note.trim()));
+
+  async function saveAllReviewedSources() {
+    if (!clientId || savingReviews || reviewRunning || !savableDrafts.length) return;
+    setSavingReviews(true);
+    setActionError(null);
+    setSavedNotice(null);
+    let saved = 0;
+    const failed: string[] = [];
+    try {
+      for (const { record, draft } of savableDrafts) {
+        try {
+          const current = await supabase.from("model_section_review_state_v7")
+            .select("updated_at,review_state,reviewed_at").eq("client_id", clientId)
+            .eq("domain", domain).eq("record_id", record.id).maybeSingle();
+          if (current.error) throw current.error;
+          const previous = reviews.find((review) => review.record_id === record.id);
+          if (!current.data || current.data.updated_at !== draft.updatedAt
+            || current.data.review_state === "supported"
+            || current.data.reviewed_at !== (previous?.reviewed_at ?? null)) {
+            throw new Error("The section or its review changed. Open Review source to check it.");
+          }
+          const { error } = await supabase.rpc("review_model_section_v7", {
+            p_record_id: record.id,
+            p_source_ref: draft.sourceRef,
+            p_observed_on: draft.observedOn,
+            p_confidence: draft.confidence,
+            p_review_note: draft.note,
+          });
+          if (error) throw error;
+          saved++;
+          setReviewDrafts((drafts) => drafts.filter((item) => item !== draft));
+        } catch (error) {
+          failed.push(`${record.title}: ${(error as { message?: string })?.message ?? "Could not save the review."}`);
+        }
+      }
+      const incomplete = tabDrafts.length - savableDrafts.length;
+      setSavedNotice(`Saved ${saved} of ${savableDrafts.length} ready source reviews.`
+        + (incomplete ? ` ${incomplete} drafts still need source details.` : ""));
+      if (failed.length) setActionError(failed.join(" · "));
+      await Promise.all([loadRecords(), loadReviews()]);
+    } catch (error) {
+      setActionError((error as { message?: string })?.message ?? "Could not refresh source reviews.");
+    } finally {
+      setSavingReviews(false);
+    }
   }
 
   const reviewingDraft = reviewing ? draftFor(reviewing) : undefined;
@@ -345,9 +404,13 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
         <span className="text-xs text-muted-foreground">
           {filled}/{templates.length} generated
         </span>
-        {domain !== "reporting" && clientId && <Button disabled={reviewRunning || !shownRecords.some((record) => record.body?.trim())}
+        {domain !== "reporting" && clientId && <Button disabled={reviewRunning || savingReviews || !shownRecords.some((record) => record.body?.trim())}
           onClick={() => void startSourceReview()}>
           {reviewRunning ? "Reviewing sources…" : "Review sources"}
+        </Button>}
+        {tabDrafts.length > 0 && <Button disabled={reviewRunning || savingReviews || !savableDrafts.length}
+          onClick={() => void saveAllReviewedSources()}>
+          {savingReviews ? "Saving reviewed sources…" : "Save all reviewed sources"}
         </Button>}
         <Button icon={Play} onClick={() => setRunOpen(true)}>
           {config.title}
